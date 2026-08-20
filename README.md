@@ -106,12 +106,12 @@ experimental reference uses explicit scene-cut protection and an exact
 output-frame trim, with reproduction details recorded in the two research
 documents above.
 
-REAL-Video-Enhancer was also tested as a Linux alternative. Its RIFE 4.26
-weights are the same as the validated local weights, and its unmodified
-TensorRT FP16 path reproduces the same grid artifact. A temporary
-PixelShuffle fallback plus corrected RGB/frame pacing produced a clean exact
-60 FPS reference, but the pipeline was slower than the validated `vs-rife`
-path; details and output locations are in the FPS research document.
+REAL-Video-Enhancer is now the default FPS backend for the unified workflow.
+Its RIFE 4.26 weights are the same as the validated local weights, and its
+unmodified TensorRT FP16 path reproduces the same grid artifact. The installed
+RVE checkout includes the PixelShuffle fallback, RGB/frame-pacing corrections,
+and exact output-FPS support validated on this RTX 5070 Ti. The older
+VapourSynth implementation remains available with `--engine vs-rife`.
 
 Audio is analyzed per source before encoding. The default gain is chosen to
 balance mean RMS `-35 dBFS` and median absolute sample level `-50 dBFS`, with a
@@ -176,7 +176,24 @@ commands into `~/bin`.
 During interpolation the console shows a live Pacman-style bar with percent,
 frame count, end-to-end pipeline FPS, elapsed time, and ETA. The displayed
 pipeline FPS includes decoding, RIFE, and delivery encoding; it is not the
-model-only inference FPS from the benchmark.
+model-only inference FPS from the benchmark. The default backend is corrected
+REAL-Video-Enhancer RIFE 4.26; use `--engine vs-rife` for the VapourSynth
+fallback.
+
+The RVE backend expects the validated local setup at these paths:
+
+```text
+/tmp/REAL-Video-Enhancer
+/tmp/rve-models-pixel-fallback/rife4.26.pkl
+/tmp/rve-shims
+```
+
+Override them with `--rve-root`, `--rve-model`, and `--rve-shims`, or set
+`RESOLVE_RVE_ROOT`, `RESOLVE_RVE_MODEL`, and `RESOLVE_RVE_SHIMS`. RVE's factor
+two output is padded or trimmed to the existing rational target-frame policy,
+so a 29.97-to-60 conversion preserves the timeline (for example, 900 input
+frames become 1,802 output frames). The adapter rejects unsupported
+non-near-integer factors instead of silently changing cadence.
 
 Press `Ctrl+C` to cancel safely. The active FFmpeg/RIFE processes are stopped,
 the hidden `.partial` output is deleted, and any temporary multi-input master
@@ -191,6 +208,9 @@ The validated strategy is a two-stage run. First create one compatible
 stream-copy master; then run one global RIFE 4.26 pass over that master. Do
 not run RIFE separately on each input clip, because resetting the 29.97-to-60
 cadence at every clip boundary is slower and can introduce timing drift.
+The integrated RVE path was 2.3x to 2.5x faster than the fallback on the
+one-clip/three-clip benchmark; exact measurements and caveats are recorded in
+[`FPS-ENHANCEMENT-RESEARCH.md`](FPS-ENHANCEMENT-RESEARCH.md).
 
 From the project directory:
 
@@ -199,9 +219,18 @@ INPUT_DIR="$HOME/Documents/edit/copy"
 MASTER="$HOME/Documents/edit/copy-concatenated-29.97fps.mp4"
 OUTPUT="$HOME/Documents/edit/copy-concatenated-rife4.26-60fps.mp4"
 
-resolve-concat "$INPUT_DIR" --output "$MASTER" --mode auto \
+resolve-concat "$INPUT_DIR" --concat-only --output "$MASTER" --mode auto \
   --audio-normalization off --performance-mode off --force
 
+# This is the normal integrated command; it concatenates once and uses RVE.
+resolve-concat "$INPUT_DIR" --engine rve --output "$OUTPUT" \
+  --performance-mode auto --force
+```
+
+For a manual reproduction of the older VapourSynth fallback, first create the
+master with `--concat-only`, then run:
+
+```sh
 INPUT_FRAMES=$(ffprobe -v error -select_streams v:0 \
   -show_entries stream=nb_frames -of csv=p=0 "$MASTER")
 TARGET_FRAMES=$((INPUT_FRAMES * 2))
@@ -224,7 +253,9 @@ ffmpeg -hide_banner -y -f yuv4mpegpipe -i - -i "$MASTER" \
 ```
 
 `TARGET_FRAMES=$((INPUT_FRAMES * 2))` matches the validated 29.97-to-60
-benchmark policy. Keep `TRT_TORCH_PIXEL=1` and the separate
+legacy benchmark policy. The integrated adapter uses rational frame-count
+math and may pad the factor-two RVE output (900 input frames become 1,802
+frames). Keep `TRT_TORCH_PIXEL=1` and the separate
 `engines-pixel-fallback` cache; pure TensorRT FP16 is known to produce grid
 artifacts on this RTX 5070 Ti. The specialized Python 3.13 environment is
 required because the system VSPipe/Python 3.14 installation has an incompatible

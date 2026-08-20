@@ -46,6 +46,8 @@ class FpsTests(unittest.TestCase):
         self.assertIn("-c:a", command)
         self.assertEqual(command[command.index("-c:a") + 1], "copy")
         self.assertEqual(command[command.index("-qp") + 1], "18")
+        self.assertIn("-f", command)
+        self.assertEqual(command[-1], str(Path("output.partial.mp4")))
 
     def test_rve_is_the_default_engine(self):
         self.assertEqual(parse_arguments([]).engine, "rve")
@@ -61,6 +63,7 @@ class FpsTests(unittest.TestCase):
         command = build_rve_custom_encoder(1802, 1800)
         self.assertIn("tpad=stop_mode=clone:stop=2", command)
         self.assertIn("-frames:v 1802", command)
+        self.assertIn("-f mp4", command)
 
     def test_progress_line_contains_pacman_metrics(self):
         line = progress_line(50, 100, 0.0, now=10.0)

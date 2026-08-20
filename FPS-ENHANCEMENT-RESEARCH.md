@@ -11,13 +11,15 @@ A controlled local benchmark, one-minute render, REAL-Video-Enhancer
 evaluation, concat/interpolation integration benchmark, and end-to-end
 30-second pipeline comparison are now included below.
 Performance numbers are labeled as local measurements, upstream measurements,
-or estimates. The local render is an experimental reference, not yet a
-production `resolve-fps` command.
+or estimates. The corrected RVE adapter is now the default backend for the
+unified `resolve-concat` workflow; the earlier isolated renders remain useful
+as reproducible comparison points.
 
 ## Executive decision
 
-For normal footage, the best current practical candidate remains RIFE 4.26 or
-`4.26.heavy`, but the backend precision must be validated per GPU/runtime.
+For normal footage, the best current practical candidate is RIFE 4.26 through
+the corrected REAL-Video-Enhancer adapter, but the backend precision must be
+validated per GPU/runtime.
 On this RTX 5070 Ti, the unmodified TensorRT FP16 path is **not safe**: it
 produces a regular grid corruption in raw frames. Selective FP16, with only
 RIFE's `aten.pixel_shuffle` operation executed by PyTorch, is clean; the
@@ -96,13 +98,12 @@ Three pipeline issues had to be corrected for a meaningful comparison:
 4. RVE's default writer did not emit the desired SDR color tags. The final
    reference was stream-copy remuxed with limited-range BT.709 metadata.
 
-These changes were applied only to the temporary RVE checkout for diagnosis;
-they are not an upstream RVE patch or a production project dependency. The
-clean result demonstrates that RVE can be made usable on this GPU, but it
-does not improve the RIFE model itself and its full pipeline was slower than
-the validated selective-`vs-rife` path (35.44 seconds for the comparable
-interpolation stage). RVE is therefore a useful reference/fallback, not the
-default backend for `resolve-fps`.
+These changes were applied only to the temporary RVE checkout; they are not an
+upstream RVE patch. The repository adapter validates that corrected checkout
+before starting a run, enables the PixelShuffle fallback, preserves the source
+audio through a final remux, and verifies the exact target frame rate/count.
+The earlier isolated comparison was slower because it used a different
+diagnostic path; the integrated benchmark below measures the final adapter.
 
 To reproduce the TensorRT part of the corrected RVE run, patch
 `backend/src/pytorch/TensorRTHandler.py` inside `build_engine` and use a new
@@ -485,10 +486,59 @@ The RVE output and a frame comparison sheet are retained here:
 **Result:** RVE is the fastest measured implementation of this model on the
 RTX 5070 Ti, but its current backend has a different frame-count policy,
 different RGB/scene-detection path, archived upstream status, and required
-local compatibility corrections. It is a strong candidate for a future
-production backend after preserving the exact rational timeline and adding
-the existing artifact gate; it should not silently replace the current
-pipeline solely from this speed result.
+local compatibility corrections. At this isolated-test stage, that was not
+enough evidence to replace the production path; the integrated benchmark
+below applies the exact timeline, audio, cleanup, and artifact safeguards
+before selecting a default.
+
+### Integrated `resolve-concat` RVE benchmark
+
+The corrected adapter was then wired into the repository's unified
+`resolve-concat` workflow and benchmarked against the existing `vs-rife`
+implementation. Both engines used RIFE 4.26, selective TensorRT FP16 with
+the PyTorch `aten.pixel_shuffle` fallback, scene detection, NVENC preset
+`p1`, constant QP 18, copied AAC, and temporary performance mode. The
+benchmark included the normal workflow overhead: one input skips
+concatenation, while three inputs are stream-copy concatenated once before
+one global interpolation pass. GPU values are sampled every 200 ms with
+`nvidia-smi`; peak values are observed samples, not hardware maxima.
+
+| Workload | Engine | Wall time | Effective output FPS | Video frames / duration | Output size | Peak VRAM | Peak power | Peak GPU |
+| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| One 30-second clip | RVE (default) | **15.07 s** | 119.6 | 1,802 / 30.033 s | 33,820,622 bytes | 3,777 MiB | 218.89 W | 83% |
+| One 30-second clip | `vs-rife` fallback | 34.48 s | 52.2 | 1,802 / 30.033 s | 33,581,576 bytes | 4,052 MiB | 171.13 W | 61% |
+| Three 30-second clips | RVE (default) | **38.06 s** | 142.0 | 5,405 / 90.083 s | 121,383,871 bytes | 3,777 MiB | 224.95 W | 86% |
+| Three 30-second clips | `vs-rife` fallback | 97.92 s | 55.2 | 5,405 / 90.083 s | 118,945,860 bytes | 4,052 MiB | 173.59 W | 63% |
+
+RVE was 2.29x faster for one clip and 2.57x faster for three clips. It
+consumed less observed VRAM but substantially more board power. The final
+adapter remuxes audio from the original input after RVE finishes video
+generation; the one-clip output therefore retains the source's 30.144-second
+AAC stream, while the three-clip output retains its 90.081333-second AAC
+stream. The RVE video is validated at exactly 60 FPS and the rational target
+frame count before the hidden partial output is atomically renamed.
+
+The integrated benchmark artifacts are retained here:
+
+```text
+/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/rve-one-final.mp4
+/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/rve-three-final.mp4
+/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/vs-one.mp4
+/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/vs-three.mp4
+```
+
+The default command is now:
+
+```sh
+resolve-concat [folder-or-video]
+```
+
+Use `--engine vs-rife` for the fallback. The RVE adapter requires the corrected
+external checkout, model, and compatibility shim documented in `README.md`;
+it refuses an uncorrected checkout because pure TensorRT FP16 is known to
+produce the grid artifact. RVE is archived upstream, so those local files
+remain an operational dependency and should be backed up or reproducibly
+repaired before migrating the machine.
 
 ### GMFSS Fortuna
 
@@ -1322,38 +1372,29 @@ file with invented objects.
 
 ## Current recommendation for this project
 
-The isolated prototype and one-minute RIFE 4.26 comparison are complete. The
-next engineering step is to turn the validated path into a production tool
-outside the TUI:
+The integrated production design is now complete:
 
-1. Keep the isolated Python/VapourSynth environment version-locked.
-2. Use selective `RGBH` plus TensorRT FP16 with the PyTorch pixel-shuffle
-   fallback as the local fast path; retain `RGBS`/FP32 as the recovery path.
-3. Add a short raw-frame artifact gate before accepting any backend/precision.
-4. Compare the clean RIFE 4.26 standard and heavy profiles on representative
-   clips.
-5. Compare one portable NCNN/Vulkan path and TensorRT-RTX if available.
-6. Test 4K with scale 0.5 and explicit frame-count/duration policy.
-7. Add GMFSS Fortuna only if the anime clips justify it.
-8. Store benchmark results before wiring the production tool into the TUI.
+1. `resolve-concat` is the single user-facing workflow. One input skips
+   concatenation; multiple inputs are stream-copy concatenated once and then
+   interpolated globally.
+2. The default backend is corrected RVE RIFE 4.26 with selective TensorRT FP16
+   and the PyTorch PixelShuffle fallback. It preserves source audio by a final
+   stream-copy remux, validates exact frame timing, and atomically publishes
+   only verified outputs.
+3. `--engine vs-rife` remains the maintained fallback. TensorRT FP32/RGBS and
+   NCNN/Vulkan remain recovery paths to benchmark if a driver or engine update
+   invalidates the fast profile.
+4. Keep the external RVE checkout, model, shim, and local corrections
+   version-locked. RVE is archived upstream, so do not delete or casually
+   upgrade that dependency.
+5. Compare RIFE 4.26 standard and heavy, GMFSS Fortuna for anime, and portable
+   Vulkan runtimes only when the footage or a runtime change justifies a new
+   benchmark.
 
-The native ComfyUI node is a reasonable first correctness and memory
-experiment because its official model files and adaptive batching are
-available without a custom node. It should remain a benchmark harness,
-however: the production architecture should still be selected from a
-controlled comparison against TensorRT and `vs-rife`/`vs-mlrt`.
-
-The likely final design is:
-
-- `fast`: RIFE 4.26 with TensorRT FP16 and the PyTorch pixel-shuffle fallback.
-- `quality`: RIFE 4.26 or heavy with the same selective FP16 path.
-- `anime`: GMFSS Fortuna with the precision/backend validated separately on
-  animation clips.
-- `portable`: RIFE 4.26 through NCNN/Vulkan when available.
-- `research`: external scripts for EDEN/LDF/other models.
-
-This gives the user a fast everyday path, a quality path, and a recoverable
-fallback without making the main tool depend on every research project.
+The current result is a fast everyday path with a documented fallback and
+explicit timing/artifact safeguards. RVE is a frontend/runtime choice, not a
+newer model or an absolute quality guarantee; visual quality still requires
+shot-level inspection.
 
 ## Sources
 

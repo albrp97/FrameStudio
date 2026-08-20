@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover - platform fallback
 VIDEO_EXTENSIONS = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".mxf", ".webm"}
 DEFAULT_TUI_ROOT = Path.home() / "Documents" / "edit"
 DEFAULT_FPS_MODEL = "4.26"
-DEFAULT_FPS_ENGINE = os.environ.get("RESOLVE_FPS_ENGINE", "rve")
+DEFAULT_FPS_ENGINE = "rve"
 DEFAULT_RVE_ROOT = Path(
     os.environ.get("RESOLVE_RVE_ROOT", "/tmp/REAL-Video-Enhancer")
 )

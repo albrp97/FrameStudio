@@ -51,6 +51,9 @@ class ConcatTests(unittest.TestCase):
         arguments = parse_arguments([])
         self.assertIsNone(arguments.input_dir)
 
+    def test_rve_is_the_default_fps_engine(self):
+        self.assertEqual(parse_arguments([]).engine, "rve")
+
     def test_selected_inputs_are_sorted_and_exclude_output(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

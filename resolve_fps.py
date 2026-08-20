@@ -273,19 +273,23 @@ def rve_base_frame_count(
 def build_rve_custom_encoder(
     target_frames: int,
     base_frames: int,
+    encoder: str = "h264_nvenc",
 ) -> str:
-    options = [
-        "-c:v",
-        "h264_nvenc",
-        "-preset",
-        "p1",
-        "-rc",
-        "constqp",
-        "-qp",
-        str(DEFAULT_NVENC_QP),
-        "-profile:v",
-        "high",
-    ]
+    options = ["-c:v", encoder]
+    if encoder == "h264_nvenc":
+        options.extend(
+            [
+                "-preset",
+                "p1",
+                "-rc",
+                "constqp",
+                "-qp",
+                str(DEFAULT_NVENC_QP),
+            ]
+        )
+    else:
+        options.extend(["-preset", "slow", "-crf", "20"])
+    options.extend(["-profile:v", "high"])
     if target_frames > base_frames:
         options.extend(
             [
@@ -382,6 +386,7 @@ def build_rve_command(
     custom_encoder = build_rve_custom_encoder(
         target_frames,
         rve_base_frame_count(source_rate, source_frames, target_rate),
+        arguments.encoder,
     )
     return [
         str(arguments.python),
@@ -418,6 +423,63 @@ def build_rve_command(
         "--cwd",
         str(cwd),
     ]
+
+
+def remux_rve_audio(source: Path, video: Path, output: Path) -> None:
+    command = [
+        require_tool("ffmpeg"),
+        "-hide_banner",
+        "-y",
+        "-nostdin",
+        "-loglevel",
+        "error",
+        "-i",
+        str(video),
+        "-i",
+        str(source),
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0?",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "copy",
+        "-movflags",
+        "+faststart",
+        "-f",
+        "mp4",
+        str(output),
+    ]
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        _, stderr = process.communicate()
+    except KeyboardInterrupt:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+        raise
+    result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    if result.returncode != 0:
+        raise RuntimeError(
+            "FFmpeg failed while restoring the source audio stream"
+            + (f":\n{result.stderr.strip()}" if result.stderr.strip() else "")
+        )
 
 
 def format_clock(seconds: float | None) -> str:
@@ -732,9 +794,10 @@ def run_interpolation_rve(
             dir=output.parent,
         ) as temporary_directory:
             cwd = Path(temporary_directory)
+            rve_video = cwd / "rve-video.mp4"
             command = build_rve_command(
                 source,
-                partial,
+                rve_video,
                 source_rate,
                 source_frames,
                 target_rate,
@@ -781,13 +844,21 @@ def run_interpolation_rve(
                     "REAL-Video-Enhancer failed"
                     + (f":\n{details}" if details else "")
                 )
-            if not partial.is_file():
+            if not rve_video.is_file():
                 raise RuntimeError("REAL-Video-Enhancer did not produce an output file")
-            actual_rate, actual_frames = probe_video(partial)
+            actual_rate, actual_frames = probe_video(rve_video)
             if actual_rate != target_rate or actual_frames != target_frames:
                 raise RuntimeError(
                     "REAL-Video-Enhancer produced invalid output timing: "
                     f"{actual_rate} FPS, {actual_frames} frames; expected "
+                    f"{target_rate} FPS, {target_frames} frames"
+                )
+            remux_rve_audio(source, rve_video, partial)
+            final_rate, final_frames = probe_video(partial)
+            if final_rate != target_rate or final_frames != target_frames:
+                raise RuntimeError(
+                    "The final RVE remux changed output timing: "
+                    f"{final_rate} FPS, {final_frames} frames; expected "
                     f"{target_rate} FPS, {target_frames} frames"
                 )
             if completed != target_frames:
