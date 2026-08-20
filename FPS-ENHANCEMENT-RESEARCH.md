@@ -8,8 +8,8 @@ classical motion-compensated conversion, diffusion-based frame generation,
 inference runtimes, Linux support, and a practical setup for the RTX 5070 Ti.
 
 A controlled local benchmark, one-minute render, REAL-Video-Enhancer
-evaluation, and concat/interpolation integration benchmark are now included
-below.
+evaluation, concat/interpolation integration benchmark, and end-to-end
+30-second pipeline comparison are now included below.
 Performance numbers are labeled as local measurements, upstream measurements,
 or estimates. The local render is an experimental reference, not yet a
 production `resolve-fps` command.
@@ -392,6 +392,53 @@ VSPipe with the RIFE environment reproduces the initialization or NumPy ABI
 failure. The persistent graph harness is
 `/home/ghiki/.cache/resolve-fps/benchmark.vpy`; `BOUNDARIES=900,1800` enables
 the explicit splice markers.
+
+## End-to-end 30-second pipeline benchmark
+
+This follow-up benchmark tested the ordering question on one exact
+30-second source: 900 frames at 1920x1080 and 30000/1001 FPS. Every RIFE run
+used the current production graph, RIFE 4.26 standard, selective TensorRT
+FP16 with the PyTorch `pixel_shuffle` fallback, BestSource, scene detection,
+RGBH input, YUV420P10 pipe output, and a target of 1,802 frames at 60 FPS.
+Performance mode was enabled temporarily for each run and restored afterward.
+
+| Approach | Final output | Wall time | Effective output rate | Size | Peak VRAM | Peak power |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| RIFE only, output discarded | None | 30.84 s | 58.4 frames/s | None | 3,638 MiB | 187.52 W |
+| Stream RIFE directly to NVENC, QP 1 | 60 FPS MP4 | **36.32 s** | 49.6 frames/s | 596,468,896 bytes | 3,921 MiB | 175.63 W |
+| Stage RIFE to Y4M, then encode, QP 1 | 60 FPS MP4 | 38.44 s | 46.9 frames/s | 596,468,896 bytes | 3,560 MiB | 176.01 W |
+| Stream RIFE directly to NVENC, QP 18 | 60 FPS MP4 | **35.02 s** | 51.5 frames/s | 33,581,576 bytes | 3,843 MiB | 172.37 W |
+
+The staged RIFE-first approach wrote 11,209,892,491 bytes (about 10.4 GiB)
+of temporary Y4M data before the encode stage. It was 2.12 seconds slower
+than streaming at the same QP 1 delivery quality. Streaming lets the encoder
+consume frames while RIFE continues generating them; forcing a complete
+intermediate file adds disk I/O without reducing the RIFE work.
+
+The QP 18 output was compared frame-for-frame with the QP 1 output. It
+measured SSIM 0.991811 (20.867575 dB) and PSNR 49.866842 dB average, with
+the same 1,802 video frames, 30.144-second duration, copied AAC stream, and
+BT.709 metadata. QP 18 is therefore the fastest tested final profile and is
+far smaller, but QP 1 remains the production default until the desired
+delivery-quality tradeoff is explicitly selected. These results measure the
+current end-to-end graph; the older 101.57 FPS number was a warm
+interpolation-only benchmark and is not comparable to a final encoded file.
+
+The benchmark workspace and outputs are retained outside the repository:
+
+```text
+/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/source-30s-900f.mp4
+/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/streamed.mp4
+/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/streamed-qp18.mp4
+/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/staged.mp4
+```
+
+**Decision:** keep the production architecture as one concat-first master
+followed by one global RIFE pass, with frames streamed directly into the
+delivery encoder. Do not stage interpolated frames to disk. If smaller files
+and the measured QP 18 quality are acceptable, QP 18 is the measured
+speed/storage optimization; it is a delivery-encoding choice, not a change
+to the RIFE model or interpolation path.
 
 ### GMFSS Fortuna
 
