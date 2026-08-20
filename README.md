@@ -199,10 +199,13 @@ Press `Ctrl+C` to cancel safely. The active FFmpeg/RIFE processes are stopped,
 the hidden `.partial` output is deleted, and any temporary multi-input master
 and normalized parts are removed. The source files and any previously completed
 output remain unchanged. Frames are streamed through a pipe rather than stored
-as an intermediate image sequence; the TensorRT engine cache is intentionally
-kept for faster future runs. A forced `SIGKILL` or power loss can prevent
-cleanup, so inspect `/tmp/resolve-fps-*` and hidden `.partial` files if the
-machine is forcibly stopped.
+as an intermediate image sequence. The RVE backend uses a temporary encoded
+video inside its private temporary directory so it can remux the original
+audio exactly; that file is removed after success or cancellation. The
+TensorRT engine cache is intentionally kept for faster future runs. A forced
+`SIGKILL` or power loss can prevent cleanup, so inspect `/tmp/resolve-fps-*`,
+the RVE temporary directories, and hidden `.partial` files if the machine is
+forcibly stopped.
 
 The validated strategy is a two-stage run. First create one compatible
 stream-copy master; then run one global RIFE 4.26 pass over that master. Do
