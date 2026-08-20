@@ -158,6 +158,21 @@ Use `--strategy single` to reproduce the older one-process path.
 
 ### FPS enhancement: concatenate first, then interpolate once
 
+For the production workflow, use the installed FPS command:
+
+```sh
+resolve-fps
+```
+
+It opens the same folder-selection TUI. Select one video and it goes directly
+to RIFE: no concatenation and no audio transformation are performed; the
+original audio stream is copied into the final MP4. When multiple videos are
+selected, they are concatenated once with audio normalization disabled, then
+one global RIFE pass runs over the temporary master. Use
+`resolve-fps /path/to/video.mp4 --force` for a direct single-file run or
+`resolve-fps --root /path/to/folder` to start the selector elsewhere. Run
+`./install.sh` once to install the command into `~/bin`.
+
 The validated strategy is a two-stage run. First create one compatible
 stream-copy master; then run one global RIFE 4.26 pass over that master. Do
 not run RIFE separately on each input clip, because resetting the 29.97-to-60

@@ -823,9 +823,15 @@ class ConcatEntry:
 
 
 class ConcatTUI:
-    def __init__(self, stdscr: Any, root: Path):
+    def __init__(
+        self,
+        stdscr: Any,
+        root: Path,
+        title: str = "| RESOLVE CONCAT // SELECT INPUT VIDEOS",
+    ):
         self.stdscr = stdscr
         self.root = root.expanduser().resolve()
+        self.title = title
         self.entries: list[ConcatEntry] = []
         self.cursor = 0
         self.offset = 0
@@ -873,7 +879,7 @@ class ConcatTUI:
         self.stdscr.addnstr(
             0,
             0,
-            "| RESOLVE CONCAT // SELECT INPUT VIDEOS",
+            self.title,
             width - 1,
             curses.color_pair(1) | curses.A_BOLD,
         )
@@ -932,14 +938,15 @@ class ConcatTUI:
     def help(self) -> None:
         self.stdscr.erase()
         height, width = self.stdscr.getmaxyx()
+        operation = "FPS enhancement" if "FPS" in self.title else "concat"
         lines = [
-            "Resolve concat help",
+            f"Resolve {operation} help",
             "",
             "Navigate to the folder containing the clips.",
             "Space selects or clears the highlighted video.",
             "a selects every video in the current folder; n clears all selections.",
             "Selections remain active while you navigate between folders.",
-            "Enter concatenates the selected videos in filename order.",
+            f"Enter runs {operation} on the selected videos in filename order.",
             "The output is written beside the current folder unless --output is used.",
             "",
             "Keys: arrows/j/k move | Right/l open | Left/h/backspace up",
@@ -1027,14 +1034,17 @@ class ConcatTUI:
                 self.help()
 
 
-def interactive_selection(root: Path) -> tuple[list[Path], Path] | None:
+def interactive_selection(
+    root: Path,
+    title: str = "| RESOLVE CONCAT // SELECT INPUT VIDEOS",
+) -> tuple[list[Path], Path] | None:
     if curses is None:
         raise RuntimeError(
             "Python curses is unavailable; pass an input directory explicitly."
         )
     if not root.is_dir():
         raise RuntimeError(f"TUI root directory does not exist: {root}")
-    return curses.wrapper(lambda stdscr: ConcatTUI(stdscr, root).run())
+    return curses.wrapper(lambda stdscr: ConcatTUI(stdscr, root, title).run())
 
 
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
