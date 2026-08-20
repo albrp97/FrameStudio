@@ -1340,6 +1340,7 @@ def main(argv: list[str] | None = None) -> int:
         requested_output,
         arguments.model,
         arguments.encoder,
+        arguments.performance_mode,
         arguments.dry_run,
         arguments.force,
     )

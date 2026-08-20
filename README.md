@@ -172,7 +172,9 @@ separate FPS-only command is desired. Run `./install.sh` once to install both
 commands into `~/bin`.
 
 During interpolation the console shows a live Pacman-style bar with percent,
-frame count, interpolation FPS, elapsed time, and ETA.
+frame count, end-to-end pipeline FPS, elapsed time, and ETA. The displayed
+pipeline FPS includes decoding, RIFE, and delivery encoding; it is not the
+model-only inference FPS from the benchmark.
 
 Press `Ctrl+C` to cancel safely. The active FFmpeg/RIFE processes are stopped,
 the hidden `.partial` output is deleted, and any temporary multi-input master

@@ -14,12 +14,14 @@ import tempfile
 import threading
 import time
 from argparse import Namespace
+from contextlib import contextmanager
 from fractions import Fraction
 from pathlib import Path
 from typing import BinaryIO
 
 from resolve_concat import (
     DEFAULT_TUI_ROOT,
+    PerformanceMode,
     concatenate,
     find_inputs,
     find_selected_inputs,
@@ -249,7 +251,7 @@ def progress_line(
     eta = (total - completed) / speed if speed > 0 else None
     return (
         f"[{bar}] {fraction * 100:6.2f}% "
-        f"frame {completed}/{total} {speed:7.2f} fps "
+        f"frame {completed}/{total} pipeline {speed:7.2f} fps "
         f"elapsed {format_clock(elapsed)} ETA {format_clock(eta)}"
     )
 
@@ -263,6 +265,31 @@ def drain_stderr(
         messages.put((label, raw_line.decode(errors="replace").rstrip()))
     stream.close()
     messages.put((label, None))
+
+
+@contextmanager
+def performance_scope(mode: str, dry_run: bool):
+    if dry_run:
+        print("Performance mode: unchanged (dry run).")
+        yield
+        return
+    performance = PerformanceMode(mode)
+    try:
+        with performance:
+            if performance.changed:
+                print(
+                    "Performance mode: performance (temporary); "
+                    f"previous profile: {performance.previous}"
+                )
+            else:
+                print(
+                    "Performance mode: unchanged "
+                    f"({performance.previous or 'unavailable'})."
+                )
+            yield
+    finally:
+        if performance.changed:
+            print(f"Performance mode restored: {performance.previous}")
 
 
 def run_interpolation(
@@ -451,38 +478,47 @@ def run_pipeline(
     if any(output == path.resolve() for path in paths):
         raise RuntimeError("The FPS output must not overwrite a selected input")
 
-    if len(paths) == 1:
-        source = paths[0]
-        print("Single input: skipping concatenation and audio transformation.")
-        if arguments.dry_run:
+    with performance_scope(arguments.performance_mode, arguments.dry_run):
+        if len(paths) == 1:
+            source = paths[0]
+            print("Single input: skipping concatenation and audio transformation.")
             source_rate, source_frames = probe_video(source)
             target_frames = target_frame_count(
                 source_rate, source_frames, arguments.target_fps
             )
-            print(f"Input: {source}")
-            print(f"Target FPS: {arguments.target_fps} ({target_frames} frames)")
+            if arguments.dry_run:
+                print(f"Input: {source}")
+                print(f"Target FPS: {arguments.target_fps} ({target_frames} frames)")
+                return 0
+            run_interpolation(
+                source,
+                output,
+                arguments.target_fps,
+                target_frames,
+                arguments,
+            )
+            print(f"Finished: {output}")
             return 0
-        source_rate, source_frames = probe_video(source)
-        target_frames = target_frame_count(
-            source_rate, source_frames, arguments.target_fps
-        )
-        run_interpolation(source, output, arguments.target_fps, target_frames, arguments)
+
+        print(f"Multiple inputs: concatenating {len(paths)} files before RIFE.")
+        if arguments.dry_run:
+            return 0
+        with tempfile.TemporaryDirectory(prefix="resolve-fps-") as temporary_directory:
+            master = Path(temporary_directory) / "master.mp4"
+            concatenate(paths, current_dir, master, concat_arguments())
+            source_rate, source_frames = probe_video(master)
+            target_frames = target_frame_count(
+                source_rate, source_frames, arguments.target_fps
+            )
+            run_interpolation(
+                master,
+                output,
+                arguments.target_fps,
+                target_frames,
+                arguments,
+            )
         print(f"Finished: {output}")
         return 0
-
-    print(f"Multiple inputs: concatenating {len(paths)} files before RIFE.")
-    if arguments.dry_run:
-        return 0
-    with tempfile.TemporaryDirectory(prefix="resolve-fps-") as temporary_directory:
-        master = Path(temporary_directory) / "master.mp4"
-        concatenate(paths, current_dir, master, concat_arguments())
-        source_rate, source_frames = probe_video(master)
-        target_frames = target_frame_count(
-            source_rate, source_frames, arguments.target_fps
-        )
-        run_interpolation(master, output, arguments.target_fps, target_frames, arguments)
-    print(f"Finished: {output}")
-    return 0
 
 
 def parse_arguments(argv: list[str] | None = None) -> Namespace:
@@ -512,6 +548,12 @@ def parse_arguments(argv: list[str] | None = None) -> Namespace:
     parser.add_argument("--trt-cache", type=Path, default=DEFAULT_TRT_CACHE)
     parser.add_argument("--bestsource", type=Path, default=DEFAULT_BESTSOURCE)
     parser.add_argument(
+        "--performance-mode",
+        choices=("auto", "on", "off"),
+        default="auto",
+        help="temporarily use the performance profile and restore it afterward",
+    )
+    parser.add_argument(
         "--encoder",
         choices=("h264_nvenc", "libx264"),
         default="h264_nvenc",
@@ -527,6 +569,7 @@ def run_combined_pipeline(
     output: Path | None,
     model: str,
     encoder: str,
+    performance_mode: str,
     dry_run: bool,
     force: bool,
 ) -> int:
@@ -534,6 +577,7 @@ def run_combined_pipeline(
     arguments.output = output
     arguments.model = model
     arguments.encoder = encoder
+    arguments.performance_mode = performance_mode
     arguments.dry_run = dry_run
     arguments.force = force
     return run_pipeline(paths, current_dir, arguments)
