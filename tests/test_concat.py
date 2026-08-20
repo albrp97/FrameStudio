@@ -13,8 +13,10 @@ from resolve_concat import (
     can_stream_copy,
     common_resolution,
     effective_jobs,
+    find_selected_inputs,
     h264_level,
     nominal_rate,
+    parse_arguments,
     run_normalization,
 )
 
@@ -45,6 +47,24 @@ def clip(name, fps="30000/1001", profile="High", width=1920, height=1080):
 
 
 class ConcatTests(unittest.TestCase):
+    def test_no_input_argument_opens_tui_mode(self):
+        arguments = parse_arguments([])
+        self.assertIsNone(arguments.input_dir)
+
+    def test_selected_inputs_are_sorted_and_exclude_output(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first = root / "b.mp4"
+            second = root / "a.mp4"
+            output = root / "joined.mp4"
+            first.touch()
+            second.touch()
+            output.touch()
+            self.assertEqual(
+                find_selected_inputs([first, output, second], output),
+                [second, first],
+            )
+
     def test_lowest_frame_rate_is_selected(self):
         clips = [clip("30.mp4", "30/1"), clip("2997.mp4")]
         self.assertEqual(min((nominal_rate(item) for item in clips), key=float), Fraction(30000, 1001))

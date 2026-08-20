@@ -19,11 +19,16 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
+
+try:
+    import curses
+except ImportError:  # pragma: no cover - platform fallback
+    curses = None
 
 
 VIDEO_EXTENSIONS = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".mxf", ".webm"}
-DEFAULT_INPUT_DIR = Path.home() / "Documents" / "edit" / "copy"
+DEFAULT_TUI_ROOT = Path.home() / "Documents" / "edit"
 TARGET_MEAN_RMS_DB = -35.0
 TARGET_MEDIAN_DB = -50.0
 TARGET_PEAK_DB = -1.0
@@ -101,21 +106,34 @@ def probe(path: Path) -> Clip:
     return Clip(path=path, duration=duration, video=video, audio=audio)
 
 
-def find_inputs(input_dir: Path, output: Path | None) -> list[Path]:
-    if not input_dir.is_dir():
-        raise RuntimeError(f"Input directory does not exist: {input_dir}")
+def _video_paths(paths: Iterable[Path], output: Path | None) -> list[Path]:
     output_resolved = output.resolve() if output else None
-    paths = [
+    selected = [
         path
-        for path in sorted(input_dir.iterdir(), key=lambda item: item.name.casefold())
+        for path in paths
         if path.is_file()
         and path.suffix.casefold() in VIDEO_EXTENSIONS
         and (output_resolved is None or path.resolve() != output_resolved)
         and not path.name.startswith(".")
     ]
+    selected.sort(key=lambda item: (item.name.casefold(), str(item)))
+    return selected
+
+
+def find_inputs(input_dir: Path, output: Path | None) -> list[Path]:
+    if not input_dir.is_dir():
+        raise RuntimeError(f"Input directory does not exist: {input_dir}")
+    paths = _video_paths(input_dir.iterdir(), output)
     if not paths:
         raise RuntimeError(f"No supported video files found in {input_dir}")
     return paths
+
+
+def find_selected_inputs(paths: list[Path], output: Path | None) -> list[Path]:
+    selected = _video_paths(paths, output)
+    if not selected:
+        raise RuntimeError("No supported video files were selected")
+    return selected
 
 
 def nominal_rate(clip: Clip) -> Fraction:
@@ -798,16 +816,245 @@ def run_normalization(
             shutil.rmtree(parts_dir)
 
 
-def parse_arguments() -> argparse.Namespace:
+@dataclass(frozen=True)
+class ConcatEntry:
+    path: Path
+    is_dir: bool
+
+
+class ConcatTUI:
+    def __init__(self, stdscr: Any, root: Path):
+        self.stdscr = stdscr
+        self.root = root.expanduser().resolve()
+        self.entries: list[ConcatEntry] = []
+        self.cursor = 0
+        self.offset = 0
+        self.selection: set[Path] = set()
+        self.message = "Space selects; a selects all videos; Enter runs."
+
+    def load(self) -> None:
+        try:
+            children = sorted(
+                self.root.iterdir(),
+                key=lambda path: (not path.is_dir(), path.name.casefold()),
+            )
+        except OSError as error:
+            self.entries = []
+            self.message = f"Cannot read {self.root}: {error}"
+            return
+        self.entries = [
+            ConcatEntry(path, path.is_dir())
+            for path in children
+            if not path.name.startswith(".")
+            and (path.is_dir() or path.suffix.casefold() in VIDEO_EXTENSIONS)
+        ]
+        self.cursor = min(self.cursor, max(0, len(self.entries) - 1))
+
+    def selected_paths(self) -> list[Path]:
+        return sorted(
+            (path for path in self.selection if path.is_file()),
+            key=lambda path: (path.name.casefold(), str(path)),
+        )
+
+    def draw(self) -> None:
+        self.stdscr.erase()
+        height, width = self.stdscr.getmaxyx()
+        if height < 12 or width < 70:
+            self.stdscr.addnstr(
+                0,
+                0,
+                "Terminal too small. Resize to at least 70x12.",
+                max(0, width - 1),
+            )
+            self.stdscr.addnstr(2, 0, "q quit", max(0, width - 1))
+            self.stdscr.refresh()
+            return
+
+        self.stdscr.addnstr(
+            0,
+            0,
+            "| RESOLVE CONCAT // SELECT INPUT VIDEOS",
+            width - 1,
+            curses.color_pair(1) | curses.A_BOLD,
+        )
+        self.stdscr.addnstr(
+            1,
+            0,
+            f"| PATH {self.root}",
+            width - 1,
+            curses.color_pair(3),
+        )
+        self.stdscr.addnstr(
+            2,
+            0,
+            "| Up/down or j/k move  Right/l open  Left/h/backspace up  Space select  a all  n clear  Enter run  ? help  q quit",
+            width - 1,
+            curses.color_pair(2),
+        )
+        list_top = 4
+        list_bottom = max(list_top + 1, height - 5)
+        visible = list_bottom - list_top
+        if self.cursor < self.offset:
+            self.offset = self.cursor
+        if self.cursor >= self.offset + visible:
+            self.offset = self.cursor - visible + 1
+        for row, entry in enumerate(
+            self.entries[self.offset : self.offset + visible],
+            list_top,
+        ):
+            index = row - list_top + self.offset
+            marker = "[x]" if entry.path in self.selection else "[ ]"
+            icon = "[DIR]" if entry.is_dir else "[VID]"
+            label = entry.path.name + ("/" if entry.is_dir else "")
+            text = f"{marker} {icon} {label}"
+            attribute = (
+                curses.A_REVERSE
+                if index == self.cursor
+                else curses.color_pair(2)
+            )
+            self.stdscr.addnstr(row, 0, text, width - 1, attribute)
+        self.stdscr.addnstr(
+            height - 3,
+            0,
+            f"Selected {len(self.selection)} video(s)",
+            width - 1,
+            curses.color_pair(1),
+        )
+        self.stdscr.addnstr(
+            height - 2,
+            0,
+            self.message,
+            width - 1,
+            curses.color_pair(4) | curses.A_BOLD,
+        )
+        self.stdscr.refresh()
+
+    def help(self) -> None:
+        self.stdscr.erase()
+        height, width = self.stdscr.getmaxyx()
+        lines = [
+            "Resolve concat help",
+            "",
+            "Navigate to the folder containing the clips.",
+            "Space selects or clears the highlighted video.",
+            "a selects every video in the current folder; n clears all selections.",
+            "Selections remain active while you navigate between folders.",
+            "Enter concatenates the selected videos in filename order.",
+            "The output is written beside the current folder unless --output is used.",
+            "",
+            "Keys: arrows/j/k move | Right/l open | Left/h/backspace up",
+            "Space select | a all | n clear | Enter run | r rescan | q quit",
+            "",
+            "Press any key to return.",
+        ]
+        for index, line in enumerate(lines[: max(0, height - 1)]):
+            self.stdscr.addnstr(index, 0, line, max(0, width - 1))
+        self.stdscr.refresh()
+        self.stdscr.timeout(-1)
+        try:
+            self.stdscr.getch()
+        finally:
+            self.stdscr.timeout(100)
+
+    def run(self) -> tuple[list[Path], Path] | None:
+        if curses is None:
+            return None
+        try:
+            curses.curs_set(0)
+        except curses.error:
+            pass
+        self.stdscr.nodelay(True)
+        self.stdscr.timeout(100)
+        try:
+            curses.start_color()
+            curses.use_default_colors()
+            curses.init_pair(1, -1, -1)
+            curses.init_pair(2, curses.COLOR_CYAN, -1)
+            curses.init_pair(3, curses.COLOR_YELLOW, -1)
+            curses.init_pair(4, curses.COLOR_MAGENTA, -1)
+        except curses.error:
+            pass
+        self.load()
+        while True:
+            self.draw()
+            key = self.stdscr.getch()
+            if key == -1:
+                continue
+            if key in (ord("q"), ord("Q")):
+                return None
+            if key in (curses.KEY_DOWN, ord("j")) and self.entries:
+                self.cursor = min(len(self.entries) - 1, self.cursor + 1)
+            elif key in (curses.KEY_UP, ord("k")) and self.entries:
+                self.cursor = max(0, self.cursor - 1)
+            elif key in (curses.KEY_RIGHT, ord("l")) and self.entries:
+                entry = self.entries[self.cursor]
+                if entry.is_dir:
+                    self.root = entry.path
+                    self.cursor = self.offset = 0
+                    self.load()
+                else:
+                    self.message = "Select videos with Space."
+            elif key in (curses.KEY_LEFT, ord("h"), curses.KEY_BACKSPACE, 127, 8):
+                if self.root.parent != self.root:
+                    self.root = self.root.parent
+                    self.cursor = self.offset = 0
+                    self.load()
+            elif key in (curses.KEY_ENTER, 10, 13):
+                paths = self.selected_paths()
+                if paths:
+                    return paths, self.root
+                self.message = "No videos selected. Use Space or a first."
+            elif key == ord(" ") and self.entries:
+                entry = self.entries[self.cursor]
+                if entry.is_dir:
+                    self.message = "Folders are for navigation; select video files."
+                elif entry.path in self.selection:
+                    self.selection.remove(entry.path)
+                else:
+                    self.selection.add(entry.path)
+            elif key in (ord("a"), ord("A")):
+                self.selection.update(
+                    entry.path for entry in self.entries if not entry.is_dir
+                )
+                self.message = "Selected all videos in the current folder."
+            elif key in (ord("n"), ord("N")):
+                self.selection.clear()
+                self.message = "Selection cleared."
+            elif key in (ord("r"), ord("R")):
+                self.load()
+                self.message = "Rescanned current folder."
+            elif key == ord("?"):
+                self.help()
+
+
+def interactive_selection(root: Path) -> tuple[list[Path], Path] | None:
+    if curses is None:
+        raise RuntimeError(
+            "Python curses is unavailable; pass an input directory explicitly."
+        )
+    if not root.is_dir():
+        raise RuntimeError(f"TUI root directory does not exist: {root}")
+    return curses.wrapper(lambda stdscr: ConcatTUI(stdscr, root).run())
+
+
+def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Concatenate videos with stream copy or GPU normalization."
+        description=(
+            "Concatenate videos with stream copy or GPU normalization; "
+            "no input opens a selector TUI."
+        )
     )
     parser.add_argument(
         "input_dir",
         nargs="?",
         type=Path,
-        default=DEFAULT_INPUT_DIR,
-        help=f"Folder containing videos (default: {DEFAULT_INPUT_DIR})",
+        help="Folder containing videos; omit to open the selector TUI",
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=DEFAULT_TUI_ROOT,
+        help=f"TUI starting folder (default: {DEFAULT_TUI_ROOT})",
     )
     parser.add_argument(
         "-o",
@@ -853,14 +1100,15 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--dry-run", action="store_true", help="Print the plan only")
     parser.add_argument("--force", action="store_true", help="Replace an existing output")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> int:
-    arguments = parse_arguments()
-    input_dir = arguments.input_dir.expanduser().resolve()
-    requested_output = arguments.output.expanduser().resolve() if arguments.output else None
-    paths = find_inputs(input_dir, requested_output)
+def concatenate(
+    paths: list[Path],
+    input_dir: Path,
+    requested_output: Path | None,
+    arguments: argparse.Namespace,
+) -> int:
     clips = [probe(path) for path in paths]
     jobs = effective_jobs(arguments.jobs, len(clips))
     target_rate = min((nominal_rate(clip) for clip in clips), key=float)
@@ -1008,6 +1256,23 @@ def main() -> int:
 
     print(f"Finished: {output}")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    arguments = parse_arguments(argv)
+    requested_output = (
+        arguments.output.expanduser().resolve() if arguments.output else None
+    )
+    if arguments.input_dir is None:
+        selection = interactive_selection(arguments.root.expanduser().resolve())
+        if selection is None:
+            return 0
+        selected_paths, input_dir = selection
+        paths = find_selected_inputs(selected_paths, requested_output)
+    else:
+        input_dir = arguments.input_dir.expanduser().resolve()
+        paths = find_inputs(input_dir, requested_output)
+    return concatenate(paths, input_dir, requested_output, arguments)
 
 
 if __name__ == "__main__":

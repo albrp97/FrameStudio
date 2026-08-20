@@ -58,11 +58,23 @@ resolve-media --gpu auto           # quiet GPU detection with CPU fallback
 resolve-media --version
 ```
 
-To concatenate every supported video in `~/Documents/edit/copy` in filename
-order:
+To open the concat selector anywhere in a terminal:
 
 ```sh
 resolve-concat
+```
+
+The TUI starts in `~/Documents/edit`. Navigate with the arrow keys or `j/k`,
+use `Right/l` to enter a folder, press `Space` on each video to select it, and
+press `Enter` to concatenate the selected videos in filename order. `a`
+selects every video in the current folder, `n` clears the selection, and
+`Left/h/Backspace` goes up. Use `resolve-concat --root ~/Videos` to start in a
+different folder.
+
+For a non-interactive run, pass the folder directly:
+
+```sh
+resolve-concat ~/Documents/edit/copy
 ```
 
 It chooses the most common resolution and the lowest nominal frame rate. It
