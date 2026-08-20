@@ -419,9 +419,10 @@ The QP 18 output was compared frame-for-frame with the QP 1 output. It
 measured SSIM 0.991811 (20.867575 dB) and PSNR 49.866842 dB average, with
 the same 1,802 video frames, 30.144-second duration, copied AAC stream, and
 BT.709 metadata. QP 18 is therefore the fastest tested final profile and is
-far smaller, but QP 1 remains the production default until the desired
-delivery-quality tradeoff is explicitly selected. These results measure the
-current end-to-end graph; the older 101.57 FPS number was a warm
+far smaller; it is now the production default. QP 1 remains useful as a
+near-lossless comparison profile when explicitly selected outside the unified
+workflow. These results measure the current end-to-end graph; the older
+101.57 FPS number was a warm
 interpolation-only benchmark and is not comparable to a final encoded file.
 
 The benchmark workspace and outputs are retained outside the repository:
@@ -436,7 +437,7 @@ The benchmark workspace and outputs are retained outside the repository:
 **Decision:** keep the production architecture as one concat-first master
 followed by one global RIFE pass, with frames streamed directly into the
 delivery encoder. Do not stage interpolated frames to disk. If smaller files
-and the measured QP 18 quality are acceptable, QP 18 is the measured
+and the measured QP 18 quality are acceptable, QP 18 is the default
 speed/storage optimization; it is a delivery-encoding choice, not a change
 to the RIFE model or interpolation path.
 

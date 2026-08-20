@@ -84,8 +84,10 @@ workers when needed, joins the temporary parts, and then performs one RIFE
 pass. `--concat-only` preserves the older concat-without-FPS behavior. The
 single-process filter graph remains available with `--strategy single`. The
 delivery output is MP4 with H.264, 8-bit `yuv420p`, BT.709 tags, `faststart`,
-and the original audio stream copied at the final remux. LosslessCut uses the
-same FFmpeg engine, but its stream-copy merge cannot normalize a mixed
+and the original audio stream copied at the final remux. The default NVENC
+delivery profile is preset `p1` with constant QP 18, the fastest tested
+quality/storage balance for the current RTX 5070 Ti pipeline. LosslessCut uses
+the same FFmpeg engine, but its stream-copy merge cannot normalize a mixed
 30/29.97 fps folder. The benchmark and redesign results are recorded in
 [`FAST-CONCAT-RESEARCH.md`](FAST-CONCAT-RESEARCH.md).
 
@@ -215,7 +217,7 @@ TRT_TORCH_PIXEL=1 BESTSOURCE_PLUGIN="$BESTSOURCE" LIMIT_SECONDS=999999 \
 TARGET_FRAMES="$TARGET_FRAMES" PYTHONPATH="$FPS_SITE" \
 "$FPS_PYTHON" benchmarks/vsrawpipe.py "$FPS_SCRIPT" | \
 ffmpeg -hide_banner -y -f yuv4mpegpipe -i - -i "$MASTER" \
-  -map 0:v:0 -map 1:a:0? -c:v h264_nvenc -preset p1 -rc constqp -qp 1 \
+  -map 0:v:0 -map 1:a:0? -c:v h264_nvenc -preset p1 -rc constqp -qp 18 \
   -profile:v high -pix_fmt yuv420p -color_range tv -colorspace bt709 \
   -color_primaries bt709 -color_trc bt709 -c:a copy \
   -movflags +faststart "$PARTIAL" && mv "$PARTIAL" "$OUTPUT"

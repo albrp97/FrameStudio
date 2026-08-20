@@ -35,6 +35,7 @@ PROGRESS_PATTERN = re.compile(
 )
 DEFAULT_MODEL = "4.26"
 DEFAULT_TARGET_FPS = Fraction(60, 1)
+DEFAULT_NVENC_QP = 18
 DEFAULT_FPS_PYTHON = (
     Path.home() / ".cache" / "resolve-fps" / "trt" / "bin" / "python"
 )
@@ -197,7 +198,9 @@ def build_encode_command(
         encoder,
     ]
     if encoder == "h264_nvenc":
-        command.extend(["-preset", "p1", "-rc", "constqp", "-qp", "1"])
+        command.extend(
+            ["-preset", "p1", "-rc", "constqp", "-qp", str(DEFAULT_NVENC_QP)]
+        )
     else:
         command.extend(["-preset", "slow", "-crf", "20"])
     command.extend(

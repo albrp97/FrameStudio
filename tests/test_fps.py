@@ -42,6 +42,7 @@ class FpsTests(unittest.TestCase):
         )
         self.assertIn("-c:a", command)
         self.assertEqual(command[command.index("-c:a") + 1], "copy")
+        self.assertEqual(command[command.index("-qp") + 1], "18")
 
     def test_progress_line_contains_pacman_metrics(self):
         line = progress_line(50, 100, 0.0, now=10.0)
