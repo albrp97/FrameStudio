@@ -144,6 +144,52 @@ parallel strategy cleans normalized parts after the final join, preserves
 source files, and retries with CPU H.264 if automatic GPU encoding fails.
 Use `--strategy single` to reproduce the older one-process path.
 
+### FPS enhancement: concatenate first, then interpolate once
+
+The validated strategy is a two-stage run. First create one compatible
+stream-copy master; then run one global RIFE 4.26 pass over that master. Do
+not run RIFE separately on each input clip, because resetting the 29.97-to-60
+cadence at every clip boundary is slower and can introduce timing drift.
+
+From the project directory:
+
+```sh
+INPUT_DIR="$HOME/Documents/edit/copy"
+MASTER="$HOME/Documents/edit/copy-concatenated-29.97fps.mp4"
+OUTPUT="$HOME/Documents/edit/copy-concatenated-rife4.26-60fps.mp4"
+
+resolve-concat "$INPUT_DIR" --output "$MASTER" --mode auto \
+  --audio-normalization off --performance-mode off --force
+
+INPUT_FRAMES=$(ffprobe -v error -select_streams v:0 \
+  -show_entries stream=nb_frames -of csv=p=0 "$MASTER")
+TARGET_FRAMES=$((INPUT_FRAMES * 2))
+FPS_PYTHON="$HOME/.cache/resolve-fps/trt/bin/python"
+FPS_SITE="$HOME/.cache/resolve-fps/trt/lib/python3.13/site-packages"
+FPS_SCRIPT="$HOME/.cache/resolve-fps/benchmark.vpy"
+TRT_CACHE="$HOME/.cache/resolve-fps/engines-pixel-fallback"
+BESTSOURCE="$HOME/.cache/resolve-fps/plugins/usr/lib/python3.14/site-packages/vapoursynth/plugins/libbestsource.so"
+PARTIAL="$OUTPUT.partial.mp4"
+
+SOURCE="$MASTER" MODEL=4.26 TRT_CACHE="$TRT_CACHE" INPUT_FORMAT=RGBH \
+TRT_TORCH_PIXEL=1 BESTSOURCE_PLUGIN="$BESTSOURCE" LIMIT_SECONDS=999999 \
+TARGET_FRAMES="$TARGET_FRAMES" PYTHONPATH="$FPS_SITE" \
+"$FPS_PYTHON" benchmarks/vsrawpipe.py "$FPS_SCRIPT" | \
+ffmpeg -hide_banner -y -f yuv4mpegpipe -i - -i "$MASTER" \
+  -map 0:v:0 -map 1:a:0? -c:v h264_nvenc -preset p1 -rc constqp -qp 1 \
+  -profile:v high -pix_fmt yuv420p -color_range tv -colorspace bt709 \
+  -color_primaries bt709 -color_trc bt709 -c:a copy \
+  -movflags +faststart "$PARTIAL" && mv "$PARTIAL" "$OUTPUT"
+```
+
+`TARGET_FRAMES=$((INPUT_FRAMES * 2))` matches the validated 29.97-to-60
+benchmark policy. Keep `TRT_TORCH_PIXEL=1` and the separate
+`engines-pixel-fallback` cache; pure TensorRT FP16 is known to produce grid
+artifacts on this RTX 5070 Ti. The specialized Python 3.13 environment is
+required because the system VSPipe/Python 3.14 installation has an incompatible
+NumPy/VapourSynth ABI. The runner writes progress to stderr and leaves the
+source and concatenated master untouched.
+
 ## GPU behavior
 
 `--gpu on` is the default setting, but it affects only the explicit `lossless`
