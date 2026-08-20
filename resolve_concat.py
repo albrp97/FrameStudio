@@ -30,6 +30,19 @@ except ImportError:  # pragma: no cover - platform fallback
 VIDEO_EXTENSIONS = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".mxf", ".webm"}
 DEFAULT_TUI_ROOT = Path.home() / "Documents" / "edit"
 DEFAULT_FPS_MODEL = "4.26"
+DEFAULT_FPS_ENGINE = os.environ.get("RESOLVE_FPS_ENGINE", "rve")
+DEFAULT_RVE_ROOT = Path(
+    os.environ.get("RESOLVE_RVE_ROOT", "/tmp/REAL-Video-Enhancer")
+)
+DEFAULT_RVE_MODEL = Path(
+    os.environ.get(
+        "RESOLVE_RVE_MODEL",
+        "/tmp/rve-models-pixel-fallback/rife4.26.pkl",
+    )
+)
+DEFAULT_RVE_SHIMS = Path(
+    os.environ.get("RESOLVE_RVE_SHIMS", "/tmp/rve-shims")
+)
 TARGET_MEAN_RMS_DB = -35.0
 TARGET_MEDIAN_DB = -50.0
 TARGET_PEAK_DB = -1.0
@@ -1100,6 +1113,30 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
         help="RIFE model for the integrated FPS pass (default: 4.26)",
     )
     parser.add_argument(
+        "--engine",
+        choices=("rve", "vs-rife"),
+        default=DEFAULT_FPS_ENGINE,
+        help="FPS backend (default: rve; vs-rife is the VapourSynth fallback)",
+    )
+    parser.add_argument(
+        "--rve-root",
+        type=Path,
+        default=DEFAULT_RVE_ROOT,
+        help="Corrected REAL-Video-Enhancer checkout",
+    )
+    parser.add_argument(
+        "--rve-model",
+        type=Path,
+        default=DEFAULT_RVE_MODEL,
+        help="RIFE 4.26 model used by the RVE backend",
+    )
+    parser.add_argument(
+        "--rve-shims",
+        type=Path,
+        default=DEFAULT_RVE_SHIMS,
+        help="Optional compatibility modules for the RVE Python environment",
+    )
+    parser.add_argument(
         "--encoder",
         choices=("h264_nvenc", "libx264"),
         default="h264_nvenc",
@@ -1343,6 +1380,10 @@ def main(argv: list[str] | None = None) -> int:
         arguments.performance_mode,
         arguments.dry_run,
         arguments.force,
+        arguments.engine,
+        arguments.rve_root.expanduser().resolve(),
+        arguments.rve_model.expanduser().resolve(),
+        arguments.rve_shims.expanduser().resolve(),
     )
 
 

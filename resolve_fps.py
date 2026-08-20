@@ -8,6 +8,7 @@ import json
 import os
 import queue
 import re
+import signal
 import shutil
 import subprocess
 import tempfile
@@ -33,9 +34,11 @@ from resolve_concat import (
 PROGRESS_PATTERN = re.compile(
     r"frame=(?P<frame>\d+)/(?P<total>\d+)\s+elapsed=(?P<elapsed>[0-9.]+)s"
 )
+RVE_PROGRESS_PATTERN = re.compile(r"Current Frame:\s*(?P<frame>\d+)")
 DEFAULT_MODEL = "4.26"
 DEFAULT_TARGET_FPS = Fraction(60, 1)
 DEFAULT_NVENC_QP = 18
+DEFAULT_ENGINE = "rve"
 DEFAULT_FPS_PYTHON = (
     Path.home() / ".cache" / "resolve-fps" / "trt" / "bin" / "python"
 )
@@ -64,6 +67,18 @@ DEFAULT_BESTSOURCE = (
     / "vapoursynth"
     / "plugins"
     / "libbestsource.so"
+)
+DEFAULT_RVE_ROOT = Path(
+    os.environ.get("RESOLVE_RVE_ROOT", "/tmp/REAL-Video-Enhancer")
+)
+DEFAULT_RVE_MODEL = Path(
+    os.environ.get(
+        "RESOLVE_RVE_MODEL",
+        "/tmp/rve-models-pixel-fallback/rife4.26.pkl",
+    )
+)
+DEFAULT_RVE_SHIMS = Path(
+    os.environ.get("RESOLVE_RVE_SHIMS", "/tmp/rve-shims")
 )
 
 
@@ -229,6 +244,182 @@ def build_encode_command(
     return command
 
 
+def rve_interpolation_factor(
+    source_rate: Fraction,
+    target_rate: Fraction,
+) -> int:
+    factor = target_rate / source_rate
+    if factor < 1:
+        raise RuntimeError(
+            "The RVE engine requires a target FPS at least as high as the input FPS"
+        )
+    rounded = max(1, round(float(factor)))
+    if abs(float(factor) - rounded) > 0.01:
+        raise RuntimeError(
+            "The RVE engine currently supports near-integer interpolation factors; "
+            f"{source_rate} to {target_rate} is not supported"
+        )
+    return rounded
+
+
+def rve_base_frame_count(
+    source_rate: Fraction,
+    source_frames: int,
+    target_rate: Fraction,
+) -> int:
+    return source_frames * rve_interpolation_factor(source_rate, target_rate)
+
+
+def build_rve_custom_encoder(
+    target_frames: int,
+    base_frames: int,
+) -> str:
+    options = [
+        "-c:v",
+        "h264_nvenc",
+        "-preset",
+        "p1",
+        "-rc",
+        "constqp",
+        "-qp",
+        str(DEFAULT_NVENC_QP),
+        "-profile:v",
+        "high",
+    ]
+    if target_frames > base_frames:
+        options.extend(
+            [
+                "-vf",
+                f"tpad=stop_mode=clone:stop={target_frames - base_frames}",
+            ]
+        )
+    options.extend(
+        [
+            "-frames:v",
+            str(target_frames),
+            "-c:a",
+            "copy",
+            "-c:s",
+            "copy",
+            "-pix_fmt",
+            "yuv420p",
+            "-color_range",
+            "tv",
+            "-colorspace",
+            "bt709",
+            "-color_primaries",
+            "bt709",
+            "-color_trc",
+            "bt709",
+            "-movflags",
+            "+faststart",
+            "-f",
+            "mp4",
+        ]
+    )
+    return " ".join(options)
+
+
+def validate_rve_checkout(root: Path) -> Path:
+    root = root.expanduser().resolve()
+    backend = root / "backend" / "rve-backend.py"
+    tensor_rt_handler = root / "backend" / "src" / "pytorch" / "TensorRTHandler.py"
+    ffmpeg_buffers = root / "backend" / "src" / "FFmpegBuffers.py"
+    for path in (backend, tensor_rt_handler, ffmpeg_buffers):
+        if not path.is_file():
+            raise RuntimeError(f"RVE checkout is missing required file: {path}")
+    try:
+        tensor_rt_text = tensor_rt_handler.read_text(encoding="utf-8")
+        ffmpeg_text = ffmpeg_buffers.read_text(encoding="utf-8")
+    except OSError as error:
+        raise RuntimeError(f"Could not inspect the RVE checkout: {root}") from error
+    if "RVE_TRT_TORCH_PIXEL" not in tensor_rt_text:
+        raise RuntimeError(
+            "RVE checkout lacks the validated PixelShuffle TensorRT fallback; "
+            "use the corrected checkout"
+        )
+    if "RVE_OUTPUT_FPS" not in ffmpeg_text:
+        raise RuntimeError(
+            "RVE checkout lacks exact output-FPS support; use the corrected checkout"
+        )
+    return backend
+
+
+def rve_environment(arguments: Namespace, target_rate: Fraction) -> dict[str, str]:
+    environment = os.environ.copy()
+    python_paths = [
+        str(arguments.rve_root / "backend"),
+        str(arguments.rve_root),
+        str(arguments.site_packages),
+    ]
+    if arguments.rve_shims.is_dir():
+        python_paths.insert(0, str(arguments.rve_shims))
+    existing_python_path = environment.get("PYTHONPATH")
+    if existing_python_path:
+        python_paths.append(existing_python_path)
+    environment.update(
+        {
+            "RVE_TRT_TORCH_PIXEL": "1",
+            "RVE_OUTPUT_FPS": str(float(target_rate)),
+            "PYTHONPATH": os.pathsep.join(python_paths),
+        }
+    )
+    return environment
+
+
+def build_rve_command(
+    source: Path,
+    partial: Path,
+    source_rate: Fraction,
+    source_frames: int,
+    target_rate: Fraction,
+    target_frames: int,
+    cwd: Path,
+    arguments: Namespace,
+) -> list[str]:
+    backend = validate_rve_checkout(arguments.rve_root)
+    factor = rve_interpolation_factor(source_rate, target_rate)
+    custom_encoder = build_rve_custom_encoder(
+        target_frames,
+        rve_base_frame_count(source_rate, source_frames, target_rate),
+    )
+    return [
+        str(arguments.python),
+        str(backend),
+        "-i",
+        str(source),
+        "-o",
+        str(partial),
+        "--ffmpeg_path",
+        require_tool("ffmpeg"),
+        "--interpolate_model",
+        str(arguments.rve_model.expanduser().resolve()),
+        "--interpolate_factor",
+        str(factor),
+        "--backend",
+        "tensorrt",
+        "--device",
+        "auto",
+        "--precision",
+        "float16",
+        "--scene_detect_method",
+        "pyscenedetect",
+        "--scene_detect_threshold",
+        "4.0",
+        "--custom_encoder",
+        custom_encoder,
+        "--audio_encoder_preset",
+        "copy_audio",
+        "--subtitle_encoder_preset",
+        "copy_subtitle",
+        "--video_pixel_format",
+        "yuv420p",
+        "--overwrite",
+        "--cwd",
+        str(cwd),
+    ]
+
+
 def format_clock(seconds: float | None) -> str:
     if seconds is None or seconds < 0:
         return "--:--:--"
@@ -268,6 +459,27 @@ def drain_stderr(
         messages.put((label, raw_line.decode(errors="replace").rstrip()))
     stream.close()
     messages.put((label, None))
+
+
+def drain_rve_output(
+    stream: BinaryIO,
+    messages: queue.Queue[tuple[str, str | None]],
+) -> None:
+    pending = ""
+    while True:
+        chunk = os.read(stream.fileno(), 4096)
+        if not chunk:
+            break
+        pending += chunk.decode(errors="replace")
+        lines = re.split(r"[\r\n]", pending)
+        pending = lines.pop()
+        for line in lines:
+            if line:
+                messages.put(("rve", line))
+    if pending:
+        messages.put(("rve", pending))
+    stream.close()
+    messages.put(("rve", None))
 
 
 @contextmanager
@@ -452,6 +664,145 @@ def run_interpolation(
         partial.unlink(missing_ok=True)
 
 
+def run_interpolation_rve(
+    source: Path,
+    output: Path,
+    source_rate: Fraction,
+    source_frames: int,
+    target_rate: Fraction,
+    target_frames: int,
+    arguments: Namespace,
+) -> None:
+    if output.resolve() == source.resolve():
+        raise RuntimeError("The FPS output must be different from the input")
+    if output.exists() and not arguments.force:
+        raise RuntimeError(f"Output already exists; use --force to replace it: {output}")
+    if not arguments.python.is_file():
+        raise RuntimeError(
+            f"RVE Python environment was not found: {arguments.python}"
+        )
+    if not arguments.site_packages.is_dir():
+        raise RuntimeError(
+            f"FPS site-packages directory was not found: {arguments.site_packages}"
+        )
+    if not arguments.rve_model.is_file():
+        raise RuntimeError(f"RIFE 4.26 model was not found: {arguments.rve_model}")
+    validate_rve_checkout(arguments.rve_root)
+    rve_interpolation_factor(source_rate, target_rate)
+
+    partial = output.with_name(f".{output.name}.partial")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    partial.unlink(missing_ok=True)
+    messages: queue.Queue[tuple[str, str | None]] = queue.Queue()
+    thread: threading.Thread | None = None
+    process: subprocess.Popen[bytes] | None = None
+    output_lines: list[str] = []
+    completed = 0
+    started = time.monotonic()
+    progress_is_tty = os.isatty(1)
+
+    def render(force: bool = False) -> None:
+        if not progress_is_tty and not force:
+            return
+        text = progress_line(completed, target_frames, started)
+        if progress_is_tty:
+            print(f"\r{text}", end="", flush=True)
+        elif force:
+            print(text, flush=True)
+
+    def stop_process() -> None:
+        if process is None or process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="resolve-rve-",
+            dir=output.parent,
+        ) as temporary_directory:
+            cwd = Path(temporary_directory)
+            command = build_rve_command(
+                source,
+                partial,
+                source_rate,
+                source_frames,
+                target_rate,
+                target_frames,
+                cwd,
+                arguments,
+            )
+            environment = rve_environment(arguments, target_rate)
+            process = subprocess.Popen(
+                command,
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            assert process.stdout is not None
+            thread = threading.Thread(
+                target=drain_rve_output,
+                args=(process.stdout, messages),
+                daemon=True,
+            )
+            thread.start()
+            render(force=True)
+            stream_finished = False
+            while not stream_finished:
+                try:
+                    label, line = messages.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+                if line is None:
+                    stream_finished = True
+                    continue
+                output_lines.append(line)
+                match = RVE_PROGRESS_PATTERN.search(line)
+                if match:
+                    completed = min(target_frames, int(match.group("frame")))
+                    if progress_is_tty:
+                        render()
+            thread.join()
+            return_code = process.wait()
+            if return_code != 0:
+                details = "\n".join(output_lines[-12:])
+                raise RuntimeError(
+                    "REAL-Video-Enhancer failed"
+                    + (f":\n{details}" if details else "")
+                )
+            if not partial.is_file():
+                raise RuntimeError("REAL-Video-Enhancer did not produce an output file")
+            actual_rate, actual_frames = probe_video(partial)
+            if actual_rate != target_rate or actual_frames != target_frames:
+                raise RuntimeError(
+                    "REAL-Video-Enhancer produced invalid output timing: "
+                    f"{actual_rate} FPS, {actual_frames} frames; expected "
+                    f"{target_rate} FPS, {target_frames} frames"
+                )
+            if completed != target_frames:
+                completed = target_frames
+                render(force=True)
+            if progress_is_tty:
+                print()
+            os.replace(partial, output)
+    finally:
+        stop_process()
+        if thread is not None:
+            thread.join(timeout=1.0)
+        partial.unlink(missing_ok=True)
+
+
 def concat_arguments() -> Namespace:
     return Namespace(
         mode="auto",
@@ -493,13 +844,24 @@ def run_pipeline(
                 print(f"Input: {source}")
                 print(f"Target FPS: {arguments.target_fps} ({target_frames} frames)")
                 return 0
-            run_interpolation(
-                source,
-                output,
-                arguments.target_fps,
-                target_frames,
-                arguments,
-            )
+            if arguments.engine == "rve":
+                run_interpolation_rve(
+                    source,
+                    output,
+                    source_rate,
+                    source_frames,
+                    arguments.target_fps,
+                    target_frames,
+                    arguments,
+                )
+            else:
+                run_interpolation(
+                    source,
+                    output,
+                    arguments.target_fps,
+                    target_frames,
+                    arguments,
+                )
             print(f"Finished: {output}")
             return 0
 
@@ -513,13 +875,24 @@ def run_pipeline(
             target_frames = target_frame_count(
                 source_rate, source_frames, arguments.target_fps
             )
-            run_interpolation(
-                master,
-                output,
-                arguments.target_fps,
-                target_frames,
-                arguments,
-            )
+            if arguments.engine == "rve":
+                run_interpolation_rve(
+                    master,
+                    output,
+                    source_rate,
+                    source_frames,
+                    arguments.target_fps,
+                    target_frames,
+                    arguments,
+                )
+            else:
+                run_interpolation(
+                    master,
+                    output,
+                    arguments.target_fps,
+                    target_frames,
+                    arguments,
+                )
         print(f"Finished: {output}")
         return 0
 
@@ -545,11 +918,20 @@ def parse_arguments(argv: list[str] | None = None) -> Namespace:
     parser.add_argument("-o", "--output", type=Path)
     parser.add_argument("--target-fps", type=parse_fraction, default=DEFAULT_TARGET_FPS)
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument(
+        "--engine",
+        choices=("rve", "vs-rife"),
+        default=DEFAULT_ENGINE,
+        help="FPS backend (default: rve; vs-rife is the VapourSynth fallback)",
+    )
     parser.add_argument("--python", type=Path, default=DEFAULT_FPS_PYTHON)
     parser.add_argument("--site-packages", type=Path, default=DEFAULT_FPS_SITE)
     parser.add_argument("--graph", type=Path, default=DEFAULT_GRAPH)
     parser.add_argument("--trt-cache", type=Path, default=DEFAULT_TRT_CACHE)
     parser.add_argument("--bestsource", type=Path, default=DEFAULT_BESTSOURCE)
+    parser.add_argument("--rve-root", type=Path, default=DEFAULT_RVE_ROOT)
+    parser.add_argument("--rve-model", type=Path, default=DEFAULT_RVE_MODEL)
+    parser.add_argument("--rve-shims", type=Path, default=DEFAULT_RVE_SHIMS)
     parser.add_argument(
         "--performance-mode",
         choices=("auto", "on", "off"),
@@ -575,6 +957,10 @@ def run_combined_pipeline(
     performance_mode: str,
     dry_run: bool,
     force: bool,
+    engine: str = DEFAULT_ENGINE,
+    rve_root: Path = DEFAULT_RVE_ROOT,
+    rve_model: Path = DEFAULT_RVE_MODEL,
+    rve_shims: Path = DEFAULT_RVE_SHIMS,
 ) -> int:
     arguments = parse_arguments([])
     arguments.output = output
@@ -583,6 +969,10 @@ def run_combined_pipeline(
     arguments.performance_mode = performance_mode
     arguments.dry_run = dry_run
     arguments.force = force
+    arguments.engine = engine
+    arguments.rve_root = rve_root
+    arguments.rve_model = rve_model
+    arguments.rve_shims = rve_shims
     return run_pipeline(paths, current_dir, arguments)
 
 
