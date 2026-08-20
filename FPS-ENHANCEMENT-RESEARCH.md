@@ -441,6 +441,55 @@ and the measured QP 18 quality are acceptable, QP 18 is the default
 speed/storage optimization; it is a delivery-encoding choice, not a change
 to the RIFE model or interpolation path.
 
+### REAL-Video-Enhancer comparison on the same 30-second source
+
+The corrected local REAL-Video-Enhancer backend was run against the same
+900-frame source and the same RIFE 4.26 weights. This was RVE `2.4.1-dev16`
+with selective TensorRT FP16 and the PyTorch `pixel_shuffle` fallback enabled
+through `RVE_TRT_TORCH_PIXEL=1`; the unmodified pure TensorRT FP16 path was
+not used because it produced the previously documented grid corruption. Both
+final-output runs used NVENC preset `p1`, constant QP 18, copied AAC audio,
+and a requested 60 FPS output.
+
+| Path | Wall time | Effective output rate | Video frames/duration | Final size | Peak VRAM | Peak power |
+| --- | ---: | ---: | --- | ---: | ---: | ---: |
+| Current `vs-rife` inference only | 30.84 s | 58.4 frames/s | 1,802 | None | 3,638 MiB | 187.52 W |
+| RVE inference only | **14.50 s** | 124.1 frames/s | 1,800 | None | 3,647 MiB | 223.35 W |
+| Current streamed final pipeline | 35.02 s | 51.5 frames/s | 1,802 / 30.033 s | 33,581,576 bytes | 3,843 MiB | 172.37 W |
+| RVE streamed final output | **16.50 s** | 109.1 frames/s | 1,800 / 30.000 s | 33,820,001 bytes | 3,941 MiB | 215.49 W |
+
+RVE is approximately 2.12x faster end-to-end and 2.13x faster in the
+inference-only comparison. It uses about 25% more peak board power and 2.5%
+more VRAM. Its output is 0.71% larger at the same QP 18 setting, with the
+same 1920x1080, BT.709, 60 FPS, YUV420P delivery format.
+
+The RVE output contains exactly 1,800 video frames (30.000 seconds) because
+its normal factor-2 policy doubles the 900 input frames. The production path
+uses rational duration preservation and emits 1,802 frames (30.033 seconds),
+matching the 29.97 FPS source timeline. Both files retain the source AAC
+stream, whose container duration is 30.144 seconds. Comparing the common
+1,800-frame window gave PSNR 39.85 dB and SSIM 0.98796 at direct frame
+alignment; allowing the one-frame ordering difference between the two
+frontends improved this to PSNR 40.85 dB and SSIM 0.99005. These are
+cross-implementation agreement metrics, not a ground-truth quality score for
+synthesized frames.
+
+The RVE output and a frame comparison sheet are retained here:
+
+```text
+/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/rve-4.26-q18.mp4
+/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/rve-vs-production-frames.jpg
+/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/rve-4.26-q18.log
+```
+
+**Result:** RVE is the fastest measured implementation of this model on the
+RTX 5070 Ti, but its current backend has a different frame-count policy,
+different RGB/scene-detection path, archived upstream status, and required
+local compatibility corrections. It is a strong candidate for a future
+production backend after preserving the exact rational timeline and adding
+the existing artifact gate; it should not silently replace the current
+pipeline solely from this speed result.
+
 ### GMFSS Fortuna
 
 GMFSS Fortuna is explicitly dedicated to anime video frame interpolation. Its
