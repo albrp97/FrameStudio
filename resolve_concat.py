@@ -354,6 +354,17 @@ def format_seconds(seconds: float | None) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds_value:02d}"
 
 
+def terminate_process(process: subprocess.Popen) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 def effective_jobs(requested: int, item_count: int) -> int:
     if requested < 0:
         raise RuntimeError("--jobs must be zero or greater")
@@ -365,13 +376,18 @@ def effective_jobs(requested: int, item_count: int) -> int:
 
 
 def run_command(command: list[str], label: str) -> None:
-    result = subprocess.run(
+    process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        check=False,
     )
+    try:
+        output, _ = process.communicate()
+    except KeyboardInterrupt:
+        terminate_process(process)
+        raise
+    result = subprocess.CompletedProcess(command, process.returncode, output)
     if result.returncode != 0:
         details = "\n".join(result.stdout.splitlines()[-8:])
         raise RuntimeError(f"FFmpeg failed during {label}:\n{details}")
@@ -452,6 +468,8 @@ def run_ffmpeg(command: list[str], total_duration: float, label: str) -> None:
                     print(message.lstrip(), flush=True)
                 last_report = now
     finally:
+        if process.poll() is None:
+            terminate_process(process)
         return_code = process.wait()
         if sys.stdout.isatty():
             print()

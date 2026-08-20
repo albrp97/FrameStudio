@@ -176,6 +176,15 @@ one global RIFE pass runs over the temporary master. Use
 During interpolation the console shows a live Pacman-style bar with percent,
 frame count, interpolation FPS, elapsed time, and ETA.
 
+Press `Ctrl+C` to cancel safely. The active FFmpeg/RIFE processes are stopped,
+the hidden `.partial` output is deleted, and any temporary multi-input master
+and normalized parts are removed. The source files and any previously completed
+output remain unchanged. Frames are streamed through a pipe rather than stored
+as an intermediate image sequence; the TensorRT engine cache is intentionally
+kept for faster future runs. A forced `SIGKILL` or power loss can prevent
+cleanup, so inspect `/tmp/resolve-fps-*` and hidden `.partial` files if the
+machine is forcibly stopped.
+
 The validated strategy is a two-stage run. First create one compatible
 stream-copy master; then run one global RIFE 4.26 pass over that master. Do
 not run RIFE separately on each input clip, because resetting the 29.97-to-60
