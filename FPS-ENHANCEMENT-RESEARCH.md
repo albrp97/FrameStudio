@@ -1,14 +1,15 @@
 # Modern FPS Enhancement Research
 
-Research snapshot: 2026-08-19
+Research snapshot: 2026-08-20
 
 This report evaluates current ways to increase the frame rate of video for
 the Resolve media workflow. It covers neural video frame interpolation (VFI),
 classical motion-compensated conversion, diffusion-based frame generation,
 inference runtimes, Linux support, and a practical setup for the RTX 5070 Ti.
 
-A controlled local benchmark, one-minute render, and REAL-Video-Enhancer
-evaluation are now included below.
+A controlled local benchmark, one-minute render, REAL-Video-Enhancer
+evaluation, and concat/interpolation integration benchmark are now included
+below.
 Performance numbers are labeled as local measurements, upstream measurements,
 or estimates. The local render is an experimental reference, not yet a
 production `resolve-fps` command.
@@ -312,6 +313,85 @@ profile if it fails.
 The current `vs-rife` implementation does not support ensemble mode for RIFE
 4.26 and `4.26.heavy`. Do not enable that option for those models; use a
 different model or a separate comparison if ensemble smoothing is needed.
+
+## Concat/interpolation integration benchmark
+
+This local benchmark compared three ways to process three contiguous sections
+before choosing the production integration. The source was:
+
+```text
+/home/ghiki/Documents/edit/copy-concatenated-29.97fps-parallel.mp4
+```
+
+The first 90 seconds were decoded into three normalized 1920x1080,
+30000/1001-FPS clips. Each contained exactly 900 frames (about 30.03 seconds
+of video) and 30 seconds of AAC audio. All runs used RIFE 4.26 standard,
+selective TensorRT FP16 (`RGBH` plus the PyTorch `pixel_shuffle` fallback),
+BestSource with BT.709 limited-range conversion, scene detection, 60/1 FPS,
+a 5,400-frame trim, YUV420P10, and the same NVENC H.264 QP 1 delivery encode.
+The two one-pass runs also used explicit 30/60-second boundary markers; the
+per-clip run reset naturally at each clip start. Audio was copied once from
+the 90-second stream-copy master.
+
+| Strategy | Physical/final concat | RIFE plus video encode | Sequential total | Peak VRAM | Peak board power |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Concatenate first, then one RIFE pass | 0.46 s | 103.67 s | **104.13 s** | 3,718 MiB | 168.16 W |
+| Fused VapourSynth splice, then one RIFE pass | none | 103.83 s | **103.83 s** | 3,718 MiB | 168.21 W |
+| RIFE each clip, then stream-copy join | 2.18 s final join | 36.99 + 36.75 + 37.15 s | **113.08 s** | 3,718 MiB | 167.77 W |
+
+The per-clip row is sequential, which is the safe policy for one 16 GB GPU.
+Running three full-resolution TensorRT jobs concurrently was not used because
+it would contend for the same engine and memory rather than provide an
+independent throughput measurement.
+
+All final outputs contained 5,400 video frames at exactly 60 FPS and 90.000
+seconds. The AAC stream was 90.081333 seconds in every output, started at
+zero, and remained copied rather than re-encoded; the 81 ms excess is the
+source AAC padding, not progressive sync drift.
+
+| Output | Final size | Size per video second | Video bitrate | Validation |
+| --- | ---: | ---: | ---: | --- |
+| Concatenate-first / fused | 2,010,126,338 bytes (1.872 GiB) | 22.33 MB/s | 178.476 Mb/s | The two files are byte-identical |
+| Per-clip join | 2,000,718,982 bytes (1.863 GiB) | 22.23 MB/s | 177.640 Mb/s | Same frame count and audio duration |
+
+The benchmark outputs and inspection sheets are in:
+
+```text
+/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/outputs/postconcat-rife.mp4
+/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/outputs/fused-rife.mp4
+/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/outputs/perclip-rife.mp4
+/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/inspect/boundary/boundary-comparison.jpg
+```
+
+The one-pass concat-first and fused outputs are bit-for-bit identical and
+showed no TensorRT grid artifact in the sampled motion-heavy frames. The
+per-clip output was also visually clean, but it resets the target cadence at
+each 30.03-second input section. Its decoded output measured SSIM 0.9664 and
+PSNR 32.04 dB against the concat-first output; the first 1,800 frames were
+identical, and differences began at the first reset boundary and accumulated
+in later sections. This is a timing/cadence difference, not a new grid
+corruption: forcing each 900-frame 29.97-FPS segment to exactly 1,800 frames
+compresses each segment to 30.000 seconds.
+
+**Decision:** concatenate compatible clips first, then run one global RIFE
+pass with explicit boundary markers and one final audio remux. It is about
+8.95 seconds faster than the separate-pass path in this 90-second test and
+avoids per-clip cadence resets. The fused splice is a valid disk-saving
+optimization, but its roughly 0.3-second end-to-end advantage over the simple
+0.46-second stream-copy
+master is not material and it adds runtime complexity; it is not the default
+recommendation.
+If per-clip processing is ever required, frame counts must be allocated from
+the global rational timeline rather than blindly using `2 * input_frames`.
+
+The installed system VSPipe embeds Python 3.14, while the validated RIFE
+environment is Python 3.13. The benchmark therefore evaluated the same
+VapourSynth graph through `/home/ghiki/.cache/resolve-fps/trt/bin/python`
+with the environment's `site-packages` on `PYTHONPATH`; mixing the system
+VSPipe with the RIFE environment reproduces the initialization or NumPy ABI
+failure. The persistent graph harness is
+`/home/ghiki/.cache/resolve-fps/benchmark.vpy`; `BOUNDARIES=900,1800` enables
+the explicit splice markers.
 
 ### GMFSS Fortuna
 
