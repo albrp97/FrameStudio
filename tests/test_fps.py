@@ -8,6 +8,7 @@ from resolve_fps import (
     build_encode_command,
     default_output,
     parse_arguments,
+    progress_line,
     run_pipeline,
     target_frame_count,
 )
@@ -41,6 +42,14 @@ class FpsTests(unittest.TestCase):
         )
         self.assertIn("-c:a", command)
         self.assertEqual(command[command.index("-c:a") + 1], "copy")
+
+    def test_progress_line_contains_pacman_metrics(self):
+        line = progress_line(50, 100, 0.0, now=10.0)
+        self.assertIn("50.00%", line)
+        self.assertIn("frame 50/100", line)
+        self.assertIn("elapsed 00:00:10", line)
+        self.assertIn("ETA 00:00:10", line)
+        self.assertIn("C", line)
 
     def test_single_input_skips_concat(self):
         with TemporaryDirectory() as temporary_directory:

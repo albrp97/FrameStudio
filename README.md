@@ -173,6 +173,9 @@ one global RIFE pass runs over the temporary master. Use
 `resolve-fps --root /path/to/folder` to start the selector elsewhere. Run
 `./install.sh` once to install the command into `~/bin`.
 
+During interpolation the console shows a live Pacman-style bar with percent,
+frame count, interpolation FPS, elapsed time, and ETA.
+
 The validated strategy is a two-stage run. First create one compatible
 stream-copy master; then run one global RIFE 4.26 pass over that master. Do
 not run RIFE separately on each input clip, because resetting the 29.97-to-60

@@ -6,12 +6,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import queue
+import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 from argparse import Namespace
 from fractions import Fraction
 from pathlib import Path
+from typing import BinaryIO
 
 from resolve_concat import (
     DEFAULT_TUI_ROOT,
@@ -23,6 +28,9 @@ from resolve_concat import (
 )
 
 
+PROGRESS_PATTERN = re.compile(
+    r"frame=(?P<frame>\d+)/(?P<total>\d+)\s+elapsed=(?P<elapsed>[0-9.]+)s"
+)
 DEFAULT_MODEL = "4.26"
 DEFAULT_TARGET_FPS = Fraction(60, 1)
 DEFAULT_FPS_PYTHON = (
@@ -171,6 +179,8 @@ def build_encode_command(
         "-hide_banner",
         "-y",
         "-nostdin",
+        "-loglevel",
+        "error",
         "-f",
         "yuv4mpegpipe",
         "-i",
@@ -212,6 +222,47 @@ def build_encode_command(
         ]
     )
     return command
+
+
+def format_clock(seconds: float | None) -> str:
+    if seconds is None or seconds < 0:
+        return "--:--:--"
+    whole = int(seconds)
+    hours, remainder = divmod(whole, 3600)
+    minutes, seconds_value = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds_value:02d}"
+
+
+def progress_line(
+    completed: int,
+    total: int,
+    started: float,
+    now: float | None = None,
+) -> str:
+    now = time.monotonic() if now is None else now
+    elapsed = max(0.0, now - started)
+    fraction = min(1.0, completed / total) if total else 0.0
+    width = 30
+    position = min(width - 1, int(fraction * width)) if width else 0
+    bar = "=" * position + "C" + "-" * max(0, width - position - 1)
+    speed = completed / elapsed if elapsed > 0 else 0.0
+    eta = (total - completed) / speed if speed > 0 else None
+    return (
+        f"[{bar}] {fraction * 100:6.2f}% "
+        f"frame {completed}/{total} {speed:7.2f} fps "
+        f"elapsed {format_clock(elapsed)} ETA {format_clock(eta)}"
+    )
+
+
+def drain_stderr(
+    stream: BinaryIO,
+    label: str,
+    messages: queue.Queue[tuple[str, str | None]],
+) -> None:
+    for raw_line in iter(stream.readline, b""):
+        messages.put((label, raw_line.decode(errors="replace").rstrip()))
+    stream.close()
+    messages.put((label, None))
 
 
 def run_interpolation(
@@ -266,24 +317,98 @@ def run_interpolation(
     )
     writer: subprocess.Popen[bytes] | None = None
     encoder: subprocess.Popen[bytes] | None = None
+    messages: queue.Queue[tuple[str, str | None]] = queue.Queue()
+    threads: list[threading.Thread] = []
+    writer_errors: list[str] = []
+    encoder_errors: list[str] = []
+    completed = 0
+    started = time.monotonic()
+    progress_is_tty = os.isatty(1)
+
+    def render(force: bool = False) -> None:
+        if not progress_is_tty and not force:
+            return
+        text = progress_line(completed, target_frames, started)
+        if progress_is_tty:
+            print(f"\r{text}", end="", flush=True)
+        elif force:
+            print(text, flush=True)
+
     try:
         writer = subprocess.Popen(
             [str(arguments.python), str(helper), str(arguments.graph)],
             env=environment,
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         assert writer.stdout is not None
+        assert writer.stderr is not None
         encoder = subprocess.Popen(
             build_encode_command(source, partial, arguments.encoder),
             stdin=writer.stdout,
+            stderr=subprocess.PIPE,
         )
+        assert encoder.stderr is not None
         writer.stdout.close()
-        encoder_return_code = encoder.wait()
-        writer_return_code = writer.wait()
+        for stream, label in (
+            (writer.stderr, "writer"),
+            (encoder.stderr, "encoder"),
+        ):
+            thread = threading.Thread(
+                target=drain_stderr,
+                args=(stream, label, messages),
+                daemon=True,
+            )
+            thread.start()
+            threads.append(thread)
+        render(force=True)
+        streams_finished: set[str] = set()
+        while len(streams_finished) < 2:
+            try:
+                label, line = messages.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if line is None:
+                streams_finished.add(label)
+                continue
+            if label == "writer":
+                match = PROGRESS_PATTERN.search(line)
+                if match:
+                    completed = min(
+                        target_frames,
+                        int(match.group("frame")),
+                    )
+                    if progress_is_tty:
+                        render()
+                elif line:
+                    writer_errors.append(line)
+            elif line:
+                encoder_errors.append(line)
+        for thread in threads:
+            thread.join()
+        if writer.poll() is None:
+            writer.wait()
+        if encoder.poll() is None:
+            encoder.wait()
+        writer_return_code = writer.returncode
+        encoder_return_code = encoder.returncode
         if encoder_return_code != 0:
-            raise RuntimeError("FFmpeg failed while encoding the FPS output")
+            details = "\n".join(encoder_errors[-8:])
+            raise RuntimeError(
+                "FFmpeg failed while encoding the FPS output"
+                + (f":\n{details}" if details else "")
+            )
         if writer_return_code != 0:
-            raise RuntimeError("RIFE/VapourSynth failed while generating frames")
+            details = "\n".join(writer_errors[-8:])
+            raise RuntimeError(
+                "RIFE/VapourSynth failed while generating frames"
+                + (f":\n{details}" if details else "")
+            )
+        if completed != target_frames:
+            completed = target_frames
+            render(force=True)
+        if progress_is_tty:
+            print()
         os.replace(partial, output)
     finally:
         if encoder is not None and encoder.poll() is None:
@@ -292,6 +417,8 @@ def run_interpolation(
         if writer is not None and writer.poll() is None:
             writer.terminate()
             writer.wait()
+        for thread in threads:
+            thread.join(timeout=1.0)
         partial.unlink(missing_ok=True)
 
 

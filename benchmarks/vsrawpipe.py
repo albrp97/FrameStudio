@@ -48,12 +48,17 @@ def main() -> int:
     output_stream.write(header)
 
     started = time.monotonic()
+    progress_interval = max(1, clip.num_frames // 100)
     for frame_number in range(clip.num_frames):
         frame = clip.get_frame(frame_number)
         output_stream.write(b"FRAME\n")
         for plane_number in range(frame.format.num_planes):
             output_stream.write(frame[plane_number].tobytes())
-        if frame_number == 0 or (frame_number + 1) % 100 == 0:
+        if (
+            frame_number == 0
+            or (frame_number + 1) % progress_interval == 0
+            or frame_number + 1 == clip.num_frames
+        ):
             elapsed = time.monotonic() - started
             print(
                 f"frame={frame_number + 1}/{clip.num_frames} "
