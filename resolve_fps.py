@@ -521,6 +521,24 @@ def parse_arguments(argv: list[str] | None = None) -> Namespace:
     return parser.parse_args(argv)
 
 
+def run_combined_pipeline(
+    paths: list[Path],
+    current_dir: Path,
+    output: Path | None,
+    model: str,
+    encoder: str,
+    dry_run: bool,
+    force: bool,
+) -> int:
+    arguments = parse_arguments([])
+    arguments.output = output
+    arguments.model = model
+    arguments.encoder = encoder
+    arguments.dry_run = dry_run
+    arguments.force = force
+    return run_pipeline(paths, current_dir, arguments)
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     requested_output = (

@@ -58,7 +58,7 @@ resolve-media --gpu auto           # quiet GPU detection with CPU fallback
 resolve-media --version
 ```
 
-To open the concat selector anywhere in a terminal:
+To open the combined concat-and-FPS selector anywhere in a terminal:
 
 ```sh
 resolve-concat
@@ -66,10 +66,11 @@ resolve-concat
 
 The TUI starts in `~/Documents/edit`. Navigate with the arrow keys or `j/k`,
 use `Right/l` to enter a folder, press `Space` on each video to select it, and
-press `Enter` to concatenate the selected videos in filename order. `a`
-selects every video in the current folder, `n` clears the selection, and
-`Left/h/Backspace` goes up. Use `resolve-concat --root ~/Videos` to start in a
-different folder.
+press `Enter` to run the complete workflow. One selected video goes directly
+to FPS enhancement with audio stream-copy; multiple selected videos are
+concatenated once and then enhanced globally. `a` selects every video in the
+current folder, `n` clears the selection, and `Left/h/Backspace` goes up. Use
+`resolve-concat --root ~/Videos` to start in a different folder.
 
 For a non-interactive run, pass the folder directly:
 
@@ -77,17 +78,15 @@ For a non-interactive run, pass the folder directly:
 resolve-concat ~/Documents/edit/copy
 ```
 
-It chooses the most common resolution and the lowest nominal frame rate. It
-normally normalizes each file independently with three bounded GPU workers,
-then joins the identical temporary parts with a stream-copy pass. The
+For a multiple-video run it chooses the most common resolution and the lowest
+nominal frame rate, normalizes each file independently with bounded GPU
+workers when needed, joins the temporary parts, and then performs one RIFE
+pass. `--concat-only` preserves the older concat-without-FPS behavior. The
 single-process filter graph remains available with `--strategy single`. The
-output is MP4 with H.264 High, 8-bit `yuv420p`, BT.709 tags, `faststart`, and
-AAC-LC stereo at 48 kHz/192 kb/s. The default GPU path uses NVIDIA H.264
-NVENC for speed; use `--gpu off` for the more compression-efficient
-`libx264` `slow`/CRF 20 path. Use `--jobs N` to override the automatic worker
-count or `--jobs 1` for sequential normalization. LosslessCut uses the same
-FFmpeg engine, but its stream-copy merge cannot normalize a mixed 30/29.97 fps
-folder or tune audio. The benchmark and redesign results are recorded in
+delivery output is MP4 with H.264, 8-bit `yuv420p`, BT.709 tags, `faststart`,
+and the original audio stream copied at the final remux. LosslessCut uses the
+same FFmpeg engine, but its stream-copy merge cannot normalize a mixed
+30/29.97 fps folder. The benchmark and redesign results are recorded in
 [`FAST-CONCAT-RESEARCH.md`](FAST-CONCAT-RESEARCH.md).
 
 Frame-rate enhancement research is recorded in
@@ -151,27 +150,26 @@ bounded parallel conversion automatically; use `--jobs 1` for sequential
 processing or `--jobs N` to choose a specific worker count. On the benchmark
 sample, `performance` reduced one conversion from about 1.08s to 0.89s.
 
-`resolve-concat` uses the same temporary performance-profile behavior. Its
-parallel strategy cleans normalized parts after the final join, preserves
+The integrated workflow cleans normalized parts after the final join, preserves
 source files, and retries with CPU H.264 if automatic GPU encoding fails.
-Use `--strategy single` to reproduce the older one-process path.
+Use `--concat-only` to reproduce the older one-process concat behavior.
 
 ### FPS enhancement: concatenate first, then interpolate once
 
-For the production workflow, use the installed FPS command:
+The single-tool production workflow is `resolve-concat`; the installed
+`resolve-fps` command remains available for direct FPS-only use:
 
 ```sh
-resolve-fps
+resolve-concat
 ```
 
-It opens the same folder-selection TUI. Select one video and it goes directly
-to RIFE: no concatenation and no audio transformation are performed; the
-original audio stream is copied into the final MP4. When multiple videos are
-selected, they are concatenated once with audio normalization disabled, then
-one global RIFE pass runs over the temporary master. Use
-`resolve-fps /path/to/video.mp4 --force` for a direct single-file run or
-`resolve-fps --root /path/to/folder` to start the selector elsewhere. Run
-`./install.sh` once to install the command into `~/bin`.
+Select one video and it goes directly to RIFE: no concatenation and no audio
+transformation are performed; the original audio stream is copied into the
+final MP4. When multiple videos are selected, they are concatenated once with
+audio normalization disabled, then one global RIFE pass runs over the
+temporary master. Use `resolve-fps /path/to/video.mp4 --force` only when a
+separate FPS-only command is desired. Run `./install.sh` once to install both
+commands into `~/bin`.
 
 During interpolation the console shows a live Pacman-style bar with percent,
 frame count, interpolation FPS, elapsed time, and ETA.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Concatenate a folder of videos with the fastest safe path."""
+"""Select videos and run the concat-first FPS workflow."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover - platform fallback
 
 VIDEO_EXTENSIONS = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".mxf", ".webm"}
 DEFAULT_TUI_ROOT = Path.home() / "Documents" / "edit"
+DEFAULT_FPS_MODEL = "4.26"
 TARGET_MEAN_RMS_DB = -35.0
 TARGET_MEDIAN_DB = -50.0
 TARGET_PEAK_DB = -1.0
@@ -845,7 +846,7 @@ class ConcatTUI:
         self,
         stdscr: Any,
         root: Path,
-        title: str = "| RESOLVE CONCAT // SELECT INPUT VIDEOS",
+        title: str = "| RESOLVE CONCAT + FPS // SELECT INPUT VIDEOS",
     ):
         self.stdscr = stdscr
         self.root = root.expanduser().resolve()
@@ -956,7 +957,12 @@ class ConcatTUI:
     def help(self) -> None:
         self.stdscr.erase()
         height, width = self.stdscr.getmaxyx()
-        operation = "FPS enhancement" if "FPS" in self.title else "concat"
+        if "CONCAT + FPS" in self.title:
+            operation = "concat + FPS"
+        elif "FPS" in self.title:
+            operation = "FPS enhancement"
+        else:
+            operation = "concat"
         lines = [
             f"Resolve {operation} help",
             "",
@@ -1054,7 +1060,7 @@ class ConcatTUI:
 
 def interactive_selection(
     root: Path,
-    title: str = "| RESOLVE CONCAT // SELECT INPUT VIDEOS",
+    title: str = "| RESOLVE CONCAT + FPS // SELECT INPUT VIDEOS",
 ) -> tuple[list[Path], Path] | None:
     if curses is None:
         raise RuntimeError(
@@ -1068,21 +1074,36 @@ def interactive_selection(
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Concatenate videos with stream copy or GPU normalization; "
-            "no input opens a selector TUI."
+            "Run concat-first FPS enhancement; no input opens the selector TUI."
         )
     )
     parser.add_argument(
         "input_dir",
         nargs="?",
         type=Path,
-        help="Folder containing videos; omit to open the selector TUI",
+        help="Video file or folder; omit to open the selector TUI",
     )
     parser.add_argument(
         "--root",
         type=Path,
         default=DEFAULT_TUI_ROOT,
         help=f"TUI starting folder (default: {DEFAULT_TUI_ROOT})",
+    )
+    parser.add_argument(
+        "--concat-only",
+        action="store_true",
+        help="Only concatenate; skip FPS enhancement",
+    )
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_FPS_MODEL,
+        help="RIFE model for the integrated FPS pass (default: 4.26)",
+    )
+    parser.add_argument(
+        "--encoder",
+        choices=("h264_nvenc", "libx264"),
+        default="h264_nvenc",
+        help="delivery encoder for the integrated FPS pass",
     )
     parser.add_argument(
         "-o",
@@ -1118,7 +1139,10 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
         "--audio-normalization",
         choices=("on", "off"),
         default="on",
-        help="Target -35 dBFS RMS and -50 dBFS median per audio track",
+        help=(
+            "audio gain policy for --concat-only; the integrated FPS workflow "
+            "preserves audio gain"
+        ),
     )
     parser.add_argument(
         "--performance-mode",
@@ -1299,11 +1323,30 @@ def main(argv: list[str] | None = None) -> int:
         paths = find_selected_inputs(selected_paths, requested_output)
     else:
         input_dir = arguments.input_dir.expanduser().resolve()
-        paths = find_inputs(input_dir, requested_output)
-    return concatenate(paths, input_dir, requested_output, arguments)
+        if input_dir.is_dir():
+            paths = find_inputs(input_dir, requested_output)
+        elif input_dir.is_file():
+            paths = find_selected_inputs([input_dir], requested_output)
+            input_dir = input_dir.parent
+        else:
+            raise RuntimeError(f"Input path does not exist: {input_dir}")
+    if arguments.concat_only:
+        return concatenate(paths, input_dir, requested_output, arguments)
+    from resolve_fps import run_combined_pipeline
+
+    return run_combined_pipeline(
+        paths,
+        input_dir,
+        requested_output,
+        arguments.model,
+        arguments.encoder,
+        arguments.dry_run,
+        arguments.force,
+    )
 
 
 if __name__ == "__main__":
+    sys.modules.setdefault("resolve_concat", sys.modules[__name__])
     try:
         raise SystemExit(main())
     except KeyboardInterrupt:
