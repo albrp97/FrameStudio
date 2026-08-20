@@ -2,7 +2,7 @@ import unittest
 from fractions import Fraction
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from resolve_fps import (
     build_encode_command,
@@ -10,6 +10,7 @@ from resolve_fps import (
     default_output,
     parse_arguments,
     progress_line,
+    remux_rve_audio,
     rve_base_frame_count,
     rve_interpolation_factor,
     run_pipeline,
@@ -64,6 +65,21 @@ class FpsTests(unittest.TestCase):
         self.assertIn("tpad=stop_mode=clone:stop=2", command)
         self.assertIn("-frames:v 1802", command)
         self.assertIn("-f mp4", command)
+
+    def test_rve_audio_remux_handles_completed_process_output(self):
+        process = Mock(returncode=0)
+        process.communicate.return_value = ("", "")
+        with (
+            patch("resolve_fps.require_tool", return_value="ffmpeg"),
+            patch("resolve_fps.subprocess.Popen", return_value=process) as popen,
+        ):
+            remux_rve_audio(
+                Path("source.mp4"),
+                Path("video.mp4"),
+                Path("output.mp4"),
+            )
+        popen.assert_called_once()
+        process.communicate.assert_called_once_with()
 
     def test_progress_line_contains_pacman_metrics(self):
         line = progress_line(50, 100, 0.0, now=10.0)

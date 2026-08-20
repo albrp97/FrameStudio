@@ -474,7 +474,7 @@ def remux_rve_audio(source: Path, video: Path, output: Path) -> None:
                 pass
             process.wait()
         raise
-    result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    result = subprocess.CompletedProcess(command, process.returncode, None, stderr)
     if result.returncode != 0:
         raise RuntimeError(
             "FFmpeg failed while restoring the source audio stream"
