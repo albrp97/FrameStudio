@@ -1,0 +1,51 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install media and GTK runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            ffmpeg \
+            gir1.2-gtk-4.0 \
+            python3-gi \
+            python3-venv
+
+      - name: Create Python quality environment
+        run: /usr/bin/python3 -m venv --system-site-packages .venv
+
+      - name: Install pinned Python quality tools
+        run: .venv/bin/python -m pip install --requirement requirements-dev.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install pinned npm quality tools
+        run: npm ci
+
+      - name: Run repository quality suite
+        run: make quality PYTHON=.venv/bin/python
+
+      - name: Upload static-analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-reports
+          path: evidence/static-analysis
+          if-no-files-found: warn

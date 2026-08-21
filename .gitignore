@@ -1,3 +1,13 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+evidence/static-analysis/*.json
+evidence/static-analysis/*.sarif
+evidence/static-analysis/*.md
+!evidence/static-analysis/baseline.json

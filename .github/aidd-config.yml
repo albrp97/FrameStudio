@@ -1,0 +1,275 @@
+# Optional repository-specific AIDD delivery configuration.
+#
+# Empty command arrays mean "discover the repository's command" rather than
+# "skip the check". Do not store credentials, tokens, or other secrets here.
+version: 1
+
+delivery:
+  artifacts:
+    plan: docs/planning/backlog.md
+    legacy_plan: plan.md
+    repository_map: docs/planning/repo-map.md
+    objective: vision.md
+    scope: docs/specs/project-scope.md
+    capability_map: docs/specs/capability-map.md
+    phase_index: docs/planning/phases.md
+    phase_directory: docs/planning/phases
+    phase_open_directory: docs/planning/phases/open
+    phase_closed_directory: docs/planning/phases/closed
+    feature_index: docs/planning/features.md
+    feature_directory: docs/planning/features
+    feature_open_directory: docs/planning/features/open
+    feature_closed_directory: docs/planning/features/closed
+    backlog: docs/planning/backlog.md
+    ticket_directory: docs/planning/tickets
+    ticket_open_directory: docs/planning/tickets/open
+    ticket_closed_directory: docs/planning/tickets/closed
+    review_directory: docs/planning/reviews
+    evidence_directory: evidence
+    activity_log: activity-log.md
+    agent_instructions: AGENTS.md
+    project_readme: README.md
+
+  planning:
+    depth: auto # lightweight | standard | full | auto
+    default_for_new_project: full
+    canonical_vocabulary:
+      objective: objective
+      scope: scope
+      capability: capability
+      phase: phase
+      feature: feature
+      ticket: ticket
+    id_prefixes:
+      objective: OBJ
+      scope: SCOPE
+      capability: CAP
+      phase: PHASE
+      feature: FEAT
+      ticket: TICKET
+    statuses:
+      draft: draft
+      confirmed: confirmed
+      needs_review: needs-review
+      blocked: blocked
+      complete: complete
+    require_parent_approval: true
+    preserve_ids_on_rename: true
+    require_coverage_links: true
+    active_phase_selection: highest-ranked-ready-ticket
+    record_filename: "{id}-{slug}.md"
+    move_records_on_status_change: true
+    require_index_sync: true
+    preserve_path_history: true
+    status_directories:
+      open:
+        - draft
+        - confirmed
+        - needs-review
+        - proposed
+        - planned
+        - active
+        - pending
+        - baseline
+        - inProgress
+        - verifying
+        - gated
+        - blocked
+      closed:
+        - complete
+        - completed
+        - cancelled
+
+  approval:
+    mode: user # user | review | repository
+    before_child_planning: true
+    before_ticket_execution: true
+    before_next_ticket: true
+
+  repository:
+    provider: auto # github | azure-devops | other | auto
+    base_branch: null
+    target_branch: null
+    ticket_branch_pattern: "ticket/{ticket-slug}"
+
+  version_control:
+    dedicated_branch_required: true
+    commit:
+      required_before_push: true
+      require_review: true
+      require_user_validation: true
+    push:
+      enabled: true
+      require_approval: true
+      remote: null
+      set_upstream: true
+      allow_force: false
+      require_clean_worktree: false
+
+  commands:
+    format:
+      - make format-check
+    lint:
+      - make lint
+    type_check:
+      - make type-check
+    build: []
+    unit:
+      - make test
+    integration:
+      - make smoke
+    end_to_end: []
+    browser: []
+    security:
+      - make security
+    coverage: []
+    migration: []
+    contract:
+      - make contract
+
+  static_analysis:
+    enabled: true
+    run_on_review: true
+    policy: auto # disabled | optional | required | auto
+    default_mode: diff # diff | full
+    deep_mode: full
+    report_directory: evidence/static-analysis
+    report_formats:
+      - json
+    baseline:
+      enabled: true
+      path: evidence/static-analysis/baseline.json
+      gate_new_findings_only: true
+      preserve_existing_findings: true
+    parity:
+      required: true
+      compare_with_pr: true
+      fail_on_mismatch: true
+      source: ci-and-manifests
+      compare:
+        - commands
+        - tool_versions
+        - configuration
+        - rules_or_profiles
+        - include_exclude_scope
+        - thresholds
+        - baseline_or_reference
+        - report_and_exit_policy
+    remediation:
+      mode: orchestrated # report | handoff | orchestrated
+      require_approval: true
+      max_iterations: 5
+      scope: changed-or-new
+      one_finding_per_fix: true
+    tools:
+      formatter:
+        enabled: true
+        required: auto
+        command:
+          - make format-check
+        recommended: "ruff format --check"
+        check_only: true
+      linter:
+        enabled: true
+        required: auto
+        command:
+          - make lint
+        recommended: "ruff check"
+        check_only: true
+      type_check:
+        enabled: true
+        required: auto
+        command:
+          - make type-check
+        recommended: "mypy"
+        check_only: true
+      complexity:
+        enabled: true
+        required: auto
+        command:
+          - make complexity
+        recommended: "Ruff C901 complexity rules"
+        check_only: true
+      duplication:
+        enabled: true
+        required: auto
+        command:
+          - make duplication
+        recommended: "jscpd"
+        check_only: true
+      dependencies:
+        enabled: true
+        required: auto
+        command:
+          - make dependency-check
+          - make dependency-audit
+        recommended: "repository dependency boundaries and pip-audit"
+        check_only: true
+      security:
+        enabled: true
+        required: auto
+        command:
+          - make security
+        recommended: "Bandit"
+        check_only: true
+      sonarqube:
+        enabled: false # Optional deep mode; no local server or scanner is configured.
+        required: optional
+        command: []
+        scanner_command: []
+        recommended: "SonarQube Community Build with the matching SonarScanner"
+        mode: deep
+        check_only: true
+      churn:
+        enabled: true
+        required: optional
+        command:
+          - make churn
+        recommended: "npx aidd churn --json"
+        check_only: true
+
+  gates:
+    baseline_required: true
+    user_validation_required: true
+    real_system_categories:
+      - api
+      - persistence
+      - integration
+      - user-facing
+    local_quality_required: true
+    remote_checks_required: true
+    independent_review: false
+    churn: optional # required | optional | disabled
+    end_to_end_before_commit: null
+
+  evidence:
+    path: evidence
+    filename: "{ticket-slug}.md"
+    retention: until-pr-ready # until-pr-ready | branch | permanent
+    include_environment: true
+    include_artifacts: true
+    redact_sensitive_values: true
+
+  ui:
+    before_after_required: true
+    screenshot_directory: evidence/screenshots
+
+  pull_request:
+    required: auto # required | optional | disabled | auto
+    reviewers: []
+    merge_strategy: repository-default
+    auto_merge: false
+    poll_seconds: null
+    require_approval: true
+    provider_adapter: auto
+
+  security:
+    redact_secrets: true
+    allow_credentials_in_config: false
+
+  delegation:
+    branch_strategy: isolated # isolated | shared | repository
+    allow_shared_branch_push: false
+    require_file_ownership: true
+    integration_owner: orchestrator
+    max_parallel: null

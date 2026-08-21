@@ -1,0 +1,150 @@
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+from resolve_editor.export import ExportPlan
+from resolve_editor.media import MediaProbe
+from resolve_editor.model import Project, ProjectValidationError
+from resolve_editor.operations import (
+    create_project_from_source,
+    export_destination_conflicts_with_project,
+    plan_project_export,
+    set_segment_deleted,
+    split_segment,
+    toggle_segment_deleted,
+)
+
+
+def make_project(root: Path) -> Project:
+    source = root / "source.mp4"
+    source.write_bytes(b"fixture")
+    return Project.create(
+        source,
+        {
+            "duration_seconds": 10.0,
+            "width": 320,
+            "height": 180,
+            "frame_rate": "10/1",
+            "video_codec": "h264",
+            "audio_codec": None,
+            "format_name": "mp4",
+        },
+    )
+
+
+def make_probe(root: Path) -> MediaProbe:
+    return MediaProbe(
+        path=root / "source.mp4",
+        duration_seconds=10.0,
+        width=320,
+        height=180,
+        frame_rate="10/1",
+        video_codec="h264",
+        audio_codec=None,
+        format_name="mp4",
+    )
+
+
+class EditorOperationsTests(unittest.TestCase):
+    def test_export_destination_conflict_uses_resolved_project_paths(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project_path = root / "edit.resolve.json"
+            project_path.write_text("project", encoding="utf-8")
+
+            self.assertTrue(
+                export_destination_conflicts_with_project(
+                    project_path,
+                    root / "." / "edit.resolve.json",
+                )
+            )
+            self.assertFalse(
+                export_destination_conflicts_with_project(
+                    None,
+                    project_path,
+                )
+            )
+            self.assertFalse(
+                export_destination_conflicts_with_project(
+                    project_path,
+                    root / "edited.mp4",
+                )
+            )
+
+    def test_create_project_from_source_uses_the_shared_probe_boundary(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"fixture")
+
+            with patch(
+                "resolve_editor.operations.probe_media",
+                return_value=make_probe(root),
+            ) as probe:
+                project = create_project_from_source(source)
+
+            probe.assert_called_once_with(source, "ffprobe")
+            self.assertEqual(project.source.metadata["width"], 320)
+            self.assertEqual(project.duration_seconds, 10.0)
+
+    def test_split_and_deletion_operations_use_timeline_invariants(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            first, second = split_segment(project.segment_timeline, 4.0)
+
+            self.assertEqual((first.start_seconds, first.end_seconds), (0.0, 4.0))
+            self.assertEqual((second.start_seconds, second.end_seconds), (4.0, 10.0))
+            self.assertTrue(
+                set_segment_deleted(
+                    project.segment_timeline,
+                    second.segment_id,
+                    True,
+                )
+            )
+            self.assertTrue(project.segment_timeline.segments[1].deleted)
+            self.assertFalse(
+                toggle_segment_deleted(
+                    project.segment_timeline,
+                    second.segment_id,
+                )
+            )
+            self.assertFalse(project.segment_timeline.segments[1].deleted)
+
+            with self.assertRaises(ProjectValidationError):
+                split_segment(project.segment_timeline, 0.0)
+
+    def test_project_export_planning_is_a_shared_boundary(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            expected = ExportPlan(
+                route="stream-copy",
+                source=root / "source.mp4",
+                destination=root / "edited.mp4",
+                segments=tuple(project.segment_timeline.segments),
+                expected_duration_seconds=10.0,
+                reason="shared plan",
+            )
+
+            with (
+                patch(
+                    "resolve_editor.operations.probe_media",
+                    return_value=make_probe(root),
+                ),
+                patch(
+                    "resolve_editor.operations.plan_export",
+                    return_value=expected,
+                ) as plan,
+            ):
+                actual = plan_project_export(
+                    project,
+                    root / "edited.mp4",
+                )
+
+            self.assertEqual(actual, expected)
+            plan.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()

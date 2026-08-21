@@ -64,6 +64,189 @@ To open the combined concat-and-FPS selector anywhere in a terminal:
 resolve-concat
 ```
 
+To open the focused one-source editor:
+
+```sh
+resolve-editor
+resolve-editor --source ~/Videos/source.mp4
+resolve-editor --project ~/Videos/source.resolve.json
+```
+
+The same executable also provides deterministic, machine-readable
+one-source CLI operations. Successful commands emit versioned JSON on stdout;
+errors emit structured JSON on stderr with a non-zero status:
+
+```sh
+resolve-editor import ~/Videos/source.mp4 --project ~/Videos/source.resolve.json
+resolve-editor inspect ~/Videos/source.resolve.json
+resolve-editor split ~/Videos/source.resolve.json --at 12.5
+resolve-editor delete ~/Videos/source.resolve.json --segment SEGMENT_ID
+resolve-editor restore ~/Videos/source.resolve.json --segment SEGMENT_ID
+resolve-editor duration ~/Videos/source.resolve.json
+resolve-editor export ~/Videos/source.resolve.json --output ~/Videos/edited.mp4
+```
+
+Use `--full-paths` only when automation needs local paths; output redacts them
+by default. Export emits structured progress events followed by a verified
+final result. The complete contract is documented in
+[`docs/specs/cli-contract.md`](docs/specs/cli-contract.md). From the
+repository, use `make cli ARGS="inspect /absolute/path/to/project.resolve.json"`.
+
+The simplest workflow is to start the editor first and choose media inside the
+interface:
+
+```sh
+make start
+```
+
+Use **Select video(s)** to choose local video files. PHASE-001 currently
+accepts one source video per project; selecting several files shows an explicit
+message instead of silently discarding them. The same in-app multi-selection
+entry point is retained for the planned multi-source timeline phase.
+
+The editor uses Python with PyGObject/GTK 4 and an FFmpeg raw-frame preview
+pipe. The target workstation must provide GTK 4, PyGObject, FFmpeg, and
+ffprobe. The current editor supports one source, real-time video preview,
+play/pause, seek, a visual clip timeline, non-destructive split/delete-toggle
+editing, versioned project save/reopen, and verified MP4 export. Preview audio
+is not included yet.
+
+The timeline shows every source clip in order. Included clips use colored
+blocks; deleted clips remain visible with a red hatched treatment. Click or
+drag across the timeline to move the playhead precisely and select the clip
+under the pointer. Use **Space** for play/pause, **B** to split at the
+playhead, **Delete** to toggle the selected clip between included and deleted,
+and **Left/Right** to move one source frame at a time. Use **Ctrl+mouse wheel**
+to zoom, **Ctrl+0** to fit, and **Alt/Shift+mouse wheel** or a horizontal
+secondary wheel to move the zoomed timeline viewport. A normal wheel always
+moves the playhead, even when zoomed. The timeline also displays the
+calculated final output duration and export progress includes percentage,
+frames, FPS, elapsed time, and ETA.
+
+The `.mp4` file selected in the editor is source media. **Save project** writes
+a `.resolve.json` editor project. **Export video** writes a separate edited
+video only after FFmpeg/ffprobe verify its playability, duration, dimensions,
+and audio-stream presence; the source is never overwritten.
+
+Export uses stream copy when the source and cut boundaries are conservatively
+eligible. Otherwise it reports the reason and uses an H.264/AAC MP4 fallback.
+Both routes write to a temporary partial file and publish atomically only
+after validation. Empty edits are rejected.
+
+### Makefile shortcuts
+
+From the repository root:
+
+```sh
+make setup
+make help
+make start
+make editor
+make editor ARGS="--source /absolute/path/to/video.mp4"
+make editor ARGS="--project /absolute/path/to/project.resolve.json"
+make cli ARGS="inspect /absolute/path/to/project.resolve.json"
+make smoke
+make test
+make check
+make quality
+```
+
+The `media`, `concat`, and `fps` targets keep the existing workflow scripts
+available, for example `make media ARGS="--dry-run --root ~/Videos"`.
+
+### Quality setup
+
+`make setup` creates `.venv` with the system GTK bindings visible, installs
+the pinned Python quality tools from `requirements-dev.txt`, and installs the
+pinned local npm tools from `package-lock.json`. Use the environment explicitly
+when running checks:
+
+```sh
+make setup
+make quality PYTHON=.venv/bin/python
+```
+
+The quality suite runs Ruff formatting/lint checks, source-only mypy checks,
+scoped C901 complexity checks for the editor CLI/domain surfaces, jscpd,
+the repository dependency-boundary check, pip-audit, Bandit, and the AIDD
+churn report. Generated JSON reports are written to
+`evidence/static-analysis/`; sensitive values and absolute paths must not be
+added to those artifacts. jscpd currently reports a 1.7% duplication baseline
+against a configured 2% ceiling, so new duplication remains visible without
+blocking on the existing helper/test overlap. The GTK/rendering/export
+adapters retain known complexity debt outside the current CLI/domain gate and
+remain a review follow-up rather than being hidden. The same commands run in
+[`.github/workflows/quality.yml`](.github/workflows/quality.yml).
+
+On a Wayland desktop, capture configured UI evidence after launching the
+editor with `make screenshot LABEL=before` and again with
+`make screenshot LABEL=after`. Screenshots are saved under
+`evidence/screenshots/` and are not required for CLI-only changes. The
+quality-tool setup evidence includes
+[`quality-before.png`](evidence/screenshots/quality-before.png) and
+[`quality-after.png`](evidence/screenshots/quality-after.png).
+
+### Manual editor test
+
+Use a short disposable MP4 or a copy of a local source:
+
+1. Launch with `make start`.
+2. Click **Select video(s)** and choose one local video.
+3. Confirm the preview loads, the duration is shown, and the timeline is
+   enabled.
+4. Press **Space** and confirm the preview starts, the position label/playhead
+   advance together, and pressing **Space** again pauses it.
+5. Click inside different colored timeline blocks and confirm the selected
+   block is outlined, the clip details update, and the playhead seeks there.
+6. Drag across the timeline and confirm the playhead and preview image update
+   while the pointer moves, stale intermediate renders do not hold up the
+   latest position, and the final frame matches the exact released position.
+7. Press **Left** and **Right** repeatedly while paused. Confirm each press
+   moves the playhead by exactly one source frame.
+8. Press **B** at an interior playhead position. Confirm a new clip block
+   appears at the split and both clips remain included.
+9. Select a clip in the timeline and press **Delete**. Confirm it remains
+   visible with the deleted styling, the **Final output** duration decreases,
+   and the selected clip status changes to **Deleted**.
+10. Press **Delete** again and confirm the clip returns to included styling and
+    the final output duration returns.
+11. Hold **Ctrl** and scroll up/down. Confirm the zoom percentage changes.
+12. Press **Ctrl+0** and confirm the complete source returns to view.
+13. At any zoom level, scroll normally and confirm the playhead moves by about
+    one second instead of moving the horizontal scrollbar.
+14. Hold **Alt** or **Shift** while scrolling, or use a horizontal secondary
+    wheel, and confirm the zoomed timeline viewport moves left/right.
+15. Click **Save project**, choose a path ending in `.resolve.json`, and
+   confirm the status reports a saved project. Verify the source file's size
+   and modification time are unchanged.
+16. Click **Reopen project**, or close the app and run
+   `make editor ARGS="--project /absolute/path/to/project.resolve.json"`.
+   Confirm the same source, duration, and saved playhead reopen.
+17. Save the project, close/reopen it, and confirm the clip deleted/included
+    state is preserved.
+18. Click **Export video**, choose a new `.mp4` path, and watch the export
+    panel. Confirm it shows percentage, current frame/total frames, FPS,
+    elapsed time, and ETA while the export runs. Confirm the output plays and
+    inspect it with:
+
+    ```sh
+    ffprobe -v error -show_entries format=duration:stream=codec_type,width,height,codec_name \
+      -of compact /absolute/path/to/exported-edited.mp4
+    ```
+
+    Confirm the duration matches the edited duration, the dimensions match the
+    source, required audio remains present, and the source file is unchanged.
+19. Select two disposable/local videos at once and confirm the UI explains
+    that the current phase supports one source per project.
+20. Check an error path safely with an invalid disposable project:
+   `printf '{' > /tmp/invalid.resolve.json`, then run
+   `make editor ARGS="--project /tmp/invalid.resolve.json"`. Confirm the
+   status shows an actionable error and does not replace valid state.
+
+This phase intentionally does not yet provide multiple sources, triplicate
+layouts, automatic audio normalization, or 60-FPS enhancement. Those remain
+planned future capabilities.
+
 The TUI starts in `~/Documents/edit`. Navigate with the arrow keys or `j/k`,
 use `Right/l` to enter a folder, press `Space` on each video to select it, and
 press `Enter` to run the complete workflow. One selected video goes directly
@@ -317,8 +500,9 @@ From this directory:
 ```
 
 This creates `~/bin/resolve-media` and `~/bin/resolve-concat`; the requested
-environment already has `~/bin` on `PATH`. FFmpeg (`ffmpeg` and `ffprobe`) must
-be installed.
+environment already has `~/bin` on `PATH`. It also installs
+`~/bin/resolve-editor`. FFmpeg (`ffmpeg` and `ffprobe`) and the GTK 4/PyGObject
+runtime must be installed for the editor.
 
 ## Checks
 
