@@ -105,15 +105,21 @@ edit without changing the source file.
   separate editable segments.
 - Given a segment marked for deletion, the final duration and export should
   exclude that segment.
+- Given ordered one-source segments, the user should be able to move a complete
+  segment block left or right without changing its source interval or state.
 - Segment changes should remain reversible through project state.
 
 **Deferred expansion:**
 
-- Move segments left or right and control ordering and gaps.
-- Select multiple segments.
-- Copy and paste segments.
-- Zoom into one or several segments for precise work.
-- Copy and paste visual or timeline modifications between segments.
+- In PHASE-004, extend atomic block movement across mixed-source timelines,
+  controlling ordering and gaps while preserving source ranges and owned state.
+- In PHASE-004, select multiple blocks and copy/paste one or several blocks at
+  an explicit timeline cursor while preserving relative order and assigning
+  fresh identities to pasted instances.
+- In PHASE-004, split blocks into fresh child identities that inherit the
+  parent's segment-owned state.
+- In PHASE-006, zoom into one or several segments and copy/paste reusable
+  visual modifications between segments.
 - Keep source-level settings distinct from segment-level modifications.
 
 **Affected surfaces:** timeline/edit-state model, interface, project storage,
@@ -171,9 +177,9 @@ source reference and decisions.
   untouched.
 - A completed output should be verified for playability, expected duration,
   stream presence, and relevant metadata before it is exposed as complete.
-- Future composition, scaling, audio changes, mixed inputs, and FPS
-  enhancement should select tested codec, container, pixel-format, color,
-  audio, and hardware settings.
+- Project output should use the fixed 1920x1080 canvas, contain-scaling inputs
+  that do not match it, and use the established render profile for codec,
+  container, pixel-format, color, audio, and hardware settings.
 
 **Affected surfaces:** export planner, FFmpeg integration, output validation,
 interface, CLI.  
@@ -226,10 +232,11 @@ agent-control requirements.
 **Observable behavior:**
 
 - Given compatible or normalizable sources, the project should retain each
-  source's identity and place it in a defined timeline order.
+  source's identity and place it in a defined timeline order on the fixed
+  1920x1080 project canvas.
 - The preview should show the composed result with clear source boundaries.
-- The exporter should normalize only what is required by the chosen output
-  and report material transformations.
+- The exporter should contain-scale to the fixed canvas, use the established
+  render profile, and report material transformations.
 - The final duration should reflect ordering, gaps, and deleted segments.
 
 **Affected surfaces:** project model, timeline, media normalization, preview,
@@ -284,15 +291,23 @@ audio only unless separately approved.
   zoom and pan/position changes.
 - Given a modified segment, the user should be able to copy its applicable
   modifications to another segment or selected group.
+- Given a modified segment, splitting should give both child segments the same
+  modification bundle, while copy/paste should clone that bundle to a fresh
+  segment identity.
+- Moving a modified segment should preserve its bundle, and a visible Clean
+  modifications button/action should reset the bundle to defaults without
+  changing the source interval.
 - Modifications should remain editable after save/reopen and should not alter
   the source.
 - The system should distinguish shared changes from per-segment overrides.
 
 **Affected surfaces:** transform model, timeline selection, interface,
   project storage, preview, export, CLI.  
-**Dependencies:** segment identity, selection model, transform schema.  
-**Risks:** conflicting pasted settings, source-versus-segment scope, preview
-  performance, future keyframe behavior.  
+**Dependencies:** segment identity, selection model, transform schema, and
+  PHASE-004 block-clone semantics.
+**Risks:** conflicting pasted settings, source-versus-segment scope, reset
+  behavior for linked groups, preview performance, and future keyframe
+  behavior.
 **Evidence:** `future-product-direction.md` segment-level visual controls.  
 **Coverage:** future reusable segment modifications.
 
@@ -314,6 +329,10 @@ audio only unless separately approved.
   instances for shared editing.
 - Shared X offset, Y offset, and zoom controls should update the linked
   copies so the user can focus on the desired action.
+- Triplicate state copied or inherited through a split should create an
+  independent linked group for the new segment while preserving the visual
+  bundle; cleaning a triplicate segment should reset its linked group
+  atomically.
 - The relationship between the original segment and its three instances
   should remain visible, editable, and restorable after reopening.
 - Background scaling, crop, blur, color, and exact placement should be

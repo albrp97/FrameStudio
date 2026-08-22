@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from .export import ExportPlan, plan_export
+from .export import (
+    ExportPlan,
+    plan_export,
+    plan_mixed_export,
+    resolve_output_policy,
+)
 from .media import probe_media
 from .model import (
     Project,
     ProjectValidationError,
     Segment,
     SegmentTimeline,
+    SourceReference,
 )
 
 
@@ -19,6 +26,20 @@ def create_project_from_source(
 ) -> Project:
     media = probe_media(source_path, ffprobe_path)
     return Project.create(source_path, media.metadata())
+
+
+def create_project_from_sources(
+    source_paths: Sequence[Path],
+    *,
+    ffprobe_path: str = "ffprobe",
+) -> Project:
+    paths = tuple(Path(path).expanduser() for path in source_paths)
+    if not paths:
+        raise ProjectValidationError("At least one source is required")
+    probes = tuple(probe_media(path, ffprobe_path) for path in paths)
+    return Project.create_multi(
+        tuple((probe.path, probe.metadata()) for probe in probes),
+    )
 
 
 def export_destination_conflicts_with_project(
@@ -33,7 +54,34 @@ def export_destination_conflicts_with_project(
 def split_segment(
     timeline: SegmentTimeline,
     position_seconds: float,
+    *,
+    segment_id: str | None = None,
+    coordinate: str = "source",
 ) -> tuple[Segment, Segment]:
+    if segment_id is not None:
+        return timeline.split_block(
+            segment_id,
+            position_seconds,
+            coordinate=coordinate,
+        )
+    if timeline.mixed_source:
+        for segment in timeline.segment_items:
+            if segment.timeline_start < position_seconds < segment.timeline_end:
+                return timeline.split_block(
+                    segment.segment_id,
+                    position_seconds,
+                    coordinate="timeline",
+                )
+        raise ProjectValidationError("Split position must be strictly inside one timeline block")
+    if timeline.has_explicit_timeline:
+        for segment in timeline.segment_items:
+            if segment.timeline_start < position_seconds < segment.timeline_end:
+                return timeline.split_block(
+                    segment.segment_id,
+                    position_seconds,
+                    coordinate="timeline",
+                )
+        raise ProjectValidationError("Split position must be strictly inside one timeline block")
     return timeline.split(position_seconds)
 
 
@@ -60,6 +108,69 @@ def toggle_segment_deleted(
     raise ProjectValidationError(f"Unknown segment_id: {segment_id}")
 
 
+def move_segment(
+    project: Project,
+    segment_id: str,
+    direction: str | int,
+) -> bool:
+    return project.timeline.move_block(segment_id, direction)
+
+
+def move_segments(
+    project: Project,
+    segment_ids: Sequence[str],
+    direction: str | int,
+) -> bool:
+    return project.timeline.move_blocks(segment_ids, direction)
+
+
+def copy_segments(
+    project: Project,
+    segment_ids: Sequence[str],
+) -> tuple[Segment, ...]:
+    return project.timeline.copy_blocks(segment_ids)
+
+
+def paste_segments(
+    project: Project,
+    segments: Sequence[Segment],
+    *,
+    at_index: int | None = None,
+    at_seconds: float | None = None,
+) -> tuple[Segment, ...]:
+    pasted = project.timeline.paste_blocks(
+        segments,
+        at_index=at_index,
+        at_seconds=at_seconds,
+    )
+    project.duration_seconds = project.timeline.timeline_duration_seconds
+    project.set_playhead(project.playhead_seconds)
+    project.validate()
+    return pasted
+
+
+def paste_segments_after_selection(
+    project: Project,
+    segments: Sequence[Segment],
+    selected_segment_id: str | None,
+) -> tuple[Segment, ...]:
+    if selected_segment_id is None:
+        raise ProjectValidationError("Select a clip before pasting blocks")
+    for index, segment in enumerate(project.timeline.segment_items):
+        if segment.segment_id == selected_segment_id:
+            return paste_segments(project, segments, at_index=index + 1)
+    raise ProjectValidationError(f"Unknown segment_id: {selected_segment_id}")
+
+
+def relink_project_source(
+    project: Project,
+    source_id: str,
+    candidate_path: Path,
+    metadata: Mapping[str, object] | None = None,
+) -> SourceReference:
+    return project.relink_source(source_id, candidate_path, metadata)
+
+
 def plan_project_export(
     project: Project,
     destination: Path,
@@ -68,14 +179,23 @@ def plan_project_export(
 ) -> ExportPlan:
     if project.segment_timeline is None:
         raise ValueError("Project segment timeline is required")
+    if project.segment_timeline.mixed_source:
+        probes = tuple(
+            probe_media(Path(source.path), ffprobe_path) for source in project.sources or ()
+        )
+        policy = resolve_output_policy(
+            [probe.metadata() for probe in probes],
+        )
+        return plan_mixed_export(
+            probes,
+            project.segment_timeline,
+            destination,
+            policy=policy,
+            source_ids=tuple(source.source_id for source in project.sources or ()),
+        )
     media = probe_media(Path(project.source.path), ffprobe_path)
     timeline = SegmentTimeline.from_segments(
         project.segment_timeline.source_duration_seconds,
         project.segment_timeline.segment_items,
     )
-    return plan_export(
-        media,
-        timeline,
-        destination,
-        ffprobe_path=ffprobe_path,
-    )
+    return plan_export(media, timeline, destination, ffprobe_path=ffprobe_path)

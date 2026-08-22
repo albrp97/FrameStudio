@@ -2,14 +2,16 @@
 
 **Map ID:** RM-001
 **Status:** confirmed
-**Last updated:** 2026-08-21
-**Repository revision:** `150d2f7`
+**Last updated:** 2026-08-22
+**Repository revision:** `b624234` (working tree includes the editor refactor)
 **Owner:** repository maintainer; maintainer identity is not recorded in the repository
 
 ## Purpose
 
-This map records the current repository surfaces before editor planning. It
-does not create implementation tickets or decide the future editor stack.
+This map records the current repository surfaces, including the editor
+implementation and the original preparation workflows that remain supported.
+It describes ownership and validation surfaces without creating implementation
+tickets.
 
 ## Source and Runtime Surfaces
 
@@ -20,9 +22,15 @@ does not create implementation tickets or decide the future editor stack.
 | FPS enhancement | `resolve_fps.py` | Runs the RIFE/VapourSynth or REAL-Video-Enhancer pipeline, preserves/remuxes audio, validates frame rate/count, and reports progress. | Observed and tested. |
 | Installation wrappers | `install.sh` | Installs `resolve-media`, `resolve-concat`, and `resolve-fps` wrappers into `~/bin`. | Observed. |
 | Benchmark harness | `benchmarks/fps.vpy`, `benchmarks/vsrawpipe.py` | Supports the validated FPS processing path and benchmark reproduction. | Observed. |
-| Editor UI | not present | Future primary editing interface with playback and timeline. | Unknown; requires architecture decision. |
-| Editor project storage | not present | Future non-destructive, reopenable project representation. | Unknown; schema and path TBD. |
-| Editor CLI | not present | Future deterministic automation surface for project inspection, editing, and export. | Unknown; command contract TBD. |
+| Editor application facade | `resolve_editor/app.py` | GTK application lifecycle and compatibility-preserving orchestration for source loading, playback, timeline actions, and export. | Implemented; `make check`, smoke, and UI evidence. |
+| Editor application modules | `resolve_editor/app_*.py` | Focused UI construction, project lifecycle, timeline actions, playback, and export workflows used by the application facade. | Implemented; stable callback seams covered by editor tests. |
+| Editor domain model | `resolve_editor/model_*.py` | Source/segment value objects, timeline invariants and operations, project lifecycle, serialization-facing behavior, and compatibility exports through `model.py`. | Implemented; model and mixed-source tests. |
+| Timeline rendering | `resolve_editor/timeline*.py` | Pure geometry/drawing helpers and GTK timeline canvas behavior, retained through `timeline.py`. | Implemented; timeline interaction and drawing tests. |
+| Export pipeline | `resolve_editor/export_*.py` | Export policy/value objects, planning, FFmpeg command/process execution, validation, and atomic publication, retained through `export.py`. | Implemented; export and source-safety tests. |
+| Playback backend | `resolve_editor/ffmpeg_playback.py`, `resolve_editor/playback.py` | Raw-frame FFmpeg playback backend and playback state controller. | Implemented; playback and smoke coverage. |
+| Editor project storage | `resolve_editor/persistence.py` | Versioned JSON project persistence, source-safety checks, and atomic save behavior. | Implemented; persistence and round-trip tests. |
+| Editor CLI facade | `resolve_editor/cli.py` | Deterministic command dispatch, JSON output/error contract, and compatibility patch seams. | Implemented; `make contract` and CLI parity tests. |
+| Editor CLI modules | `resolve_editor/cli_parser.py`, `resolve_editor/cli_export.py`, `resolve_editor/cli_payload.py`, `resolve_editor/cli_types.py` | Focused parser, export handler, payload serialization, and contract definitions used by the CLI facade. | Implemented; CLI contract and editing tests. |
 
 ## Test Surfaces
 
@@ -31,10 +39,11 @@ does not create implementation tickets or decide the future editor stack.
 | `tests/test_classification.py` | Media classification, profiles, output commands, GPU/lossless behavior. | Existing unittest coverage. |
 | `tests/test_concat.py` | Clip probing decisions, stream-copy eligibility, audio gain, normalization commands, cleanup. | Existing unittest coverage. |
 | `tests/test_fps.py` | FPS counts, output commands, RVE behavior, progress, and pipeline branching. | Existing unittest coverage. |
+| `tests/test_editor_*.py` | Editor model, operations, persistence, playback, timeline, export, CLI, and UI-helper regression coverage. | 158 tests passed on 2026-08-22. |
 | `tests/__init__.py` | Test package marker. | Observed. |
 
 Baseline command:
-`python3 -m unittest discover -s tests` — 34 tests passed on 2026-08-21.
+`python3 -m unittest discover -s tests` — 158 tests passed on 2026-08-22.
 
 ## Documentation and Research
 
@@ -53,17 +62,18 @@ Baseline command:
 
 | Path / surface | Responsibility | Evidence / status |
 |---|---|---|
-| `.github/aidd-config.yml` | Configured artifact paths, planning depth, approvals, gates, evidence policy, and provider defaults. | Existing configuration; the unit command is configured and other command arrays remain discovery states. |
+| `.github/aidd-config.yml` | Configured artifact paths, planning depth, approvals, gates, evidence policy, and provider defaults. | Existing configuration; unit, integration, contract, and local quality commands are configured. |
 | `.github/prompts/` | Prompt wrappers for planning and delivery skills. | Existing automation guidance. |
 | `.github/skills/` | Colocated lifecycle and domain skill contracts. | Existing automation guidance. |
-| CI workflows | Continuous integration. | None observed. |
-| Package manifest | Dependency/runtime declaration. | None observed. |
+| `.github/workflows/quality.yml` | GitHub Actions quality workflow for Python, GTK/FFmpeg, npm, and static-analysis checks. | Observed; runs `make quality PYTHON=.venv/bin/python`. |
+| `pyproject.toml`, `requirements-dev.txt`, `package.json`, `package-lock.json` | Ruff/mypy/Bandit configuration and pinned development quality dependencies. | Observed; runtime dependencies remain system-provided. |
 | Ownership/contribution file | Maintainer or ownership rules. | None observed; TBD. |
 
 ## External Dependencies and Integrations
 
 - `python3` is the current runtime.
 - `ffmpeg` and `ffprobe` are required for media inspection and processing.
+- GTK 4 and PyGObject are required by the editor GUI.
 - `curses` is required by the interactive TUIs.
 - `nvidia-smi`, CUDA/NVENC, `powerprofilesctl`, and `gio` are supported
   optional Linux integrations in the existing scripts.
@@ -74,14 +84,19 @@ Baseline command:
 ## Current Commands
 
 - `python3 -m unittest discover -s tests`
-- `python3 -m py_compile resolve_media.py resolve_concat.py resolve_fps.py tests/*.py`
+- `python3 -m py_compile resolve_media.py resolve_concat.py resolve_fps.py resolve_editor.py resolve_editor/*.py tests/*.py tools/*.py`
+- `make check`
+- `make contract`
+- `make smoke`
+- `make quality PYTHON=.venv/bin/python`
 - `./install.sh`
+- `./resolve_editor.py --help`
 - `./resolve_media.py --help`
 - `./resolve_media.py --dry-run --root <directory>`
 - `resolve-concat --dry-run <directory>`
 
-The last two commands require suitable media/tooling; no claim is made that
-they pass for every environment.
+The media-dependent script commands require suitable media/tooling; no claim
+is made that they pass for every environment.
 
 ## Protected Existing Behavior
 
@@ -93,14 +108,12 @@ they pass for every environment.
   product requirement.
 - The current TUI preparation and concat/FPS flows are not silently replaced
   by the new editor.
+- The editor uses focused implementation modules with compatibility facades at
+  `model.py`, `export.py`, `timeline.py`, `app.py`, and `cli.py`.
 
 ## Unknowns and Planning Blockers
 
-- GUI runtime and packaging approach.
-- Playback/timeline backend and how frames are presented in real time.
-- Versioned project-file schema and source-path relinking behavior.
-- Exact split semantics, frame accuracy, and deletion/ripple behavior.
-- Smart-render eligibility and fallback policy at cut boundaries.
-- First-horizon audio preservation behavior.
-- CLI command grammar, output format, and error contract.
-- Maintainer/ownership and CI/remote-check setup.
+- Packaging and distribution beyond the current local Python/GTK/FFmpeg
+  runtime.
+- Future audio, visual composition, and 60-FPS enhancement behavior.
+- Maintainer/ownership and remote PR/check configuration.

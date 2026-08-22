@@ -26,10 +26,18 @@ class MediaProbe:
     audio_stream_present: bool | None = None
 
     def metadata(self) -> dict[str, Any]:
+        orientation = (
+            "portrait"
+            if self.height > self.width
+            else "landscape"
+            if self.width > self.height
+            else "square"
+        )
         return {
             "duration_seconds": self.duration_seconds,
             "width": self.width,
             "height": self.height,
+            "orientation": orientation,
             "frame_rate": self.frame_rate,
             "video_codec": self.video_codec,
             "audio_codec": self.audio_codec,

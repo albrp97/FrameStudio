@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from resolve_editor.ffmpeg_playback import FfmpegPlaybackBackend, VideoFrame
+from resolve_editor.model import Segment
 
 
 @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is required")
@@ -64,6 +65,27 @@ class FfmpegPlaybackTests(unittest.TestCase):
 
         self.assertGreater(len(frames), 1)
         self.assertEqual(errors, [])
+
+    def test_seek_scales_and_letterboxes_into_requested_canvas(self):
+        frames = []
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            32,
+            16,
+            10.0,
+            0.5,
+            frames.append,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            backend.seek(0.2)
+            self.assertEqual(len(frames), 1)
+            self.assertEqual((frames[0].width, frames[0].height), (32, 16))
+            self.assertEqual(len(frames[0].data), 32 * 16 * 4)
+        finally:
+            backend.close()
 
     def test_preview_requests_only_deliver_the_latest_position(self):
         class PreviewBackend(FfmpegPlaybackBackend):
@@ -138,6 +160,28 @@ class FfmpegPlaybackTests(unittest.TestCase):
             self.assertAlmostEqual(frames[0].position_seconds, 0.2)
         finally:
             backend.close()
+
+    def test_composed_backend_accepts_one_source_blocks_without_source_ids(self):
+        from resolve_editor.ffmpeg_playback import FfmpegComposedPlaybackBackend
+
+        backend = FfmpegComposedPlaybackBackend(
+            (("source", self.source),),
+            (Segment.create(0.0, 0.5),),
+            16,
+            16,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            command = backend._command(0.0, realtime=False, frame_count=1)
+        finally:
+            backend.close()
+
+        self.assertIn("[0:v:0]trim=start=0.000000:duration=0.500000", " ".join(command))
 
 
 if __name__ == "__main__":

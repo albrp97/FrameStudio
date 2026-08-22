@@ -19,7 +19,7 @@ help:
 		'make compile    Compile Python sources and tests' \
 		'make check      Run tests, compilation, and git diff checks' \
 		'make quality    Run all local quality checks and churn analysis' \
-		'make screenshot LABEL=name  Capture a Wayland editor screenshot' \
+		'make screenshot LABEL=name  Capture the active Wayland window' \
 		'make start      Launch the editor for in-app video selection' \
 		'make editor     Launch the GTK editor (pass ARGS="...")' \
 		'make cli        Run deterministic editor CLI commands (pass ARGS="...")' \
@@ -103,8 +103,14 @@ screenshot:
 	esac
 	@command -v grim >/dev/null 2>&1 || \
 		(printf '%s\n' 'grim is required for Wayland screenshots' >&2; exit 2)
+	@command -v hyprctl >/dev/null 2>&1 || \
+		(printf '%s\n' 'hyprctl is required to capture the active window' >&2; exit 2)
 	@mkdir -p evidence/screenshots
-	grim "evidence/screenshots/$(LABEL).png"
+	@window_geometry="$$(hyprctl activewindow -j 2>/dev/null | \
+		$(PYTHON) -c 'import json, sys; data = json.load(sys.stdin); at = data.get("at"); size = data.get("size"); print(f"{at[0]},{at[1]} {size[0]}x{size[1]}" if isinstance(at, list) and len(at) == 2 and isinstance(size, list) and len(size) == 2 else "")')"; \
+	test -n "$$window_geometry" || \
+		(printf '%s\n' 'No active window geometry was found; focus the editor first' >&2; exit 2); \
+	grim -g "$$window_geometry" "evidence/screenshots/$(LABEL).png"
 	@printf 'Captured evidence/screenshots/%s.png\n' "$(LABEL)"
 
 start: editor

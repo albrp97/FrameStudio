@@ -71,6 +71,49 @@ class EditorExportPlannerTests(unittest.TestCase):
         self.assertIn("keyframe", plan.reason.lower())
         self.assertEqual(plan.destination, destination)
 
+    def test_pasted_one_source_block_keeps_source_duration_for_export_planning(self):
+        probe = media_probe(Path("/tmp"))
+        timeline = SegmentTimeline(10.0)
+        timeline.split(3.0)
+        copied = timeline.copy_blocks([timeline.segments[0].segment_id])
+        timeline.paste_blocks(copied, at_index=1)
+
+        plan = plan_export(
+            probe,
+            timeline,
+            Path("/tmp/edited.mp4"),
+            keyframe_timestamps=(0.0, 3.0, 10.0),
+        )
+
+        self.assertEqual(plan.expected_duration_seconds, 13.0)
+        self.assertEqual(len(plan.segments), 3)
+        self.assertEqual(timeline.source_duration_seconds, 10.0)
+
+    def test_non_1080p_source_requires_fixed_canvas_fallback(self):
+        probe = MediaProbe(
+            path=Path("/tmp/source.mp4"),
+            duration_seconds=10.0,
+            width=320,
+            height=180,
+            frame_rate="30/1",
+            video_codec="h264",
+            audio_codec=None,
+            format_name="mp4",
+        )
+        timeline = SegmentTimeline(10.0)
+
+        plan = plan_export(
+            probe,
+            timeline,
+            Path("/tmp/edited.mp4"),
+            keyframe_timestamps=(),
+        )
+
+        self.assertEqual(plan.route, "fallback")
+        self.assertEqual(plan.output_policy.width, 1920)
+        self.assertEqual(plan.output_policy.height, 1080)
+        self.assertIn("1920x1080", plan.reason)
+
     def test_non_keyframe_cut_selects_explicit_fallback(self):
         probe = media_probe(Path("/tmp"))
         timeline = SegmentTimeline(10.0)

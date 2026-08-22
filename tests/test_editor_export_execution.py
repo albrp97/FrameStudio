@@ -18,7 +18,7 @@ from resolve_editor.model import SegmentTimeline
     "FFmpeg and ffprobe are required",
 )
 class EditorExportExecutionTests(unittest.TestCase):
-    def make_source(self, root: Path) -> Path:
+    def make_source(self, root: Path, *, size: str = "64x64") -> Path:
         source = root / "source.mp4"
         subprocess.run(
             [
@@ -29,7 +29,7 @@ class EditorExportExecutionTests(unittest.TestCase):
                 "-f",
                 "lavfi",
                 "-i",
-                "testsrc=size=64x64:rate=10",
+                f"testsrc=size={size}:rate=10",
                 "-f",
                 "lavfi",
                 "-i",
@@ -79,8 +79,7 @@ class EditorExportExecutionTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), source_before)
             output = probe_media(destination)
             self.assertAlmostEqual(output.duration_seconds, 0.5, delta=0.15)
-            self.assertEqual(output.width, probe.width)
-            self.assertEqual(output.height, probe.height)
+            self.assertEqual((output.width, output.height), (1920, 1080))
             self.assertIsNotNone(output.audio_codec)
             self.assertEqual(progress[-1].stage, "complete")
             self.assertTrue(any(item.fps is not None for item in progress))
@@ -88,7 +87,7 @@ class EditorExportExecutionTests(unittest.TestCase):
     def test_stream_copy_export_is_verified(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            source = self.make_source(root)
+            source = self.make_source(root, size="1920x1080")
             probe = probe_media(source)
             timeline = SegmentTimeline(probe.duration_seconds)
             destination = root / "copied.mp4"

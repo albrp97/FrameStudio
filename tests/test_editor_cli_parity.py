@@ -108,6 +108,43 @@ class EditorCliParityTests(unittest.TestCase):
             )
             self.assertEqual(cli_project.source.to_dict(), gui_project.source.to_dict())
 
+    def test_cli_move_supports_one_source_blocks(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project_path = root / "edit.resolve.json"
+            project = make_project(root)
+            project.segment_timeline.split(3.0)
+            project.segment_timeline.split(7.0)
+            first, middle, last = project.segment_timeline.segments
+            save_project(project, project_path)
+
+            result, stdout, stderr = run_cli(
+                "move",
+                str(project_path),
+                "--segment",
+                middle.segment_id,
+                "--direction",
+                "left",
+            )
+
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            payload = json.loads(stdout.getvalue())
+            self.assertTrue(payload["operation"]["changed"])
+            reopened = load_project(project_path)
+            self.assertEqual(
+                [segment.segment_id for segment in reopened.segment_timeline.segments],
+                [middle.segment_id, first.segment_id, last.segment_id],
+            )
+            self.assertEqual(
+                [
+                    (segment.timeline_start_seconds, segment.timeline_end_seconds)
+                    for segment in reopened.segment_timeline.segments
+                ],
+                [(0.0, 4.0), (4.0, 7.0), (7.0, 10.0)],
+            )
+            self.assertEqual(reopened.segment_timeline.edited_duration_seconds, 10.0)
+
     def test_repeated_delete_and_reopen_keep_a_deterministic_project_state(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

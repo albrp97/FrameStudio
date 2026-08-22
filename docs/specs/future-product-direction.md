@@ -38,6 +38,8 @@ change, and render an edit.
   codecs, and other media parameters.
 - Show all clips in a timeline with real-time playback of the composed edit.
 - Pause, play, seek, and inspect the current position and final output length.
+- Use a fixed 1920x1080 project canvas by default, contain-scaling and
+  letterboxing inputs that do not match it.
 - Move clips or segments left and right and keep the resulting duration
   visible.
 - Define how source boundaries, gaps, ordering, and multiple tracks should
@@ -49,6 +51,15 @@ change, and render an edit.
   position.
 - Delete segments non-destructively and update the final duration immediately.
 - Copy and paste segments within a project.
+- Treat each segment as an atomic timeline block. Moving a block preserves its
+  source interval, source identity, deletion state, and segment-owned state;
+  copying creates a new segment instance with a fresh identity and the same
+  persisted block state.
+- Pasting one or several copied blocks inserts them at an explicit timeline
+  cursor while preserving their relative order and leaving the originals
+  unchanged.
+- Splitting a block creates fresh child identities and gives both children the
+  parent's segment-owned state.
 - Copy visual or timeline modifications from one segment to another segment or
   to several selected segments.
 - Zoom into one segment or a group of selected segments for precise editing.
@@ -89,7 +100,17 @@ change, and render an edit.
 ### Segment-level visual controls
 
 - Apply zoom and pan to one segment or multiple selected segments.
-- Copy and paste those modifications between segments.
+- Treat zoom, X/Y offsets, triplicate mode, and its layout parameters as one
+  segment-owned modification bundle.
+- Moving a segment preserves its modification bundle. Splitting or
+  copy/pasting a segment clones the bundle to the resulting segment instance
+  or split children without sharing their identities.
+- Provide a visible **Clean modifications** button/action that resets the
+  selected segment's visual bundle to defaults without changing its source
+  interval.
+- When triplicate mode is active, a copied or split segment receives a new
+  independent linked group whose three instances retain the cloned bundle;
+  cleaning that segment resets the linked group atomically.
 - Keep transforms editable after saving and reopening the project.
 - Decide later whether keyframes, interpolation, and animation belong in this
   focused editor or should remain outside its scope.
@@ -106,6 +127,9 @@ change, and render an edit.
   invalid timestamps, missing streams, or an unplayable file.
 - Select practical container, codec, pixel-format, color, audio, and hardware
   settings from reproducible tests on the target workstation.
+- Treat the established render profile as the authority for output delivery;
+  input codec/container differences do not change the project canvas or
+  delivery profile.
 - Retain the source-safe temporary-output, verification, and cleanup policy.
 - Use the existing fast-concatenation research as evidence, not as a
   universal promise for every future edit.

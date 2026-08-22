@@ -38,9 +38,12 @@ Included:
 - A timeline representing the source and its edited segments.
 - Split at a selected position.
 - Delete one or more segments.
+- Move selected segment blocks left or right.
 - Visible edited duration/final output length.
 - Non-destructive project save and reopen.
 - Export of the edited result.
+- A fixed 1920x1080 (1080p) project canvas for preview and export, regardless
+  of input dimensions; mismatched inputs are contain-scaled and letterboxed.
 - Fast-path export using stream-copy/smart rendering when valid.
 - Explicit reliable fallback behavior when stream copy cannot satisfy the
   requested edit.
@@ -52,7 +55,8 @@ Included:
 
 - Multiple source videos in one timeline.
 - Multiple video or audio tracks.
-- Mixed dimensions, frame rates, codecs, or source normalization.
+- Multiple mixed-source timelines with different dimensions, frame rates,
+  codecs, or source normalization.
 - Per-input audio-level analysis or normalization.
 - Portrait triplicate/background composition and linked transforms.
 - Zoom/pan/keyframing or segment-level visual modifications beyond cutting.
@@ -73,12 +77,25 @@ The deferred direction includes:
 
 - A multi-video timeline with clips that may have different dimensions,
   orientations, frame rates, codecs, and audio characteristics.
-- Segment split, delete, copy/paste, movement left or right, multi-selection,
-  zoom, and reusable segment modifications.
+- A fixed 1920x1080 project canvas is used for every project; source aspect
+  ratios are preserved with contain scaling and letterboxing.
+- Segment split, delete, copy/paste, movement left or right, and multi-selection
+  using atomic timeline blocks.
+- Block moves preserve source ranges and segment state; block copy/paste
+  creates fresh segment identities, preserves relative order, and inserts at
+  an explicit timeline cursor without changing the original blocks.
+- Splitting a segment clones its segment-owned state to both resulting
+  segments.
+- Zoom, reusable segment modifications, and a visible Clean modifications
+  button/action that resets a segment's visual state without changing its
+  source range.
 - Automatic audio level handling per input video, not independently per
   segment.
 - A triplicate portrait/focused-action mode with one centered copy and two
   side copies, automatic linking/selection, and shared X/Y/zoom controls.
+- Triplicate state is part of the segment modification bundle; copied or split
+  segments receive independent linked groups, and cleaning a triplicate
+  segment resets that group atomically.
 - Efficient smart rendering, stream copy when valid, and evidence-based
   codec/container/export profiles.
 - Optional validated FPS enhancement to 60 FPS.

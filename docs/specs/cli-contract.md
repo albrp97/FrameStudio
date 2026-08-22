@@ -1,15 +1,21 @@
 # Deterministic Editor CLI Contract
 
 The editor executable keeps the GTK workflow as its default mode and exposes
-first-horizon one-source operations as JSON commands:
+deterministic one-source and mixed-source operations as JSON commands:
 
 ```sh
 resolve-editor inspect PROJECT
-resolve-editor import SOURCE --project PROJECT
+resolve-editor import SOURCE [SOURCE ...] --project PROJECT
 resolve-editor split PROJECT --at SECONDS
 resolve-editor delete PROJECT --segment SEGMENT_ID
 resolve-editor restore PROJECT --segment SEGMENT_ID
 resolve-editor toggle-delete PROJECT --segment SEGMENT_ID
+resolve-editor move PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+  --direction {left,right}
+resolve-editor copy PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
+resolve-editor paste PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+  --at SECONDS
+resolve-editor relink PROJECT --source SOURCE_ID --path SOURCE
 resolve-editor duration PROJECT
 resolve-editor save PROJECT [--output PROJECT]
 resolve-editor reopen PROJECT
@@ -34,9 +40,9 @@ Every completed command emits one JSON object with:
 Inspection and mutation commands include a `project` object containing:
 
 - `project_id` and `schema_version`;
-- stable `source_id` and persisted source metadata;
-- ordered stable `segment_id` values with source boundaries and deletion
-  state;
+- ordered stable `source_id` values and persisted source metadata;
+- ordered stable `segment_id` values with source boundaries, timeline
+  placement, block state, deletion state, and display color;
 - source duration, playhead, edited duration, and active/deleted counts;
 - conservative exportability state.
 
@@ -44,6 +50,10 @@ Repeated inspection of unchanged inputs is byte-equivalent. Explicit delete
 and restore operations are idempotent; split creates two new stable segment
 identifiers once and rejects invalid or boundary positions without saving a
 partial mutation. Project writes use the existing atomic persistence boundary.
+Copy and paste on one-source or mixed-source timelines create fresh segment
+identities, preserve source coverage and block-owned state, and return the
+source and pasted IDs in the operation result. Source relinking requires an
+explicit stable `source_id`.
 
 ## Errors and exit statuses
 
@@ -87,6 +97,13 @@ failed export cannot be mistaken for a completed command. The final result
 reports the selected stream-copy or fallback route, the reason, verified
 output metadata, and publication path. Unverified partial files are never
 reported as successful output.
+
+Every project export uses the fixed 1920x1080 project canvas. Inputs that do
+not match it are contain-scaled and letterboxed through the established
+fallback render profile; a one-source input may use stream copy only when it
+already matches the project canvas. Source codec/container differences do not
+select a different delivery profile, and 60 FPS enhancement is outside
+contract version 1.
 
 The contract is versioned by `contract_version`. Additive fields preserve the
 current version; incompatible changes require a new version and an explicit

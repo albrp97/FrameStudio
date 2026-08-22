@@ -20,8 +20,13 @@ non-destructive, half-open intervals:
   they would create an empty segment.
 - Splitting preserves the deleted flag of the segment being split.
 - Deleted segments remain in source order and retain their source boundaries.
-- The edited timeline ripples retained segments together in source order; it
-  does not preserve gaps created by deletion.
+- The edited timeline initially follows source order and ripples retained
+  segments together without preserving gaps created by deletion. Explicit
+  block movement may change timeline order while each segment keeps its
+  source-time interval.
+- Copying a one-source block preserves its source interval while pasting
+  creates a fresh timeline block at the selected insertion point. The source
+  duration remains unchanged while the composed timeline duration grows.
 - Edited duration is the sum of the durations of retained segments. It may be
   zero when every segment is deleted; export must reject an empty edit.
 - The source reference and source media are never changed by segment edits.
@@ -37,7 +42,8 @@ fallback.
 
 ## Verification
 
-The model must validate that segments are non-empty, ordered, contiguous,
-within the source duration, and uniquely identified. Invalid operations must
-fail before mutation so the last valid timeline remains available.
-
+The model must validate that source intervals provide complete coverage,
+allowing intentional overlap from pasted blocks, timeline placements are
+contiguous when explicit movement or paste has occurred, and segment
+identifiers are unique. Invalid operations must fail before mutation so the
+last valid timeline remains available.

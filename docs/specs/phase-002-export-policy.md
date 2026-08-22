@@ -8,6 +8,11 @@
 **Scope:** SCOPE-001  
 **Last updated:** 2026-08-21
 
+The project render canvas is fixed at 1920x1080. This applies to one-source
+and mixed-source projects; non-1080p inputs use the validated fallback path for
+contain scaling and letterboxing. A matching one-source input may still use
+the fast stream-copy route when all other eligibility conditions hold.
+
 ## Fast stream-copy route
 
 The planner may select `stream-copy` only when all of these conditions hold:
@@ -31,8 +36,7 @@ reason. The initial validated output policy is:
 - H.264 video through `libx264`.
 - AAC audio when the source contains audio.
 - `yuv420p` video pixel format.
-- Source dimensions and the project timebase remain the output target unless
-  the execution layer reports an explicit incompatibility.
+- Fixed 1920x1080 project dimensions with the existing project timebase.
 
 The fallback route is not a silent success path. Unsupported or ambiguous
 project/source state, an empty edit, a destination equal to the source, and
@@ -44,4 +48,3 @@ Keyframe alignment is checked using FFprobe JSON frame data. A stream-copy
 plan does not claim frame-accurate cuts for non-keyframe boundaries. Such
 edits use the fallback route, which is responsible for validating final
 duration and stream presence.
-

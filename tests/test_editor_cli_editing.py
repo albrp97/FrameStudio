@@ -165,6 +165,43 @@ class EditorCliEditingTests(unittest.TestCase):
                 restored.segment_timeline.segments[1].deleted,
             )
 
+    def test_one_source_paste_accepts_the_project_and_expands_the_timeline(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project_path = root / "edit.resolve.json"
+            project = make_project(root)
+            project.segment_timeline.split(3.0)
+            project.segment_timeline.split(6.0)
+            selected_id = project.segment_timeline.segments[1].segment_id
+            save_project(project, project_path)
+
+            result, stdout, stderr = run_cli(
+                "paste",
+                str(project_path),
+                "--segment",
+                selected_id,
+                "--at",
+                "6",
+            )
+
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            payload = json.loads(stdout.getvalue())
+            segments = payload["project"]["timeline"]["segments"]
+            self.assertEqual(len(segments), 4)
+            self.assertEqual(
+                [segment["segment_id"] for segment in segments][0:2],
+                [segments[0]["segment_id"], selected_id],
+            )
+            self.assertNotEqual(segments[2]["segment_id"], selected_id)
+            self.assertEqual(
+                payload["project"]["timeline"]["duration_seconds"],
+                13.0,
+            )
+            restored = load_project(project_path)
+            self.assertEqual(restored.duration_seconds, 13.0)
+            self.assertEqual(restored.timeline.source_duration_seconds, 10.0)
+
     def test_invalid_split_preserves_the_last_valid_project(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

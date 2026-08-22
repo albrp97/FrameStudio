@@ -14,8 +14,9 @@
 **Migration source:** `docs/planning/phases.md`, inline section
 `PHASE-006 - Focusing and Composing Important Action`; migrated on
 2026-08-21 with the phase content preserved.  
-**Affected surfaces:** segment transforms, selection, linked triplicate
-composition, preview, output canvas, project persistence, CLI, and renderer  
+**Affected surfaces:** segment transforms and modification inheritance,
+selection, linked triplicate composition, preview, output canvas, project
+persistence, CLI, and renderer
 
 ## Outcome
 
@@ -26,13 +27,23 @@ vertically concentrated action.
 ### Included
 
 - Apply zoom and X/Y position changes to one segment or selected segments.
-- Copy and paste applicable visual modifications between segments.
+- Treat zoom, X/Y offsets, triplicate mode, and its layout parameters as a
+  segment-owned modification bundle.
+- Copy and paste the modification bundle between existing segments or
+  selected groups.
+- Preserve the modification bundle when a segment moves; clone it when a
+  segment is split or copy/pasted so the resulting segment identities remain
+  independent.
+- Provide a visible Clean modifications button/action that resets the
+  selected segment's bundle to defaults without changing its source interval.
 - Preserve transforms across save/reopen and expose shared versus overridden
   values.
 - Activate a triplicate mode for portrait or mostly vertical action.
 - Place one copy in the middle and two linked copies on the left and right.
 - Automatically select or link the three instances when the mode is enabled.
 - Apply shared X offset, Y offset, and zoom controls to the linked copies.
+- Give copied or split triplicate segments new independent linked groups while
+  retaining the cloned modification bundle; clean a linked group atomically.
 - Support a 1080p source whose important action is concentrated in a vertical
   region, not only a physically portrait source.
 - Preview and export the composition, including a defined output canvas.
@@ -49,6 +60,8 @@ vertically concentrated action.
 
 - PHASE-004 provides multi-source/segment identity and selection semantics.
 - PHASE-005 provides the output and delivery profile required by composition.
+- PHASE-004 block operations provide deterministic split/copy inheritance and
+  fresh identities.
 - The transform model defines coordinate space, aspect-ratio behavior, and
   source-versus-segment ownership.
 - Triplicate linking, automatic selection, and background treatment are
@@ -60,6 +73,9 @@ vertically concentrated action.
 
 - A user can apply, review, copy, paste, save, reopen, and export transforms
   on one or several segments.
+- A user can split or copy/paste a modified segment and observe the same
+  modification bundle on the independent resulting segment(s), then clean
+  that bundle without changing source ranges.
 - Triplicate mode creates three visibly linked instances, selects them
   automatically, and updates all three through shared X/Y/zoom changes.
 - Portrait and vertical-action examples preserve intended focus without
@@ -73,7 +89,8 @@ vertically concentrated action.
 - Depends on stable segment identity, selection, output canvas, and project
   schema.
 - Linked-instance state can become ambiguous when segments are copied,
-  deleted, or reordered.
+  deleted, split, or reordered unless cloned group identity and reset rules
+  are explicit.
 - Automatic focus quality may be unreliable and must remain user-correctable.
 - Composition increases render cost and removes stream-copy eligibility.
 

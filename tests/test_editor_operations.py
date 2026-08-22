@@ -7,8 +7,10 @@ from resolve_editor.export import ExportPlan
 from resolve_editor.media import MediaProbe
 from resolve_editor.model import Project, ProjectValidationError
 from resolve_editor.operations import (
+    copy_segments,
     create_project_from_source,
     export_destination_conflicts_with_project,
+    paste_segments_after_selection,
     plan_project_export,
     set_segment_deleted,
     split_segment,
@@ -113,6 +115,29 @@ class EditorOperationsTests(unittest.TestCase):
 
             with self.assertRaises(ProjectValidationError):
                 split_segment(project.segment_timeline, 0.0)
+
+    def test_paste_after_selection_inserts_after_the_selected_block(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            project.timeline.split(3.0)
+            project.timeline.split(6.0)
+            before_ids = [segment.segment_id for segment in project.timeline.segments]
+            selected = project.timeline.segments[1]
+            copied = copy_segments(project, [selected.segment_id])
+
+            pasted = paste_segments_after_selection(
+                project,
+                copied,
+                selected.segment_id,
+            )
+
+            self.assertEqual(len(pasted), 1)
+            self.assertEqual(
+                [segment.segment_id for segment in project.timeline.segments],
+                [before_ids[0], before_ids[1], pasted[0].segment_id, before_ids[2]],
+            )
+            self.assertEqual(pasted[0].timeline_start, 6.0)
+            self.assertEqual(pasted[0].timeline_end, 9.0)
 
     def test_project_export_planning_is_a_shared_boundary(self):
         with TemporaryDirectory() as temporary_directory:

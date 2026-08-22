@@ -6,7 +6,7 @@ import subprocess
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Sequence
 
 from .playback import PlaybackBackendError
 
@@ -96,7 +96,11 @@ class FfmpegPlaybackBackend:
                 "-sn",
                 "-dn",
                 "-vf",
-                "format=rgba",
+                (
+                    f"scale={self.width}:{self.height}:force_original_aspect_ratio=decrease,"
+                    f"pad={self.width}:{self.height}:(ow-iw)/2:(oh-ih)/2,"
+                    "setsar=1,format=rgba"
+                ),
             ]
         )
         if frame_count is not None:
@@ -471,3 +475,102 @@ class FfmpegPlaybackBackend:
             self._terminate_preview_process(process)
         if worker is not None and worker is not threading.current_thread():
             worker.join(timeout=2)
+
+
+class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
+    """Decode a sequential mixed-source timeline into one preview stream."""
+
+    def __init__(
+        self,
+        sources: Sequence[tuple[str, Path]],
+        blocks,
+        width: int,
+        height: int,
+        frame_rate: float,
+        duration_seconds: float,
+        on_frame: FrameCallback,
+        on_error: MessageCallback,
+        on_end: VoidCallback,
+        ffmpeg_path: str = "ffmpeg",
+    ) -> None:
+        source_items = tuple(sources)
+        if not source_items:
+            raise ValueError("At least one source is required for composed playback")
+        self._source_items = source_items
+        self._blocks = tuple(blocks)
+        if not self._blocks:
+            raise ValueError("At least one timeline block is required for composed playback")
+        self._source_indexes = {
+            source_id: index for index, (source_id, _path) in enumerate(source_items)
+        }
+        super().__init__(
+            source_items[0][1],
+            width,
+            height,
+            frame_rate,
+            duration_seconds,
+            on_frame,
+            on_error,
+            on_end,
+            ffmpeg_path,
+        )
+
+    def _command(
+        self,
+        position_seconds: float,
+        *,
+        realtime: bool,
+        frame_count: int | None = None,
+    ) -> list[str]:
+        command = [
+            self.ffmpeg_path,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+        ]
+        for _source_id, path in self._source_items:
+            if realtime:
+                command.append("-re")
+            command.extend(["-noautorotate", "-i", str(path)])
+        filters: list[str] = []
+        video_inputs: list[str] = []
+        for index, block in enumerate(self._blocks):
+            source_index = self._source_indexes.get(block.source_id)
+            if source_index is None and block.source_id is None and len(self._source_items) == 1:
+                source_index = 0
+            if source_index is None:
+                raise PlaybackBackendError(
+                    f"Preview block references unknown source: {block.source_id}"
+                )
+            filters.append(
+                f"[{source_index}:v:0]trim=start={block.start_seconds:.6f}:"
+                f"duration={block.duration_seconds:.6f},setpts=PTS-STARTPTS,"
+                f"scale={self.width}:{self.height}:force_original_aspect_ratio=decrease,"
+                f"pad={self.width}:{self.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+                f"fps={self.frame_rate:.12g}[v{index}]"
+            )
+            video_inputs.append(f"[v{index}]")
+        filters.append(f"{''.join(video_inputs)}concat=n={len(video_inputs)}:v=1:a=0[outv]")
+        command.extend(
+            [
+                "-filter_complex",
+                ";".join(filters),
+                "-map",
+                "[outv]",
+            ]
+        )
+        if position_seconds > 0:
+            command.extend(["-ss", f"{position_seconds:.6f}"])
+        if frame_count is not None:
+            command.extend(["-frames:v", str(frame_count)])
+        command.extend(
+            [
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgba",
+                "pipe:1",
+            ]
+        )
+        return command

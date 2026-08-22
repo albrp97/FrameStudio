@@ -2,9 +2,11 @@ import unittest
 from pathlib import Path
 
 from resolve_editor.app import (
+    KEYCODE_SPACE,
     _metadata_float,
     create_play_pause_key_controller,
     format_export_progress_label,
+    format_key_bindings,
     format_output_duration_label,
     format_segment_label,
     frame_step_direction,
@@ -13,6 +15,7 @@ from resolve_editor.app import (
     is_fit_zoom_key,
     is_frame_step_key,
     is_play_pause_key,
+    playback_action_label,
     segment_action_state,
     timeline_scroll_mode,
     timeline_scroll_position,
@@ -21,6 +24,7 @@ from resolve_editor.app import (
 )
 from resolve_editor.export import ExportProgress
 from resolve_editor.model import SegmentTimeline
+from resolve_editor.playback import PlaybackState
 from resolve_editor.ui import format_duration
 
 
@@ -65,6 +69,15 @@ class EditorUiHelperTests(unittest.TestCase):
         self.assertTrue(is_play_pause_key(ord(" ")))
         self.assertFalse(is_play_pause_key(ord("p")))
 
+    def test_space_key_accepts_keypad_and_hardware_keycode_variants(self):
+        self.assertTrue(is_play_pause_key(0xFF80))
+        self.assertTrue(is_play_pause_key(0, KEYCODE_SPACE))
+        self.assertFalse(is_play_pause_key(ord("p"), 33))
+
+    def test_playback_action_label_reflects_current_state(self):
+        self.assertEqual(playback_action_label(PlaybackState.PAUSED), "Play")
+        self.assertEqual(playback_action_label(PlaybackState.PLAYING), "Pause")
+
     def test_delete_is_the_clip_delete_key(self):
         self.assertTrue(is_delete_key(0xFFFF))
         self.assertTrue(is_delete_key(0xFF9F))
@@ -96,6 +109,18 @@ class EditorUiHelperTests(unittest.TestCase):
             format_output_duration_label(65.25),
             "Final output: 01:05",
         )
+
+    def test_key_bindings_are_available_as_a_compact_help_panel(self):
+        bindings = format_key_bindings()
+
+        self.assertIn("Space", bindings)
+        self.assertIn("B", bindings)
+        self.assertIn("Delete", bindings)
+        self.assertIn("Ctrl+mouse wheel", bindings)
+        self.assertIn("Click/drag timeline", bindings)
+        self.assertIn("Shift-click", bindings)
+        self.assertIn("after the selected block", bindings)
+        self.assertGreaterEqual(bindings.count("\n"), 10)
 
     def test_delete_toggles_selected_clip_between_included_and_deleted(self):
         timeline = SegmentTimeline(12.5)

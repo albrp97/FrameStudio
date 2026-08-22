@@ -72,16 +72,24 @@ resolve-editor --source ~/Videos/source.mp4
 resolve-editor --project ~/Videos/source.resolve.json
 ```
 
-The same executable also provides deterministic, machine-readable
-one-source CLI operations. Successful commands emit versioned JSON on stdout;
-errors emit structured JSON on stderr with a non-zero status:
+The same executable also provides deterministic, machine-readable editor
+operations. Successful commands emit versioned JSON on stdout; errors emit
+structured JSON on stderr with a non-zero status:
 
 ```sh
 resolve-editor import ~/Videos/source.mp4 --project ~/Videos/source.resolve.json
+resolve-editor import ~/Videos/landscape.mp4 ~/Videos/portrait.mp4 \
+  --project ~/Videos/mixed.resolve.json
 resolve-editor inspect ~/Videos/source.resolve.json
 resolve-editor split ~/Videos/source.resolve.json --at 12.5
 resolve-editor delete ~/Videos/source.resolve.json --segment SEGMENT_ID
 resolve-editor restore ~/Videos/source.resolve.json --segment SEGMENT_ID
+resolve-editor move ~/Videos/source.resolve.json --segment SEGMENT_ID \
+  --direction left
+resolve-editor copy ~/Videos/mixed.resolve.json --segment SEGMENT_ID
+resolve-editor paste ~/Videos/mixed.resolve.json --segment SEGMENT_ID --at 0
+resolve-editor relink ~/Videos/mixed.resolve.json --source SOURCE_ID \
+  --path ~/Videos/relocated.mp4
 resolve-editor duration ~/Videos/source.resolve.json
 resolve-editor export ~/Videos/source.resolve.json --output ~/Videos/edited.mp4
 ```
@@ -99,29 +107,44 @@ interface:
 make start
 ```
 
-Use **Select video(s)** to choose local video files. PHASE-001 currently
-accepts one source video per project; selecting several files shows an explicit
-message instead of silently discarding them. The same in-app multi-selection
-entry point is retained for the planned multi-source timeline phase.
+Use **Select video(s)** to choose one or several local video files. One-source
+projects retain the original schema and editing behavior; selecting several
+files creates a mixed-source project with stable source identities and a
+sequential timeline.
 
 The editor uses Python with PyGObject/GTK 4 and an FFmpeg raw-frame preview
 pipe. The target workstation must provide GTK 4, PyGObject, FFmpeg, and
-ffprobe. The current editor supports one source, real-time video preview,
-play/pause, seek, a visual clip timeline, non-destructive split/delete-toggle
-editing, versioned project save/reopen, and verified MP4 export. Preview audio
-is not included yet.
+ffprobe. The editor supports one-source and mixed-source projects, real-time
+composed preview, play/pause, seek, a visual clip timeline, non-destructive
+split/delete-toggle editing, block movement and copy/paste, versioned project
+save/reopen, and verified MP4 export. Preview audio is not included yet.
+The implementation keeps the public `resolve_editor.model`, `export`, `app`,
+`timeline`, and `cli` paths as compatibility facades over focused model,
+export, playback, application, timeline, and CLI modules.
+Every project uses a fixed 1920x1080 (1080p) canvas. Inputs with another
+dimension or orientation are contain-scaled and letterboxed without stretching
+or cropping.
 
-The timeline shows every source clip in order. Included clips use colored
-blocks; deleted clips remain visible with a red hatched treatment. Click or
-drag across the timeline to move the playhead precisely and select the clip
-under the pointer. Use **Space** for play/pause, **B** to split at the
-playhead, **Delete** to toggle the selected clip between included and deleted,
-and **Left/Right** to move one source frame at a time. Use **Ctrl+mouse wheel**
-to zoom, **Ctrl+0** to fit, and **Alt/Shift+mouse wheel** or a horizontal
+The timeline shows every source block in order. Included blocks use colored
+blocks; deleted blocks remain visible with a red hatched treatment. Click or
+drag across the timeline to move the playhead precisely and select the block
+under the pointer. Block colors belong to each block, so moving or
+copying/pasting preserves its color; splitting creates fresh child colors and
+restoring a deleted block reveals its original color. Use **Ctrl-click** to
+add or remove blocks from the selection, **Shift-click** to select an
+inclusive range, and a normal click to replace the selection. Use **Space**
+for play/pause, **B** to split at the playhead, **Delete** to toggle the selected
+block or blocks, **Shift+Left/Right** to move selected blocks, and
+**Ctrl+C/Ctrl+V** to copy and paste them immediately after the selected
+block. Click **Play** or **Pause**, or press **Space**, to toggle playback.
+Bare
+**Left/Right** moves one output frame at a time. Use **Ctrl+mouse wheel** to
+zoom, **Ctrl+0** to fit, and **Alt/Shift+mouse wheel** or a horizontal
 secondary wheel to move the zoomed timeline viewport. A normal wheel always
 moves the playhead, even when zoomed. The timeline also displays the
 calculated final output duration and export progress includes percentage,
-frames, FPS, elapsed time, and ETA.
+frames, FPS, elapsed time, and ETA. The editor keeps this area compact; click
+**Key bindings** to open the complete keyboard and timeline-control reference.
 
 The `.mp4` file selected in the editor is source media. **Save project** writes
 a `.resolve.json` editor project. **Export video** writes a separate edited
@@ -132,6 +155,12 @@ Export uses stream copy when the source and cut boundaries are conservatively
 eligible. Otherwise it reports the reason and uses an H.264/AAC MP4 fallback.
 Both routes write to a temporary partial file and publish atomically only
 after validation. Empty edits are rejected.
+
+For a non-1080p input, fixed-canvas scaling requires the fallback render path.
+The established render profile owns the output container, codecs, audio, and
+pixel format; source codec/container differences do not change it. Current
+frame-rate handling is deterministic and 60-FPS enhancement remains a later
+capability.
 
 ### Makefile shortcuts
 
@@ -171,16 +200,18 @@ scoped C901 complexity checks for the editor CLI/domain surfaces, jscpd,
 the repository dependency-boundary check, pip-audit, Bandit, and the AIDD
 churn report. Generated JSON reports are written to
 `evidence/static-analysis/`; sensitive values and absolute paths must not be
-added to those artifacts. jscpd currently reports a 1.7% duplication baseline
-against a configured 2% ceiling, so new duplication remains visible without
-blocking on the existing helper/test overlap. The GTK/rendering/export
+added to those artifacts. jscpd currently reports approximately a 1.76%
+duplication baseline against a configured 2% ceiling, so new duplication
+remains visible without blocking on the existing helper/test overlap. The
+GTK/rendering/export
 adapters retain known complexity debt outside the current CLI/domain gate and
 remain a review follow-up rather than being hidden. The same commands run in
 [`.github/workflows/quality.yml`](.github/workflows/quality.yml).
 
-On a Wayland desktop, capture configured UI evidence after launching the
-editor with `make screenshot LABEL=before` and again with
-`make screenshot LABEL=after`. Screenshots are saved under
+On a Hyprland Wayland desktop, focus the editor window and capture configured
+UI evidence with `make screenshot LABEL=before`, then repeat with
+`make screenshot LABEL=after`. The target captures only the active window
+using `grim` and `hyprctl`; screenshots are saved under
 `evidence/screenshots/` and are not required for CLI-only changes. The
 quality-tool setup evidence includes
 [`quality-before.png`](evidence/screenshots/quality-before.png) and
@@ -191,13 +222,15 @@ quality-tool setup evidence includes
 Use a short disposable MP4 or a copy of a local source:
 
 1. Launch with `make start`.
-2. Click **Select video(s)** and choose one local video.
+2. Click **Select video(s)** and choose one local video, or choose two
+   disposable videos with different dimensions or frame rates for the
+   mixed-source flow.
 3. Confirm the preview loads, the duration is shown, and the timeline is
    enabled.
 4. Press **Space** and confirm the preview starts, the position label/playhead
    advance together, and pressing **Space** again pauses it.
 5. Click inside different colored timeline blocks and confirm the selected
-   block is outlined, the clip details update, and the playhead seeks there.
+   block is outlined, the source details update, and the playhead seeks there.
 6. Drag across the timeline and confirm the playhead and preview image update
    while the pointer moves, stale intermediate renders do not hold up the
    latest position, and the final frame matches the exact released position.
@@ -210,21 +243,38 @@ Use a short disposable MP4 or a copy of a local source:
    and the selected clip status changes to **Deleted**.
 10. Press **Delete** again and confirm the clip returns to included styling and
     the final output duration returns.
-11. Hold **Ctrl** and scroll up/down. Confirm the zoom percentage changes.
-12. Press **Ctrl+0** and confirm the complete source returns to view.
-13. At any zoom level, scroll normally and confirm the playhead moves by about
+11. Split the source into three clips, select the middle clip, and press
+    **Shift+Left** or **Shift+Right**. Confirm the whole block changes
+    timeline position while its source range, color, and duration remain
+    attached to it.
+12. Seek across the moved blocks and confirm the preview follows timeline
+    order; split the selected moved block and confirm both children stay in
+    that position.
+13. Hold **Ctrl** and click another block. Confirm both blocks have orange
+    selected outlines; click it again with **Ctrl** to remove it from the
+    selection. Click a different block normally and confirm the previous
+    selection clears.
+14. Select a block, hold **Shift**, and click another block. Confirm every
+    block between the two endpoints is selected inclusively.
+15. Select a block, press **Ctrl+C**, then **Ctrl+V**. Confirm a fresh copy is
+    inserted immediately after the selected block, later blocks move forward,
+    the copied color/state remain attached, and the final timeline duration
+    increases by the copied block duration.
+16. Hold **Ctrl** and scroll up/down. Confirm the zoom percentage changes.
+17. Press **Ctrl+0** and confirm the complete source returns to view.
+18. At any zoom level, scroll normally and confirm the playhead moves by about
     one second instead of moving the horizontal scrollbar.
-14. Hold **Alt** or **Shift** while scrolling, or use a horizontal secondary
+19. Hold **Alt** or **Shift** while scrolling, or use a horizontal secondary
     wheel, and confirm the zoomed timeline viewport moves left/right.
-15. Click **Save project**, choose a path ending in `.resolve.json`, and
+20. Click **Save project**, choose a path ending in `.resolve.json`, and
    confirm the status reports a saved project. Verify the source file's size
    and modification time are unchanged.
-16. Click **Reopen project**, or close the app and run
+21. Click **Reopen project**, or close the app and run
    `make editor ARGS="--project /absolute/path/to/project.resolve.json"`.
    Confirm the same source, duration, and saved playhead reopen.
-17. Save the project, close/reopen it, and confirm the clip deleted/included
+22. Save the project, close/reopen it, and confirm the clip deleted/included
     state is preserved.
-18. Click **Export video**, choose a new `.mp4` path, and watch the export
+23. Click **Export video**, choose a new `.mp4` path, and watch the export
     panel. Confirm it shows percentage, current frame/total frames, FPS,
     elapsed time, and ETA while the export runs. Confirm the output plays and
     inspect it with:
@@ -234,17 +284,24 @@ Use a short disposable MP4 or a copy of a local source:
       -of compact /absolute/path/to/exported-edited.mp4
     ```
 
-    Confirm the duration matches the edited duration, the dimensions match the
-    source, required audio remains present, and the source file is unchanged.
-19. Select two disposable/local videos at once and confirm the UI explains
-    that the current phase supports one source per project.
-20. Check an error path safely with an invalid disposable project:
+    Confirm the duration matches the edited duration, required audio remains
+    present, the source file is unchanged, and the output dimensions are
+    exactly 1920x1080.
+24. For the mixed-source flow, seek across the source boundary, use
+    **Ctrl-click** to select blocks from both sources and **Shift-click** to
+    select an inclusive range, move them with **Shift+Left/Right**, and use
+    **Ctrl+C/Ctrl+V** to insert copies after the selected block. Confirm
+    order, source coverage, fresh pasted identities, final duration, and the
+    fixed 1920x1080 preview/output canvas.
+25. Reopen the mixed project and confirm source order, block order, deletion
+    state, and the selected output duration are preserved.
+26. Check an error path safely with an invalid disposable project:
    `printf '{' > /tmp/invalid.resolve.json`, then run
    `make editor ARGS="--project /tmp/invalid.resolve.json"`. Confirm the
    status shows an actionable error and does not replace valid state.
 
-This phase intentionally does not yet provide multiple sources, triplicate
-layouts, automatic audio normalization, or 60-FPS enhancement. Those remain
+The mixed-source editor intentionally does not yet provide triplicate layouts,
+automatic per-input audio normalization, or 60-FPS enhancement. Those remain
 planned future capabilities.
 
 The TUI starts in `~/Documents/edit`. Navigate with the arrow keys or `j/k`,
