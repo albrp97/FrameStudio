@@ -5,7 +5,9 @@ import time
 from collections.abc import Sequence
 from fractions import Fraction
 from pathlib import Path
+from typing import Any, Mapping
 
+from .audio import AudioDecision, audio_filter
 from .export_process import (
     emit_export_progress,
     expected_export_frames,
@@ -191,6 +193,7 @@ def fallback_filter(
     has_audio: bool,
     *,
     output_policy: OutputPolicy | None = None,
+    audio_decision: AudioDecision | Mapping[str, Any] | None = None,
 ) -> str:
     filters: list[str] = []
     for index, segment in enumerate(segments):
@@ -206,7 +209,10 @@ def fallback_filter(
             )
         filters.append(f"{video_filter}[v{index}]")
         if has_audio:
-            filters.append(f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{index}]")
+            filters.append(
+                f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS,"
+                f"{audio_filter(audio_decision)}[a{index}]"
+            )
     if has_audio:
         inputs = "".join(f"[v{index}][a{index}]" for index in range(len(segments)))
         filters.append(f"{inputs}concat=n={len(segments)}:v=1:a=1[outv][outa]")
@@ -229,6 +235,7 @@ def mixed_fallback_filter(
     filters: list[str] = []
     video_inputs: list[str] = []
     audio_inputs: list[str] = []
+    audio_decisions = dict(plan.audio_decisions)
     target_rate = policy.frame_rate
     for index, segment in enumerate(plan.segments):
         source_index = source_indexes.get(segment.source_id or "")
@@ -250,7 +257,8 @@ def mixed_fallback_filter(
             if probes[source_index].has_audio_stream:
                 filters.append(
                     f"[{source_index}:a:0]atrim=start={start}:duration={duration},"
-                    f"asetpts=PTS-STARTPTS,aresample=async=1:first_pts=0[a{index}]"
+                    "asetpts=PTS-STARTPTS,"
+                    f"{audio_filter(audio_decisions.get(segment.source_id or ''))}[a{index}]"
                 )
             else:
                 filters.append(
@@ -325,6 +333,10 @@ def execute_mixed_fallback(
                 policy.audio_codec or "aac",
                 "-b:a",
                 "192k",
+                "-ar",
+                str(policy.audio_sample_rate),
+                "-ac",
+                str(policy.audio_channels),
             ]
         )
     command.extend(
@@ -371,6 +383,7 @@ def execute_fallback(
             plan.segments,
             has_audio,
             output_policy=plan.output_policy,
+            audio_decision=(None if not plan.audio_decisions else plan.audio_decisions[0][1]),
         ),
         "-map",
         "[outv]",
@@ -392,6 +405,10 @@ def execute_fallback(
                 plan.fallback_audio_codec or "aac",
                 "-b:a",
                 "192k",
+                "-ar",
+                "48000",
+                "-ac",
+                "2",
             ]
         )
     command.extend(

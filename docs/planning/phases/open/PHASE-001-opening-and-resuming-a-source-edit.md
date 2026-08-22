@@ -4,12 +4,15 @@
 **Parent links:** OBJ-001, SCOPE-001
 **Capability links:** CAP-001, CAP-002, CAP-004, CAP-012
 **Sequence:** 1
-**Status:** complete
-**Closure:** user-approved on 2026-08-22 after successful implementation,
-review evidence, and target-workstation validation; remote checks remain
-unavailable and are recorded as an accepted warning.
+**Status:** verifying
+**Previous closure:** user-approved on 2026-08-22 after successful
+implementation, review evidence, and target-workstation validation; remote
+checks remain unavailable and are recorded as an accepted warning.
+**Reopened:** user-reported on 2026-08-22 to correct timeline playback pacing
+after a cursor seek.
 **Path history:** `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md`
 -> `phases/closed/PHASE-001-opening-and-resuming-a-source-edit.md`
+-> `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md`
 **Horizon:** first
 **Owner:** repository planning; maintainer identity is not recorded
 **Approval:** user-approved on 2026-08-21 before feature generation
@@ -24,9 +27,9 @@ playback, project persistence, timeline state, and user-facing errors
 
 ## Outcome
 
-The user can open one supported video in the editor, view it in
-real time, navigate its timeline, save the project, and reopen it with the
-same source and state.
+The user can open one supported video in the editor, view it in real time,
+navigate its timeline, start playback after a cursor seek, save the project,
+and reopen it with the same source and state.
 
 ### Included
 
@@ -36,6 +39,8 @@ same source and state.
   export.
 - Provide the primary editor view with real-time playback, play, pause, seek,
   current position, source duration, and timeline representation.
+- Deliver preview frames at the configured output rate after timeline seeks
+  and honor pause/resume without collapsing playback to a single frame.
 - Define and implement the initial versioned project representation for one
   source.
 - Save and reopen the project without modifying the source.
@@ -65,7 +70,8 @@ same source and state.
 ### Exit conditions
 
 - One supported source can be imported and played through the primary
-  interface with reliable play/pause/seek behavior on the target workstation.
+  interface with reliable play/pause/seek behavior, including playback after
+  a timeline cursor seek, on the target workstation.
 - The timeline and preview expose consistent current position and duration.
 - A save/reopen round trip restores source reference and edit foundation state.
 - An invalid source or unavailable playback/tool path produces an explicit
@@ -88,6 +94,7 @@ same source and state.
 
 - Project and source-model unit tests.
 - Playback control and timeline-state tests where the chosen runtime permits.
+- A regression test proves that frames remain paced after a timeline seek.
 - Manual target-workstation test using representative local media.
 - Persistence round-trip evidence and source-preservation evidence.
 - Record selected stack, versions, setup, and known limitations.

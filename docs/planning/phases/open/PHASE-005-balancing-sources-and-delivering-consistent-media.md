@@ -4,13 +4,16 @@
 **Parent links:** OBJ-001, SCOPE-001  
 **Capability links:** CAP-005, CAP-008, CAP-012  
 **Sequence:** 5  
-**Status:** confirmed  
+**Status:** verifying
 **Horizon:** future  
 **Owner:** repository planning; maintainer identity is not recorded  
-**Approval:** user-approved on 2026-08-21 before feature generation  
+**Approval:** user-approved on 2026-08-21 before feature generation;
+implementation authorized on 2026-08-22; user validation is pending
+**Feature links:** FEAT-014, FEAT-015, FEAT-016
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/planning/phases.md`,
-`docs/planning/repo-map.md`, `.github/aidd-config.yml`  
+`docs/planning/repo-map.md`, `docs/planning/features.md`,
+`docs/planning/backlog.md`, `.github/aidd-config.yml`
 **Migration source:** `docs/planning/phases.md`, inline section
 `PHASE-005 - Balancing Sources and Delivering Consistent Media`; migrated on
 2026-08-21 with the phase content preserved.  
@@ -79,3 +82,27 @@ silently recalculated per segment.
 - Measured output metadata and peak/loudness evidence.
 - Manual listening and playback evidence on representative local media.
 - Render benchmark evidence for the target workstation.
+
+## Planned feature decomposition
+
+- FEAT-014 - Balance each input source consistently across its timeline.
+- FEAT-015 - Select tested delivery routes for audio-aware and mixed-source
+  exports.
+- FEAT-016 - Synchronize media decisions across the GUI, CLI, project file,
+  and verified output.
+
+The feature records and ticket contracts have been implemented on the
+dedicated PHASE-005 branch. Their evidence records are open in `verifying`
+while user validation and delivery review remain pending.
+
+## Planning readiness
+
+- Parent objective, scope, capability map, and PHASE-005 are approved.
+- FEAT-014 through FEAT-016 have one phase, explicit capability links,
+  observable requirements, non-goals, risks, and evidence paths.
+- TICKET-031 through TICKET-037 have bounded scope, dependency order,
+  protected behaviors, commands, quality gates, and user-validation plans.
+- TICKET-031 through TICKET-037 have completed implementation and automated
+  verification on the dedicated branch.
+- User validation, review, and configured remote checks remain open; no ticket
+  or parent record is ready to close yet.

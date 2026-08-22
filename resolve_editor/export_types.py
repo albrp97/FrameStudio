@@ -7,6 +7,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
+from .audio import AudioDecision
 from .model import Segment
 
 _BOUNDARY_TOLERANCE = 1e-3
@@ -69,6 +70,8 @@ class OutputPolicy:
     audio_stream_present: bool
     requires_normalization: bool
     reason: str
+    audio_sample_rate: int = 48000
+    audio_channels: int = 2
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -84,6 +87,8 @@ class OutputPolicy:
             "audio_stream_present": self.audio_stream_present,
             "requires_normalization": self.requires_normalization,
             "reason": self.reason,
+            "audio_sample_rate": self.audio_sample_rate,
+            "audio_channels": self.audio_channels,
         }
 
 
@@ -252,6 +257,7 @@ class ExportPlan:
     source_paths: tuple[Path, ...] = ()
     source_ids: tuple[str, ...] = ()
     output_policy: OutputPolicy | None = None
+    audio_decisions: tuple[tuple[str, AudioDecision | dict[str, Any]], ...] = ()
 
     @property
     def is_fast_path(self) -> bool:
@@ -272,4 +278,10 @@ class ExportPlan:
             "source_paths": [str(path) for path in self.source_paths],
             "source_ids": list(self.source_ids),
             "output_policy": (None if self.output_policy is None else self.output_policy.to_dict()),
+            "audio_decisions": {
+                source_id: (
+                    decision.to_dict() if isinstance(decision, AudioDecision) else dict(decision)
+                )
+                for source_id, decision in self.audio_decisions
+            },
         }

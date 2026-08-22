@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
+from .audio import AUDIO_CHANNELS, AUDIO_SAMPLE_RATE, audio_filter
 from .playback import PlaybackBackendError
 
 
@@ -38,6 +41,8 @@ class FfmpegPlaybackBackend:
         on_error: MessageCallback,
         on_end: VoidCallback,
         ffmpeg_path: str = "ffmpeg",
+        audio_decision: Mapping[str, Any] | None = None,
+        ffplay_path: str = "ffplay",
     ) -> None:
         if width <= 0 or height <= 0:
             raise ValueError("Playback dimensions must be positive")
@@ -52,9 +57,15 @@ class FfmpegPlaybackBackend:
         self.on_error = on_error
         self.on_end = on_end
         self.ffmpeg_path = ffmpeg_path
+        self.audio_decision = None if audio_decision is None else dict(audio_decision)
+        self.ffplay_path = ffplay_path
         self._lock = threading.RLock()
         self._process: subprocess.Popen[bytes] | None = None
         self._stop_event: threading.Event | None = None
+        self._audio_process: subprocess.Popen[bytes] | None = None
+        self._audio_sink: subprocess.Popen[bytes] | None = None
+        self._audio_copy_thread: threading.Thread | None = None
+        self._audio_monitor_thread: threading.Thread | None = None
         self._position_seconds = 0.0
         self._paused = False
         self._preview_condition = threading.Condition(self._lock)
@@ -116,6 +127,191 @@ class FfmpegPlaybackBackend:
         )
         return command
 
+    def _has_audio_preview(self) -> bool:
+        if self.audio_decision is None:
+            return False
+        return self.audio_decision.get("status") != "not-applicable"
+
+    def _audio_command(
+        self,
+        position_seconds: float,
+        *,
+        realtime: bool,
+    ) -> list[str]:
+        command = [
+            self.ffmpeg_path,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+        ]
+        if realtime:
+            command.append("-re")
+        command.extend(
+            [
+                "-ss",
+                f"{position_seconds:.6f}",
+                "-i",
+                str(self.source),
+                "-map",
+                "0:a:0",
+                "-vn",
+                "-af",
+                audio_filter(self.audio_decision),
+                "-f",
+                "s16le",
+                "-ar",
+                str(AUDIO_SAMPLE_RATE),
+                "-ac",
+                str(AUDIO_CHANNELS),
+                "pipe:1",
+            ]
+        )
+        return command
+
+    def _start_audio_preview_locked(self, position_seconds: float) -> None:
+        if not self._has_audio_preview():
+            return
+        if shutil.which(self.ffplay_path) is None:
+            raise PlaybackBackendError(
+                f"ffplay is required for audio preview but was not found: {self.ffplay_path}"
+            )
+        try:
+            audio_process = subprocess.Popen(
+                self._audio_command(position_seconds, realtime=True),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                bufsize=0,
+                start_new_session=True,
+            )
+            audio_sink = subprocess.Popen(
+                [
+                    self.ffplay_path,
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-nodisp",
+                    "-autoexit",
+                    "-f",
+                    "s16le",
+                    "-ar",
+                    str(AUDIO_SAMPLE_RATE),
+                    "-ac",
+                    str(AUDIO_CHANNELS),
+                    "-i",
+                    "pipe:0",
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except (FileNotFoundError, OSError) as error:
+            for process in (
+                audio_process if "audio_process" in locals() else None,
+                audio_sink if "audio_sink" in locals() else None,
+            ):
+                if process is not None:
+                    self._terminate_process_instance(process)
+                    self._close_process_streams(process)
+            raise PlaybackBackendError(f"Could not start audio preview: {error}") from error
+        self._audio_process = audio_process
+        self._audio_sink = audio_sink
+        self._audio_copy_thread = threading.Thread(
+            target=self._copy_audio,
+            args=(audio_process, audio_sink),
+            name="resolve-editor-audio",
+            daemon=True,
+        )
+        self._audio_copy_thread.start()
+        self._audio_monitor_thread = threading.Thread(
+            target=self._monitor_audio_preview,
+            args=(audio_process, audio_sink),
+            name="resolve-editor-audio-monitor",
+            daemon=True,
+        )
+        self._audio_monitor_thread.start()
+
+    @staticmethod
+    def _close_process_streams(process: subprocess.Popen[bytes] | None) -> None:
+        if process is None:
+            return
+        for stream in (process.stdin, process.stdout, process.stderr):
+            if stream is not None:
+                stream.close()
+
+    @staticmethod
+    def _copy_audio(
+        audio_process: subprocess.Popen[bytes],
+        audio_sink: subprocess.Popen[bytes],
+    ) -> None:
+        try:
+            if audio_process.stdout is None or audio_sink.stdin is None:
+                return
+            while True:
+                chunk = audio_process.stdout.read(64 * 1024)
+                if not chunk:
+                    break
+                audio_sink.stdin.write(chunk)
+                audio_sink.stdin.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            return
+        finally:
+            if audio_sink.stdin is not None:
+                try:
+                    audio_sink.stdin.close()
+                except (OSError, ValueError):
+                    pass
+
+    def _monitor_audio_preview(
+        self,
+        audio_process: subprocess.Popen[bytes],
+        audio_sink: subprocess.Popen[bytes],
+    ) -> None:
+        sink_return_code = audio_sink.wait()
+        if sink_return_code != 0 and audio_process.poll() is None:
+            self._terminate_process_instance(audio_process)
+        audio_return_code = audio_process.wait()
+        with self._lock:
+            is_current = self._audio_process is audio_process or self._audio_sink is audio_sink
+            if is_current:
+                self._audio_process = None
+                self._audio_sink = None
+                self._audio_monitor_thread = None
+        if is_current and (sink_return_code != 0 or audio_return_code != 0):
+            self._notify_error(
+                "Audio preview failed "
+                f"(ffplay status {sink_return_code}, ffmpeg status {audio_return_code})"
+            )
+
+    def _terminate_audio_preview(self) -> None:
+        with self._lock:
+            audio_process = self._audio_process
+            audio_sink = self._audio_sink
+            copy_thread = self._audio_copy_thread
+            monitor_thread = self._audio_monitor_thread
+            self._audio_process = None
+            self._audio_sink = None
+            self._audio_copy_thread = None
+            self._audio_monitor_thread = None
+        for process in (audio_process, audio_sink):
+            if process is None:
+                continue
+            if process.poll() is None:
+                try:
+                    os.kill(process.pid, signal.SIGCONT)
+                except ProcessLookupError:
+                    pass
+                self._terminate_process_instance(process)
+            else:
+                process.wait()
+        self._close_process_streams(audio_process)
+        self._close_process_streams(audio_sink)
+        if copy_thread is not None and copy_thread is not threading.current_thread():
+            copy_thread.join(timeout=1)
+        if monitor_thread is not None and monitor_thread is not threading.current_thread():
+            monitor_thread.join(timeout=1)
+
     def _start_process_locked(self) -> None:
         if self._process is not None:
             return
@@ -138,6 +334,15 @@ class FfmpegPlaybackBackend:
         self._process = process
         self._stop_event = event
         self._paused = False
+        try:
+            self._start_audio_preview_locked(start_position)
+        except PlaybackBackendError:
+            self._process = None
+            self._stop_event = None
+            event.set()
+            self._terminate_process_instance(process)
+            self._close_process_streams(process)
+            raise
         stderr_output: list[bytes] = []
         stderr_thread = threading.Thread(
             target=self._drain_stderr,
@@ -175,6 +380,29 @@ class FfmpegPlaybackBackend:
             data.extend(chunk)
         return bytes(data)
 
+    def _wait_for_frame_deadline(
+        self,
+        process: subprocess.Popen[bytes],
+        event: threading.Event,
+        deadline: float,
+        frame_interval: float,
+    ) -> bool:
+        while not event.is_set():
+            with self._lock:
+                if self._process is not process:
+                    return False
+                paused = self._paused
+            if paused:
+                event.wait(min(frame_interval, 0.05))
+                deadline = time.monotonic() + frame_interval
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return True
+            if event.wait(min(remaining, 0.05)):
+                return False
+        return False
+
     def _read_frames(
         self,
         process: subprocess.Popen[bytes],
@@ -185,6 +413,8 @@ class FfmpegPlaybackBackend:
     ) -> None:
         frame_index = 0
         incomplete = False
+        frame_interval = 1.0 / self.frame_rate
+        next_frame_at = time.monotonic()
         if process.stdout is None:
             self._notify_error("FFmpeg playback did not provide a video pipe")
             return
@@ -196,6 +426,13 @@ class FfmpegPlaybackBackend:
                 if len(data) != self.frame_size:
                     incomplete = True
                     break
+                if not self._wait_for_frame_deadline(
+                    process,
+                    event,
+                    next_frame_at,
+                    frame_interval,
+                ):
+                    break
                 position = min(
                     self.duration_seconds,
                     start_position + frame_index / self.frame_rate,
@@ -206,6 +443,7 @@ class FfmpegPlaybackBackend:
                     self._position_seconds = position
                 self.on_frame(VideoFrame(data, self.width, self.height, position))
                 frame_index += 1
+                next_frame_at = time.monotonic() + frame_interval
         except (OSError, ValueError) as error:
             if not event.is_set():
                 self._notify_error(f"FFmpeg playback read failed: {error}")
@@ -225,6 +463,7 @@ class FfmpegPlaybackBackend:
                         self._stop_event = None
                         self._paused = False
                 if is_current:
+                    self._terminate_audio_preview()
                     if incomplete:
                         self._notify_error("FFmpeg playback ended with an incomplete frame")
                     elif return_code not in (0, None):
@@ -238,6 +477,22 @@ class FfmpegPlaybackBackend:
     def _notify_error(self, message: str) -> None:
         self.on_error(message or "FFmpeg playback failed")
 
+    @staticmethod
+    def _terminate_process_instance(process: subprocess.Popen[bytes]) -> None:
+        if process.poll() is None:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=2)
+
     def play(self) -> None:
         self._cancel_preview_requests()
         with self._lock:
@@ -246,6 +501,22 @@ class FfmpegPlaybackBackend:
                     os.kill(self._process.pid, signal.SIGCONT)
                 except ProcessLookupError as error:
                     raise PlaybackBackendError("Playback process is no longer running") from error
+                if self._audio_process is not None:
+                    if self._audio_process.poll() is None:
+                        try:
+                            os.kill(self._audio_process.pid, signal.SIGCONT)
+                        except ProcessLookupError as error:
+                            raise PlaybackBackendError(
+                                "Audio preview process is no longer running"
+                            ) from error
+                if self._audio_sink is not None:
+                    if self._audio_sink.poll() is None:
+                        try:
+                            os.kill(self._audio_sink.pid, signal.SIGCONT)
+                        except ProcessLookupError as error:
+                            raise PlaybackBackendError(
+                                "Audio preview sink is no longer running"
+                            ) from error
                 self._paused = False
                 return
             if self._process is None:
@@ -259,9 +530,18 @@ class FfmpegPlaybackBackend:
                 os.kill(self._process.pid, signal.SIGSTOP)
             except ProcessLookupError as error:
                 raise PlaybackBackendError("Playback process is no longer running") from error
+            for process in (self._audio_process, self._audio_sink):
+                if process is not None and process.poll() is None:
+                    try:
+                        os.kill(process.pid, signal.SIGSTOP)
+                    except ProcessLookupError as error:
+                        raise PlaybackBackendError(
+                            "Audio preview process is no longer running"
+                        ) from error
             self._paused = True
 
     def _terminate_process(self) -> None:
+        self._terminate_audio_preview()
         with self._lock:
             process = self._process
             event = self._stop_event
@@ -492,6 +772,8 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
         on_error: MessageCallback,
         on_end: VoidCallback,
         ffmpeg_path: str = "ffmpeg",
+        audio_decisions: Mapping[str, Mapping[str, Any]] | None = None,
+        ffplay_path: str = "ffplay",
     ) -> None:
         source_items = tuple(sources)
         if not source_items:
@@ -503,6 +785,7 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
         self._source_indexes = {
             source_id: index for index, (source_id, _path) in enumerate(source_items)
         }
+        self.audio_decisions = {} if audio_decisions is None else dict(audio_decisions)
         super().__init__(
             source_items[0][1],
             width,
@@ -513,7 +796,79 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             on_error,
             on_end,
             ffmpeg_path,
+            ffplay_path=ffplay_path,
         )
+
+    def _has_audio_preview(self) -> bool:
+        return any(
+            settings.get("status") != "not-applicable" for settings in self.audio_decisions.values()
+        )
+
+    def _audio_command(
+        self,
+        position_seconds: float,
+        *,
+        realtime: bool,
+    ) -> list[str]:
+        command = [
+            self.ffmpeg_path,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+        ]
+        for _source_id, path in self._source_items:
+            if realtime:
+                command.append("-re")
+            command.extend(["-noautorotate", "-i", str(path)])
+        filters: list[str] = []
+        audio_inputs: list[str] = []
+        for index, block in enumerate(self._blocks):
+            source_id = block.source_id or (
+                self._source_items[0][0] if len(self._source_items) == 1 else ""
+            )
+            source_index = self._source_indexes.get(source_id)
+            if source_index is None:
+                raise PlaybackBackendError(
+                    f"Preview block references unknown source: {block.source_id}"
+                )
+            start = f"{block.start_seconds:.6f}"
+            duration = f"{block.duration_seconds:.6f}"
+            decision = self.audio_decisions.get(source_id)
+            if decision is not None and decision.get("status") == "not-applicable":
+                filters.append(
+                    f"anullsrc=channel_layout=stereo:sample_rate={AUDIO_SAMPLE_RATE},"
+                    f"atrim=duration={duration},asetpts=PTS-STARTPTS[a{index}]"
+                )
+            else:
+                filters.append(
+                    f"[{source_index}:a:0]atrim=start={start}:duration={duration},"
+                    f"{audio_filter(decision)}[a{index}]"
+                )
+            audio_inputs.append(f"[a{index}]")
+        filters.append(f"{''.join(audio_inputs)}concat=n={len(audio_inputs)}:v=0:a=1[outa]")
+        output_options = ["-map", "[outa]"]
+        if position_seconds > 0:
+            output_options.extend(["-ss", f"{position_seconds:.6f}"])
+        output_options.extend(
+            [
+                "-f",
+                "s16le",
+                "-ar",
+                str(AUDIO_SAMPLE_RATE),
+                "-ac",
+                str(AUDIO_CHANNELS),
+                "pipe:1",
+            ]
+        )
+        command.extend(
+            [
+                "-filter_complex",
+                ";".join(filters),
+                *output_options,
+            ]
+        )
+        return command
 
     def _command(
         self,

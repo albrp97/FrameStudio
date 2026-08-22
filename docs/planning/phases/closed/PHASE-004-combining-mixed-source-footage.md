@@ -107,8 +107,10 @@ and a fixed 1920x1080 project render canvas.
 
 ## Current delivery state
 
-- TICKET-018 through TICKET-029 completed local implementation, contract,
+- TICKET-018 through TICKET-028 completed local implementation, contract,
   quality, real-media, and applicable target-workstation verification.
+- TICKET-029 completed its original transport scope at phase closure and was
+  later reopened under PHASE-001 for a timeline playback pacing correction.
 - CHG-002 replaced the prior maximum-dimension mixed-output policy with a fixed
   1920x1080 render canvas; mixed output-policy and export evidence reflect this
   revision.

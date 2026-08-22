@@ -4,14 +4,16 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from .app_helpers import _metadata_float
+from .app_helpers import _metadata_float, format_audio_decisions
 from .export import resolve_output_policy
 from .ffmpeg_playback import FfmpegComposedPlaybackBackend, FfmpegPlaybackBackend
 from .media import MediaProbeError
 from .model import Project, ProjectValidationError
 from .operations import (
+    analyze_project_audio,
     create_project_from_source,
     create_project_from_sources,
+    ensure_project_audio_analysis,
 )
 from .persistence import ProjectPersistenceError, load_project, save_project
 from .playback import PlaybackController, PlaybackState
@@ -41,6 +43,7 @@ def load_source(window: Any, paths: Path | Sequence[Path]) -> bool:
             project = create_project_from_source(selected_paths[0])
         else:
             project = create_project_from_sources(selected_paths)
+        analyze_project_audio(project)
     except (MediaProbeError, ProjectValidationError) as error:
         window._show_error(str(error))
         return False
@@ -69,6 +72,11 @@ def load_project_path(window: Any, path: Path) -> bool:
             )
             return False
     try:
+        ensure_project_audio_analysis(project)
+    except ProjectValidationError as error:
+        window._show_error(str(error))
+        return False
+    try:
         attach_project(window, project, path)
     except (MediaProbeError, ProjectValidationError, ValueError) as error:
         window._show_error(str(error))
@@ -85,6 +93,7 @@ def attach_project(
     window._stop_backend()
     sources = project.sources or (project.source,)
     policy = resolve_output_policy([source.metadata for source in sources])
+    audio_decisions = ensure_project_audio_analysis(project)
     window.project = project
     window.project_path = project_path
     window.source_frame_rate = _metadata_float(
@@ -103,6 +112,7 @@ def attach_project(
         window.selected_segment_ids,
     )
     window.timeline_canvas.set_sensitive(True)
+    window.audio_status_label.set_text(format_audio_decisions(project))
     if window.segment_timeline.mixed_source:
         window.backend = FfmpegComposedPlaybackBackend(
             tuple((source.source_id, Path(source.path)) for source in sources),
@@ -114,6 +124,7 @@ def attach_project(
             window._on_frame,
             window._on_backend_error,
             window._on_backend_end,
+            audio_decisions=audio_decisions,
         )
     elif window.segment_timeline.has_explicit_timeline:
         window.backend = FfmpegComposedPlaybackBackend(
@@ -126,6 +137,7 @@ def attach_project(
             window._on_frame,
             window._on_backend_error,
             window._on_backend_end,
+            audio_decisions=audio_decisions,
         )
     else:
         window.backend = FfmpegPlaybackBackend(
@@ -137,6 +149,7 @@ def attach_project(
             window._on_frame,
             window._on_backend_error,
             window._on_backend_end,
+            audio_decision=audio_decisions[project.source.source_id],
         )
     window.controller = PlaybackController(
         window.backend,
@@ -165,6 +178,8 @@ def refresh_playback_backend(window: Any) -> None:
     was_playing = previous_snapshot is not None and previous_snapshot.state == PlaybackState.PLAYING
     sources = window.project.sources or (window.project.source,)
     policy = resolve_output_policy([source.metadata for source in sources])
+    audio_decisions = ensure_project_audio_analysis(window.project)
+    window.audio_status_label.set_text(format_audio_decisions(window.project))
     window._stop_backend()
     if window.segment_timeline.mixed_source:
         window.backend = FfmpegComposedPlaybackBackend(
@@ -177,6 +192,7 @@ def refresh_playback_backend(window: Any) -> None:
             window._on_frame,
             window._on_backend_error,
             window._on_backend_end,
+            audio_decisions=audio_decisions,
         )
     else:
         window.backend = FfmpegComposedPlaybackBackend(
@@ -189,6 +205,7 @@ def refresh_playback_backend(window: Any) -> None:
             window._on_frame,
             window._on_backend_error,
             window._on_backend_end,
+            audio_decisions=audio_decisions,
         )
     window.controller = PlaybackController(
         window.backend,

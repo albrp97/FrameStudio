@@ -135,6 +135,12 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     timeline_layout.append(timeline_selection)
     window.timeline_selection_label = timeline_selection
 
+    audio_status = Gtk.Label(label="Audio decisions: no project loaded")
+    audio_status.set_xalign(0.0)
+    audio_status.set_wrap(True)
+    timeline_layout.append(audio_status)
+    window.audio_status_label = audio_status
+
     timeline_frame.set_child(timeline_layout)
     root.append(timeline_frame)
 

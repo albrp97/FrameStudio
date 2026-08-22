@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .audio import pending_audio_decision
 from .model_timeline import SegmentTimeline
 from .model_types import (
     _TIME_EPSILON,
@@ -52,6 +53,11 @@ class Project:
             duration_seconds=duration,
             schema_version=ONE_SOURCE_SCHEMA_VERSION,
             sources=(source,),
+            source_settings={
+                source.source_id: {
+                    "audio": pending_audio_decision(source).to_dict(),
+                },
+            },
         )
 
     @classmethod
@@ -118,7 +124,12 @@ class Project:
             schema_version=SCHEMA_VERSION,
             segment_timeline=timeline,
             sources=tuple(sources),
-            source_settings={source.source_id: {} for source in sources},
+            source_settings={
+                source.source_id: {
+                    "audio": pending_audio_decision(source).to_dict(),
+                }
+                for source in sources
+            },
         )
 
     @classmethod
@@ -202,6 +213,12 @@ class Project:
                     raise ProjectValidationError(
                         "Timeline edited duration does not match its segments"
                     )
+            raw_source_settings = value.get("source_settings", {})
+            raw_output_settings = value.get("output_settings", {})
+            if not isinstance(raw_source_settings, Mapping):
+                raise ProjectValidationError("Project source settings must be an object")
+            if not isinstance(raw_output_settings, Mapping):
+                raise ProjectValidationError("Project output settings must be an object")
             project = cls(
                 project_id=project_id,
                 source=source,
@@ -210,6 +227,8 @@ class Project:
                 schema_version=ONE_SOURCE_SCHEMA_VERSION,
                 segment_timeline=segment_timeline,
                 sources=(source,),
+                source_settings=dict(raw_source_settings),
+                output_settings=dict(raw_output_settings),
             )
             project.validate()
             return project
@@ -291,7 +310,12 @@ class Project:
                 raise ProjectValidationError(f"Source settings must be an object: {source_id}")
             self.source_settings[source_id] = deepcopy(dict(settings))
         for source in self.sources:
-            self.source_settings.setdefault(source.source_id, {})
+            self.source_settings.setdefault(
+                source.source_id,
+                {
+                    "audio": pending_audio_decision(source).to_dict(),
+                },
+            )
         if not isinstance(self.output_settings, dict):
             raise ProjectValidationError("Project output settings must be an object")
         self.validate()
@@ -310,6 +334,15 @@ class Project:
             raise ProjectValidationError("Project source identifiers must be unique")
         if self.source.source_id != self.sources[0].source_id:
             raise ProjectValidationError("Project source must match the first source entry")
+        unknown_settings = set(self.source_settings).difference(source_ids)
+        if unknown_settings:
+            raise ProjectValidationError(
+                "Project source settings reference unknown sources: "
+                + ", ".join(sorted(unknown_settings))
+            )
+        for source_id, settings in self.source_settings.items():
+            if not isinstance(settings, Mapping):
+                raise ProjectValidationError(f"Source settings must be an object: {source_id}")
         if not math.isfinite(self.duration_seconds) or self.duration_seconds <= 0:
             raise ProjectValidationError("Project duration must be greater than zero")
         if not math.isfinite(self.playhead_seconds):
@@ -381,6 +414,31 @@ class Project:
         self.source = self.sources[0]
         return replacement
 
+    def source_audio_settings(self, source_id: str) -> dict[str, Any]:
+        source = self.source_by_id(source_id)
+        settings = self.source_settings.setdefault(
+            source.source_id,
+            {
+                "audio": pending_audio_decision(source).to_dict(),
+            },
+        )
+        audio = settings.get("audio")
+        if not isinstance(audio, Mapping):
+            audio = pending_audio_decision(source).to_dict()
+            settings["audio"] = audio
+        return deepcopy(dict(audio))
+
+    def set_source_audio_settings(
+        self,
+        source_id: str,
+        settings: Mapping[str, Any],
+    ) -> None:
+        self.source_by_id(source_id)
+        if not isinstance(settings, Mapping):
+            raise ProjectValidationError("Source audio settings must be an object")
+        source_settings = self.source_settings.setdefault(source_id, {})
+        source_settings["audio"] = deepcopy(dict(settings))
+
     def set_playhead(self, position_seconds: float) -> None:
         if (
             not isinstance(position_seconds, (int, float))
@@ -410,6 +468,8 @@ class Project:
                     "edited_duration_seconds": (self.segment_timeline.edited_duration_seconds),
                     "segments": [segment.to_dict() for segment in segments],
                 },
+                "source_settings": deepcopy(self.source_settings),
+                "output_settings": deepcopy(self.output_settings),
             }
         return {
             "schema_version": self.schema_version,

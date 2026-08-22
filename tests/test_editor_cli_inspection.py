@@ -116,6 +116,54 @@ class EditorCliInspectionTests(unittest.TestCase):
             self.assertEqual(payload["error"]["code"], "source_unavailable")
             self.assertIn("missing", payload["error"]["message"].lower())
 
+    def test_analyze_audio_reports_and_persists_explicit_failure_state(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"fixture")
+            project = Project.create(
+                source,
+                {
+                    "duration_seconds": 1.0,
+                    "width": 320,
+                    "height": 180,
+                    "frame_rate": "10/1",
+                    "video_codec": "h264",
+                    "audio_codec": "aac",
+                    "audio_stream_present": True,
+                    "format_name": "mp4",
+                },
+            )
+            project_path = root / "edit.resolve.json"
+            save_project(project, project_path)
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+
+            result = cli_main(
+                [
+                    "analyze-audio",
+                    str(project_path),
+                    "--ffmpeg",
+                    "/missing/ffmpeg",
+                ],
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+            payload = json.loads(stdout.getvalue())
+            reopened = Project.from_dict(json.loads(project_path.read_text(encoding="utf-8")))
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        source_id = project.source.source_id
+        self.assertEqual(payload["command"], "analyze-audio")
+        self.assertEqual(payload["operation"]["statuses"][source_id], "failed")
+        self.assertEqual(payload["project"]["audio_decisions"][source_id]["status"], "failed")
+        self.assertEqual(
+            reopened.source_audio_settings(source_id)["status"],
+            "failed",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

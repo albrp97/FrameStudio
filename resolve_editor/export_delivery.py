@@ -52,6 +52,13 @@ def verify_mixed_export_output(
         raise ExportExecutionError("Mixed export dimensions do not match the output policy")
     if output_probe.has_audio_stream != policy.audio_stream_present:
         raise ExportExecutionError("Mixed export audio presence does not match the output policy")
+    if policy.audio_stream_present:
+        if output_probe.audio_sample_rate != policy.audio_sample_rate:
+            raise ExportExecutionError("Mixed export sample rate does not match the output policy")
+        if output_probe.audio_channels != policy.audio_channels:
+            raise ExportExecutionError(
+                "Mixed export channel count does not match the output policy"
+            )
     try:
         result = subprocess.run(
             [
@@ -205,6 +212,16 @@ def verify_export_output(
         raise ExportExecutionError("Export dimensions do not match the project output policy")
     if output_probe.has_audio_stream != source_probe.has_audio_stream:
         raise ExportExecutionError("Export audio stream presence does not match the source")
+    if (
+        output_probe.has_audio_stream
+        and plan.output_policy is not None
+        and (plan.route == "fallback" or plan.audio_decisions)
+        and (
+            output_probe.audio_sample_rate != plan.output_policy.audio_sample_rate
+            or output_probe.audio_channels != plan.output_policy.audio_channels
+        )
+    ):
+        raise ExportExecutionError("Export audio format does not match the output policy")
     try:
         result = subprocess.run(
             [

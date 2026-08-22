@@ -3,6 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from .audio import (
+    AUDIO_POLICY_VERSION,
+    AudioDecision,
+    analyze_source_audio,
+    audio_decision_is_stale,
+    pending_audio_decision,
+)
 from .export import (
     ExportPlan,
     plan_export,
@@ -171,14 +178,55 @@ def relink_project_source(
     return project.relink_source(source_id, candidate_path, metadata)
 
 
+def analyze_project_audio(
+    project: Project,
+    *,
+    ffmpeg_path: str = "ffmpeg",
+) -> dict[str, AudioDecision]:
+    decisions: dict[str, AudioDecision] = {}
+    for source in project.sources or (project.source,):
+        decision = analyze_source_audio(source, ffmpeg_path=ffmpeg_path)
+        project.set_source_audio_settings(source.source_id, decision.to_dict())
+        decisions[source.source_id] = decision
+    project.validate()
+    return decisions
+
+
+def ensure_project_audio_analysis(
+    project: Project,
+    *,
+    ffmpeg_path: str = "ffmpeg",
+) -> dict[str, dict[str, object]]:
+    decisions: dict[str, dict[str, object]] = {}
+    for source in project.sources or (project.source,):
+        settings = project.source_audio_settings(source.source_id)
+        status = settings.get("status")
+        if (
+            status not in {"ready", "silent", "unsupported", "failed", "not-applicable"}
+            or settings.get("policy_version") != AUDIO_POLICY_VERSION
+            or audio_decision_is_stale(source, settings)
+        ):
+            decision = analyze_source_audio(source, ffmpeg_path=ffmpeg_path)
+            settings = decision.to_dict()
+            project.set_source_audio_settings(source.source_id, settings)
+        decisions[source.source_id] = settings
+    project.validate()
+    return decisions
+
+
 def plan_project_export(
     project: Project,
     destination: Path,
     *,
     ffprobe_path: str = "ffprobe",
+    ffmpeg_path: str = "ffmpeg",
 ) -> ExportPlan:
     if project.segment_timeline is None:
         raise ValueError("Project segment timeline is required")
+    audio_decisions = ensure_project_audio_analysis(
+        project,
+        ffmpeg_path=ffmpeg_path,
+    )
     if project.segment_timeline.mixed_source:
         probes = tuple(
             probe_media(Path(source.path), ffprobe_path) for source in project.sources or ()
@@ -192,10 +240,22 @@ def plan_project_export(
             destination,
             policy=policy,
             source_ids=tuple(source.source_id for source in project.sources or ()),
+            audio_decisions=audio_decisions,
         )
     media = probe_media(Path(project.source.path), ffprobe_path)
     timeline = SegmentTimeline.from_segments(
         project.segment_timeline.source_duration_seconds,
         project.segment_timeline.segment_items,
     )
-    return plan_export(media, timeline, destination, ffprobe_path=ffprobe_path)
+    source_id = project.source.source_id
+    return plan_export(
+        media,
+        timeline,
+        destination,
+        ffprobe_path=ffprobe_path,
+        audio_source_id=source_id,
+        audio_decision=audio_decisions.get(
+            source_id,
+            pending_audio_decision(project.source).to_dict(),
+        ),
+    )

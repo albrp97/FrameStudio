@@ -65,6 +65,7 @@ def handle_export(
             project,
             args.output,
             ffprobe_path=args.ffprobe,
+            ffmpeg_path=args.ffmpeg,
         )
 
         def report_progress(progress: ExportProgress) -> None:

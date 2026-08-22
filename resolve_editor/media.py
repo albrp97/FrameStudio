@@ -24,6 +24,9 @@ class MediaProbe:
     audio_codec: str | None
     format_name: str
     audio_stream_present: bool | None = None
+    audio_sample_rate: int | None = None
+    audio_channels: int | None = None
+    audio_channel_layout: str | None = None
 
     def metadata(self) -> dict[str, Any]:
         orientation = (
@@ -42,6 +45,9 @@ class MediaProbe:
             "video_codec": self.video_codec,
             "audio_codec": self.audio_codec,
             "audio_stream_present": self.has_audio_stream,
+            "audio_sample_rate": self.audio_sample_rate,
+            "audio_channels": self.audio_channels,
+            "audio_channel_layout": self.audio_channel_layout,
             "format_name": self.format_name,
         }
 
@@ -134,6 +140,27 @@ def probe_media(path: Path, ffprobe_path: str = "ffprobe") -> MediaProbe:
     audio_codec = None if audio is None else audio.get("codec_name")
     if audio_codec is not None and not isinstance(audio_codec, str):
         audio_codec = None
+    audio_sample_rate = None
+    audio_channels = None
+    audio_channel_layout = None
+    if audio is not None:
+        raw_sample_rate = audio.get("sample_rate")
+        try:
+            parsed_sample_rate = int(raw_sample_rate)
+        except (TypeError, ValueError):
+            parsed_sample_rate = 0
+        if parsed_sample_rate > 0:
+            audio_sample_rate = parsed_sample_rate
+        raw_channels = audio.get("channels")
+        try:
+            parsed_channels = int(raw_channels)
+        except (TypeError, ValueError):
+            parsed_channels = 0
+        if parsed_channels > 0:
+            audio_channels = parsed_channels
+        raw_channel_layout = audio.get("channel_layout")
+        if isinstance(raw_channel_layout, str) and raw_channel_layout:
+            audio_channel_layout = raw_channel_layout
     format_name = data.get("format", {}).get("format_name")
     if not isinstance(format_name, str):
         format_name = ""
@@ -147,4 +174,7 @@ def probe_media(path: Path, ffprobe_path: str = "ffprobe") -> MediaProbe:
         audio_codec=audio_codec,
         format_name=format_name,
         audio_stream_present=audio is not None,
+        audio_sample_rate=audio_sample_rate,
+        audio_channels=audio_channels,
+        audio_channel_layout=audio_channel_layout,
     )

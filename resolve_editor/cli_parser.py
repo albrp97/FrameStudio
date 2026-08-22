@@ -58,6 +58,15 @@ def build_cli_parser() -> argparse.ArgumentParser:
         help="include absolute local paths in output",
     )
 
+    analyze_audio_parser = commands.add_parser(
+        "analyze-audio",
+        help="analyze and persist one source-level audio decision per source",
+    )
+    analyze_audio_parser.add_argument("project", type=Path)
+    analyze_audio_parser.add_argument("--ffmpeg", default="ffmpeg")
+    analyze_audio_parser.add_argument("--output", type=Path)
+    analyze_audio_parser.add_argument("--full-paths", action="store_true")
+
     move_parser = commands.add_parser(
         "move",
         help="move one or more timeline blocks left or right",

@@ -4,8 +4,8 @@
 **Feature:** FEAT-013
 **Phase:** PHASE-004A
 **Date:** 2026-08-22
-**Status:** implementation, local verification, and user validation complete;
-commit pending
+**Status:** implementation, local verification, user validation, and local
+commit complete
 **Baseline revision:** `b624234` before the uncommitted refactor
 **Worktree:** `ticket/phase-004-mixed-source-footage`
 
@@ -98,4 +98,15 @@ accepted warning for this local commit.
   passed.
 - User-validation gate: passed.
 - Remote-check gate: unavailable because no remote or upstream is configured.
-- Commit readiness: ready for one scoped local commit.
+- Commit: `d2495ba3ba4cfd6a6abb98ad469f5de6f0a9806a`
+  (`refactor(editor): modularize editor boundaries`) on
+  `ticket/phase-004-mixed-source-footage`.
+- Commit readiness: passed for the local delivery checkpoint.
+
+## Commit evidence
+
+- The reviewed work was committed locally on 2026-08-22 as
+  `d2495ba3ba4cfd6a6abb98ad469f5de6f0a9806a`.
+- The commit includes the editor refactor, protected regression coverage,
+  planning lifecycle closure, evidence, and related documentation.
+- No upstream or remote publication was attempted because none is configured.

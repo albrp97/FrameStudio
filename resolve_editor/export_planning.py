@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import math
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
+from .audio import AudioDecision
 from .export_types import (
     _BOUNDARY_TOLERANCE,
     _DURATION_TOLERANCE,
@@ -131,6 +133,12 @@ def internal_boundaries(
     return tuple(sorted(boundaries))
 
 
+def _persisted_audio_decision(
+    decision: AudioDecision | Mapping[str, Any],
+) -> AudioDecision | dict[str, Any]:
+    return decision if isinstance(decision, AudioDecision) else dict(decision)
+
+
 def plan_export(
     media: MediaProbe,
     timeline: SegmentTimeline,
@@ -138,6 +146,8 @@ def plan_export(
     *,
     keyframe_timestamps: Sequence[float] | None = None,
     ffprobe_path: str = "ffprobe",
+    audio_decision: AudioDecision | Mapping[str, Any] | None = None,
+    audio_source_id: str = "source",
 ) -> ExportPlan:
     timeline.validate()
     if not math.isclose(
@@ -154,6 +164,9 @@ def plan_export(
     active_segments = tuple(segment for segment in timeline.segment_items if not segment.deleted)
     if not active_segments or timeline.edited_duration_seconds <= 0:
         raise ExportPlanningError("Cannot export an empty edit")
+    persisted_audio_decision = (
+        None if audio_decision is None else _persisted_audio_decision(audio_decision)
+    )
 
     output_policy = resolve_output_policy([media.metadata()])
     fallback_reasons: list[str] = []
@@ -171,6 +184,33 @@ def plan_export(
     )
     if not audio_is_eligible:
         fallback_reasons.append(f"audio codec {media.audio_codec} is not in the stream-copy policy")
+    if media.has_audio_stream and audio_decision is not None:
+        if media.audio_sample_rate not in (None, 48000):
+            fallback_reasons.append(
+                "audio sample rate does not match the established 48000 Hz profile"
+            )
+        if media.audio_channels not in (None, 2):
+            fallback_reasons.append(
+                "audio channel count does not match the established stereo profile"
+            )
+    if audio_decision is not None and media.has_audio_stream:
+        decision_status = (
+            audio_decision.status
+            if isinstance(audio_decision, AudioDecision)
+            else audio_decision.get("status")
+        )
+        decision_gain = (
+            audio_decision.gain_db
+            if isinstance(audio_decision, AudioDecision)
+            else audio_decision.get("gain_db", 0.0)
+        )
+        if decision_status == "ready" and isinstance(decision_gain, (int, float)):
+            if math.isfinite(float(decision_gain)) and abs(float(decision_gain)) >= 0.01:
+                fallback_reasons.append("source-level audio normalization requires decoding")
+        elif decision_status not in {"not-applicable", "silent"}:
+            fallback_reasons.append(
+                f"source-level audio decision is {decision_status or 'pending'}"
+            )
 
     boundaries = internal_boundaries(
         active_segments,
@@ -200,6 +240,11 @@ def plan_export(
             expected_duration_seconds=timeline.edited_duration_seconds,
             reason=reason,
             output_policy=output_policy,
+            audio_decisions=(
+                ()
+                if persisted_audio_decision is None
+                else ((audio_source_id, persisted_audio_decision),)
+            ),
         )
 
     return ExportPlan(
@@ -214,6 +259,11 @@ def plan_export(
         fallback_container="mp4",
         fallback_pixel_format="yuv420p",
         output_policy=output_policy,
+        audio_decisions=(
+            ()
+            if persisted_audio_decision is None
+            else ((audio_source_id, persisted_audio_decision),)
+        ),
     )
 
 
@@ -224,6 +274,11 @@ def plan_mixed_export(
     *,
     policy: OutputPolicy | None = None,
     source_ids: Sequence[str] | None = None,
+    audio_decisions: Mapping[
+        str,
+        AudioDecision | Mapping[str, Any],
+    ]
+    | None = None,
 ) -> ExportPlan:
     """Plan a composed export for a timeline that references several sources."""
     timeline.validate()
@@ -261,6 +316,14 @@ def plan_mixed_export(
     source_paths = tuple(probe.path.expanduser().resolve() for probe in probes)
     if output.resolve() in source_paths:
         raise ExportPlanningError("Export destination must differ from every source")
+    decision_items = tuple(
+        (
+            source_id,
+            _persisted_audio_decision(audio_decisions[source_id]),
+        )
+        for source_id in ids
+        if audio_decisions is not None and source_id in audio_decisions
+    )
     return ExportPlan(
         route="fallback",
         source=source_paths[0],
@@ -275,4 +338,5 @@ def plan_mixed_export(
         source_paths=source_paths,
         source_ids=ids,
         output_policy=resolved_policy,
+        audio_decisions=decision_items,
     )

@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from fractions import Fraction
 from pathlib import Path
 
+from .audio import audio_decision_is_stale
 from .export import ExportProgress
 from .model import ProjectValidationError, Segment, SegmentTimeline
 from .operations import toggle_segment_deleted
@@ -49,6 +50,7 @@ __all__ = [
     "TIMELINE_SCROLL_STEP_SECONDS",
     "_metadata_float",
     "create_play_pause_key_controller",
+    "format_audio_decisions",
     "format_export_progress_label",
     "format_key_bindings",
     "format_output_duration_label",
@@ -148,6 +150,22 @@ def frame_step_position(
 
 def format_output_duration_label(duration_seconds: float) -> str:
     return f"Final output: {format_duration(duration_seconds)}"
+
+
+def format_audio_decisions(project) -> str:
+    sources = project.sources or (project.source,)
+    labels: list[str] = []
+    for source in sources:
+        settings = project.source_audio_settings(source.source_id)
+        status = settings.get("status", "pending")
+        if audio_decision_is_stale(source, settings):
+            status = "stale"
+        label = f"{Path(source.path).name}: {status}"
+        gain = settings.get("gain_db")
+        if status == "ready" and isinstance(gain, (int, float)) and not isinstance(gain, bool):
+            label += f" ({float(gain):+.2f} dB)"
+        labels.append(label)
+    return "Audio decisions: " + "; ".join(labels)
 
 
 def format_key_bindings() -> str:

@@ -12,6 +12,7 @@ CLI_COMMANDS = frozenset(
     {
         "inspect",
         "import",
+        "analyze-audio",
         "move",
         "copy",
         "paste",

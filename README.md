@@ -81,6 +81,7 @@ resolve-editor import ~/Videos/source.mp4 --project ~/Videos/source.resolve.json
 resolve-editor import ~/Videos/landscape.mp4 ~/Videos/portrait.mp4 \
   --project ~/Videos/mixed.resolve.json
 resolve-editor inspect ~/Videos/source.resolve.json
+resolve-editor analyze-audio ~/Videos/source.resolve.json
 resolve-editor split ~/Videos/source.resolve.json --at 12.5
 resolve-editor delete ~/Videos/source.resolve.json --segment SEGMENT_ID
 resolve-editor restore ~/Videos/source.resolve.json --segment SEGMENT_ID
@@ -112,12 +113,17 @@ projects retain the original schema and editing behavior; selecting several
 files creates a mixed-source project with stable source identities and a
 sequential timeline.
 
-The editor uses Python with PyGObject/GTK 4 and an FFmpeg raw-frame preview
-pipe. The target workstation must provide GTK 4, PyGObject, FFmpeg, and
-ffprobe. The editor supports one-source and mixed-source projects, real-time
-composed preview, play/pause, seek, a visual clip timeline, non-destructive
+The editor uses Python with PyGObject/GTK 4 and FFmpeg raw-frame preview and
+audio pipes. The target workstation must provide GTK 4, PyGObject, FFmpeg,
+ffprobe, and `ffplay` for audio preview. The editor supports one-source and
+mixed-source projects, real-time composed preview with source-level audio
+decisions, play/pause, seek, a visual clip timeline, non-destructive
 split/delete-toggle editing, block movement and copy/paste, versioned project
-save/reopen, and verified MP4 export. Preview audio is not included yet.
+save/reopen, and verified MP4 export. Audio is analyzed once per input source
+using the legacy mean/median policy and the same decision is reused by every
+included segment from that source. Missing `ffplay` or an audio preview
+process failure is reported explicitly; it is not silently treated as a
+successful audio preview.
 The implementation keeps the public `resolve_editor.model`, `export`, `app`,
 `timeline`, and `cli` paths as compatibility facades over focused model,
 export, playback, application, timeline, and CLI modules.
@@ -149,7 +155,8 @@ frames, FPS, elapsed time, and ETA. The editor keeps this area compact; click
 The `.mp4` file selected in the editor is source media. **Save project** writes
 a `.resolve.json` editor project. **Export video** writes a separate edited
 video only after FFmpeg/ffprobe verify its playability, duration, dimensions,
-and audio-stream presence; the source is never overwritten.
+audio-stream presence, sample rate, and channels; the source is never
+overwritten.
 
 Export uses stream copy when the source and cut boundaries are conservatively
 eligible. Otherwise it reports the reason and uses an H.264/AAC MP4 fallback.
@@ -295,14 +302,24 @@ Use a short disposable MP4 or a copy of a local source:
     fixed 1920x1080 preview/output canvas.
 25. Reopen the mixed project and confirm source order, block order, deletion
     state, and the selected output duration are preserved.
-26. Check an error path safely with an invalid disposable project:
+26. For a mixed-source project with different audio levels, confirm the
+   **Audio decisions** status shown after import/open. For an explicit CLI
+   refresh, run `resolve-editor analyze-audio` and inspect each source's
+   status, measurement, and gain decision. Split and reorder segments from one
+   source, then confirm the decision remains source-level rather than becoming
+   a per-segment setting. Preview and export the project, confirm the same
+   source decisions are used, and inspect the result with `ffprobe` for
+   48 kHz stereo audio and the expected duration. If `ffplay` is unavailable,
+   confirm the editor reports that dependency failure instead of claiming
+   audio preview succeeded.
+27. Check an error path safely with an invalid disposable project:
    `printf '{' > /tmp/invalid.resolve.json`, then run
    `make editor ARGS="--project /tmp/invalid.resolve.json"`. Confirm the
    status shows an actionable error and does not replace valid state.
 
 The mixed-source editor intentionally does not yet provide triplicate layouts,
-automatic per-input audio normalization, or 60-FPS enhancement. Those remain
-planned future capabilities.
+automatic focus/visual transforms, or 60-FPS enhancement. Those remain planned
+future capabilities.
 
 The TUI starts in `~/Documents/edit`. Navigate with the arrow keys or `j/k`,
 use `Right/l` to enter a folder, press `Space` on each video to select it, and

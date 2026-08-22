@@ -36,6 +36,7 @@ from .export import ExportProgress, execute_export
 from .media import MediaProbeError, probe_media
 from .model import Project, ProjectValidationError, Segment
 from .operations import (
+    analyze_project_audio,
     copy_segments,
     create_project_from_source,
     create_project_from_sources,
@@ -165,6 +166,7 @@ def _handle_import(args: argparse.Namespace) -> dict[str, Any]:
             project = create_project_from_source(sources[0], ffprobe_path=args.ffprobe)
         else:
             project = create_project_from_sources(sources, ffprobe_path=args.ffprobe)
+        analyze_project_audio(project)
     except MediaProbeError as error:
         raise CliError(
             "media_probe",
@@ -186,6 +188,25 @@ def _handle_import(args: argparse.Namespace) -> dict[str, Any]:
         saved,
         include_paths=args.full_paths,
         operation={"saved": True},
+    )
+
+
+def _handle_analyze_audio(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    decisions = analyze_project_audio(
+        project,
+        ffmpeg_path=args.ffmpeg,
+    )
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "analyze-audio",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "source_ids": list(decisions),
+            "statuses": {source_id: decision.status for source_id, decision in decisions.items()},
+        },
     )
 
 
@@ -472,6 +493,8 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return _handle_inspect(args)
     if args.command == "import":
         return _handle_import(args)
+    if args.command == "analyze-audio":
+        return _handle_analyze_audio(args)
     if args.command == "move":
         return _handle_move(args)
     if args.command == "copy":

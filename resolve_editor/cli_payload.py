@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
+from .audio import audio_decision_is_stale
 from .cli_types import CLI_EXIT_INVALID, CliError
 from .model import Project, Segment, SourceReference
 
@@ -16,9 +17,10 @@ def source_payload(
     source: SourceReference,
     *,
     include_paths: bool,
+    audio: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     status = source.status()
-    return {
+    payload = {
         "source_id": source.source_id,
         "path": display_path(source.path, include_paths),
         "uri": (source.uri if include_paths else Path(source.path).name),
@@ -32,6 +34,9 @@ def source_payload(
             "reason": status.reason,
         },
     }
+    if audio is not None:
+        payload["audio"] = dict(audio)
+    return payload
 
 
 def segment_payload(segment: Segment) -> dict[str, Any]:
@@ -84,6 +89,14 @@ def project_payload(
         timeline_payload["segments"] = [
             segment_payload(segment) for segment in timeline.segment_items
         ]
+    sources = project.sources or (project.source,)
+    audio_decisions: dict[str, dict[str, Any]] = {}
+    for source in sources:
+        settings = project.source_audio_settings(source.source_id)
+        if audio_decision_is_stale(source, settings):
+            settings["status"] = "stale"
+            settings["diagnostic"] = "Source changed since audio analysis"
+        audio_decisions[source.source_id] = settings
     return {
         "project_id": project.project_id,
         "schema_version": project.schema_version,
@@ -93,13 +106,19 @@ def project_payload(
         "source": source_payload(
             project.source,
             include_paths=include_paths,
+            audio=audio_decisions.get(project.source.source_id),
         ),
         "sources": [
-            source_payload(source, include_paths=include_paths)
-            for source in project.sources or (project.source,)
+            source_payload(
+                source,
+                include_paths=include_paths,
+                audio=audio_decisions.get(source.source_id),
+            )
+            for source in sources
         ],
         "timeline": timeline_payload,
         "source_settings": dict(project.source_settings),
+        "audio_decisions": audio_decisions,
         "output_settings": dict(project.output_settings),
         "export": {
             "exportable": timeline.edited_duration_seconds > 0,

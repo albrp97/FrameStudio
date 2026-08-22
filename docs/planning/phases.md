@@ -45,14 +45,14 @@ the first horizon without approved scope change.
 
 | Sequence | ID | Outcome | Capability links | Dependencies | Status |
 |---:|---|---|---|---|---|
-| 1 | PHASE-001 | Open and resume a source edit | CAP-001, CAP-002, CAP-004, CAP-012 | Approved objective, scope, and capability map | complete |
+| 1 | PHASE-001 | Open and resume a source edit | CAP-001, CAP-002, CAP-004, CAP-012 | Approved objective, scope, and capability map | verifying |
 | 2 | PHASE-002 | Cut and export one source safely | CAP-003, CAP-005, CAP-012 | PHASE-001 | complete |
 | 3 | PHASE-003 | Repeat the basic edit through agents | CAP-004, CAP-006, CAP-012 | PHASE-001, PHASE-002 | complete |
 | 4 | PHASE-004 | Combine mixed-source footage | CAP-002, CAP-003, CAP-005, CAP-007, CAP-012 | PHASE-001 through PHASE-003 | complete |
 | 4.5 | PHASE-004A | Stabilize editor architecture for future phases | CAP-012 | PHASE-004 | complete |
-| 6 | PHASE-005 | Balance sources and deliver consistent media | CAP-005, CAP-008, CAP-012 | PHASE-004A | confirmed |
-| 7 | PHASE-006 | Focus and compose important action | CAP-005, CAP-009, CAP-010, CAP-012 | PHASE-004A, PHASE-005 | confirmed |
-| 8 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | confirmed |
+| 5 | PHASE-005 | Balance sources and deliver consistent media | CAP-005, CAP-008, CAP-012 | PHASE-004A | verifying |
+| 6 | PHASE-006 | Focus and compose important action | CAP-005, CAP-009, CAP-010, CAP-012 | PHASE-004A, PHASE-005 | confirmed |
+| 7 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | confirmed |
 
 ## Common Phase Rules
 
@@ -74,12 +74,12 @@ are closed; confirmed future phases remain open.
 
 | Sequence | ID | Status | Parent links | Current path |
 |---:|---|---|---|---|
-| 1 | PHASE-001 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-001-opening-and-resuming-a-source-edit.md` |
+| 1 | PHASE-001 | verifying | OBJ-001, SCOPE-001 | `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md` |
 | 2 | PHASE-002 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-002-cutting-and-exporting-one-source-safely.md` |
 | 3 | PHASE-003 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-003-repeating-the-basic-edit-through-agents.md` |
 | 4 | PHASE-004 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-004-combining-mixed-source-footage.md` |
 | 4.5 | PHASE-004A | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-004A-stabilizing-editor-architecture.md` |
-| 6 | PHASE-005 | confirmed | OBJ-001, SCOPE-001 | `phases/open/PHASE-005-balancing-sources-and-delivering-consistent-media.md` |
+| 6 | PHASE-005 | verifying | OBJ-001, SCOPE-001 | `phases/open/PHASE-005-balancing-sources-and-delivering-consistent-media.md` |
 | 7 | PHASE-006 | confirmed | OBJ-001, SCOPE-001 | `phases/open/PHASE-006-focusing-and-composing-important-action.md` |
 | 8 | PHASE-007 | confirmed | OBJ-001, SCOPE-001 | `phases/open/PHASE-007-producing-validated-60-fps-edits.md` |
 
@@ -104,11 +104,12 @@ are closed; confirmed future phases remain open.
 
 This phase index was approved before downstream planning. Its phase records
 are individual lifecycle files, and each feature record is assigned to exactly
-one phase. PHASE-001 through PHASE-004 are complete and closed after user
-approval on 2026-08-22. PHASE-004A is complete and closed after user
-validation; PHASE-005 through PHASE-007 remain confirmed future phases.
-Ticket execution remains governed by the backlog and the open/closed ticket
-directories.
+one phase. PHASE-002 through PHASE-004 are complete and closed after user
+approval on 2026-08-22. PHASE-001 is verifying again because its playback
+feature was reopened for a timeline pacing correction. PHASE-004A is complete
+and closed after user validation. PHASE-005 is verifying with implemented features and tickets;
+PHASE-006 and PHASE-007 remain confirmed future phases. Ticket execution
+remains governed by the backlog and the open/closed ticket directories.
 
 ## Source References
 
@@ -126,12 +127,16 @@ directories.
 - The phase records were extracted into
   `docs/planning/phases/open/` during the initial migration.
 - PHASE-001 through PHASE-004 later transitioned to `complete` and moved to
-  `docs/planning/phases/closed/` on 2026-08-22 after user approval.
+  `docs/planning/phases/closed/` on 2026-08-22 after user approval. PHASE-001
+  was reopened and moved back to `docs/planning/phases/open/` on 2026-08-22
+  for a timeline playback pacing correction.
 - PHASE-004A was added on 2026-08-22 as a user-approved prerequisite before
   the confirmed future phases and closed after its exit conditions were
   satisfied.
-- PHASE-005 through PHASE-007 remain in `phases/open/` as confirmed future
-  work and now depend on PHASE-004A.
+- PHASE-005 through PHASE-007 remain in `phases/open/` as future work and now
+  depend on PHASE-004A. PHASE-005 is verifying with FEAT-014 through FEAT-016
+  and TICKET-031 through TICKET-037 implemented; user validation and review
+  remain pending.
 - The original phase-index metadata, sequencing rationale, common rules,
   capability coverage, handoff gate, and source references remain in this
   synchronized index.
