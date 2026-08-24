@@ -170,6 +170,8 @@ def plan_export(
 
     output_policy = resolve_output_policy([media.metadata()])
     fallback_reasons: list[str] = []
+    if any(segment.has_visual_modifications for segment in active_segments):
+        fallback_reasons.append("visual focus or triplicate composition requires decoded rendering")
     if (media.width, media.height) != (output_policy.width, output_policy.height):
         fallback_reasons.append("source dimensions do not match the fixed 1920x1080 project canvas")
     formats = format_name_tokens(media.format_name)
@@ -324,13 +326,21 @@ def plan_mixed_export(
         for source_id in ids
         if audio_decisions is not None and source_id in audio_decisions
     )
+    composition_reason = (
+        "; visual focus or triplicate composition is rendered per segment"
+        if any(segment.has_visual_modifications for segment in active_segments)
+        else ""
+    )
     return ExportPlan(
         route="fallback",
         source=source_paths[0],
         destination=output,
         segments=active_segments,
         expected_duration_seconds=timeline.edited_duration_seconds,
-        reason=(f"Mixed-source composition requires normalization: {resolved_policy.reason}"),
+        reason=(
+            f"Mixed-source composition requires normalization: {resolved_policy.reason}"
+            f"{composition_reason}"
+        ),
         fallback_video_codec=resolved_policy.video_codec,
         fallback_audio_codec=resolved_policy.audio_codec,
         fallback_container=resolved_policy.container,

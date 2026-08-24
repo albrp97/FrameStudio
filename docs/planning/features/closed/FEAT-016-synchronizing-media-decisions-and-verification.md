@@ -3,12 +3,16 @@
 **Feature ID:** FEAT-016
 **Parent links:** OBJ-001, SCOPE-001, PHASE-005
 **Capability links:** CAP-005, CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after TICKET-036 and TICKET-037
+passed implementation, automated, real-media, review, user-validation, and
+local delivery gates; remote checks remain unavailable and are recorded as an
+accepted warning.
 **Horizon:** future
 **Priority:** 3
 **Owner:** repository planning and implementation in the active worktree
-**Approval:** user-authorized on 2026-08-22 to implement the approved
-PHASE-005 ticket set; user validation is pending
+**Approval:** user-authorized on 2026-08-22 to implement and close the
+approved PHASE-005 ticket set after validation
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`,
 `docs/specs/future-product-direction.md`,
@@ -21,9 +25,11 @@ alone cannot prove perceived audio balance; manual listening coverage is
 environment-dependent
 **Affected surfaces:** project schema/state, GUI controls, CLI payloads,
 preview, export, output validation, source-preservation checks, and evidence
-**Evidence path:** `evidence/phase-005-media-decision-verification.md`
+**Evidence path:** `evidence/phase-005-media-decision-surfaces.md`
 **Planned tickets:** TICKET-036, TICKET-037
 **Last updated:** 2026-08-22
+**Path history:** `features/open/FEAT-016-synchronizing-media-decisions-and-verification.md`
+-> `features/closed/FEAT-016-synchronizing-media-decisions-and-verification.md`
 
 ## Outcome
 
@@ -79,3 +85,9 @@ scripts remain protected.
 - Measured output and manual listening evidence is recorded with limitations.
 - All PHASE-005 exit conditions have terminal evidence or an explicit
   blocked/skipped reason.
+
+## Closure
+
+TICKET-036 and TICKET-037 satisfy the synchronized-decision and verification
+outcome. The reviewed local delivery checkpoint is
+`6aebb26121eb7e4088b4c3678b670038116be2be`; remote checks remain unavailable.

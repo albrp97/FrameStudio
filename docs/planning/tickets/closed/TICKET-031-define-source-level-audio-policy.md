@@ -6,7 +6,12 @@
 **Phase:** PHASE-005
 **Feature:** FEAT-014
 **Capability links:** CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after implementation, automated and
+real-media verification, review, user validation, and local delivery evidence;
+remote checks remain unavailable and are recorded as an accepted warning.
+**Path history:** `tickets/open/TICKET-031-define-source-level-audio-policy.md`
+-> `tickets/closed/TICKET-031-define-source-level-audio-policy.md`
 **Horizon:** future
 **Priority:** 1
 **Owner:** repository planning and implementation in the active worktree
@@ -137,7 +142,12 @@ user validation is pending
 - Remote checks are required by `.github/aidd-config.yml`, but no remote or
   upstream is configured, so no provider-side check can be claimed.
 
-TICKET-031 has completed implementation and automated verification. It remains
-open in `verifying` until the required user validation is recorded; its
-downstream tickets have also been implemented and are awaiting the same
-delivery gates.
+TICKET-031 has completed implementation and automated verification. User
+validation, review, and local delivery are terminal; remote checks remain
+unavailable because no remote or upstream is configured.
+
+## Closure
+
+The source-level policy is complete and matches the approved legacy
+mean/median behavior. Local delivery checkpoint:
+`6aebb26121eb7e4088b4c3678b670038116be2be`.

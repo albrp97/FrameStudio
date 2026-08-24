@@ -12,7 +12,7 @@ from resolve_editor.ffmpeg_playback import (
     FfmpegPlaybackBackend,
     VideoFrame,
 )
-from resolve_editor.model import Segment
+from resolve_editor.model import Segment, TriplicateGroup
 from resolve_editor.playback import PlaybackBackendError
 
 
@@ -254,6 +254,61 @@ class FfmpegPlaybackTests(unittest.TestCase):
 
         self.assertIn("[0:v:0]trim=start=0.000000:duration=0.500000", " ".join(command))
 
+    def test_composed_backend_ignores_deleted_blocks(self):
+        backend = FfmpegComposedPlaybackBackend(
+            (("source", self.source),),
+            (
+                Segment.create(0.0, 0.25),
+                Segment.create(0.25, 0.5, deleted=True),
+            ),
+            16,
+            16,
+            10.0,
+            0.25,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            command = backend._command(0.0, realtime=False, frame_count=1)
+        finally:
+            backend.close()
+
+        rendered = " ".join(command)
+        self.assertIn("concat=n=1:v=1:a=0", rendered)
+        self.assertNotIn("trim=start=0.250000:duration=0.250000", rendered)
+
+    def test_composed_command_starts_from_requested_output_position(self):
+        backend = FfmpegComposedPlaybackBackend(
+            (("source", self.source),),
+            (
+                Segment.create(0.0, 0.15),
+                Segment.create(0.15, 0.25),
+                Segment.create(0.25, 0.4).with_triplicate(TriplicateGroup.create()),
+                Segment.create(0.4, 0.5),
+            ),
+            18,
+            18,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            command = backend._command(0.3, realtime=False, frame_count=1)
+        finally:
+            backend.close()
+
+        rendered = " ".join(command)
+        self.assertIn("concat=n=2:v=1:a=0", rendered)
+        self.assertEqual(rendered.count("trim=start=0.000000:duration=0.100000"), 1)
+        self.assertIn("trim=start=0.100000:duration=0.100000", rendered)
+        self.assertEqual(command.count("-ss"), 1)
+        self.assertLess(command.index("-ss"), command.index("-i"))
+
     def test_composed_audio_command_reuses_decisions_by_source(self):
         first = self.root / "first.mp4"
         second = self.root / "second.mp4"
@@ -296,11 +351,12 @@ class FfmpegPlaybackTests(unittest.TestCase):
             backend.close()
 
         rendered = " ".join(command)
-        self.assertIn("[0:a:0]atrim=start=0.000000:duration=0.500000", rendered)
+        self.assertIn("[0:a:0]atrim=start=0.000000:duration=0.250000", rendered)
         self.assertIn("volume=2.00dB", rendered)
         self.assertIn("[1:a:0]atrim=start=0.000000:duration=0.500000", rendered)
         self.assertIn("volume=-3.00dB", rendered)
-        self.assertLess(rendered.index("-ss 0.250000"), rendered.index("-f s16le"))
+        self.assertEqual(command.count("-ss"), 1)
+        self.assertLess(command.index("-ss"), command.index("-i"))
 
     def test_audio_preview_is_disabled_for_sources_without_audio(self):
         backend = FfmpegPlaybackBackend(
@@ -339,6 +395,134 @@ class FfmpegPlaybackTests(unittest.TestCase):
                     backend._start_audio_preview_locked(0.0)
         finally:
             backend.close()
+
+    def test_audio_preview_failure_does_not_stop_video_playback(self):
+        frames = []
+        warnings = []
+        errors = []
+        ended = threading.Event()
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            frames.append,
+            errors.append,
+            ended.set,
+            audio_decision={"status": "ready", "gain_db": 0.0},
+            on_warning=warnings.append,
+        )
+
+        try:
+            with patch.object(
+                backend,
+                "_start_audio_preview_locked",
+                side_effect=PlaybackBackendError("Audio output is unavailable"),
+            ):
+                backend.play()
+                deadline = time.monotonic() + 3
+                while not ended.is_set() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+
+            self.assertTrue(ended.is_set())
+            self.assertGreater(len(frames), 1)
+            self.assertEqual(errors, [])
+            self.assertEqual(warnings, ["Audio output is unavailable"])
+        finally:
+            backend.close()
+
+    def test_composed_playback_crosses_triplicated_portrait_and_landscape_sources(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            portrait = root / "portrait.mp4"
+            landscape = root / "landscape.mp4"
+            for path, size, rate, frequency in (
+                (portrait, "18x32", "10", "440"),
+                (landscape, "32x18", "15", "880"),
+            ):
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-y",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        f"testsrc=size={size}:rate={rate}",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        f"sine=frequency={frequency}:sample_rate=48000",
+                        "-t",
+                        "0.8",
+                        "-c:v",
+                        "libx264",
+                        "-pix_fmt",
+                        "yuv420p",
+                        "-c:a",
+                        "aac",
+                        "-ac",
+                        "2",
+                        "-shortest",
+                        str(path),
+                    ],
+                    check=True,
+                )
+
+            first = Segment.create(
+                0.0,
+                0.8,
+                source_id="portrait",
+                timeline_start_seconds=0.0,
+                timeline_end_seconds=0.8,
+            ).with_triplicate(TriplicateGroup.create())
+            second = Segment.create(
+                0.0,
+                0.8,
+                source_id="landscape",
+                timeline_start_seconds=0.8,
+                timeline_end_seconds=1.6,
+            )
+            frames = []
+            warnings = []
+            errors = []
+            ended = threading.Event()
+            backend = FfmpegComposedPlaybackBackend(
+                (("portrait", portrait), ("landscape", landscape)),
+                (first, second),
+                60,
+                36,
+                10.0,
+                1.6,
+                frames.append,
+                errors.append,
+                ended.set,
+                audio_decisions={
+                    "portrait": {"status": "ready", "gain_db": 0.0},
+                    "landscape": {"status": "ready", "gain_db": 0.0},
+                },
+                on_warning=warnings.append,
+            )
+
+            try:
+                with patch.object(
+                    backend,
+                    "_start_audio_preview_locked",
+                    side_effect=PlaybackBackendError("Audio output is unavailable"),
+                ):
+                    backend.play()
+                    self.assertTrue(ended.wait(timeout=5))
+
+                self.assertGreater(len(frames), 5)
+                self.assertTrue(any(frame.position_seconds >= 0.8 for frame in frames))
+                self.assertEqual(errors, [])
+                self.assertEqual(warnings, ["Audio output is unavailable"])
+                self.assertTrue(all(len(frame.data) == 60 * 36 * 4 for frame in frames))
+            finally:
+                backend.close()
 
 
 if __name__ == "__main__":

@@ -6,7 +6,12 @@
 **Phase:** PHASE-005
 **Feature:** FEAT-015
 **Capability links:** CAP-005, CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after implementation, automated and
+real-media verification, review, user validation, and local delivery evidence;
+remote checks remain unavailable and are recorded as an accepted warning.
+**Path history:** `tickets/open/TICKET-035-route-audio-aware-and-mixed-source-exports-safely.md`
+-> `tickets/closed/TICKET-035-route-audio-aware-and-mixed-source-exports-safely.md`
 **Horizon:** future
 **Priority:** 5
 **Owner:** repository planning and implementation in the active worktree
@@ -98,3 +103,8 @@ failed or cancelled attempt.
 - Audio-aware and mixed-source outputs use validated fallback behavior.
 - Fast-path eligibility remains protected where still valid.
 - Failure, cancellation, verification, and source-safety evidence is recorded.
+
+## Closure
+
+Audio-aware and mixed-source route selection is complete in local delivery
+checkpoint `6aebb26121eb7e4088b4c3678b670038116be2be`.

@@ -89,6 +89,13 @@ resolve-editor move ~/Videos/source.resolve.json --segment SEGMENT_ID \
   --direction left
 resolve-editor copy ~/Videos/mixed.resolve.json --segment SEGMENT_ID
 resolve-editor paste ~/Videos/mixed.resolve.json --segment SEGMENT_ID --at 0
+resolve-editor focus ~/Videos/source.resolve.json --segment SEGMENT_ID \
+  --zoom 2 --offset-x 120 --offset-y -80
+resolve-editor copy-focus ~/Videos/source.resolve.json \
+  --source-segment SOURCE_SEGMENT_ID --segment DESTINATION_SEGMENT_ID
+resolve-editor triplicate-enable ~/Videos/source.resolve.json --segment SEGMENT_ID
+resolve-editor triplicate-disable ~/Videos/source.resolve.json --segment SEGMENT_ID
+resolve-editor clean-focus ~/Videos/source.resolve.json --segment SEGMENT_ID
 resolve-editor relink ~/Videos/mixed.resolve.json --source SOURCE_ID \
   --path ~/Videos/relocated.mp4
 resolve-editor duration ~/Videos/source.resolve.json
@@ -119,7 +126,8 @@ ffprobe, and `ffplay` for audio preview. The editor supports one-source and
 mixed-source projects, real-time composed preview with source-level audio
 decisions, play/pause, seek, a visual clip timeline, non-destructive
 split/delete-toggle editing, block movement and copy/paste, versioned project
-save/reopen, and verified MP4 export. Audio is analyzed once per input source
+save/reopen, reusable per-segment focus controls, linked triplicate
+compositions, and verified MP4 export. Audio is analyzed once per input source
 using the legacy mean/median policy and the same decision is reused by every
 included segment from that source. Missing `ffplay` or an audio preview
 process failure is reported explicitly; it is not silently treated as a
@@ -207,7 +215,7 @@ scoped C901 complexity checks for the editor CLI/domain surfaces, jscpd,
 the repository dependency-boundary check, pip-audit, Bandit, and the AIDD
 churn report. Generated JSON reports are written to
 `evidence/static-analysis/`; sensitive values and absolute paths must not be
-added to those artifacts. jscpd currently reports approximately a 1.76%
+added to those artifacts. jscpd currently reports approximately a 1.89%
 duplication baseline against a configured 2% ceiling, so new duplication
 remains visible without blocking on the existing helper/test overlap. The
 GTK/rendering/export
@@ -316,10 +324,24 @@ Use a short disposable MP4 or a copy of a local source:
    `printf '{' > /tmp/invalid.resolve.json`, then run
    `make editor ARGS="--project /tmp/invalid.resolve.json"`. Confirm the
    status shows an actionable error and does not replace valid state.
-
-The mixed-source editor intentionally does not yet provide triplicate layouts,
-automatic focus/visual transforms, or 60-FPS enhancement. Those remain planned
-future capabilities.
+28. Select one or more clips and use the **Focus** controls. Apply zoom and
+    X/Y offsets, confirm the preview changes without changing clip duration,
+    source bounds, colors, or ordering, then use **Clean modifications** and
+    confirm the default view returns.
+29. Select a primary clip and additional clips, then use **Copy to selection**.
+    Confirm the destination clips receive the primary clip's focus values while
+    retaining their own identities and timing.
+30. Enable **Triplicate** on portrait or vertically focused landscape footage.
+    Confirm the preview shows black-backed left, center, and right copies using
+    the same focus values. Disable it and confirm the source interval and
+    ordinary clip state are unchanged.
+31. Save and reopen a focused/triplicate project, then run `inspect` through
+    the CLI. Confirm the transform, group ID, roles, and segment state match
+    the GUI.
+32. Export a focused/triplicate project and confirm the route explanation says
+    decoded fallback rendering, the output is verified 1920x1080, the duration
+    is correct, and the source and any previous valid output remain unchanged
+    if a render fails.
 
 The TUI starts in `~/Documents/edit`. Navigate with the arrow keys or `j/k`,
 use `Right/l` to enter a folder, press `Space` on each video to select it, and

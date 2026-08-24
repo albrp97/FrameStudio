@@ -15,6 +15,15 @@ resolve-editor move PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
 resolve-editor copy PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
 resolve-editor paste PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
   --at SECONDS
+resolve-editor focus PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+  [--zoom ZOOM] [--offset-x PIXELS] [--offset-y PIXELS]
+resolve-editor copy-focus PROJECT --source-segment SEGMENT_ID \
+  --segment SEGMENT_ID [--segment SEGMENT_ID ...]
+resolve-editor clean-focus PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
+resolve-editor triplicate-enable PROJECT --segment SEGMENT_ID \
+  [--segment SEGMENT_ID ...]
+resolve-editor triplicate-disable PROJECT --segment SEGMENT_ID \
+  [--segment SEGMENT_ID ...]
 resolve-editor relink PROJECT --source SOURCE_ID --path SOURCE
 resolve-editor duration PROJECT
 resolve-editor save PROJECT [--output PROJECT]
@@ -42,7 +51,8 @@ Inspection and mutation commands include a `project` object containing:
 - `project_id` and `schema_version`;
 - ordered stable `source_id` values and persisted source metadata;
 - ordered stable `segment_id` values with source boundaries, timeline
-  placement, block state, deletion state, and display color;
+  placement, block state, deletion state, display color, visual transform, and
+  triplicate group state;
 - source duration, playhead, edited duration, and active/deleted counts;
 - conservative exportability state.
 
@@ -104,6 +114,16 @@ fallback render profile; a one-source input may use stream copy only when it
 already matches the project canvas. Source codec/container differences do not
 select a different delivery profile, and 60 FPS enhancement is outside
 contract version 1.
+
+Focused composition edits use a versioned segment-owned transform on the fixed
+1920x1080 canvas. Zoom is bounded to `1.0..8.0`; X and Y offsets are bounded to
+`-960..960` and `-540..540` canvas pixels. Interactive CLI/UI values are
+clamped to those bounds. Mismatched sources are contain-scaled without
+stretching. Triplicate mode stores one linked group with exactly `center`,
+`left`, and `right` instances, renders them in that order over a black
+background, and applies one shared transform to all three. Focused or
+triplicate segments always use the verified fallback render route; they are
+never silently stream-copied.
 
 The contract is versioned by `contract_version`. Additive fields preserve the
 current version; incompatible changes require a new version and an explicit

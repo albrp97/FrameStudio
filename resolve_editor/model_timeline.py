@@ -9,6 +9,8 @@ from .model_types import (
     _TIME_EPSILON,
     ProjectValidationError,
     Segment,
+    TriplicateGroup,
+    VisualTransform,
     _assign_missing_segment_colors,
     _finite_float,
     _split_segment_color_indices,
@@ -95,6 +97,8 @@ class SegmentTimeline:
                     state=block.state,
                     block_id=block.block_id,
                     color_index=(block.color_index if block._color_index_explicit else None),
+                    visual_transform=block.visual_transform,
+                    triplicate=block.triplicate,
                 )
             )
             next_position = end
@@ -140,6 +144,55 @@ class SegmentTimeline:
         return sum(
             segment.duration_seconds for segment in self.segment_items if not segment.deleted
         )
+
+    def timeline_to_edited_position(self, position_seconds: float) -> float:
+        """Map a visible timeline position to the concatenated playback time."""
+        position = _finite_float(position_seconds, "Timeline position")
+        timeline_duration = self.timeline_duration_seconds
+        position = max(0.0, min(timeline_duration, position))
+        edited_position = 0.0
+        for segment in self.segment_items:
+            start = segment.timeline_start
+            end = segment.timeline_end
+            if position <= start + _TIME_EPSILON:
+                return edited_position
+            if position < end - _TIME_EPSILON:
+                if segment.deleted:
+                    return edited_position
+                return min(
+                    self.edited_duration_seconds,
+                    edited_position + position - start,
+                )
+            if position <= end + _TIME_EPSILON:
+                if segment.deleted:
+                    return edited_position
+                return min(
+                    self.edited_duration_seconds,
+                    edited_position + segment.duration_seconds,
+                )
+            if not segment.deleted:
+                edited_position += segment.duration_seconds
+        return min(self.edited_duration_seconds, edited_position)
+
+    def edited_to_timeline_position(self, position_seconds: float) -> float:
+        """Map concatenated playback time to the visible timeline position."""
+        position = _finite_float(position_seconds, "Edited position")
+        edited_duration = self.edited_duration_seconds
+        position = max(0.0, min(edited_duration, position))
+        active_segments = self.active_blocks()
+        if not active_segments:
+            return 0.0
+        edited_position = 0.0
+        for index, segment in enumerate(active_segments):
+            segment_end = edited_position + segment.duration_seconds
+            if position < segment_end - _TIME_EPSILON:
+                return segment.timeline_start + position - edited_position
+            if position <= segment_end + _TIME_EPSILON:
+                if index + 1 < len(active_segments):
+                    return active_segments[index + 1].timeline_start
+                return segment.timeline_end
+            edited_position = segment_end
+        return active_segments[-1].timeline_end
 
     def validate(self) -> None:
         validate_timeline(self)
@@ -203,6 +256,8 @@ class SegmentTimeline:
                 timeline_end_seconds=(timeline_position if preserve_timeline else None),
                 state=segment.state,
                 color_index=first_color,
+                visual_transform=segment.visual_transform,
+                triplicate=(None if segment.triplicate is None else segment.triplicate.clone()),
             )
             second = Segment.create(
                 first.end_seconds,
@@ -213,6 +268,8 @@ class SegmentTimeline:
                 timeline_end_seconds=(segment.timeline_end if preserve_timeline else None),
                 state=segment.state,
                 color_index=second_color,
+                visual_transform=segment.visual_transform,
+                triplicate=(None if segment.triplicate is None else segment.triplicate.clone()),
             )
             candidate = (
                 self.segment_items[:index] + (first, second) + self.segment_items[index + 1 :]
@@ -243,6 +300,8 @@ class SegmentTimeline:
                     state=segment.state,
                     block_id=segment.block_id,
                     color_index=segment.color_index,
+                    visual_transform=segment.visual_transform,
+                    triplicate=segment.triplicate,
                 )
                 candidate = list(segments)
                 candidate[index] = replacement
@@ -255,6 +314,73 @@ class SegmentTimeline:
 
     def restore_segment(self, segment_id: str) -> None:
         self.set_deleted(segment_id, False)
+
+    def _validated_segment_ids(self, segment_ids: Sequence[str]) -> set[str]:
+        requested = tuple(segment_ids)
+        if not requested:
+            raise ProjectValidationError("At least one segment_id is required")
+        selected = set(requested)
+        if len(selected) != len(requested):
+            raise ProjectValidationError("Segment identifiers must be unique")
+        known = {segment.segment_id for segment in self.segment_items}
+        missing = next((segment_id for segment_id in selected if segment_id not in known), None)
+        if missing is not None:
+            raise ProjectValidationError(f"Unknown segment_id: {missing}")
+        return selected
+
+    def set_visual_transform(
+        self,
+        segment_ids: Sequence[str],
+        visual_transform: VisualTransform,
+    ) -> None:
+        self.validate()
+        selected = self._validated_segment_ids(segment_ids)
+        if not isinstance(visual_transform, VisualTransform):
+            raise ProjectValidationError("Segment visual transform is invalid")
+        replacements = tuple(
+            segment.with_visual_transform(visual_transform)
+            if segment.segment_id in selected
+            else segment
+            for segment in self.segment_items
+        )
+        self._replace_segments(replacements)
+
+    def clean_visual_modifications(self, segment_ids: Sequence[str]) -> None:
+        self.validate()
+        selected = self._validated_segment_ids(segment_ids)
+        replacements = tuple(
+            segment.with_visual_transform(VisualTransform()).with_triplicate(None)
+            if segment.segment_id in selected
+            else segment
+            for segment in self.segment_items
+        )
+        self._replace_segments(replacements)
+
+    def enable_triplicate(self, segment_ids: Sequence[str]) -> None:
+        self.validate()
+        selected = self._validated_segment_ids(segment_ids)
+        replacements = tuple(
+            segment.with_triplicate(
+                (
+                    TriplicateGroup.create(segment.visual_transform)
+                    if segment.triplicate is None
+                    else segment.triplicate.with_enabled(True)
+                )
+            )
+            if segment.segment_id in selected
+            else segment
+            for segment in self.segment_items
+        )
+        self._replace_segments(replacements)
+
+    def disable_triplicate(self, segment_ids: Sequence[str]) -> None:
+        self.validate()
+        selected = self._validated_segment_ids(segment_ids)
+        replacements = tuple(
+            segment.with_triplicate(None) if segment.segment_id in selected else segment
+            for segment in self.segment_items
+        )
+        self._replace_segments(replacements)
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -504,6 +630,8 @@ class SegmentTimeline:
                     state=segment.state,
                     block_id=segment.block_id,
                     color_index=segment.color_index,
+                    visual_transform=segment.visual_transform,
+                    triplicate=segment.triplicate,
                 )
             )
             position = end

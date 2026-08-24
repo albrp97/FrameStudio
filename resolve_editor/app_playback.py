@@ -109,8 +109,8 @@ def seek_timeline(window: Any, position_seconds: float) -> bool:
         )
         return False
     if window.project is not None:
-        window.project.set_playhead(window.controller.snapshot().position_seconds)
-    window.timeline_canvas.set_playhead(window.controller.snapshot().position_seconds)
+        window.project.set_playhead(_timeline_position(window))
+    window.timeline_canvas.set_playhead(_timeline_position(window))
     window._update_playback_controls()
     return True
 
@@ -124,13 +124,23 @@ def request_timeline_preview(window: Any, position_seconds: float) -> None:
                 window.controller.snapshot().error or "Could not pause source for preview",
             )
             return
-    window.controller.update_position(position_seconds)
+    edited_position = (
+        window.segment_timeline.timeline_to_edited_position(
+            position_seconds,
+        )
+        if window.segment_timeline is not None
+        else position_seconds
+    )
+    window.controller.update_position(edited_position)
+    actual_position = window.controller.snapshot().position_seconds
     if window.project is not None:
-        window.project.set_playhead(position_seconds)
-    window.timeline_canvas.set_playhead(position_seconds)
+        window.project.set_playhead(
+            _timeline_position(window, actual_position),
+        )
+    window.timeline_canvas.set_playhead(_timeline_position(window, actual_position))
     window._update_playback_controls()
     try:
-        window.backend.request_preview(position_seconds)
+        window.backend.request_preview(edited_position)
     except PlaybackBackendError as error:
         window.controller.report_error(str(error))
         window._show_error(str(error))
@@ -189,7 +199,7 @@ def poll_playback(window: Any) -> bool:
     if window.backend is not None and window.controller is not None:
         window.controller.update_position(window.backend.current_position())
         if window.project is not None:
-            window.project.set_playhead(window.controller.snapshot().position_seconds)
+            window.project.set_playhead(_timeline_position(window))
         window._update_playback_controls()
     return True
 
@@ -201,7 +211,18 @@ def update_playback_controls(window: Any) -> None:
     snapshot = window.controller.snapshot()
     window.play_button.set_label(playback_action_label(snapshot.state))
     window.position_label.set_text(format_duration(snapshot.position_seconds))
-    window.timeline_canvas.set_playhead(snapshot.position_seconds)
+    window.timeline_canvas.set_playhead(_timeline_position(window))
+
+
+def _timeline_position(window: Any, edited_position: float | None = None) -> float:
+    position = edited_position
+    if position is None:
+        if window.controller is None:
+            return 0.0
+        position = float(window.controller.snapshot().position_seconds)
+    if window.segment_timeline is None:
+        return float(position)
+    return float(window.segment_timeline.edited_to_timeline_position(position))
 
 
 def on_frame(window: Any, frame: VideoFrame, GLib: Any) -> None:
@@ -236,11 +257,22 @@ def deliver_latest_frame(window: Any, Gdk: Any, GLib: Any) -> bool:
     return False
 
 
-def on_backend_error(window: Any, message: str, GLib: Any) -> None:
-    GLib.idle_add(window._handle_backend_error, message)
+def on_backend_error(
+    window: Any,
+    message: str,
+    GLib: Any,
+    generation: int | None = None,
+) -> None:
+    GLib.idle_add(window._handle_backend_error, message, generation)
 
 
-def handle_backend_error(window: Any, message: str) -> bool:
+def handle_backend_error(
+    window: Any,
+    message: str,
+    generation: int | None = None,
+) -> bool:
+    if generation is not None and generation != getattr(window, "_playback_generation", generation):
+        return False
     if window.controller is not None:
         window.controller.report_error(message)
     window._show_error(message)
@@ -248,11 +280,37 @@ def handle_backend_error(window: Any, message: str) -> bool:
     return False
 
 
-def on_backend_end(window: Any, GLib: Any) -> None:
-    GLib.idle_add(window._handle_backend_end)
+def on_backend_warning(
+    window: Any,
+    message: str,
+    GLib: Any,
+    generation: int | None = None,
+) -> None:
+    GLib.idle_add(window._handle_backend_warning, message, generation)
 
 
-def handle_backend_end(window: Any) -> bool:
+def handle_backend_warning(
+    window: Any,
+    message: str,
+    generation: int | None = None,
+) -> bool:
+    if generation is not None and generation != getattr(window, "_playback_generation", generation):
+        return False
+    window._set_status(f"Warning: {message}")
+    return False
+
+
+def on_backend_end(
+    window: Any,
+    GLib: Any,
+    generation: int | None = None,
+) -> None:
+    GLib.idle_add(window._handle_backend_end, generation)
+
+
+def handle_backend_end(window: Any, generation: int | None = None) -> bool:
+    if generation is not None and generation != getattr(window, "_playback_generation", generation):
+        return False
     if window.controller is not None:
         window.controller.finish()
         window._update_playback_controls()

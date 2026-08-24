@@ -3,15 +3,17 @@
 **Feature ID:** FEAT-002
 **Parent links:** OBJ-001, SCOPE-001, PHASE-001
 **Capability links:** CAP-002, CAP-012
-**Status:** verifying
-**Previous closure:** user-approved on 2026-08-22 after successful
-implementation, review evidence, and target-workstation validation; remote
-checks remain unavailable and are recorded as an accepted warning.
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after the post-seek playback
+correction passed automated, target-workstation, review, and local delivery
+evidence; remote checks remain unavailable and are recorded as an accepted
+warning.
 **Reopened:** user-reported on 2026-08-22 to correct timeline playback pacing
 after a cursor seek.
 **Path history:** `features/open/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
 -> `features/closed/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
 -> `features/open/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
+-> `features/closed/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
 **Horizon:** first
 **Owner:** repository planning; maintainer identity is not recorded
 **Approval:** user-approved on 2026-08-21 as part of PHASE-001 planning
@@ -84,3 +86,9 @@ duration in the primary editor interface.
 
 The existing curses workflows and media-processing scripts remain callable;
 the editor does not silently replace their commands or behavior.
+
+## Closure
+
+FEAT-002 and TICKET-029 satisfy the playback outcome and its post-seek
+correction. The local delivery checkpoint is
+`6aebb26121eb7e4088b4c3678b670038116be2be`; remote checks remain unavailable.

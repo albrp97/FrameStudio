@@ -3,7 +3,7 @@
 - Phase: `PHASE-001` - Opening and Resuming a Source Edit
 - Feature: `FEAT-002` - Controlling Playback and Navigating the Source Timeline
 - Ticket: `TICKET-029` - Restore Space Playback Toggle
-- Status: `verifying`
+- Status: `complete`
 - Branch: `ticket/phase-005-source-audio-delivery`
 - Evidence path: `evidence/space-playback-toggle.md`
 
@@ -228,4 +228,31 @@
   playback in a later structural ticket.
 - Accepted warning: Remote checks and PR state cannot be terminally evidenced
   without a configured remote.
+
+## SPACE-CLOSE-001
+
+- Requirement/flow: Close TICKET-029 and FEAT-002 after the corrected
+  post-seek playback behavior was validated and committed.
+- Observed: User validation returned `PASS`; review and local delivery
+  checkpoint `6aebb26121eb7e4088b4c3678b670038116be2be` are recorded.
+- Status: `complete`
+- Accepted warning: No remote or upstream is configured, so provider-side
+  checks remain unavailable.
 - Status: `passedWithConcerns`
+
+## SPACE-COMMIT-001
+
+- Requirement/flow: Create the reviewed local delivery checkpoint for
+  TICKET-029 and the approved combined editor scope.
+- Commit: `6aebb26121eb7e4088b4c3678b670038116be2be`
+  (`feat(editor): deliver balanced media`)
+- Branch: `ticket/phase-005-source-audio-delivery`
+- Staged scope: 60 reviewed files covering editor implementation, tests,
+  planning records, evidence, documentation, and active-window screenshots.
+- Readiness references: `SPACE-USER-002`, `SPACE-REVIEW-001`, and the
+  PHASE-005 review and user-validation entries.
+- Upstream/remote: no upstream or remote is configured; no publication was
+  attempted.
+- Status: `passedWithConcerns`
+- Accepted warning: Remote checks and PR parity remain unavailable until a
+  remote and upstream branch are configured.

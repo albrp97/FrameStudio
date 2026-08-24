@@ -4,15 +4,17 @@
 **Parent links:** OBJ-001, SCOPE-001
 **Capability links:** CAP-001, CAP-002, CAP-004, CAP-012
 **Sequence:** 1
-**Status:** verifying
-**Previous closure:** user-approved on 2026-08-22 after successful
-implementation, review evidence, and target-workstation validation; remote
-checks remain unavailable and are recorded as an accepted warning.
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after the post-seek playback
+correction passed automated, target-workstation, review, and local delivery
+evidence; remote checks remain unavailable and are recorded as an accepted
+warning.
 **Reopened:** user-reported on 2026-08-22 to correct timeline playback pacing
 after a cursor seek.
 **Path history:** `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md`
 -> `phases/closed/PHASE-001-opening-and-resuming-a-source-edit.md`
 -> `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md`
+-> `phases/closed/PHASE-001-opening-and-resuming-a-source-edit.md`
 **Horizon:** first
 **Owner:** repository planning; maintainer identity is not recorded
 **Approval:** user-approved on 2026-08-21 before feature generation
@@ -105,3 +107,10 @@ and reopen it with the same source and state.
 commands, current tests, source-safe output behavior, and research documents
 remain available and unchanged unless a separately approved change requires
 otherwise.
+
+## Closure
+
+The playback correction satisfies the PHASE-001 exit conditions through
+TICKET-029 and FEAT-002. The local delivery checkpoint is
+`6aebb26121eb7e4088b4c3678b670038116be2be`; no remote or upstream is
+configured, so provider-side checks remain an accepted warning.

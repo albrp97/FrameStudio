@@ -28,18 +28,17 @@ atomic segment-block movement, copy/paste, split inheritance, CLI parity, and
 the fixed 1920x1080 project render profile. Visual-modification authoring and
 cleaning, audio, composition, and 60 FPS work remain assigned to later phases.
 The PHASE-004A section adds the architecture-stabilization prerequisite before
-those future phases. The PHASE-005 section adds the source-level audio and
-tested delivery-policy ticket set; implementation is complete and remains in
-verification pending user validation and delivery review.
+those future phases. The PHASE-005 section adds the source-level audio and tested delivery-policy
+ticket set, now complete and closed after user validation and delivery review.
+The PHASE-006 section adds the approved reusable focus and linked triplicate
+composition ticket set; implementation, validation, review, and local delivery
+are complete and its records are closed.
 
 ## Ticket Lifecycle Records
 
 This backlog index is synchronized with both ticket lifecycle directories.
-Completed tickets are closed; TICKET-001 through TICKET-028 and TICKET-030
-remain complete and closed. TICKET-029 is verifying again after its playback
-scope was reopened for a timeline pacing correction. TICKET-031 through
-TICKET-037 are verifying open records awaiting user validation and delivery
-review for PHASE-005.
+Completed tickets are closed; TICKET-001 through TICKET-047 are complete and
+closed after their approved validation, review, and local delivery evidence.
 
 | Sequence | ID | Status | Parent feature | Phase | Current path |
 |---:|---|---|---|---|---|
@@ -55,7 +54,7 @@ review for PHASE-005.
 | 10 | TICKET-010 | complete | FEAT-005 | PHASE-002 | `tickets/closed/TICKET-010-export-plan-selection.md` |
 | 11 | TICKET-011 | complete | FEAT-005 | PHASE-002 | `tickets/closed/TICKET-011-verified-safe-export.md` |
 | 28 | TICKET-028 | complete | FEAT-004 | PHASE-002 | `tickets/closed/TICKET-028-restore-one-source-block-movement.md` |
-| 29 | TICKET-029 | verifying | FEAT-002 | PHASE-001 | `tickets/open/TICKET-029-restore-space-playback-toggle.md` |
+| 29 | TICKET-029 | complete | FEAT-002 | PHASE-001 | `tickets/closed/TICKET-029-restore-space-playback-toggle.md` |
 | 12 | TICKET-012 | complete | FEAT-007 | PHASE-003 | `tickets/closed/TICKET-012-select-deterministic-cli-contract-and-inspection-schema.md` |
 | 13 | TICKET-013 | complete | FEAT-007 | PHASE-003 | `tickets/closed/TICKET-013-implement-deterministic-project-inspection.md` |
 | 14 | TICKET-014 | complete | FEAT-008 | PHASE-003 | `tickets/closed/TICKET-014-implement-one-source-edit-commands.md` |
@@ -73,13 +72,23 @@ review for PHASE-005.
 | 26 | TICKET-026 | complete | FEAT-012 | PHASE-004 | `tickets/closed/TICKET-026-implement-verified-mixed-source-export.md` |
 | 27 | TICKET-027 | complete | FEAT-012 | PHASE-004 | `tickets/closed/TICKET-027-verifying-mixed-source-round-trips-and-source-preservation.md` |
 | 30 | TICKET-030 | complete | FEAT-013 | PHASE-004A | `tickets/closed/TICKET-030-refactor-editor-architecture.md` |
-| 31 | TICKET-031 | verifying | FEAT-014 | PHASE-005 | `tickets/open/TICKET-031-define-source-level-audio-policy.md` |
-| 32 | TICKET-032 | verifying | FEAT-014 | PHASE-005 | `tickets/open/TICKET-032-analyze-and-persist-source-audio-decisions.md` |
-| 33 | TICKET-033 | verifying | FEAT-014 | PHASE-005 | `tickets/open/TICKET-033-apply-source-audio-decisions-consistently.md` |
-| 34 | TICKET-034 | verifying | FEAT-015 | PHASE-005 | `tickets/open/TICKET-034-benchmark-and-document-delivery-profiles.md` |
-| 35 | TICKET-035 | verifying | FEAT-015 | PHASE-005 | `tickets/open/TICKET-035-route-audio-aware-and-mixed-source-exports-safely.md` |
-| 36 | TICKET-036 | verifying | FEAT-016 | PHASE-005 | `tickets/open/TICKET-036-expose-synchronized-media-decisions.md` |
-| 37 | TICKET-037 | verifying | FEAT-016 | PHASE-005 | `tickets/open/TICKET-037-verify-balanced-mixed-source-delivery.md` |
+| 31 | TICKET-031 | complete | FEAT-014 | PHASE-005 | `tickets/closed/TICKET-031-define-source-level-audio-policy.md` |
+| 32 | TICKET-032 | complete | FEAT-014 | PHASE-005 | `tickets/closed/TICKET-032-analyze-and-persist-source-audio-decisions.md` |
+| 33 | TICKET-033 | complete | FEAT-014 | PHASE-005 | `tickets/closed/TICKET-033-apply-source-audio-decisions-consistently.md` |
+| 34 | TICKET-034 | complete | FEAT-015 | PHASE-005 | `tickets/closed/TICKET-034-benchmark-and-document-delivery-profiles.md` |
+| 35 | TICKET-035 | complete | FEAT-015 | PHASE-005 | `tickets/closed/TICKET-035-route-audio-aware-and-mixed-source-exports-safely.md` |
+| 36 | TICKET-036 | complete | FEAT-016 | PHASE-005 | `tickets/closed/TICKET-036-expose-synchronized-media-decisions.md` |
+| 37 | TICKET-037 | complete | FEAT-016 | PHASE-005 | `tickets/closed/TICKET-037-verify-balanced-mixed-source-delivery.md` |
+| 38 | TICKET-038 | complete | FEAT-017 | PHASE-006 | `tickets/closed/TICKET-038-define-segment-visual-modification-contract.md` |
+| 39 | TICKET-039 | complete | FEAT-017 | PHASE-006 | `tickets/closed/TICKET-039-implement-segment-focus-controls.md` |
+| 40 | TICKET-040 | complete | FEAT-017 | PHASE-006 | `tickets/closed/TICKET-040-preserve-visual-modifications-through-block-edits.md` |
+| 41 | TICKET-041 | complete | FEAT-018 | PHASE-006 | `tickets/closed/TICKET-041-define-triplicate-group-and-layout-policy.md` |
+| 42 | TICKET-042 | complete | FEAT-018 | PHASE-006 | `tickets/closed/TICKET-042-implement-linked-triplicate-composition.md` |
+| 43 | TICKET-043 | complete | FEAT-018 | PHASE-006 | `tickets/closed/TICKET-043-preserve-triplicate-group-lifecycle.md` |
+| 44 | TICKET-044 | complete | FEAT-019 | PHASE-006 | `tickets/closed/TICKET-044-persist-focused-composition-state.md` |
+| 45 | TICKET-045 | complete | FEAT-019 | PHASE-006 | `tickets/closed/TICKET-045-expose-focused-edits-through-cli-and-gui-parity.md` |
+| 46 | TICKET-046 | complete | FEAT-019 | PHASE-006 | `tickets/closed/TICKET-046-render-and-verify-focused-compositions-safely.md` |
+| 47 | TICKET-047 | complete | FEAT-019 | PHASE-006 | `tickets/closed/TICKET-047-verify-focused-composition-delivery.md` |
 
 ## Ticket summary
 
@@ -488,16 +497,16 @@ contracts remain protected.
 - `docs/planning/features/open/FEAT-013-modular-editor-architecture.md`
 - `.github/aidd-config.yml`
 
-## PHASE-005 - Planned Ticket Set
+## PHASE-005 - Completed Ticket Set
 
 **Backlog extension ID:** BACKLOG-005
 **Objective:** OBJ-001
 **Scope:** SCOPE-001
 **Phase:** PHASE-005
 **Features:** FEAT-014, FEAT-015, FEAT-016
-**Status:** verifying
-**Approval:** user-authorized on 2026-08-22 to implement the feature and
-ticket set; user validation is pending
+**Status:** complete
+**Approval:** user-authorized on 2026-08-22 to implement and close the
+feature and ticket set after validation
 **Owner:** repository planning and implementation in the active worktree
 **Last updated:** 2026-08-22
 **Source paths:** `docs/planning/phases/open/PHASE-005-balancing-sources-and-delivering-consistent-media.md`,
@@ -516,13 +525,13 @@ composition, or 60 FPS enhancement.
 
 | Sequence | ID | Title | Parent feature | Dependencies | Status | Current path |
 |---:|---|---|---|---|---|---|
-| 31 | TICKET-031 | Define source-level audio policy | FEAT-014 | PHASE-004A; approved product direction | verifying | `tickets/open/TICKET-031-define-source-level-audio-policy.md` |
-| 32 | TICKET-032 | Analyze and persist source audio decisions | FEAT-014 | TICKET-031; source probing and project schema | verifying | `tickets/open/TICKET-032-analyze-and-persist-source-audio-decisions.md` |
-| 33 | TICKET-033 | Apply source audio decisions consistently | FEAT-014 | TICKET-031, TICKET-032; preview/export seams | verifying | `tickets/open/TICKET-033-apply-source-audio-decisions-consistently.md` |
-| 34 | TICKET-034 | Benchmark and document delivery profiles | FEAT-015 | TICKET-031; established render profile | verifying | `tickets/open/TICKET-034-benchmark-and-document-delivery-profiles.md` |
-| 35 | TICKET-035 | Route audio-aware and mixed-source exports safely | FEAT-015 | TICKET-031, TICKET-032, TICKET-034 | verifying | `tickets/open/TICKET-035-route-audio-aware-and-mixed-source-exports-safely.md` |
-| 36 | TICKET-036 | Expose synchronized media decisions | FEAT-016 | TICKET-032, TICKET-034, TICKET-035 | verifying | `tickets/open/TICKET-036-expose-synchronized-media-decisions.md` |
-| 37 | TICKET-037 | Verify balanced mixed-source delivery | FEAT-016 | TICKET-033, TICKET-035, TICKET-036 | verifying | `tickets/open/TICKET-037-verify-balanced-mixed-source-delivery.md` |
+| 31 | TICKET-031 | Define source-level audio policy | FEAT-014 | PHASE-004A; approved product direction | complete | `tickets/closed/TICKET-031-define-source-level-audio-policy.md` |
+| 32 | TICKET-032 | Analyze and persist source audio decisions | FEAT-014 | TICKET-031; source probing and project schema | complete | `tickets/closed/TICKET-032-analyze-and-persist-source-audio-decisions.md` |
+| 33 | TICKET-033 | Apply source audio decisions consistently | FEAT-014 | TICKET-031, TICKET-032; preview/export seams | complete | `tickets/closed/TICKET-033-apply-source-audio-decisions-consistently.md` |
+| 34 | TICKET-034 | Benchmark and document delivery profiles | FEAT-015 | TICKET-031; established render profile | complete | `tickets/closed/TICKET-034-benchmark-and-document-delivery-profiles.md` |
+| 35 | TICKET-035 | Route audio-aware and mixed-source exports safely | FEAT-015 | TICKET-031, TICKET-032, TICKET-034 | complete | `tickets/closed/TICKET-035-route-audio-aware-and-mixed-source-exports-safely.md` |
+| 36 | TICKET-036 | Expose synchronized media decisions | FEAT-016 | TICKET-032, TICKET-034, TICKET-035 | complete | `tickets/closed/TICKET-036-expose-synchronized-media-decisions.md` |
+| 37 | TICKET-037 | Verify balanced mixed-source delivery | FEAT-016 | TICKET-033, TICKET-035, TICKET-036 | complete | `tickets/closed/TICKET-037-verify-balanced-mixed-source-delivery.md` |
 
 ### Dependency order
 
@@ -551,16 +560,15 @@ source analysis and delivery benchmarking.
 
 ### Readiness and gates
 
-- PHASE-005 and FEAT-014 through FEAT-016 are verifying under approved
-  objective, scope, and capability ancestry.
+- PHASE-005 and FEAT-014 through FEAT-016 are complete and closed under
+  approved objective, scope, and capability ancestry.
 - TICKET-031 through TICKET-037 define bounded scope, non-goals,
   dependencies, protected behavior, commands, evidence paths, and
   user-validation plans.
 - The configured baseline command remains
   `python3 -m unittest discover -s tests`.
-- Implementation and automated verification are complete on the dedicated
-  ticket branch. User validation, review, and configured delivery gates remain
-  required before closure.
+- Implementation, automated verification, user validation, review, and local
+  delivery are complete on the dedicated ticket branch.
 - Remote checks remain required by `.github/aidd-config.yml`, but no
   remote-check infrastructure is configured; no remote pass is claimed.
 
@@ -584,6 +592,104 @@ contracts.
 - `docs/planning/features/open/FEAT-016-synchronizing-media-decisions-and-verification.md`
 - `.github/aidd-config.yml`
 
+## PHASE-006 - Verification Ticket Set
+
+**Backlog extension ID:** BACKLOG-006
+**Objective:** OBJ-001
+**Scope:** SCOPE-001
+**Phase:** PHASE-006
+**Features:** FEAT-017, FEAT-018, FEAT-019
+**Status:** complete
+**Approval:** user-authorized on 2026-08-22 to break down and implement the
+approved phase; user validation, review, and local delivery are complete
+**Owner:** repository planning; maintainer identity is not recorded
+**Last updated:** 2026-08-22
+**Source paths:** `vision.md`, `docs/specs/project-scope.md`,
+`docs/specs/capability-map.md`, `docs/specs/future-product-direction.md`,
+`docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`,
+`docs/planning/features.md`, `.github/aidd-config.yml`
+
+This ticket set covers reusable segment focus controls, linked triplicate
+portrait/focused-action composition, versioned persistence, GUI/CLI parity,
+safe rendering, and end-to-end verification. It does not include automatic
+60 FPS enhancement, arbitrary effects, or full professional compositing.
+
+### Ticket summary
+
+| Sequence | ID | Title | Parent feature | Dependencies | Status | Current path |
+|---:|---|---|---|---|---|---|
+| 38 | TICKET-038 | Define segment visual modification contract | FEAT-017 | PHASE-005; stable segment identity and selection | complete | `tickets/closed/TICKET-038-define-segment-visual-modification-contract.md` |
+| 39 | TICKET-039 | Implement segment focus controls | FEAT-017 | TICKET-038 | complete | `tickets/closed/TICKET-039-implement-segment-focus-controls.md` |
+| 40 | TICKET-040 | Preserve visual modifications through block edits | FEAT-017 | TICKET-038, TICKET-039 | complete | `tickets/closed/TICKET-040-preserve-visual-modifications-through-block-edits.md` |
+| 41 | TICKET-041 | Define triplicate group and layout policy | FEAT-018 | TICKET-038; fixed 1920x1080 canvas | complete | `tickets/closed/TICKET-041-define-triplicate-group-and-layout-policy.md` |
+| 42 | TICKET-042 | Implement linked triplicate composition | FEAT-018 | TICKET-039, TICKET-041 | complete | `tickets/closed/TICKET-042-implement-linked-triplicate-composition.md` |
+| 43 | TICKET-043 | Preserve triplicate group lifecycle | FEAT-018 | TICKET-040, TICKET-041, TICKET-042 | complete | `tickets/closed/TICKET-043-preserve-triplicate-group-lifecycle.md` |
+| 44 | TICKET-044 | Persist focused composition state | FEAT-019 | TICKET-040, TICKET-043 | complete | `tickets/closed/TICKET-044-persist-focused-composition-state.md` |
+| 45 | TICKET-045 | Expose focused edits through CLI and GUI parity | FEAT-019 | TICKET-044 | complete | `tickets/closed/TICKET-045-expose-focused-edits-through-cli-and-gui-parity.md` |
+| 46 | TICKET-046 | Render and verify focused compositions safely | FEAT-019 | TICKET-044, TICKET-045 | complete | `tickets/closed/TICKET-046-render-and-verify-focused-compositions-safely.md` |
+| 47 | TICKET-047 | Verify focused composition delivery | FEAT-019 | TICKET-039, TICKET-040, TICKET-043, TICKET-045, TICKET-046 | complete | `tickets/closed/TICKET-047-verify-focused-composition-delivery.md` |
+
+### Dependency order
+
+`TICKET-038 -> TICKET-039 -> TICKET-040`
+
+`TICKET-041 -> TICKET-042 -> TICKET-043`
+
+`TICKET-038 + TICKET-040 + TICKET-043 -> TICKET-044`
+
+`TICKET-044 -> TICKET-045 -> TICKET-046 -> TICKET-047`
+
+TICKET-038 settles the shared transform contract before implementation.
+TICKET-041 settles linked-group and background/layout semantics before
+triplicate behavior. Persistence and surface parity precede safe render
+integration and end-to-end verification.
+
+### Feature coverage
+
+| Feature outcome | Ticket coverage | Coverage status |
+|---|---|---|
+| Edit reusable visual focus controls on timeline segments | TICKET-038 through TICKET-040 | covered |
+| Create linked triplicate portrait and focused-action compositions | TICKET-041 through TICKET-043 | covered |
+| Preview, persist, and safely deliver focused compositions | TICKET-044 through TICKET-047 | covered |
+| CAP-005 - Rendering fast, valid, and safe outputs | TICKET-046, TICKET-047 | covered |
+| CAP-009 - Applying reusable segment visual modifications | TICKET-038 through TICKET-040, TICKET-044, TICKET-045, TICKET-047 | covered |
+| CAP-010 - Linking triplicate composition instances | TICKET-041 through TICKET-047 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | TICKET-038 through TICKET-047 | covered |
+
+### Readiness and gates
+
+- PHASE-006, FEAT-017, FEAT-018, and FEAT-019 are complete closed records
+  with stable objective, scope, and capability links.
+- TICKET-038 through TICKET-047 have implemented bounded scope, non-goals,
+  dependencies, protected behavior, commands, evidence paths, and
+  user-validation plans.
+- Technical implementation, local verification, user validation, review, and
+  local delivery are complete.
+- The configured baseline, local quality, contract, smoke, and user-facing
+  gates must be established by the preimplementation checklist before any
+  ticket enters execution.
+- Remote checks remain required by `.github/aidd-config.yml`; no remote or
+  upstream is configured, so no remote pass is claimed.
+
+### Protected behavior
+
+Existing one-source and mixed-source editing, segment colors and identities,
+source-level audio decisions, fixed 1920x1080 output, project compatibility,
+safe export, CLI contracts, legacy scripts, and source preservation remain
+protected throughout PHASE-006.
+
+### Source references
+
+- `vision.md`
+- `docs/specs/project-scope.md`
+- `docs/specs/capability-map.md`
+- `docs/specs/future-product-direction.md`
+- `docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`
+- `docs/planning/features/open/FEAT-017-editing-reusable-visual-focus-controls.md`
+- `docs/planning/features/open/FEAT-018-creating-linked-triplicate-compositions.md`
+- `docs/planning/features/open/FEAT-019-delivering-focused-compositions-safely.md`
+- `.github/aidd-config.yml`
+
 ## Migration Notes
 
 - `BACKLOG-001` and `BACKLOG-002` remain represented in this single backlog
@@ -604,3 +710,9 @@ contracts.
   architecture-stabilization subtree before the confirmed future phases. The
   subtree completed after user validation on 2026-08-22 and its records moved
   to the closed lifecycle directories.
+- PHASE-005, FEAT-014 through FEAT-016, and TICKET-031 through TICKET-037
+  completed after user validation, review, and local delivery on 2026-08-22;
+  their records moved to the closed lifecycle directories.
+- BACKLOG-006 added the PHASE-006 planning set with FEAT-017 through FEAT-019
+  and TICKET-038 through TICKET-047. After user validation, review, and local
+  delivery, all records moved to the configured closed lifecycle directories.

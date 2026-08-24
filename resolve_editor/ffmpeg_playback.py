@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from .audio import AUDIO_CHANNELS, AUDIO_SAMPLE_RATE, audio_filter
+from .composition_render import segment_video_filters
 from .playback import PlaybackBackendError
 
 
@@ -43,6 +44,7 @@ class FfmpegPlaybackBackend:
         ffmpeg_path: str = "ffmpeg",
         audio_decision: Mapping[str, Any] | None = None,
         ffplay_path: str = "ffplay",
+        on_warning: MessageCallback | None = None,
     ) -> None:
         if width <= 0 or height <= 0:
             raise ValueError("Playback dimensions must be positive")
@@ -59,6 +61,7 @@ class FfmpegPlaybackBackend:
         self.ffmpeg_path = ffmpeg_path
         self.audio_decision = None if audio_decision is None else dict(audio_decision)
         self.ffplay_path = ffplay_path
+        self.on_warning = on_warning or (lambda _message: None)
         self._lock = threading.RLock()
         self._process: subprocess.Popen[bytes] | None = None
         self._stop_event: threading.Event | None = None
@@ -279,7 +282,7 @@ class FfmpegPlaybackBackend:
                 self._audio_sink = None
                 self._audio_monitor_thread = None
         if is_current and (sink_return_code != 0 or audio_return_code != 0):
-            self._notify_error(
+            self._notify_warning(
                 "Audio preview failed "
                 f"(ffplay status {sink_return_code}, ffmpeg status {audio_return_code})"
             )
@@ -336,13 +339,8 @@ class FfmpegPlaybackBackend:
         self._paused = False
         try:
             self._start_audio_preview_locked(start_position)
-        except PlaybackBackendError:
-            self._process = None
-            self._stop_event = None
-            event.set()
-            self._terminate_process_instance(process)
-            self._close_process_streams(process)
-            raise
+        except PlaybackBackendError as error:
+            self._notify_warning(str(error))
         stderr_output: list[bytes] = []
         stderr_thread = threading.Thread(
             target=self._drain_stderr,
@@ -476,6 +474,9 @@ class FfmpegPlaybackBackend:
 
     def _notify_error(self, message: str) -> None:
         self.on_error(message or "FFmpeg playback failed")
+
+    def _notify_warning(self, message: str) -> None:
+        self.on_warning(message or "Audio preview warning")
 
     @staticmethod
     def _terminate_process_instance(process: subprocess.Popen[bytes]) -> None:
@@ -774,14 +775,15 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
         ffmpeg_path: str = "ffmpeg",
         audio_decisions: Mapping[str, Mapping[str, Any]] | None = None,
         ffplay_path: str = "ffplay",
+        on_warning: MessageCallback | None = None,
     ) -> None:
         source_items = tuple(sources)
         if not source_items:
             raise ValueError("At least one source is required for composed playback")
         self._source_items = source_items
-        self._blocks = tuple(blocks)
+        self._blocks = tuple(block for block in blocks if not block.deleted)
         if not self._blocks:
-            raise ValueError("At least one timeline block is required for composed playback")
+            raise ValueError("At least one active timeline block is required for composed playback")
         self._source_indexes = {
             source_id: index for index, (source_id, _path) in enumerate(source_items)
         }
@@ -797,12 +799,97 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             on_end,
             ffmpeg_path,
             ffplay_path=ffplay_path,
+            on_warning=on_warning,
         )
 
     def _has_audio_preview(self) -> bool:
         return any(
             settings.get("status") != "not-applicable" for settings in self.audio_decisions.values()
         )
+
+    def _render_plan(
+        self,
+        position_seconds: float,
+    ) -> tuple[tuple[tuple[Any, int, float, float], ...], bool, dict[int, float]]:
+        total_duration = sum(block.duration_seconds for block in self._blocks)
+        target = max(0.0, min(total_duration, float(position_seconds)))
+        plan: list[tuple[Any, int, float, float]] = []
+        elapsed = 0.0
+        optimized = target < total_duration - 1e-9
+        start_index = 0
+        if optimized:
+            for index, block in enumerate(self._blocks):
+                block_end = elapsed + block.duration_seconds
+                if target >= block_end - 1e-9:
+                    elapsed = block_end
+                    continue
+                offset = max(0.0, target - elapsed)
+                source_start = block.start_seconds + offset
+                plan.append(
+                    (
+                        block,
+                        self._source_index_for_block(block),
+                        source_start,
+                        block.end_seconds - source_start,
+                    )
+                )
+                start_index = index + 1
+                break
+        if not plan:
+            optimized = False
+            plan = [
+                (
+                    block,
+                    self._source_index_for_block(block),
+                    block.start_seconds,
+                    block.duration_seconds,
+                )
+                for block in self._blocks
+            ]
+        else:
+            for block in self._blocks[start_index:]:
+                plan.append(
+                    (
+                        block,
+                        self._source_index_for_block(block),
+                        block.start_seconds,
+                        block.duration_seconds,
+                    )
+                )
+        input_offsets: dict[int, float] = {}
+        if optimized:
+            for _block, source_index, source_start, _duration in plan:
+                input_offsets[source_index] = min(
+                    source_start,
+                    input_offsets.get(source_index, source_start),
+                )
+        return tuple(plan), optimized, input_offsets
+
+    def _source_index_for_block(self, block: Any) -> int:
+        source_id = block.source_id or (
+            self._source_items[0][0] if len(self._source_items) == 1 else ""
+        )
+        source_index = self._source_indexes.get(source_id)
+        if source_index is None:
+            raise PlaybackBackendError(
+                f"Preview block references unknown source: {block.source_id}"
+            )
+        return source_index
+
+    def _append_inputs(
+        self,
+        command: list[str],
+        *,
+        realtime: bool,
+        input_offsets: Mapping[int, float],
+    ) -> None:
+        for index, (_source_id, path) in enumerate(self._source_items):
+            if realtime:
+                command.append("-re")
+            offset = input_offsets.get(index, 0.0)
+            if offset > 0:
+                command.extend(["-ss", f"{offset:.6f}"])
+            command.extend(["-noautorotate", "-i", str(path)])
 
     def _audio_command(
         self,
@@ -817,23 +904,21 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             "error",
             "-nostdin",
         ]
-        for _source_id, path in self._source_items:
-            if realtime:
-                command.append("-re")
-            command.extend(["-noautorotate", "-i", str(path)])
+        plan, optimized, input_offsets = self._render_plan(position_seconds)
+        self._append_inputs(
+            command,
+            realtime=realtime,
+            input_offsets=input_offsets,
+        )
         filters: list[str] = []
         audio_inputs: list[str] = []
-        for index, block in enumerate(self._blocks):
+        for index, (block, source_index, source_start, duration_value) in enumerate(plan):
             source_id = block.source_id or (
                 self._source_items[0][0] if len(self._source_items) == 1 else ""
             )
-            source_index = self._source_indexes.get(source_id)
-            if source_index is None:
-                raise PlaybackBackendError(
-                    f"Preview block references unknown source: {block.source_id}"
-                )
-            start = f"{block.start_seconds:.6f}"
-            duration = f"{block.duration_seconds:.6f}"
+            source_offset = input_offsets.get(source_index, 0.0)
+            start = f"{source_start - source_offset:.6f}"
+            duration = f"{duration_value:.6f}"
             decision = self.audio_decisions.get(source_id)
             if decision is not None and decision.get("status") == "not-applicable":
                 filters.append(
@@ -848,7 +933,7 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             audio_inputs.append(f"[a{index}]")
         filters.append(f"{''.join(audio_inputs)}concat=n={len(audio_inputs)}:v=0:a=1[outa]")
         output_options = ["-map", "[outa]"]
-        if position_seconds > 0:
+        if not optimized and position_seconds > 0:
             output_options.extend(["-ss", f"{position_seconds:.6f}"])
         output_options.extend(
             [
@@ -884,26 +969,27 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             "error",
             "-nostdin",
         ]
-        for _source_id, path in self._source_items:
-            if realtime:
-                command.append("-re")
-            command.extend(["-noautorotate", "-i", str(path)])
+        plan, optimized, input_offsets = self._render_plan(position_seconds)
+        self._append_inputs(
+            command,
+            realtime=realtime,
+            input_offsets=input_offsets,
+        )
         filters: list[str] = []
         video_inputs: list[str] = []
-        for index, block in enumerate(self._blocks):
-            source_index = self._source_indexes.get(block.source_id)
-            if source_index is None and block.source_id is None and len(self._source_items) == 1:
-                source_index = 0
-            if source_index is None:
-                raise PlaybackBackendError(
-                    f"Preview block references unknown source: {block.source_id}"
+        for index, (block, source_index, source_start, duration_value) in enumerate(plan):
+            source_offset = input_offsets.get(source_index, 0.0)
+            filters.extend(
+                segment_video_filters(
+                    f"[{source_index}:v:0]",
+                    block,
+                    self.width,
+                    self.height,
+                    f"[v{index}]",
+                    frame_rate=self.frame_rate,
+                    source_start_seconds=source_start - source_offset,
+                    source_duration_seconds=duration_value,
                 )
-            filters.append(
-                f"[{source_index}:v:0]trim=start={block.start_seconds:.6f}:"
-                f"duration={block.duration_seconds:.6f},setpts=PTS-STARTPTS,"
-                f"scale={self.width}:{self.height}:force_original_aspect_ratio=decrease,"
-                f"pad={self.width}:{self.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-                f"fps={self.frame_rate:.12g}[v{index}]"
             )
             video_inputs.append(f"[v{index}]")
         filters.append(f"{''.join(video_inputs)}concat=n={len(video_inputs)}:v=1:a=0[outv]")
@@ -915,7 +1001,7 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
                 "[outv]",
             ]
         )
-        if position_seconds > 0:
+        if not optimized and position_seconds > 0:
             command.extend(["-ss", f"{position_seconds:.6f}"])
         if frame_count is not None:
             command.extend(["-frames:v", str(frame_count)])

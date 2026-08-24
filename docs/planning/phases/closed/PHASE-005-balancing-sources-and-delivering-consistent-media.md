@@ -4,11 +4,17 @@
 **Parent links:** OBJ-001, SCOPE-001  
 **Capability links:** CAP-005, CAP-008, CAP-012  
 **Sequence:** 5  
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after FEAT-014 through FEAT-016
+completed their implementation, automated, real-media, review, user-validation,
+and local commit gates; remote checks remain unavailable and are recorded as
+an accepted warning.
 **Horizon:** future  
 **Owner:** repository planning; maintainer identity is not recorded  
 **Approval:** user-approved on 2026-08-21 before feature generation;
-implementation authorized on 2026-08-22; user validation is pending
+implementation authorized and user validation completed on 2026-08-22
+**Path history:** `phases/open/PHASE-005-balancing-sources-and-delivering-consistent-media.md`
+-> `phases/closed/PHASE-005-balancing-sources-and-delivering-consistent-media.md`
 **Feature links:** FEAT-014, FEAT-015, FEAT-016
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/planning/phases.md`,
@@ -91,9 +97,9 @@ silently recalculated per segment.
 - FEAT-016 - Synchronize media decisions across the GUI, CLI, project file,
   and verified output.
 
-The feature records and ticket contracts have been implemented on the
-dedicated PHASE-005 branch. Their evidence records are open in `verifying`
-while user validation and delivery review remain pending.
+The feature records and ticket contracts were implemented on the dedicated
+PHASE-005 branch. Their evidence records contain terminal local implementation,
+user-validation, review, and commit entries; remote checks remain unavailable.
 
 ## Planning readiness
 
@@ -104,5 +110,12 @@ while user validation and delivery review remain pending.
   protected behaviors, commands, quality gates, and user-validation plans.
 - TICKET-031 through TICKET-037 have completed implementation and automated
   verification on the dedicated branch.
-- User validation, review, and configured remote checks remain open; no ticket
-  or parent record is ready to close yet.
+- User validation, review, and local delivery are terminal. Remote checks
+  remain unavailable because no remote or upstream is configured.
+
+## Closure
+
+All PHASE-005 exit conditions are satisfied by FEAT-014 through FEAT-016 and
+TICKET-031 through TICKET-037. The local delivery checkpoint is
+`6aebb26121eb7e4088b4c3678b670038116be2be`; remote publication and provider
+checks remain unavailable as an accepted warning.

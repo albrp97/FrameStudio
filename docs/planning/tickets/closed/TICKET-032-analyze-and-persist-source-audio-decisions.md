@@ -6,7 +6,12 @@
 **Phase:** PHASE-005
 **Feature:** FEAT-014
 **Capability links:** CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after implementation, automated and
+real-media verification, review, user validation, and local delivery evidence;
+remote checks remain unavailable and are recorded as an accepted warning.
+**Path history:** `tickets/open/TICKET-032-analyze-and-persist-source-audio-decisions.md`
+-> `tickets/closed/TICKET-032-analyze-and-persist-source-audio-decisions.md`
 **Horizon:** future
 **Priority:** 2
 **Owner:** repository planning and implementation in the active worktree
@@ -101,3 +106,8 @@ project, and confirm that each source keeps one recoverable decision.
 - Per-segment automatic gain is not introduced.
 - The evidence record covers success, silence, unsupported audio, failure, and
   stale-source cases.
+
+## Closure
+
+Source-scoped analysis and persistence are complete in local delivery
+checkpoint `6aebb26121eb7e4088b4c3678b670038116be2be`.

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from .audio import pending_audio_decision
+from .composition import COMPOSITION_SCHEMA_VERSION
 from .model_timeline import SegmentTimeline
 from .model_types import (
     _TIME_EPSILON,
@@ -32,6 +33,7 @@ class Project:
     sources: tuple[SourceReference, ...] | None = None
     source_settings: dict[str, dict[str, Any]] = field(default_factory=dict)
     output_settings: dict[str, Any] = field(default_factory=dict)
+    composition_version: int = COMPOSITION_SCHEMA_VERSION
 
     @classmethod
     def create(
@@ -165,6 +167,18 @@ class Project:
         project_id = value.get("project_id")
         if not isinstance(project_id, str) or not project_id:
             raise ProjectValidationError("Project project_id must be a non-empty string")
+        composition_version = value.get(
+            "composition_version",
+            COMPOSITION_SCHEMA_VERSION,
+        )
+        if (
+            isinstance(composition_version, bool)
+            or not isinstance(composition_version, int)
+            or composition_version != COMPOSITION_SCHEMA_VERSION
+        ):
+            raise ProjectValidationError(
+                f"Unsupported composition version: {composition_version!r}"
+            )
         timeline = value.get("timeline")
         if not isinstance(timeline, Mapping):
             raise ProjectValidationError("Project timeline must be an object")
@@ -229,6 +243,7 @@ class Project:
                 sources=(source,),
                 source_settings=dict(raw_source_settings),
                 output_settings=dict(raw_output_settings),
+                composition_version=composition_version,
             )
             project.validate()
             return project
@@ -287,6 +302,7 @@ class Project:
             sources=tuple(sources),
             source_settings=dict(raw_source_settings),
             output_settings=dict(raw_output_settings),
+            composition_version=composition_version,
         )
         project.validate()
         return project
@@ -321,6 +337,10 @@ class Project:
         self.validate()
 
     def validate(self) -> None:
+        if self.composition_version != COMPOSITION_SCHEMA_VERSION:
+            raise ProjectValidationError(
+                f"Unsupported composition version: {self.composition_version!r}"
+            )
         if self.schema_version not in (ONE_SOURCE_SCHEMA_VERSION, SCHEMA_VERSION):
             raise ProjectValidationError(
                 f"Unsupported project schema version: {self.schema_version!r}"
@@ -459,6 +479,7 @@ class Project:
             segments = self.segment_timeline.segment_items
             return {
                 "schema_version": self.schema_version,
+                "composition_version": self.composition_version,
                 "project_id": self.project_id,
                 "source": self.source.to_dict(),
                 "timeline": {
@@ -473,6 +494,7 @@ class Project:
             }
         return {
             "schema_version": self.schema_version,
+            "composition_version": self.composition_version,
             "project_id": self.project_id,
             "source": self.source.to_dict(),
             "sources": [source.to_dict() for source in self.sources or ()],

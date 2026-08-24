@@ -6,15 +6,16 @@
 **Phase:** PHASE-001
 **Feature:** FEAT-002
 **Capability links:** CAP-002, CAP-012
-**Status:** verifying
-**Previous closure:** user-approved on 2026-08-22 after successful
-implementation, review evidence, and target-workstation validation; remote
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after successful implementation,
+review, target-workstation validation, and local delivery evidence; remote
 checks remain unavailable and are recorded as an accepted warning.
 **Reopened:** user-reported on 2026-08-22 after playback stopped advancing
 when Space was pressed following a timeline cursor seek.
 **Path history:** `tickets/open/TICKET-029-restore-space-playback-toggle.md`
 -> `tickets/closed/TICKET-029-restore-space-playback-toggle.md`
 -> `tickets/open/TICKET-029-restore-space-playback-toggle.md`
+-> `tickets/closed/TICKET-029-restore-space-playback-toggle.md`
 **Horizon:** first
 **Priority:** 1
 **Owner:** repository implementation in the active worktree
@@ -97,3 +98,9 @@ and source-preservation guarantees remain unchanged.
 - The ticket reaches `complete` through user-approved validation; configured
   remote delivery checks remain unavailable and are recorded as an accepted
   warning.
+
+## Closure
+
+The post-seek pacing correction, Space transport behavior, and live GTK
+validation are complete in local commit
+`6aebb26121eb7e4088b4c3678b670038116be2be`.

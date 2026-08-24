@@ -6,7 +6,12 @@
 **Phase:** PHASE-005
 **Feature:** FEAT-015
 **Capability links:** CAP-005, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after implementation, benchmark,
+review, user validation, and local delivery evidence; remote checks remain
+unavailable and are recorded as an accepted warning.
+**Path history:** `tickets/open/TICKET-034-benchmark-and-document-delivery-profiles.md`
+-> `tickets/closed/TICKET-034-benchmark-and-document-delivery-profiles.md`
 **Horizon:** future
 **Priority:** 4
 **Owner:** repository planning and implementation in the active worktree
@@ -95,3 +100,8 @@ policy.
 - Candidate outputs pass metadata, playability, and source-safety checks.
 - The selected policy is approved before routing implementation begins.
 - No universal performance claim is made from local benchmark evidence.
+
+## Closure
+
+Delivery profiles and workstation-specific limitations are documented in local
+delivery checkpoint `6aebb26121eb7e4088b4c3678b670038116be2be`.

@@ -39,12 +39,18 @@ def validate_timeline(timeline: TimelineValidationTarget) -> None:
     if segments is None or not segments:
         raise ProjectValidationError("Segment timeline must contain at least one segment")
     seen_ids: set[str] = set()
+    seen_group_ids: set[str] = set()
     for index, segment in enumerate(segments):
         if not isinstance(segment, Segment):
             raise ProjectValidationError(f"Segment at index {index} must be a Segment")
         if segment.segment_id in seen_ids:
             raise ProjectValidationError(f"Duplicate segment_id: {segment.segment_id}")
         seen_ids.add(segment.segment_id)
+        if segment.triplicate is not None:
+            group_id = segment.triplicate.group_id
+            if group_id in seen_group_ids:
+                raise ProjectValidationError(f"Duplicate triplicate group_id: {group_id}")
+            seen_group_ids.add(group_id)
         if segment.start_seconds < 0 or segment.end_seconds > timeline.source_duration_seconds:
             raise ProjectValidationError(
                 f"Segment {segment.segment_id} is outside the source duration"
@@ -149,6 +155,7 @@ def validate_mixed_timeline(timeline: TimelineValidationTarget) -> None:
         except (TypeError, ValueError, ZeroDivisionError):
             raise ProjectValidationError("Timeline frame rate must be a positive rate") from None
     seen_ids: set[str] = set()
+    seen_group_ids: set[str] = set()
     previous_end = 0.0
     maximum_end = 0.0
     for index, segment in enumerate(segments):
@@ -157,6 +164,11 @@ def validate_mixed_timeline(timeline: TimelineValidationTarget) -> None:
         if segment.segment_id in seen_ids:
             raise ProjectValidationError(f"Duplicate segment_id: {segment.segment_id}")
         seen_ids.add(segment.segment_id)
+        if segment.triplicate is not None:
+            group_id = segment.triplicate.group_id
+            if group_id in seen_group_ids:
+                raise ProjectValidationError(f"Duplicate triplicate group_id: {group_id}")
+            seen_group_ids.add(group_id)
         if segment.source_id is None:
             raise ProjectValidationError(f"Timeline block {segment.segment_id} needs a source_id")
         timeline_start = segment.timeline_start

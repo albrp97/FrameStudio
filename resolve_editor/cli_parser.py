@@ -110,6 +110,81 @@ def build_cli_parser() -> argparse.ArgumentParser:
     paste_parser.add_argument("--output", type=Path)
     paste_parser.add_argument("--full-paths", action="store_true")
 
+    focus_parser = commands.add_parser(
+        "focus",
+        aliases=("set-focus",),
+        help="apply a shared visual focus transform to one or more segments",
+    )
+    focus_parser.add_argument("project", type=Path)
+    focus_parser.add_argument(
+        "--segment",
+        dest="segments",
+        action="append",
+        required=True,
+    )
+    focus_parser.add_argument("--zoom", type=float, default=1.0)
+    focus_parser.add_argument("--offset-x", "--x", dest="offset_x", type=float, default=0.0)
+    focus_parser.add_argument("--offset-y", "--y", dest="offset_y", type=float, default=0.0)
+    focus_parser.add_argument("--output", type=Path)
+    focus_parser.add_argument("--full-paths", action="store_true")
+
+    clean_focus_parser = commands.add_parser(
+        "clean-focus",
+        aliases=("clean-modifications",),
+        help="reset visual focus and triplicate state for selected segments",
+    )
+    clean_focus_parser.add_argument("project", type=Path)
+    clean_focus_parser.add_argument(
+        "--segment",
+        dest="segments",
+        action="append",
+        required=True,
+    )
+    clean_focus_parser.add_argument("--output", type=Path)
+    clean_focus_parser.add_argument("--full-paths", action="store_true")
+
+    copy_focus_parser = commands.add_parser(
+        "copy-focus",
+        help="copy one segment's visual focus values to other segments",
+    )
+    copy_focus_parser.add_argument("project", type=Path)
+    copy_focus_parser.add_argument("--source-segment", required=True)
+    copy_focus_parser.add_argument(
+        "--segment",
+        dest="segments",
+        action="append",
+        required=True,
+    )
+    copy_focus_parser.add_argument("--output", type=Path)
+    copy_focus_parser.add_argument("--full-paths", action="store_true")
+
+    for command, aliases, help_text in (
+        (
+            "triplicate-enable",
+            ("enable-triplicate",),
+            "enable linked center, left, and right composition instances",
+        ),
+        (
+            "triplicate-disable",
+            ("disable-triplicate",),
+            "disable linked triplicate composition instances",
+        ),
+    ):
+        triplicate_parser = commands.add_parser(
+            command,
+            aliases=aliases,
+            help=help_text,
+        )
+        triplicate_parser.add_argument("project", type=Path)
+        triplicate_parser.add_argument(
+            "--segment",
+            dest="segments",
+            action="append",
+            required=True,
+        )
+        triplicate_parser.add_argument("--output", type=Path)
+        triplicate_parser.add_argument("--full-paths", action="store_true")
+
     relink_parser = commands.add_parser(
         "relink",
         help="relink a source identity to a replacement local file",

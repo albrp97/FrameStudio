@@ -3,12 +3,16 @@
 **Feature ID:** FEAT-015
 **Parent links:** OBJ-001, SCOPE-001, PHASE-005
 **Capability links:** CAP-005, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after TICKET-034 and TICKET-035
+passed implementation, automated, real-media, review, user-validation, and
+local delivery gates; remote checks remain unavailable and are recorded as an
+accepted warning.
 **Horizon:** future
 **Priority:** 2
 **Owner:** repository planning and implementation in the active worktree
-**Approval:** user-authorized on 2026-08-22 to implement the approved
-PHASE-005 ticket set; user validation is pending
+**Approval:** user-authorized on 2026-08-22 to implement and close the
+approved PHASE-005 ticket set after validation
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`,
 `docs/specs/future-product-direction.md`,
@@ -20,9 +24,11 @@ established render profile; source-level audio policy from FEAT-014
 can invalidate stream copy, and a fast command can still produce unsafe media
 **Affected surfaces:** delivery benchmarks, export planning, FFmpeg execution,
 output verification, progress reporting, GUI, CLI, and documentation
-**Evidence path:** `evidence/phase-005-delivery-routes.md`
+**Evidence path:** `evidence/phase-005-delivery-profiles.md`
 **Planned tickets:** TICKET-034, TICKET-035
 **Last updated:** 2026-08-22
+**Path history:** `features/open/FEAT-015-selecting-tested-delivery-routes.md`
+-> `features/closed/FEAT-015-selecting-tested-delivery-routes.md`
 
 ## Outcome
 
@@ -83,3 +89,9 @@ approved source-level audio policy requires a documented fallback.
 - Output verification and source safety remain enforced.
 - Automated, real-media, GUI/CLI, and user-validation evidence covers the
   feature outcome.
+
+## Closure
+
+TICKET-034 and TICKET-035 satisfy the tested delivery-route outcome. The
+reviewed local delivery checkpoint is
+`6aebb26121eb7e4088b4c3678b670038116be2be`; remote checks remain unavailable.

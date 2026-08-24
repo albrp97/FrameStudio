@@ -24,7 +24,7 @@ stream-copy eligibility, invalid fallback output, fixed-canvas scaling cost,
 and hardware-specific rendering behavior
 **Affected surfaces:** playback/composition preview, output-profile policy,
 export planner/executor, validation, persistence, CLI, GUI, and tests
-**Evidence path:** `evidence/phase-004-mixed-source-preview-export.md`
+**Evidence path:** `evidence/phase-004-mixed-source-preview.md`
 **Planned tickets:** TICKET-024, TICKET-025, TICKET-026, TICKET-027
 
 ## Outcome

@@ -7,6 +7,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .composition import (
+    TriplicateGroup,
+    VisualTransform,
+    coerce_legacy_transform,
+)
+
 LEGACY_SCHEMA_VERSION = 1
 ONE_SOURCE_SCHEMA_VERSION = 2
 SCHEMA_VERSION = 3
@@ -244,6 +250,8 @@ class Segment:
     state: dict[str, Any] = field(default_factory=dict)
     block_id: str | None = None
     color_index: int | None = None
+    visual_transform: VisualTransform = field(default_factory=VisualTransform)
+    triplicate: TriplicateGroup | None = None
     _color_index_explicit: bool = field(default=False, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -272,6 +280,22 @@ class Segment:
                 raise ProjectValidationError("Segment timeline bounds are invalid")
         if not isinstance(self.state, Mapping):
             raise ProjectValidationError("Segment state must be an object")
+        if not isinstance(self.visual_transform, VisualTransform):
+            raise ProjectValidationError("Segment visual transform is invalid")
+        if self.triplicate is not None and not isinstance(self.triplicate, TriplicateGroup):
+            raise ProjectValidationError("Segment triplicate group is invalid")
+        state = deepcopy(dict(self.state))
+        visual_transform = self.visual_transform
+        try:
+            if visual_transform.is_default:
+                visual_transform = coerce_legacy_transform(state)
+        except ValueError as error:
+            raise ProjectValidationError(str(error)) from error
+        triplicate = self.triplicate
+        if triplicate is not None and triplicate.shared_transform != visual_transform:
+            raise ProjectValidationError(
+                "Segment triplicate transform must match its visual transform"
+            )
         if self.block_id is not None and (not isinstance(self.block_id, str) or not self.block_id):
             raise ProjectValidationError("Segment block_id must be a non-empty string")
         color_index = self.color_index
@@ -286,8 +310,10 @@ class Segment:
         object.__setattr__(self, "end_seconds", end)
         object.__setattr__(self, "timeline_start_seconds", timeline_start)
         object.__setattr__(self, "timeline_end_seconds", timeline_end)
-        object.__setattr__(self, "state", deepcopy(dict(self.state)))
+        object.__setattr__(self, "state", state)
         object.__setattr__(self, "color_index", color_index)
+        object.__setattr__(self, "visual_transform", visual_transform)
+        object.__setattr__(self, "triplicate", triplicate)
         object.__setattr__(self, "_color_index_explicit", color_index_explicit)
 
     @classmethod
@@ -304,6 +330,8 @@ class Segment:
         state: Mapping[str, Any] | None = None,
         block_id: str | None = None,
         color_index: int | None = None,
+        visual_transform: VisualTransform | None = None,
+        triplicate: TriplicateGroup | None = None,
     ) -> Segment:
         return cls(
             segment_id=segment_id or uuid.uuid4().hex,
@@ -316,6 +344,8 @@ class Segment:
             state={} if state is None else dict(state),
             block_id=block_id,
             color_index=color_index,
+            visual_transform=(VisualTransform() if visual_transform is None else visual_transform),
+            triplicate=triplicate,
         )
 
     @property
@@ -352,6 +382,9 @@ class Segment:
             value["block_id"] = self.block_id
         if self.color_index is not None:
             value["color_index"] = self.color_index
+        value["visual_transform"] = self.visual_transform.to_dict()
+        if self.triplicate is not None:
+            value["triplicate"] = self.triplicate.to_dict()
         return value
 
     @classmethod
@@ -368,6 +401,8 @@ class Segment:
         state = value.get("state", {})
         block_id = value.get("block_id")
         color_index = value.get("color_index")
+        visual_transform_value = value.get("visual_transform")
+        triplicate_value = value.get("triplicate")
         if not isinstance(segment_id, str) or not segment_id:
             raise ProjectValidationError("Project segment_id must be a non-empty string")
         if not isinstance(start_seconds, (int, float)) or isinstance(start_seconds, bool):
@@ -398,6 +433,13 @@ class Segment:
             raise ProjectValidationError(
                 "Project segment color_index must be a non-negative integer"
             )
+        try:
+            visual_transform = VisualTransform.from_dict(visual_transform_value)
+            triplicate = (
+                None if triplicate_value is None else TriplicateGroup.from_dict(triplicate_value)
+            )
+        except (TypeError, ValueError) as error:
+            raise ProjectValidationError(str(error)) from error
         return cls(
             segment_id=segment_id,
             start_seconds=float(start_seconds),
@@ -413,6 +455,8 @@ class Segment:
             state=dict(state),
             block_id=block_id,
             color_index=color_index,
+            visual_transform=visual_transform,
+            triplicate=triplicate,
         )
 
     def clone(
@@ -440,6 +484,8 @@ class Segment:
             state=deepcopy(self.state),
             block_id=(segment_id if new_id else self.block_id),
             color_index=self.color_index,
+            visual_transform=self.visual_transform,
+            triplicate=(None if self.triplicate is None else self.triplicate.clone(new_id=new_id)),
         )
 
     def with_color_index(self, color_index: int) -> Segment:
@@ -454,6 +500,52 @@ class Segment:
             state=self.state,
             block_id=self.block_id,
             color_index=color_index,
+            visual_transform=self.visual_transform,
+            triplicate=self.triplicate,
+        )
+
+    def with_visual_transform(self, visual_transform: VisualTransform) -> Segment:
+        triplicate = (
+            None if self.triplicate is None else self.triplicate.with_transform(visual_transform)
+        )
+        return Segment(
+            segment_id=self.segment_id,
+            start_seconds=self.start_seconds,
+            end_seconds=self.end_seconds,
+            deleted=self.deleted,
+            source_id=self.source_id,
+            timeline_start_seconds=self.timeline_start_seconds,
+            timeline_end_seconds=self.timeline_end_seconds,
+            state=self.state,
+            block_id=self.block_id,
+            color_index=self.color_index,
+            visual_transform=visual_transform,
+            triplicate=triplicate,
+        )
+
+    def with_triplicate(self, triplicate: TriplicateGroup | None) -> Segment:
+        visual_transform = (
+            self.visual_transform if triplicate is None else triplicate.shared_transform
+        )
+        return Segment(
+            segment_id=self.segment_id,
+            start_seconds=self.start_seconds,
+            end_seconds=self.end_seconds,
+            deleted=self.deleted,
+            source_id=self.source_id,
+            timeline_start_seconds=self.timeline_start_seconds,
+            timeline_end_seconds=self.timeline_end_seconds,
+            state=self.state,
+            block_id=self.block_id,
+            color_index=self.color_index,
+            visual_transform=visual_transform,
+            triplicate=triplicate,
+        )
+
+    @property
+    def has_visual_modifications(self) -> bool:
+        return not self.visual_transform.is_default or (
+            self.triplicate is not None and self.triplicate.enabled
         )
 
     @property

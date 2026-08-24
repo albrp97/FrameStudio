@@ -24,7 +24,7 @@ duplicate block identities, lost segment-owned state, selection errors, and
 inconsistent GUI/CLI edits
 **Affected surfaces:** timeline model, segment operations, selection state,
 playback navigation, GUI, CLI, persistence, and tests
-**Evidence path:** `evidence/phase-004-mixed-source-timeline.md`
+**Evidence path:** `evidence/phase-004-mixed-source-movement.md`
 **Planned tickets:** TICKET-020, TICKET-021, TICKET-022, TICKET-023
 
 ## Outcome

@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Callable, TextIO
 
 from .cli_export import handle_export, progress_payload
 from .cli_parser import JsonArgumentParser, build_cli_parser
@@ -37,9 +37,14 @@ from .media import MediaProbeError, probe_media
 from .model import Project, ProjectValidationError, Segment
 from .operations import (
     analyze_project_audio,
+    apply_visual_transform,
+    clean_visual_modifications,
     copy_segments,
+    copy_visual_transform,
     create_project_from_source,
     create_project_from_sources,
+    disable_triplicate,
+    enable_triplicate,
     move_segment,
     move_segments,
     paste_segments,
@@ -338,6 +343,113 @@ def _handle_paste(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def _handle_focus(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    try:
+        transform = apply_visual_transform(
+            project,
+            args.segments,
+            zoom=args.zoom,
+            offset_x=args.offset_x,
+            offset_y=args.offset_y,
+        )
+    except ProjectValidationError as error:
+        raise CliError(
+            "invalid_operation",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "focus",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "segment_ids": list(args.segments),
+            "visual_transform": transform.to_dict(),
+        },
+    )
+
+
+def _handle_clean_focus(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    try:
+        clean_visual_modifications(project, args.segments)
+    except ProjectValidationError as error:
+        raise CliError(
+            "invalid_operation",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "clean-focus",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "segment_ids": list(args.segments),
+            "cleaned": True,
+        },
+    )
+
+
+def _handle_copy_focus(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    try:
+        transform = copy_visual_transform(
+            project,
+            args.source_segment,
+            args.segments,
+        )
+    except ProjectValidationError as error:
+        raise CliError(
+            "invalid_operation",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "copy-focus",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "source_segment_id": args.source_segment,
+            "destination_segment_ids": list(args.segments),
+            "visual_transform": transform.to_dict(),
+        },
+    )
+
+
+def _handle_triplicate(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    enabled = args.command in {"triplicate-enable", "enable-triplicate"}
+    try:
+        if enabled:
+            enable_triplicate(project, args.segments)
+        else:
+            disable_triplicate(project, args.segments)
+    except ProjectValidationError as error:
+        raise CliError(
+            "invalid_operation",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "triplicate-enable" if enabled else "triplicate-disable",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "segment_ids": list(args.segments),
+            "enabled": enabled,
+        },
+    )
+
+
 def _handle_relink(args: argparse.Namespace) -> dict[str, Any]:
     project = _load_project_for_cli(
         args.project,
@@ -489,40 +601,45 @@ def _handle_inspect(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
-    if args.command == "inspect":
-        return _handle_inspect(args)
-    if args.command == "import":
-        return _handle_import(args)
-    if args.command == "analyze-audio":
-        return _handle_analyze_audio(args)
-    if args.command == "move":
-        return _handle_move(args)
-    if args.command == "copy":
-        return _handle_copy(args)
-    if args.command == "paste":
-        return _handle_paste(args)
-    if args.command == "relink":
-        return _handle_relink(args)
-    if args.command in {"open", "reopen"}:
-        return _handle_open(args)
-    if args.command == "split":
-        return _handle_split(args)
-    if args.command in {"delete", "restore", "toggle-delete"}:
-        return _handle_deletion(args)
-    if args.command == "duration":
-        return _handle_duration(args)
-    if args.command == "save":
-        return _handle_save(args)
+    handlers: dict[str, Callable[[argparse.Namespace], dict[str, Any]]] = {
+        "inspect": _handle_inspect,
+        "import": _handle_import,
+        "analyze-audio": _handle_analyze_audio,
+        "move": _handle_move,
+        "copy": _handle_copy,
+        "paste": _handle_paste,
+        "focus": _handle_focus,
+        "set-focus": _handle_focus,
+        "clean-focus": _handle_clean_focus,
+        "clean-modifications": _handle_clean_focus,
+        "copy-focus": _handle_copy_focus,
+        "triplicate-enable": _handle_triplicate,
+        "enable-triplicate": _handle_triplicate,
+        "triplicate-disable": _handle_triplicate,
+        "disable-triplicate": _handle_triplicate,
+        "relink": _handle_relink,
+        "open": _handle_open,
+        "reopen": _handle_open,
+        "split": _handle_split,
+        "delete": _handle_deletion,
+        "restore": _handle_deletion,
+        "toggle-delete": _handle_deletion,
+        "duration": _handle_duration,
+        "save": _handle_save,
+    }
     if args.command == "export":
         raise CliError(
             "internal_error",
             "Export output stream was not provided",
             exit_code=CLI_EXIT_OPERATION,
         )
-    raise CliError(
-        "unsupported_command",
-        f"Command is not implemented: {args.command}",
-    )
+    handler = handlers.get(args.command)
+    if handler is None:
+        raise CliError(
+            "unsupported_command",
+            f"Command is not implemented: {args.command}",
+        )
+    return handler(args)
 
 
 def _write_json(stream: TextIO, payload: dict[str, Any]) -> None:

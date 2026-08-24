@@ -6,7 +6,12 @@
 **Phase:** PHASE-005
 **Feature:** FEAT-016
 **Capability links:** CAP-005, CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after implementation, automated and
+real-media verification, review, user validation, and local delivery evidence;
+remote checks remain unavailable and are recorded as an accepted warning.
+**Path history:** `tickets/open/TICKET-036-expose-synchronized-media-decisions.md`
+-> `tickets/closed/TICKET-036-expose-synchronized-media-decisions.md`
 **Horizon:** future
 **Priority:** 6
 **Owner:** repository planning and implementation in the active worktree
@@ -94,3 +99,8 @@ verification status match without segment-level ambiguity.
 - Success, pending, fallback, and failure states are explicit and tested.
 - CLI and GUI evidence demonstrates parity.
 - No source media or established project compatibility is broken.
+
+## Closure
+
+GUI, CLI, and project-state synchronization is complete in local delivery
+checkpoint `6aebb26121eb7e4088b4c3678b670038116be2be`.

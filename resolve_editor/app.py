@@ -49,8 +49,10 @@ from .app_playback import (
     finish_smoke_test,
     handle_backend_end,
     handle_backend_error,
+    handle_backend_warning,
     on_backend_end,
     on_backend_error,
+    on_backend_warning,
     on_close_request,
     on_frame,
     on_key_pressed,
@@ -78,11 +80,16 @@ from .app_timeline_actions import (
     copy_selected_segments,
     fit_timeline_zoom,
     move_selected_segments,
+    on_apply_focus_clicked,
+    on_clean_visual_clicked,
+    on_copy_focus_clicked,
     on_delete_segment_clicked,
+    on_focus_control_changed,
     on_split_clicked,
     on_timeline_segment_selected,
     on_timeline_selection_changed,
     on_timeline_viewport_changed,
+    on_triplicate_clicked,
     paste_selected_segments,
     update_segment_controls,
     update_selected_clip_label,
@@ -173,6 +180,8 @@ def run_gui(
             self._segment_clipboard: tuple[Segment, ...] = ()
             self.source_frame_rate = 30.0
             self._export_in_progress = False
+            self._updating_focus_controls = False
+            self._playback_generation = 0
             self._smoke_test = smoke_test
             self._smoke_project_path = smoke_project_path
             self._build_ui()
@@ -366,6 +375,21 @@ def run_gui(
         def _on_split_clicked(self, _button) -> None:
             on_split_clicked(self, _button)
 
+        def _on_apply_focus_clicked(self, _button) -> None:
+            on_apply_focus_clicked(self, _button)
+
+        def _on_focus_control_changed(self, _control) -> None:
+            on_focus_control_changed(self, _control)
+
+        def _on_clean_visual_clicked(self, _button) -> None:
+            on_clean_visual_clicked(self, _button)
+
+        def _on_copy_focus_clicked(self, _button) -> None:
+            on_copy_focus_clicked(self, _button)
+
+        def _on_triplicate_clicked(self, _button) -> None:
+            on_triplicate_clicked(self, _button)
+
         def _on_delete_segment_clicked(self, _button) -> None:
             on_delete_segment_clicked(self, _button)
 
@@ -426,17 +450,31 @@ def run_gui(
         def _deliver_latest_frame(self) -> bool:
             return deliver_latest_frame(self, Gdk, GLib)
 
-        def _on_backend_error(self, message: str) -> None:
-            on_backend_error(self, message, GLib)
+        def _on_backend_error(self, message: str, generation: int | None = None) -> None:
+            on_backend_error(self, message, GLib, generation)
 
-        def _handle_backend_error(self, message: str) -> bool:
-            return handle_backend_error(self, message)
+        def _handle_backend_warning(
+            self,
+            message: str,
+            generation: int | None = None,
+        ) -> bool:
+            return handle_backend_warning(self, message, generation)
 
-        def _on_backend_end(self) -> None:
-            on_backend_end(self, GLib)
+        def _on_backend_warning(self, message: str, generation: int | None = None) -> None:
+            on_backend_warning(self, message, GLib, generation)
 
-        def _handle_backend_end(self) -> bool:
-            return handle_backend_end(self)
+        def _handle_backend_error(
+            self,
+            message: str,
+            generation: int | None = None,
+        ) -> bool:
+            return handle_backend_error(self, message, generation)
+
+        def _on_backend_end(self, generation: int | None = None) -> None:
+            on_backend_end(self, GLib, generation)
+
+        def _handle_backend_end(self, generation: int | None = None) -> bool:
+            return handle_backend_end(self, generation)
 
         def _on_close_request(self, _window) -> bool:
             return on_close_request(self, _window)

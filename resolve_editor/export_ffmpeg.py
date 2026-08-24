@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .audio import AudioDecision, audio_filter
+from .composition_render import segment_video_filters
 from .export_process import (
     emit_export_progress,
     expected_export_frames,
@@ -199,15 +200,19 @@ def fallback_filter(
     for index, segment in enumerate(segments):
         start = f"{segment.start_seconds:.6f}"
         end = f"{segment.end_seconds:.6f}"
-        video_filter = f"[0:v]trim=start={start}:end={end},setpts=PTS-STARTPTS"
         if output_policy is not None:
-            video_filter += (
-                f",scale={output_policy.width}:{output_policy.height}:"
-                "force_original_aspect_ratio=decrease,"
-                f"pad={output_policy.width}:{output_policy.height}:(ow-iw)/2:(oh-ih)/2,"
-                "setsar=1"
+            filters.extend(
+                segment_video_filters(
+                    "[0:v:0]",
+                    segment,
+                    output_policy.width,
+                    output_policy.height,
+                    f"[v{index}]",
+                    frame_rate=output_policy.frame_rate,
+                )
             )
-        filters.append(f"{video_filter}[v{index}]")
+        else:
+            filters.append(f"[0:v:0]trim=start={start}:end={end},setpts=PTS-STARTPTS[v{index}]")
         if has_audio:
             filters.append(
                 f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS,"
@@ -245,12 +250,15 @@ def mixed_fallback_filter(
             )
         start = f"{segment.start_seconds:.6f}"
         duration = f"{segment.duration_seconds:.6f}"
-        filters.append(
-            f"[{source_index}:v:0]trim=start={start}:duration={duration},"
-            f"setpts=PTS-STARTPTS,scale={policy.width}:{policy.height}:"
-            "force_original_aspect_ratio=decrease,"
-            f"pad={policy.width}:{policy.height}:(ow-iw)/2:(oh-ih)/2,"
-            f"setsar=1,fps={target_rate}[v{index}]"
+        filters.extend(
+            segment_video_filters(
+                f"[{source_index}:v:0]",
+                segment,
+                policy.width,
+                policy.height,
+                f"[v{index}]",
+                frame_rate=target_rate,
+            )
         )
         video_inputs.append(f"[v{index}]")
         if policy.audio_stream_present:

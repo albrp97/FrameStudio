@@ -3,8 +3,8 @@
 **Feature:** FEAT-016
 **Phase:** PHASE-005
 **Branch:** `ticket/phase-005-source-audio-delivery`
-**Evidence status:** verifying; technical evidence is terminal and user
-validation is required before closure
+**Evidence status:** complete; technical evidence, user validation, review,
+and local delivery are terminal
 **Recorded:** 2026-08-22
 
 ## Evidence entries
@@ -131,3 +131,42 @@ PHASE-005 has terminal implementation, automated, real-media, review, and
 user-validation evidence. It remains in `verifying` until the local commit
 and configured delivery operations are completed. Remote checks are
 unavailable because no upstream is configured.
+
+### E-037-008 - Local commit
+
+- **Category:** commit
+- **Requirement:** Create one auditable local checkpoint for the reviewed
+  PHASE-005 scope.
+- **Observed:** Commit `6aebb26121eb7e4088b4c3678b670038116be2be`
+  (`feat(editor): deliver balanced media`) was created on
+  `ticket/phase-005-source-audio-delivery` with the reviewed 60-file scope.
+- **Status:** passedWithConcerns
+- **Accepted warning:** No remote or upstream is configured, so publication,
+  provider checks, and PR parity remain unavailable.
+
+## Readiness (superseding E-037-001 through E-037-008)
+
+PHASE-005 has a reviewed local commit with terminal implementation,
+automated, real-media, review, and user-validation evidence. It remains in
+`verifying` pending configured publication and any required provider-side
+checks; no remote or upstream is currently configured.
+
+### E-037-009 - Phase closure
+
+- **Category:** closure
+- **Requirement:** Close PHASE-005 and its completed feature and ticket
+  records after the requested validation, review, and commit.
+- **Observed:** FEAT-014 through FEAT-016 and TICKET-031 through TICKET-037
+  have terminal local evidence. The user explicitly requested moving completed
+  phases and features to `closed`; local delivery checkpoint
+  `6aebb26121eb7e4088b4c3678b670038116be2be` is recorded.
+- **Status:** completeWithWarning
+- **Accepted warning:** No remote or upstream is configured, so publication
+  and provider-side checks remain unavailable.
+
+## Readiness (superseding E-037-001 through E-037-009)
+
+PHASE-005 is complete for local delivery and approved closure. Its phase,
+feature, and ticket records are moved to the configured `closed` directories.
+Remote publication and provider-side checks remain unavailable because no
+remote or upstream is configured.

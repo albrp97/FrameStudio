@@ -52,6 +52,8 @@ def segment_payload(segment: Segment) -> dict[str, Any]:
         "state": dict(segment.state),
         "block_id": segment.block_id,
         "color_index": segment.color_index,
+        "visual_transform": segment.visual_transform.to_dict(),
+        "triplicate": (None if segment.triplicate is None else segment.triplicate.to_dict()),
     }
 
 

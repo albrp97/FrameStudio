@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .app_helpers import KEY_BINDINGS
+from .composition import MAX_OFFSET_X, MAX_OFFSET_Y, MAX_ZOOM, MIN_ZOOM
 from .timeline import create_timeline_canvas
 
 
@@ -58,6 +59,75 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     window.position_label = Gtk.Label(label="00:00")
     window.position_label.set_tooltip_text("Current source position")
     controls.append(window.position_label)
+
+    composition_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    composition_controls.append(Gtk.Label(label="Focus", xalign=0.0))
+
+    zoom_adjustment = Gtk.Adjustment.new(
+        MIN_ZOOM,
+        MIN_ZOOM,
+        MAX_ZOOM,
+        0.1,
+        1.0,
+        0.0,
+    )
+    window.focus_zoom_spin = Gtk.SpinButton.new(zoom_adjustment, 0.1, 2)
+    window.focus_zoom_spin.set_tooltip_text("Selected clip zoom (1.00x to 8.00x)")
+    window.focus_zoom_spin.connect("value-changed", window._on_focus_control_changed)
+    composition_controls.append(Gtk.Label(label="Zoom"))
+    composition_controls.append(window.focus_zoom_spin)
+
+    offset_x_adjustment = Gtk.Adjustment.new(
+        0.0,
+        -MAX_OFFSET_X,
+        MAX_OFFSET_X,
+        10.0,
+        100.0,
+        0.0,
+    )
+    window.focus_offset_x_spin = Gtk.SpinButton.new(offset_x_adjustment, 10.0, 0)
+    window.focus_offset_x_spin.set_tooltip_text("Selected clip horizontal focus offset")
+    window.focus_offset_x_spin.connect("value-changed", window._on_focus_control_changed)
+    composition_controls.append(Gtk.Label(label="X"))
+    composition_controls.append(window.focus_offset_x_spin)
+
+    offset_y_adjustment = Gtk.Adjustment.new(
+        0.0,
+        -MAX_OFFSET_Y,
+        MAX_OFFSET_Y,
+        10.0,
+        100.0,
+        0.0,
+    )
+    window.focus_offset_y_spin = Gtk.SpinButton.new(offset_y_adjustment, 10.0, 0)
+    window.focus_offset_y_spin.set_tooltip_text("Selected clip vertical focus offset")
+    window.focus_offset_y_spin.connect("value-changed", window._on_focus_control_changed)
+    composition_controls.append(Gtk.Label(label="Y"))
+    composition_controls.append(window.focus_offset_y_spin)
+
+    copy_focus = Gtk.Button(label="Copy to selection")
+    copy_focus.set_tooltip_text(
+        "Copy the primary selected clip's focus to the other selected clips"
+    )
+    copy_focus.connect("clicked", window._on_copy_focus_clicked)
+    composition_controls.append(copy_focus)
+    window.copy_focus_button = copy_focus
+
+    clean_focus = Gtk.Button(label="Clean modifications")
+    clean_focus.set_tooltip_text("Reset focus and triplicate settings on the selected clips")
+    clean_focus.connect("clicked", window._on_clean_visual_clicked)
+    composition_controls.append(clean_focus)
+    window.clean_focus_button = clean_focus
+
+    triplicate = Gtk.Button(label="Enable triplicate")
+    triplicate.set_tooltip_text(
+        "Render the selected clips as linked left, center, and right copies"
+    )
+    triplicate.connect("clicked", window._on_triplicate_clicked)
+    composition_controls.append(triplicate)
+    window.triplicate_button = triplicate
+
+    root.append(composition_controls)
 
     timeline_frame = Gtk.Frame()
     timeline_frame.set_label("Timeline / clips")

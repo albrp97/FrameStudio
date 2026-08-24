@@ -6,7 +6,12 @@
 **Phase:** PHASE-005
 **Feature:** FEAT-014
 **Capability links:** CAP-005, CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after implementation, automated and
+real-media verification, review, user validation, and local delivery evidence;
+remote checks remain unavailable and are recorded as an accepted warning.
+**Path history:** `tickets/open/TICKET-033-apply-source-audio-decisions-consistently.md`
+-> `tickets/closed/TICKET-033-apply-source-audio-decisions-consistently.md`
 **Horizon:** future
 **Priority:** 3
 **Owner:** repository planning and implementation in the active worktree
@@ -28,7 +33,7 @@ could apply different decisions, and segment-level processing could drift
 from source-level intent
 **Affected surfaces:** preview audio path, export filters, timing and channel
 handling, progress/verification, GUI, CLI, tests, and evidence
-**Evidence path:** `evidence/phase-005-source-audio-application.md`
+**Evidence path:** `evidence/phase-005-audio-application.md`
 **Protected behaviors:** fixed output canvas, current timing, source
 preservation, atomic publication, output verification, and existing
 stream-copy eligibility rules remain intact
@@ -99,3 +104,8 @@ decision without changing duration or source files.
   safety.
 - Route changes are explicit and verified.
 - Automated, real-media, GUI/CLI, and user-listening evidence is recorded.
+
+## Closure
+
+Preview and export apply source-level decisions consistently in local delivery
+checkpoint `6aebb26121eb7e4088b4c3678b670038116be2be`.

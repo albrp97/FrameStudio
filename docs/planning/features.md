@@ -28,26 +28,27 @@ normalization, visual-modification authoring, triplicate composition, or FPS
 work. The PHASE-004A section adds the approved architecture-stabilization
 feature that must complete before those future product phases.
 The PHASE-005 section decomposes the approved source-level audio and
-delivery-policy outcome into features whose implementation is complete and
-awaiting user validation and delivery review. This file does not create
-implementation work or architecture decisions.
+delivery-policy outcome into features that are now complete and closed after
+user validation and delivery review. The PHASE-006 section below decomposes the approved focus and composition
+outcome into feature records that are now complete and closed after user
+validation, review, and local delivery.
+This file does not create implementation work or architecture decisions.
 
 ## Phase and scope boundary
 
-PHASE-002 through PHASE-004 are complete and closed after user-approved
-implementation. PHASE-001 is verifying again for a timeline playback pacing
-correction. The first-horizon boundary remains one source video per project
-for PHASE-001 through PHASE-003. PHASE-004 delivered the approved
-mixed-source expansion; triplicate composition and FPS enhancement remain
-assigned to future phases. PHASE-005 is verifying;
-PHASE-006 and PHASE-007 remain confirmed future phases.
+PHASE-001 through PHASE-005 and PHASE-004A are complete and closed after
+user-approved implementation and terminal local evidence. The first-horizon
+boundary remains one source video per project for PHASE-001 through PHASE-003.
+PHASE-004 delivered the approved mixed-source expansion and PHASE-006
+completed the approved focus and triplicate composition work. FPS enhancement
+remains assigned to PHASE-007.
 
 ## Feature summary
 
 | ID | Outcome | Capability links | Dependencies | Status |
 |---|---|---|---|---|
 | FEAT-001 | Open a supported source as a non-destructive project | CAP-001, CAP-012 | PHASE-001 entry decisions; FFmpeg/ffprobe | complete |
-| FEAT-002 | Control playback and navigate the source timeline | CAP-002, CAP-012 | FEAT-001; selected playback/runtime approach | verifying |
+| FEAT-002 | Control playback and navigate the source timeline | CAP-002, CAP-012 | FEAT-001; selected playback/runtime approach | complete |
 | FEAT-003 | Save and reopen the source edit foundation | CAP-004, CAP-012 | FEAT-001; initial project schema and relinking policy | complete |
 
 ## Capability coverage
@@ -67,7 +68,7 @@ features are closed; future feature work remains open in its assigned phase.
 | ID | Status | Parent links | Current path |
 |---|---|---|---|
 | FEAT-001 | complete | OBJ-001, SCOPE-001, PHASE-001 | `features/closed/FEAT-001-opening-a-supported-source-as-a-non-destructive-project.md` |
-| FEAT-002 | verifying | OBJ-001, SCOPE-001, PHASE-001 | `features/open/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md` |
+| FEAT-002 | complete | OBJ-001, SCOPE-001, PHASE-001 | `features/closed/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md` |
 | FEAT-003 | complete | OBJ-001, SCOPE-001, PHASE-001 | `features/closed/FEAT-003-saving-and-reopening-the-source-edit-foundation.md` |
 | FEAT-004 | complete | OBJ-001, SCOPE-001, PHASE-002 | `features/closed/FEAT-004-removing-unwanted-portions-from-one-source.md` |
 | FEAT-005 | complete | OBJ-001, SCOPE-001, PHASE-002 | `features/closed/FEAT-005-exporting-a-verified-edited-video.md` |
@@ -79,9 +80,12 @@ features are closed; future feature work remains open in its assigned phase.
 | FEAT-011 | complete | OBJ-001, SCOPE-001, PHASE-004 | `features/closed/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md` |
 | FEAT-012 | complete | OBJ-001, SCOPE-001, PHASE-004 | `features/closed/FEAT-012-previewing-and-exporting-mixed-source-edits.md` |
 | FEAT-013 | complete | OBJ-001, SCOPE-001, PHASE-004A | `features/closed/FEAT-013-modular-editor-architecture.md` |
-| FEAT-014 | verifying | OBJ-001, SCOPE-001, PHASE-005 | `features/open/FEAT-014-balancing-each-source-consistently.md` |
-| FEAT-015 | verifying | OBJ-001, SCOPE-001, PHASE-005 | `features/open/FEAT-015-selecting-tested-delivery-routes.md` |
-| FEAT-016 | verifying | OBJ-001, SCOPE-001, PHASE-005 | `features/open/FEAT-016-synchronizing-media-decisions-and-verification.md` |
+| FEAT-014 | complete | OBJ-001, SCOPE-001, PHASE-005 | `features/closed/FEAT-014-balancing-each-source-consistently.md` |
+| FEAT-015 | complete | OBJ-001, SCOPE-001, PHASE-005 | `features/closed/FEAT-015-selecting-tested-delivery-routes.md` |
+| FEAT-016 | complete | OBJ-001, SCOPE-001, PHASE-005 | `features/closed/FEAT-016-synchronizing-media-decisions-and-verification.md` |
+| FEAT-017 | complete | OBJ-001, SCOPE-001, PHASE-006 | `features/closed/FEAT-017-editing-reusable-visual-focus-controls.md` |
+| FEAT-018 | complete | OBJ-001, SCOPE-001, PHASE-006 | `features/closed/FEAT-018-creating-linked-triplicate-compositions.md` |
+| FEAT-019 | complete | OBJ-001, SCOPE-001, PHASE-006 | `features/closed/FEAT-019-delivering-focused-compositions-safely.md` |
 
 ## Open decisions carried into feature readiness
 
@@ -97,11 +101,11 @@ by this feature index:
 
 This feature index is approved for the phase plan. FEAT-001 and FEAT-003
 through FEAT-012 are individual lifecycle files that remain complete and
-closed after user approval on 2026-08-22. FEAT-002 is verifying again because
-its playback ticket was reopened for a timeline pacing correction. FEAT-014
-through FEAT-016 are verifying under PHASE-005; their ticket implementation is
-recorded in the per-ticket evidence files. User validation, review, and
-delivery operations remain governed by the backlog. This index does not own
+closed after user approval on 2026-08-22. FEAT-002 and FEAT-014 through
+FEAT-016 are also complete and closed after their corrective playback and
+source-level audio delivery work passed user validation, review, and local
+delivery. FEAT-017 through FEAT-019 are complete and closed after their user
+validation, review, and local delivery evidence. This index does not own
 implementation, branches, commits, or pull requests.
 
 ## PHASE-002 - Feature Decomposition
@@ -281,10 +285,10 @@ PHASE-001 through PHASE-004.
 ### Approval and downstream gate
 
 FEAT-013 is complete and closed after TICKET-030 passed regression, quality,
-review, and user-validation gates. PHASE-005 is verifying with FEAT-014 through
-FEAT-016 and TICKET-031 through TICKET-037 implemented and awaiting user
-validation.
-PHASE-006 and PHASE-007 remain confirmed future phases.
+review, and user-validation gates. PHASE-005 is complete and closed with
+FEAT-014 through FEAT-016 and TICKET-031 through TICKET-037.
+PHASE-006 is complete and closed, and PHASE-007 remains a confirmed future
+phase.
 
 ## Source references
 
@@ -307,6 +311,9 @@ PHASE-006 and PHASE-007 remain confirmed future phases.
 - FEAT-013 was added to `features/open/` on 2026-08-22 under PHASE-004A as the
   architecture-stabilization prerequisite and moved to
   `features/closed/` after user validation on 2026-08-22.
+- FEAT-014 through FEAT-016 were added to `features/open/` on 2026-08-22
+  under PHASE-005 and moved to `features/closed/` after user validation,
+  review, and local delivery evidence.
 
 ## PHASE-005 - Feature Decomposition
 
@@ -315,9 +322,9 @@ PHASE-006 and PHASE-007 remain confirmed future phases.
 **Scope:** SCOPE-001
 **Phase:** PHASE-005
 **Capability map:** CAP-MAP-001
-**Status:** verifying
-**Approval:** user-authorized on 2026-08-22 to implement the approved feature
-and ticket set; user validation is pending
+**Status:** complete
+**Approval:** user-authorized on 2026-08-22 to implement and close the
+approved feature and ticket set after validation
 **Owner:** repository planning and implementation in the active worktree
 **Last updated:** 2026-08-22
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
@@ -336,9 +343,9 @@ composition, or 60 FPS enhancement.
 
 | ID | Outcome | Capability links | Dependencies | Status |
 |---|---|---|---|---|
-| FEAT-014 | Balance each input source consistently across its timeline | CAP-008, CAP-012 | PHASE-004A; approved audio policy | verifying |
-| FEAT-015 | Select tested delivery routes for audio-aware and mixed-source exports | CAP-005, CAP-012 | FEAT-014; fixed output policy | verifying |
-| FEAT-016 | Synchronize media decisions across product surfaces and verified output | CAP-005, CAP-008, CAP-012 | FEAT-014, FEAT-015 | verifying |
+| FEAT-014 | Balance each input source consistently across its timeline | CAP-008, CAP-012 | PHASE-004A; approved audio policy | complete |
+| FEAT-015 | Select tested delivery routes for audio-aware and mixed-source exports | CAP-005, CAP-012 | FEAT-014; fixed output policy | complete |
+| FEAT-016 | Synchronize media decisions across product surfaces and verified output | CAP-005, CAP-008, CAP-012 | FEAT-014, FEAT-015 | complete |
 
 ### Capability coverage
 
@@ -363,7 +370,72 @@ approved policy is required by source analysis and delivery benchmarking.
 
 ### Planning readiness
 
-FEAT-014 through FEAT-016 are verifying under the approved PHASE-005 record.
-TICKET-031 through TICKET-037 have implemented their observable requirements
-and have evidence records covering automated and real-media checks. User
-validation and delivery review remain required before closure.
+FEAT-014 through FEAT-016 are complete and closed under the approved PHASE-005
+record. TICKET-031 through TICKET-037 have terminal implementation,
+automated, real-media, user-validation, review, and local delivery evidence.
+Remote checks remain unavailable because no remote or upstream is configured.
+
+## PHASE-006 - Feature Decomposition
+
+**Feature index ID:** FEAT-INDEX-006
+**Objective:** OBJ-001
+**Scope:** SCOPE-001
+**Phase:** PHASE-006
+**Capability map:** CAP-MAP-001
+**Status:** complete
+**Approval:** user-authorized on 2026-08-22 to break down and implement the
+approved phase; user validation, review, and local delivery are complete
+**Owner:** repository planning; maintainer identity is not recorded
+**Last updated:** 2026-08-22
+**Source paths:** `vision.md`, `docs/specs/project-scope.md`,
+`docs/specs/capability-map.md`, `docs/specs/future-product-direction.md`,
+`docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`,
+`.github/aidd-config.yml`
+
+### Phase boundary
+
+PHASE-006 adds reusable segment-owned visual modifications and linked
+triplicate portrait/focused-action composition. It depends on the completed
+mixed-source, architecture, and source-level delivery foundations. It does
+not include automatic FPS enhancement, arbitrary effects, or full
+professional compositing.
+
+### Feature summary
+
+| ID | Outcome | Capability links | Dependencies | Status |
+|---|---|---|---|---|
+| FEAT-017 | Edit reusable visual focus controls on timeline segments | CAP-009, CAP-012 | PHASE-005; segment identity and selection semantics | complete |
+| FEAT-018 | Create linked triplicate portrait and focused-action compositions | CAP-010, CAP-012 | FEAT-017; approved transform and group semantics | complete |
+| FEAT-019 | Preview, persist, and safely deliver focused compositions | CAP-005, CAP-009, CAP-010, CAP-012 | FEAT-017, FEAT-018; fixed 1920x1080 output policy | complete |
+
+### Capability coverage
+
+| Phase capability | Feature coverage | Coverage status |
+|---|---|---|
+| CAP-005 - Rendering fast, valid, and safe outputs | FEAT-019 | covered |
+| CAP-009 - Applying reusable segment visual modifications | FEAT-017, FEAT-019 | covered |
+| CAP-010 - Linking triplicate composition instances | FEAT-018, FEAT-019 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | FEAT-017, FEAT-018, FEAT-019 | covered |
+
+### Dependency order
+
+`TICKET-038 -> TICKET-039 -> TICKET-040`
+
+`TICKET-041 -> TICKET-042 -> TICKET-043`
+
+`TICKET-038 + TICKET-040 + TICKET-043 -> TICKET-044`
+
+`TICKET-044 -> TICKET-045 -> TICKET-046 -> TICKET-047`
+
+FEAT-017 establishes the segment modification contract before linked
+triplicate behavior. FEAT-018 then defines and implements independent linked
+groups. FEAT-019 integrates persistence, CLI/GUI parity, safe rendering, and
+end-to-end verification.
+
+### Planning readiness
+
+PHASE-006 is complete with bounded feature records and terminal
+implementation, automated, real-media, user-validation, review, and local
+delivery evidence for FEAT-017 through FEAT-019 and TICKET-038 through
+TICKET-047. Remote checks remain unavailable because no remote or upstream is
+configured.

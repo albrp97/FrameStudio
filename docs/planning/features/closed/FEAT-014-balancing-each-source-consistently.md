@@ -3,12 +3,16 @@
 **Feature ID:** FEAT-014
 **Parent links:** OBJ-001, SCOPE-001, PHASE-005
 **Capability links:** CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after TICKET-031 through TICKET-033
+passed implementation, automated, real-media, review, user-validation, and
+local delivery gates; remote checks remain unavailable and are recorded as an
+accepted warning.
 **Horizon:** future
 **Priority:** 1
 **Owner:** repository planning and implementation in the active worktree
-**Approval:** user-authorized on 2026-08-22 to implement the approved
-PHASE-005 ticket set; user validation is pending
+**Approval:** user-authorized on 2026-08-22 to implement and close the
+approved PHASE-005 ticket set after validation
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`,
 `docs/specs/future-product-direction.md`,
@@ -21,9 +25,11 @@ audio may have incompatible channels or sample rates, and failed analysis
 could otherwise become a silent default
 **Affected surfaces:** source audio analysis, project state, preview/export
 audio handling, GUI, CLI, persistence, tests, and evidence
-**Evidence path:** `evidence/phase-005-source-level-audio.md`
+**Evidence path:** `evidence/phase-005-audio-policy.md`
 **Planned tickets:** TICKET-031, TICKET-032, TICKET-033
 **Last updated:** 2026-08-22
+**Path history:** `features/open/FEAT-014-balancing-each-source-consistently.md`
+-> `features/closed/FEAT-014-balancing-each-source-consistently.md`
 
 ## Outcome
 
@@ -81,3 +87,9 @@ behavior remain unchanged.
   source.
 - Automated, real-media, GUI/CLI, persistence, and user-validation evidence
   covers the feature outcome.
+
+## Closure
+
+TICKET-031 through TICKET-033 satisfy the source-level audio outcome. The
+reviewed local delivery checkpoint is
+`6aebb26121eb7e4088b4c3678b670038116be2be`; remote checks remain unavailable.

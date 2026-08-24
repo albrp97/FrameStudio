@@ -6,7 +6,12 @@
 **Phase:** PHASE-005
 **Feature:** FEAT-016
 **Capability links:** CAP-005, CAP-008, CAP-012
-**Status:** verifying
+**Status:** complete
+**Closure:** user-approved on 2026-08-22 after implementation, automated and
+real-media verification, review, user validation, and local delivery evidence;
+remote checks remain unavailable and are recorded as an accepted warning.
+**Path history:** `tickets/open/TICKET-037-verify-balanced-mixed-source-delivery.md`
+-> `tickets/closed/TICKET-037-verify-balanced-mixed-source-delivery.md`
 **Horizon:** future
 **Priority:** 7
 **Owner:** repository planning and implementation in the active worktree
@@ -102,3 +107,8 @@ with ffprobe, and confirm original sources remain unchanged.
 - Every PHASE-005 exit condition has terminal evidence or an explicit blocked
   or skipped reason.
 - The feature does not claim triplicate, visual-transform, or 60 FPS support.
+
+## Closure
+
+PHASE-005 integrated delivery verification is complete in local delivery
+checkpoint `6aebb26121eb7e4088b4c3678b670038116be2be`.

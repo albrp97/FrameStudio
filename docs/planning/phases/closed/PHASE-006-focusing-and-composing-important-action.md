@@ -4,10 +4,17 @@
 **Parent links:** OBJ-001, SCOPE-001  
 **Capability links:** CAP-005, CAP-009, CAP-010, CAP-012  
 **Sequence:** 6  
-**Status:** confirmed  
+**Status:** complete
+**Closure:** user-approved on 2026-08-23 after FEAT-017 through FEAT-019 and
+TICKET-038 through TICKET-047 passed implementation, automated and real-media
+verification, target-workstation validation, review, and local delivery gates;
+remote checks remain unavailable and are recorded as an accepted warning.
 **Horizon:** future  
 **Owner:** repository planning; maintainer identity is not recorded  
-**Approval:** user-approved on 2026-08-21 before feature generation  
+**Approval:** user-approved on 2026-08-21 before feature generation;
+implementation authorized on 2026-08-22 after ticket approval
+**Feature links:** FEAT-017, FEAT-018, FEAT-019
+**Evidence path:** `evidence/phase-006-focused-composition-delivery.md`
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/planning/phases.md`,
 `docs/planning/repo-map.md`, `.github/aidd-config.yml`  
@@ -17,6 +24,8 @@
 **Affected surfaces:** segment transforms and modification inheritance,
 selection, linked triplicate composition, preview, output canvas, project
 persistence, CLI, and renderer
+**Path history:** `phases/open/PHASE-006-focusing-and-composing-important-action.md`
+-> `phases/closed/PHASE-006-focusing-and-composing-important-action.md`
 
 ## Outcome
 
@@ -101,3 +110,35 @@ vertically concentrated action.
 - Render fixtures for portrait, landscape vertical focus, crop, and
   out-of-bounds offsets.
 - Manual before/after visual evidence and target-workstation playback/export.
+
+## Planned feature decomposition
+
+- FEAT-017 - Edit reusable visual focus controls on timeline segments.
+- FEAT-018 - Create linked triplicate portrait and focused-action
+  compositions.
+- FEAT-019 - Preview, persist, and safely deliver focused compositions.
+
+The feature records and ticket contracts were created on 2026-08-22 in the
+configured open lifecycle directories. Their implementation, validation, and
+local delivery are complete; provider-side checks remain unavailable because
+no remote or upstream is configured.
+
+## Planning readiness
+
+- PHASE-004A and PHASE-005 are complete with terminal local evidence.
+- FEAT-017 through FEAT-019 each have one phase, explicit capability links,
+  observable requirements, non-goals, dependencies, risks, affected surfaces,
+  and evidence paths.
+- TICKET-038 through TICKET-047 have bounded scope, dependency order,
+  protected behaviors, commands, evidence paths, and user-validation plans.
+- The transform coordinate policy and triplicate layout policy are implemented
+  and covered by automated evidence.
+- TICKET-038 through TICKET-047 have terminal implementation, automated,
+  real-media, user-validation, review, and local delivery evidence.
+
+## Closure
+
+All PHASE-006 exit conditions are satisfied by FEAT-017 through FEAT-019 and
+TICKET-038 through TICKET-047. The phase is moved to the configured closed
+directory after user approval; remote publication and provider-side checks
+remain unavailable because no remote or upstream is configured.

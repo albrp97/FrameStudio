@@ -10,6 +10,7 @@ from .audio import (
     audio_decision_is_stale,
     pending_audio_decision,
 )
+from .composition import VisualTransform
 from .export import (
     ExportPlan,
     plan_export,
@@ -167,6 +168,76 @@ def paste_segments_after_selection(
         if segment.segment_id == selected_segment_id:
             return paste_segments(project, segments, at_index=index + 1)
     raise ProjectValidationError(f"Unknown segment_id: {selected_segment_id}")
+
+
+def _validated_visual_transform(
+    *,
+    zoom: object,
+    offset_x: object,
+    offset_y: object,
+) -> VisualTransform:
+    try:
+        return VisualTransform.clamped(
+            zoom=zoom,
+            offset_x=offset_x,
+            offset_y=offset_y,
+        )
+    except ValueError as error:
+        raise ProjectValidationError(str(error)) from error
+
+
+def apply_visual_transform(
+    project: Project,
+    segment_ids: Sequence[str],
+    *,
+    zoom: object = 1.0,
+    offset_x: object = 0.0,
+    offset_y: object = 0.0,
+) -> VisualTransform:
+    transform = _validated_visual_transform(
+        zoom=zoom,
+        offset_x=offset_x,
+        offset_y=offset_y,
+    )
+    project.timeline.set_visual_transform(segment_ids, transform)
+    project.validate()
+    return transform
+
+
+def copy_visual_transform(
+    project: Project,
+    source_segment_id: str,
+    destination_segment_ids: Sequence[str],
+) -> VisualTransform:
+    source = project.timeline.find(source_segment_id)
+    transform = source.visual_transform
+    project.timeline.set_visual_transform(destination_segment_ids, transform)
+    project.validate()
+    return transform
+
+
+def clean_visual_modifications(
+    project: Project,
+    segment_ids: Sequence[str],
+) -> None:
+    project.timeline.clean_visual_modifications(segment_ids)
+    project.validate()
+
+
+def enable_triplicate(
+    project: Project,
+    segment_ids: Sequence[str],
+) -> None:
+    project.timeline.enable_triplicate(segment_ids)
+    project.validate()
+
+
+def disable_triplicate(
+    project: Project,
+    segment_ids: Sequence[str],
+) -> None:
+    project.timeline.disable_triplicate(segment_ids)
+    project.validate()
 
 
 def relink_project_source(
