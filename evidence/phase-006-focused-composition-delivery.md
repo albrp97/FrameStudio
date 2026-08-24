@@ -558,3 +558,31 @@ and quality gates are terminal, so the scoped local commit may proceed.
 Provider-side checks and publication remain blocked until a remote and
 upstream are configured. This is a delivery-environment blocker, not an
 unverified implementation result.
+
+### E-006-032 - Local delivery commit
+
+- **Timestamp:** 2026-08-24T10:33:12+02:00
+- **Phase:** PHASE-006
+- **Features:** FEAT-017, FEAT-018, FEAT-019
+- **Tickets:** TICKET-038 through TICKET-047
+- **Category:** commit
+- **Command:** `git commit -m "feat(editor): add focused composition" -m
+  "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"`
+- **Expected:** The reviewed and staged Phase 006 implementation is recorded
+  in one scoped local commit without altering unrelated work.
+- **Observed:** Commit `233d6c0ec0082d29236c7942c645c8aec943d83f`
+  (`feat(editor): add focused composition`) recorded 71 reviewed paths,
+  including implementation, tests, documentation, evidence, screenshots,
+  and planning lifecycle migrations. The source branch is
+  `ticket/phase-006-focused-composition`, the worktree is clean, and the
+  required Copilot co-author trailer is present.
+- **Status:** passedWithConcerns
+- **Accepted warning:** No remote or upstream is configured, so the commit
+  has not been published and provider-side checks remain unavailable.
+
+## Final local delivery state
+
+PHASE-006 implementation, validation, review, and local commit are complete
+in `233d6c0ec0082d29236c7942c645c8aec943d83f`. Publication and provider-side
+checks remain pending because this repository has no configured remote or
+upstream.
