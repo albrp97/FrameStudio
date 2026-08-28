@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Compatibility entrypoint for the legacy ``resolve_media.py`` command."""
 
 from __future__ import annotations
