@@ -45,7 +45,7 @@ remain letterboxed on the fixed canvas before the shared crop.
   tests.test_editor_composition tests.test_editor_cli_parity
   tests.test_editor_persistence` — 58 tests passed.
 - Full regression and compile: `python3 -m unittest discover -s tests &&
-  python3 -m py_compile resolve_editor.py resolve_editor/*.py tests/*.py` —
+  python3 -m py_compile framestudio.py framestudio/*.py tests/*.py` —
   274 tests passed; compilation passed.
 - Formatting: `.venv/bin/python -m ruff format --check ...` — 10 changed focus
   files already formatted.
@@ -65,7 +65,7 @@ Direct physical wheel gestures and visual corner screenshots were not
 automated; the GTK display was available for the repository smoke harness, but
 there is no deterministic headless gesture driver in the repository. Mypy
 remains blocked by a pre-existing annotation error in
-`resolve_editor/ffmpeg_playback.py:82`, outside this workstream.
+`framestudio/ffmpeg_playback.py:82`, outside this workstream.
 
 The later user-validation addendum records a target-workstation `PASS` for
 normal and triplicate segments, direct focus scrolling, ordinary timeline

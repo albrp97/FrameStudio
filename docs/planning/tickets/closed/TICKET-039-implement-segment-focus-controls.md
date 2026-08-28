@@ -22,8 +22,8 @@ PHASE-006 ticket set; the completed outcome was confirmed by the user on
 **Source paths:** `docs/planning/tickets/open/TICKET-038-define-segment-visual-modification-contract.md`,
 `docs/planning/features/open/FEAT-017-editing-reusable-visual-focus-controls.md`,
 `docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`,
-`resolve_editor/model_project.py`, `resolve_editor/operations.py`,
-`resolve_editor/app_ui.py`, `.github/aidd-config.yml`
+`framestudio/model_project.py`, `framestudio/operations.py`,
+`framestudio/app_ui.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-038; stable segment and selection operations
 **Risks:** UI actions can update only part of a selected group, invalid values
 can leak into preview state, and clean/reset can accidentally alter timing

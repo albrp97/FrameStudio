@@ -24,8 +24,8 @@ when Space was pressed following a timeline cursor seek.
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/tickets/closed/TICKET-003-playback-control-state.md`,
 `docs/planning/tickets/closed/TICKET-004-preview-timeline-interaction.md`,
-`resolve_editor/app.py`, `resolve_editor/playback.py`,
-`resolve_editor/ffmpeg_playback.py`, and the user-reported Space playback
+`framestudio/app.py`, `framestudio/playback.py`,
+`framestudio/ffmpeg_playback.py`, and the user-reported Space playback
 failure
 **Dependencies:** TICKET-003 and TICKET-004; existing FFmpeg playback backend
 **Risks:** keyboard focus, duplicate toggles, stale transport state, burst

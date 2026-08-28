@@ -28,7 +28,7 @@ for traceability. The current fixed-canvas policy is appended below.
 
 ### POLICY-001
 
-- Evidence: `resolve_editor/export.py`,
+- Evidence: `framestudio/export.py`,
   `tests/test_editor_mixed_source.py`, and
   `docs/specs/cli-contract.md`.
 - Observed: Deliberately different dimensions and frame rates resolve to the
@@ -49,7 +49,7 @@ below without removing that history.
 
 ### POLICY-002
 
-- Evidence: `resolve_editor/export.py`,
+- Evidence: `framestudio/export.py`,
   `tests/test_editor_export.py`, `tests/test_editor_mixed_source.py`, and
   `docs/specs/phase-002-export-policy.md`.
 - Observed: One-source and mixed-source policies resolve to a fixed

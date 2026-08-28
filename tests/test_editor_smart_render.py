@@ -5,16 +5,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.export_smart_render import (
+from framestudio.export_smart_render import (
     PreparedSource,
     build_concat_copy_command,
     build_lossless_cut_command,
     build_source_normalization_command,
 )
-from resolve_editor.export_types import OutputPolicy
-from resolve_editor.fps_policy import FrameRatePolicy
-from resolve_editor.media import MediaProbe
-from resolve_editor.model import Segment
+from framestudio.export_types import OutputPolicy
+from framestudio.fps_policy import FrameRatePolicy
+from framestudio.media import MediaProbe
+from framestudio.model import Segment
 
 
 def make_probe(
@@ -149,7 +149,7 @@ class EditorSmartRenderCommandTests(unittest.TestCase):
 
 class EditorSmartRenderPipelineTests(unittest.TestCase):
     def test_video_only_assembly_strips_discarded_audio_before_stream_copy(self):
-        from resolve_editor.export_interpolation import _execute_enhanced_clip_assembly
+        from framestudio.export_interpolation import _execute_enhanced_clip_assembly
 
         policy = OutputPolicy(
             width=1920,
@@ -193,19 +193,19 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.export_interpolation.run_ffmpeg",
+                    "framestudio.export_interpolation.run_ffmpeg",
                     side_effect=fake_run_ffmpeg,
                 ),
                 patch(
-                    "resolve_editor.export_interpolation.probe_media",
+                    "framestudio.export_interpolation.probe_media",
                     side_effect=(video_only_probe, video_only_probe, joined_probe),
                 ),
                 patch(
-                    "resolve_editor.export_interpolation.probe_frame_count",
+                    "framestudio.export_interpolation.probe_frame_count",
                     return_value=20,
                 ),
                 patch(
-                    "resolve_editor.export_interpolation._execute_clip_concat_fallback",
+                    "framestudio.export_interpolation._execute_clip_concat_fallback",
                 ) as fallback,
             ):
                 _execute_enhanced_clip_assembly(
@@ -231,9 +231,9 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
             fallback.assert_not_called()
 
     def test_video_only_preparation_requests_audio_free_lossless_cuts(self):
-        from resolve_editor.export_smart_render import prepare_enhanced_sources
-        from resolve_editor.export_types import ExportPlan
-        from resolve_editor.fps_policy import SourceRateDecision
+        from framestudio.export_smart_render import prepare_enhanced_sources
+        from framestudio.export_types import ExportPlan
+        from framestudio.fps_policy import SourceRateDecision
 
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -280,11 +280,11 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.export_smart_render._can_losslessly_select",
+                    "framestudio.export_smart_render._can_losslessly_select",
                     return_value=True,
                 ),
                 patch(
-                    "resolve_editor.export_smart_render._execute_lossless_selection",
+                    "framestudio.export_smart_render._execute_lossless_selection",
                     side_effect=fake_lossless_selection,
                 ),
             ):
@@ -313,8 +313,8 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
             self.assertEqual(prepared[0].probe.audio_codec, None)
 
     def test_enhanced_export_does_not_select_concat_first_strategy(self):
-        from resolve_editor.export_interpolation import _should_use_concat_first
-        from resolve_editor.export_types import ExportPlan
+        from framestudio.export_interpolation import _should_use_concat_first
+        from framestudio.export_types import ExportPlan
 
         source = Path("portrait.mp4")
         plan = ExportPlan(
@@ -364,8 +364,8 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
         )
 
     def test_enhanced_mixed_export_enhances_each_prepared_segment_then_concats(self):
-        from resolve_editor.export_interpolation import execute_enhanced_export
-        from resolve_editor.export_types import ExportPlan
+        from framestudio.export_interpolation import execute_enhanced_export
+        from framestudio.export_types import ExportPlan
 
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -521,14 +521,14 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.export_interpolation.prepare_export_sources",
+                    "framestudio.export_interpolation.prepare_export_sources",
                     return_value=(
                         (first_path.stat(), second_path.stat()),
                         (first, second),
                     ),
                 ),
                 patch(
-                    "resolve_editor.export_interpolation.prepare_enhanced_sources",
+                    "framestudio.export_interpolation.prepare_enhanced_sources",
                     return_value=tuple(
                         PreparedSource(
                             source_id="first" if index < 2 else "second",
@@ -543,18 +543,16 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
                     ),
                 ) as prepare_sources,
                 patch(
-                    "resolve_editor.export_interpolation._interpolate_probe",
+                    "framestudio.export_interpolation._interpolate_probe",
                     side_effect=fake_interpolate,
                 ) as interpolate,
+                patch("framestudio.export_interpolation.run_ffmpeg", side_effect=fake_run_ffmpeg),
                 patch(
-                    "resolve_editor.export_interpolation.run_ffmpeg", side_effect=fake_run_ffmpeg
-                ),
-                patch(
-                    "resolve_editor.export_interpolation.probe_media",
+                    "framestudio.export_interpolation.probe_media",
                     return_value=output_probe,
                 ),
                 patch(
-                    "resolve_editor.export_interpolation.probe_frame_count",
+                    "framestudio.export_interpolation.probe_frame_count",
                     return_value=671,
                 ),
             ):

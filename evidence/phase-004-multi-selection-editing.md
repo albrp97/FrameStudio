@@ -17,8 +17,8 @@
   Delete toggles all selected blocks; Shift+Left/Right moves selected blocks;
   Ctrl+C/Ctrl+V copies and pastes fresh independent blocks; split children
   inherit state and deletion status.
-- Evidence: `resolve_editor/timeline.py`, `resolve_editor/app.py`,
-  `resolve_editor/model.py`, and `tests/test_editor_timeline.py`.
+- Evidence: `framestudio/timeline.py`, `framestudio/app.py`,
+  `framestudio/model.py`, and `tests/test_editor_timeline.py`.
 - Status: `passed`
 
 ### GUI-001
@@ -68,8 +68,8 @@
   movement/reflow, cloning, deletion, and project serialization preserve it;
   split children receive distinct fresh slots; timeline geometry and drawing
   use the stored slot instead of the positional index.
-- Evidence: `resolve_editor/model.py`, `resolve_editor/timeline.py`,
-  `resolve_editor/cli.py`, and the color regression tests.
+- Evidence: `framestudio/model.py`, `framestudio/timeline.py`,
+  `framestudio/cli.py`, and the color regression tests.
 - Status: `passed`
 
 ### COLOR-REGRESSION-001
@@ -119,7 +119,7 @@
 - Observed: Direct segments now expose a stable persisted color index;
   timelines preserve explicit persisted slots and assign missing slots without
   allowing identity-derived defaults to duplicate adjacent new colors.
-- Evidence: `resolve_editor/model.py` and
+- Evidence: `framestudio/model.py` and
   `tests/test_editor_model.py::EditorModelTests.test_new_timeline_blocks_receive_stable_sequential_colors`.
 - Status: `passed`
 
@@ -206,9 +206,9 @@
   timelines, inserts after the selected block in the UI, preserves state and
   color, assigns fresh identities, shifts later placements, and keeps source
   duration separate from expanded timeline duration.
-- Evidence: `resolve_editor/model.py`, `resolve_editor/timeline.py`,
-  `resolve_editor/operations.py`, `resolve_editor/app.py`,
-  `resolve_editor/cli.py`, and the updated planning/README contracts.
+- Evidence: `framestudio/model.py`, `framestudio/timeline.py`,
+  `framestudio/operations.py`, `framestudio/app.py`,
+  `framestudio/cli.py`, and the updated planning/README contracts.
 - Status: `passed`
 
 ### SELECTION-PASTE-REGRESSION-001
@@ -323,7 +323,7 @@
   `GestureClick.pressed` remains the single selection owner. Ctrl-click now
   keeps discontiguous selections, Shift-click keeps inclusive ranges, and
   normal clicks replace the selection.
-- Evidence: `resolve_editor/timeline.py` and
+- Evidence: `framestudio/timeline.py` and
   `tests/test_editor_timeline.py`.
 - Status: `passed`
 

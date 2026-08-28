@@ -83,8 +83,8 @@ delivery-ready by this record.
   registries, stable source IDs, probe metadata, source settings, source
   intervals, and redacted inspection output. Relinking and structured missing
   source failures use the shared domain and CLI boundaries.
-- Evidence: `resolve_editor/model.py`, `resolve_editor/operations.py`,
-  `resolve_editor/cli.py`, `tests/test_editor_mixed_source.py`, and
+- Evidence: `framestudio/model.py`, `framestudio/operations.py`,
+  `framestudio/cli.py`, `tests/test_editor_mixed_source.py`, and
   `tests/test_editor_cli_mixed.py`.
 - Status: `passed`
 

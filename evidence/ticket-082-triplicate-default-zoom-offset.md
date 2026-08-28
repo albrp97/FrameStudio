@@ -96,7 +96,7 @@ mapping. Normal full-canvas rendering remains visually centered at `1.0x`.
    preview with X at `0`.
 4. Save and reopen the project; confirm the selected X value and triplicate
    linkage remain unchanged.
-5. Optionally run `resolve-editor focus <project> --segment <id>
+5. Optionally run `framestudio focus <project> --segment <id>
    --offset-x 640` and inspect the JSON result.
 
 Expected result: the repeated source region moves horizontally while the

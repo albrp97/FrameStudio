@@ -270,7 +270,7 @@ def _restoration_arguments(
 ):
     import argparse
 
-    from resolve_fps import (
+    from framestudio_fps import (
         DEFAULT_FPS_PYTHON,
         DEFAULT_FPS_SITE,
         DEFAULT_RVE_ROOT,
@@ -304,7 +304,7 @@ def _run_source_restoration(
     ffprobe_path: str,
     cancel_event: threading.Event | None,
 ) -> MediaProbe:
-    from resolve_fps import (
+    from framestudio_fps import (
         DEFAULT_RVE_RESTORATION_MODEL,
         probe_video,
         run_restoration_rve,

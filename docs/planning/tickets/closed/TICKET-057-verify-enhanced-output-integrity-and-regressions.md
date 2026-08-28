@@ -21,8 +21,8 @@ approval
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/features/closed/FEAT-023-verifying-safe-enhanced-delivery.md`,
 `docs/planning/tickets/closed/TICKET-056-connect-enhanced-export-routes-and-progress.md`,
-`resolve_editor/export_delivery.py`, `resolve_editor/export_process.py`,
-`resolve_editor/cli_export.py`, `resolve_editor/persistence.py`,
+`framestudio/export_delivery.py`, `framestudio/export_process.py`,
+`framestudio/cli_export.py`, `framestudio/persistence.py`,
 `tests/test_fps.py`, `tests/test_editor_*.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-056; exact timing and audio behavior from TICKET-054
 and TICKET-055; representative generated and real-media fixtures

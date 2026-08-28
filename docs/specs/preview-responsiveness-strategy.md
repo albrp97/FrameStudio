@@ -10,7 +10,7 @@ requested cursor position while `VideoFrame.decoded_position_seconds` preserves
 the timestamp from which the cached pixels were decoded.
 
 This is a deliberately small, dependency-free change in
-`resolve_editor/preview_strategy.py` and `resolve_editor/ffmpeg_playback.py`.
+`framestudio/preview_strategy.py` and `framestudio/ffmpeg_playback.py`.
 The cache is scoped to one backend instance and is not used by export or
 persistence.
 

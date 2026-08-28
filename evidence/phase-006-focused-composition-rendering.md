@@ -12,9 +12,9 @@ terminal
 ### E-046-001 - Safe preview and export route
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/composition_render.py`,
-  `resolve_editor/export_planning.py`, `resolve_editor/export_ffmpeg.py`,
-  `resolve_editor/app_project.py`, `resolve_editor/ffmpeg_playback.py`
+- **Source references:** `framestudio/composition_render.py`,
+  `framestudio/export_planning.py`, `framestudio/export_ffmpeg.py`,
+  `framestudio/app_project.py`, `framestudio/ffmpeg_playback.py`
 - **Expected:** Focused edits use decoded fallback rendering, preview and
   export share filters, deleted blocks are excluded, and output is published
   only after verification.

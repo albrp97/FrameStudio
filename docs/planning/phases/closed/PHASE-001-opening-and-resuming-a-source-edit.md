@@ -103,7 +103,7 @@ and reopen it with the same source and state.
 
 ### Protected surfaces
 
-`resolve_media.py`, `resolve_concat.py`, `resolve_fps.py`, their existing
+`framestudio_media.py`, `framestudio_concat.py`, `framestudio_fps.py`, their existing
 commands, current tests, source-safe output behavior, and research documents
 remain available and unchanged unless a separately approved change requires
 otherwise.

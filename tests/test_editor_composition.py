@@ -9,8 +9,8 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from resolve_editor import app_timeline_actions
-from resolve_editor.app_playback import (
+from framestudio import app_timeline_actions
+from framestudio.app_playback import (
     deliver_latest_frame,
     handle_backend_end,
     on_frame,
@@ -19,7 +19,7 @@ from resolve_editor.app_playback import (
     request_timeline_preview,
     stop_backend,
 )
-from resolve_editor.app_project import (
+from framestudio.app_project import (
     _finish_source_load,
     _load_source_worker,
     attach_project,
@@ -27,8 +27,8 @@ from resolve_editor.app_project import (
     load_source,
     refresh_playback_backend,
 )
-from resolve_editor.cli import cli_main
-from resolve_editor.composition import (
+from framestudio.cli import cli_main
+from framestudio.composition import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
     MAX_OFFSET_X,
@@ -38,12 +38,12 @@ from resolve_editor.composition import (
     VisualTransform,
     focus_offset_bounds,
 )
-from resolve_editor.composition_render import segment_video_filters
-from resolve_editor.export import execute_export
-from resolve_editor.ffmpeg_playback import VideoFrame
-from resolve_editor.media import probe_media
-from resolve_editor.model import Project, ProjectValidationError, SegmentTimeline
-from resolve_editor.operations import (
+from framestudio.composition_render import segment_video_filters
+from framestudio.export import execute_export
+from framestudio.ffmpeg_playback import VideoFrame
+from framestudio.media import probe_media
+from framestudio.model import Project, ProjectValidationError, SegmentTimeline
+from framestudio.operations import (
     apply_visual_transform,
     clean_visual_modifications,
     copy_visual_transform,
@@ -52,9 +52,9 @@ from resolve_editor.operations import (
     paste_segments_after_selection,
     plan_project_export,
 )
-from resolve_editor.persistence import load_project, save_project
-from resolve_editor.playback import PlaybackController, PlaybackState
-from resolve_editor.upscale_policy import UpscalePolicy
+from framestudio.persistence import load_project, save_project
+from framestudio.playback import PlaybackController, PlaybackState
+from framestudio.upscale_policy import UpscalePolicy
 
 
 def metadata(duration=10.0):
@@ -121,7 +121,7 @@ class EditorCompositionTests(unittest.TestCase):
             _set_status=MagicMock(),
         )
         with patch(
-            "resolve_editor.app_project.create_project_from_source",
+            "framestudio.app_project.create_project_from_source",
             side_effect=AssertionError("source loading must be blocked"),
         ):
             self.assertFalse(load_source(window, Path("source.mp4")))
@@ -138,7 +138,7 @@ class EditorCompositionTests(unittest.TestCase):
             _update_segment_controls=MagicMock(),
         )
         glib = SimpleNamespace(idle_add=MagicMock())
-        with patch("resolve_editor.app_project.threading.Thread") as thread:
+        with patch("framestudio.app_project.threading.Thread") as thread:
             self.assertFalse(
                 load_source(
                     window,
@@ -172,14 +172,14 @@ class EditorCompositionTests(unittest.TestCase):
 
         with (
             patch(
-                "resolve_editor.app_project._build_source_project",
+                "framestudio.app_project._build_source_project",
                 side_effect=build_project,
             ),
             patch(
-                "resolve_editor.app_project.analyze_project_audio",
+                "framestudio.app_project.analyze_project_audio",
                 side_effect=analyze_audio,
             ),
-            patch("resolve_editor.app_project._finish_source_load"),
+            patch("framestudio.app_project._finish_source_load"),
         ):
             _load_source_worker(
                 window,
@@ -251,10 +251,10 @@ class EditorCompositionTests(unittest.TestCase):
             _set_status=MagicMock(),
         )
         with patch(
-            "resolve_editor.app_project.load_project",
+            "framestudio.app_project.load_project",
             side_effect=AssertionError("project loading must be blocked"),
         ):
-            self.assertFalse(load_project_path(window, Path("project.resolve.json")))
+            self.assertFalse(load_project_path(window, Path("project.framestudio.json")))
 
         window._set_status.assert_called_once_with(
             "Editing is disabled while export is in progress",
@@ -624,9 +624,9 @@ class EditorCompositionTests(unittest.TestCase):
             )
 
             with (
-                patch("resolve_editor.app_project.ensure_project_audio_analysis") as analyze,
-                patch("resolve_editor.app_project.FfmpegPlaybackBackend") as direct_type,
-                patch("resolve_editor.app_project.FfmpegComposedPlaybackBackend") as composed_type,
+                patch("framestudio.app_project.ensure_project_audio_analysis") as analyze,
+                patch("framestudio.app_project.FfmpegPlaybackBackend") as direct_type,
+                patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as composed_type,
             ):
                 analyze.return_value = {
                     project.source.source_id: {"status": "not-applicable", "gain_db": 0.0},
@@ -932,7 +932,7 @@ class EditorCompositionTests(unittest.TestCase):
             segment_id = project.timeline.segments[0].segment_id
             apply_visual_transform(project, [segment_id], zoom=2.0, offset_x=50, offset_y=-25)
             enable_triplicate(project, [segment_id])
-            destination = root / "focused.resolve.json"
+            destination = root / "focused.framestudio.json"
 
             save_project(project, destination)
             restored = load_project(destination)
@@ -1220,8 +1220,8 @@ class EditorCompositionTests(unittest.TestCase):
             )
 
             with (
-                patch("resolve_editor.app_project.ensure_project_audio_analysis") as analyze,
-                patch("resolve_editor.app_project.FfmpegComposedPlaybackBackend") as backend_type,
+                patch("framestudio.app_project.ensure_project_audio_analysis") as analyze,
+                patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as backend_type,
             ):
                 analyze.return_value = {
                     project.source.source_id: {"status": "not-applicable", "gain_db": 0.0},
@@ -1265,9 +1265,9 @@ class EditorCompositionTests(unittest.TestCase):
             )
 
             with (
-                patch("resolve_editor.app_project.ensure_project_audio_analysis") as analyze,
-                patch("resolve_editor.app_project.FfmpegPlaybackBackend") as direct_type,
-                patch("resolve_editor.app_project.FfmpegComposedPlaybackBackend") as composed_type,
+                patch("framestudio.app_project.ensure_project_audio_analysis") as analyze,
+                patch("framestudio.app_project.FfmpegPlaybackBackend") as direct_type,
+                patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as composed_type,
             ):
                 analyze.return_value = {
                     project.source.source_id: {"status": "not-applicable", "gain_db": 0.0},
@@ -1285,7 +1285,7 @@ class EditorCompositionTests(unittest.TestCase):
     def test_cli_focus_and_triplicate_operations_are_persisted(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             segment_id = project.timeline.segments[0].segment_id
             save_project(project, project_path)

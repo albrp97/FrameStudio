@@ -23,7 +23,7 @@
 - Command: `.venv/bin/python -m unittest tests.test_editor_ui_helpers`
 - Expected: The new tests fail before implementation.
 - Observed: Test collection failed because `KEYCODE_SPACE` was not yet
-  exported by `resolve_editor.app`.
+  exported by `framestudio.app`.
 - Status: `passed`
 - Note: This was the intentional TDD red state.
 
@@ -35,7 +35,7 @@
   Space, and the standard hardware keycode fallback. The editor requests
   focus when presented, and the transport row exposes a `Play`/`Pause` button
   whose label follows the playback state.
-- Evidence: `resolve_editor/app.py`, `tests/test_editor_ui_helpers.py`, and
+- Evidence: `framestudio/app.py`, `tests/test_editor_ui_helpers.py`, and
   `README.md`.
 - Status: `passed`
 
@@ -98,7 +98,7 @@
 - Observed: `FfmpegPlaybackBackend` now uses frame deadlines based on the
   configured frame rate, interrupts waits on stop, and resets pacing while
   paused so resumed playback does not burst or skip to the latest frame.
-- Evidence: `resolve_editor/ffmpeg_playback.py` and
+- Evidence: `framestudio/ffmpeg_playback.py` and
   `tests/test_editor_ffmpeg_playback.py`.
 - Status: `passed`
 
@@ -127,7 +127,7 @@
 
 - Requirement/flow: Validate timeline-cursor playback and pause in the live
   GTK window with active-window screenshots.
-- Command: `python3 resolve_editor.py --source
+- Command: `python3 framestudio.py --source
   /home/ghiki/Videos/portrait-test-720p.mp4`; `wtype -k space`; `make
   screenshot LABEL=timeline-playback-playing-1`; `make screenshot
   LABEL=timeline-playback-playing-2`; `wtype -k space`; `make screenshot
@@ -150,7 +150,7 @@
 
 - Requirement/flow: Validate that Space starts visible playback after a real
   timeline cursor seek and pauses it without losing the selected position.
-- Command: `python3 resolve_editor.py --source
+- Command: `python3 framestudio.py --source
   /home/ghiki/Videos/portrait-test-720p.mp4`; click the active timeline near
   `00:01`; `wtype -k space`; `make screenshot
   LABEL=timeline-playback-seeked-real-playing-1`; `make screenshot
@@ -186,7 +186,7 @@
 
 - Requirement/flow: Confirm post-seek play, pause, and resume behavior in the
   maintainer's live editor workflow.
-- Setup: `.venv/bin/python resolve_editor.py --source
+- Setup: `.venv/bin/python framestudio.py --source
   /home/ghiki/Videos/portrait-test-720p.mp4`
 - Steps: Move the timeline cursor to about `00:01`, press Space to start,
   press Space to pause, press Space again to resume, and close the editor.
@@ -223,7 +223,7 @@
 - Local/PR parity: `unavailable`; the repository workflow defines the same
   `make quality PYTHON=.venv/bin/python` command, but no remote or upstream is
   configured to execute or compare provider checks.
-- Non-blocking follow-up: `resolve_editor/ffmpeg_playback.py` remains a large
+- Non-blocking follow-up: `framestudio/ffmpeg_playback.py` remains a large
   adapter module and can be split further around audio lifecycle and composed
   playback in a later structural ticket.
 - Accepted warning: Remote checks and PR state cannot be terminally evidenced

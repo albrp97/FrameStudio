@@ -255,14 +255,14 @@ class FfmpegPlaybackBackend:
         self._audio_copy_thread = threading.Thread(
             target=self._copy_audio,
             args=(audio_process, audio_sink),
-            name="resolve-editor-audio",
+            name="framestudio-editor-audio",
             daemon=True,
         )
         self._audio_copy_thread.start()
         self._audio_monitor_thread = threading.Thread(
             target=self._monitor_audio_preview,
             args=(audio_process, audio_sink),
-            name="resolve-editor-audio-monitor",
+            name="framestudio-editor-audio-monitor",
             daemon=True,
         )
         self._audio_monitor_thread.start()
@@ -854,7 +854,7 @@ class FfmpegPlaybackBackend:
                 if worker is None or not worker.is_alive():
                     worker = threading.Thread(
                         target=self._run_preview_worker,
-                        name="resolve-editor-preview",
+                        name="framestudio-editor-preview",
                         daemon=True,
                     )
                     self._preview_thread = worker

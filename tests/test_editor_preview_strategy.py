@@ -2,7 +2,7 @@ import unittest
 from dataclasses import dataclass
 
 from benchmarks.preview_responsiveness import summarize_preview_benchmark
-from resolve_editor.preview_strategy import PreviewFrameCache
+from framestudio.preview_strategy import PreviewFrameCache
 
 
 @dataclass(frozen=True)

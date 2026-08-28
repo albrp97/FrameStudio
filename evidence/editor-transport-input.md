@@ -13,7 +13,7 @@ toggle, and source/project labeling without expanding the one-source model.
 - The timeline is easier to click and drag.
 - Mouse-wheel movement over the timeline seeks forward/backward.
 - Space toggles play/pause when the editor has an opened source.
-- Source `.mp4` media and saved `.resolve.json` projects are clearly
+- Source `.mp4` media and saved `.framestudio.json` projects are clearly
   distinguished in the interface.
 - Existing source, playback, persistence, and protected workflows remain
   functional.
@@ -36,7 +36,7 @@ toggle, and source/project labeling without expanding the one-source model.
 - **Command:** `python3 -m unittest tests.test_editor_ui_helpers`
 - **Expected:** New scroll/key tests fail because the helpers do not exist.
 - **Observed:** Import failed for the missing
-  `resolve_editor.app.is_play_pause_key` helper.
+  `framestudio.app.is_play_pause_key` helper.
 - **Status:** passedWithConcerns
 - **Artifacts:** terminal output.
 - **Failure:** expected missing implementation.
@@ -63,7 +63,7 @@ toggle, and source/project labeling without expanding the one-source model.
   timeline.
 - **Observed:** Controller construction and capture configuration succeeded.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/app.py`.
+- **Artifacts:** `framestudio/app.py`.
 - **Failure:** none
 - **Fix:** none
 
@@ -114,7 +114,7 @@ toggle, and source/project labeling without expanding the one-source model.
   available.
 - **Skipped:** automated screenshot evidence.
 - **Accepted scope:** export and multi-source timelines remain outside
-  PHASE-001; `.mp4` is source media and `.resolve.json` is editor state.
+  PHASE-001; `.mp4` is source media and `.framestudio.json` is editor state.
 
 ## E-913 - User-confirmed transport interaction
 
@@ -159,7 +159,7 @@ toggle, and source/project labeling without expanding the one-source model.
 - **Expected:** The new capture-phase regression test fails because the
   controller factory is not implemented yet.
 - **Observed:** Import failed for the missing
-  `resolve_editor.app.create_play_pause_key_controller` helper.
+  `framestudio.app.create_play_pause_key_controller` helper.
 - **Status:** passedWithConcerns
 - **Artifacts:** terminal output.
 - **Failure:** expected missing implementation.

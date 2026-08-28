@@ -4,10 +4,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.fps_policy import FrameRatePolicy
-from resolve_editor.model import Project
-from resolve_editor.operations import apply_visual_transform, enable_triplicate
-from resolve_editor.persistence import (
+from framestudio.fps_policy import FrameRatePolicy
+from framestudio.model import Project
+from framestudio.operations import apply_visual_transform, enable_triplicate
+from framestudio.persistence import (
     ProjectPersistenceError,
     load_project,
     save_project,
@@ -44,7 +44,7 @@ class EditorPersistenceTests(unittest.TestCase):
                     enhancement_enabled=True,
                 )
             )
-            destination = root / "edit.resolve.json"
+            destination = root / "edit.framestudio.json"
 
             save_project(project, destination)
             restored = load_project(destination)
@@ -69,7 +69,7 @@ class EditorPersistenceTests(unittest.TestCase):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             project = make_project(root)
-            destination = root / "edit.resolve.json"
+            destination = root / "edit.framestudio.json"
             save_project(project, destination)
             payload = json.loads(destination.read_text(encoding="utf-8"))
             payload["output_settings"]["frame_rate_policy"] = {
@@ -90,7 +90,7 @@ class EditorPersistenceTests(unittest.TestCase):
             project.set_playhead(4.5)
             project.segment_timeline.split(4.5)
             project.segment_timeline.delete_segment(project.segment_timeline.segments[1].segment_id)
-            destination = root / "edit.resolve.json"
+            destination = root / "edit.framestudio.json"
 
             save_project(project, destination)
             restored = load_project(destination)
@@ -106,11 +106,11 @@ class EditorPersistenceTests(unittest.TestCase):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             project = make_project(root)
-            destination = root / "edit.resolve.json"
+            destination = root / "edit.framestudio.json"
             destination.write_text('{"previous": true}\n', encoding="utf-8")
 
             with patch(
-                "resolve_editor.persistence.os.replace",
+                "framestudio.persistence.os.replace",
                 side_effect=OSError("replace failed"),
             ):
                 with self.assertRaises(ProjectPersistenceError):
@@ -120,11 +120,11 @@ class EditorPersistenceTests(unittest.TestCase):
                 destination.read_text(encoding="utf-8"),
                 '{"previous": true}\n',
             )
-            self.assertEqual(list(root.glob(".edit.resolve.json.partial-*")), [])
+            self.assertEqual(list(root.glob(".edit.framestudio.json.partial-*")), [])
 
     def test_invalid_json_is_reported(self):
         with TemporaryDirectory() as temporary_directory:
-            destination = Path(temporary_directory) / "edit.resolve.json"
+            destination = Path(temporary_directory) / "edit.framestudio.json"
             destination.write_text("{not json", encoding="utf-8")
 
             with self.assertRaises(ProjectPersistenceError):
@@ -143,7 +143,7 @@ class EditorPersistenceTests(unittest.TestCase):
                 offset_y=-1620.0,
             )
             enable_triplicate(project, [segment_id])
-            destination = root / "focus.resolve.json"
+            destination = root / "focus.framestudio.json"
 
             save_project(project, destination)
             restored = load_project(destination)
@@ -168,7 +168,7 @@ class EditorPersistenceTests(unittest.TestCase):
                 offset_y=0.0,
             )
             enable_triplicate(project, [segment_id])
-            destination = root / "default-zoom-focus.resolve.json"
+            destination = root / "default-zoom-focus.framestudio.json"
 
             save_project(project, destination)
             restored = load_project(destination)

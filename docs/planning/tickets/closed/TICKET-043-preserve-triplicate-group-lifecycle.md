@@ -23,7 +23,7 @@ PHASE-006 ticket set; the completed outcome was confirmed by the user on
 `docs/planning/tickets/open/TICKET-041-define-triplicate-group-and-layout-policy.md`,
 `docs/planning/tickets/open/TICKET-042-implement-linked-triplicate-composition.md`,
 `docs/planning/features/open/FEAT-018-creating-linked-triplicate-compositions.md`,
-`resolve_editor/operations.py`, `resolve_editor/model_project.py`,
+`framestudio/operations.py`, `framestudio/model_project.py`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-040, TICKET-041, and TICKET-042; approved linked
 group identity and atomic block operations

@@ -16,9 +16,9 @@ FPS Strategy A/B comparison; implementation may proceed under CHG-005
 **Source paths:** `docs/planning/reviews/CHG-005-adopt-per-source-render-default.md`,
 `evidence/phase-008-render-strategy-comparison.md`,
 `docs/planning/tickets/closed/TICKET-072-select-and-document-mixed-fps-render-default.md`,
-`resolve_editor/export_interpolation.py`,
-`resolve_editor/export_smart_render.py`,
-`resolve_editor/export_delivery.py`,
+`framestudio/export_interpolation.py`,
+`framestudio/export_smart_render.py`,
+`framestudio/export_delivery.py`,
 `tests/test_editor_smart_render.py`,
 `tests/test_editor_export_execution.py`,
 `.github/aidd-config.yml`

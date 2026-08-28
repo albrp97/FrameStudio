@@ -4,14 +4,14 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.cli import (
+from framestudio.cli import (
     CLI_CONTRACT_VERSION,
     cli_main,
     error_payload,
     project_payload,
     success_payload,
 )
-from resolve_editor.model import Project
+from framestudio.model import Project
 
 
 def make_project(root: Path) -> Project:
@@ -66,12 +66,12 @@ class EditorCliContractTests(unittest.TestCase):
 
             payload = project_payload(
                 project,
-                root / "edit.resolve.json",
+                root / "edit.framestudio.json",
                 include_paths=False,
             )
             serialized = json.dumps(payload)
 
-            self.assertEqual(payload["project_path"], "edit.resolve.json")
+            self.assertEqual(payload["project_path"], "edit.framestudio.json")
             self.assertEqual(payload["source"]["path"], "source.mp4")
             self.assertEqual(payload["source"]["uri"], "source.mp4")
             self.assertTrue(payload["source"]["path_redacted"])
@@ -94,13 +94,13 @@ class EditorCliContractTests(unittest.TestCase):
 
             payload = project_payload(
                 project,
-                root / "edit.resolve.json",
+                root / "edit.framestudio.json",
                 include_paths=True,
             )
 
             self.assertEqual(
                 payload["project_path"],
-                str((root / "edit.resolve.json").resolve()),
+                str((root / "edit.framestudio.json").resolve()),
             )
             self.assertEqual(payload["source"]["path"], str(project.source.path))
             self.assertFalse(payload["source"]["path_redacted"])

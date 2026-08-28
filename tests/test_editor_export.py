@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.export import (
+from framestudio.export import (
     ExportExecutionError,
     ExportPlan,
     ExportPlanningError,
@@ -13,11 +13,11 @@ from resolve_editor.export import (
     parse_ffmpeg_progress_values,
     plan_export,
 )
-from resolve_editor.export_delivery import verify_mixed_export_output
-from resolve_editor.fps_policy import FrameRatePolicy
-from resolve_editor.media import MediaProbe, probe_media
-from resolve_editor.model import SegmentTimeline
-from resolve_editor.upscale_policy import UpscalePolicy
+from framestudio.export_delivery import verify_mixed_export_output
+from framestudio.fps_policy import FrameRatePolicy
+from framestudio.media import MediaProbe, probe_media
+from framestudio.model import SegmentTimeline
+from framestudio.upscale_policy import UpscalePolicy
 
 
 def media_probe(
@@ -79,9 +79,9 @@ class EditorExportPlannerTests(unittest.TestCase):
             )
 
             with (
-                patch("resolve_editor.export_delivery.probe_media", return_value=output_probe),
-                patch("resolve_editor.export_delivery.probe_frame_count", return_value=19),
-                patch("resolve_editor.export_delivery.validate_decoded_output"),
+                patch("framestudio.export_delivery.probe_media", return_value=output_probe),
+                patch("framestudio.export_delivery.probe_frame_count", return_value=19),
+                patch("framestudio.export_delivery.validate_decoded_output"),
             ):
                 with self.assertRaisesRegex(
                     ExportExecutionError,

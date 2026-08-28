@@ -17,7 +17,7 @@ remote checks remain unavailable and are recorded as an accepted warning.
 **Owner:** repository planning and implementation in the active worktree
 **Approval:** user-authorized on 2026-08-22 to implement all approved
 PHASE-005 tickets, including source-level audio balancing, with the legacy
-`resolve_concat.py` mean/median policy applied once per input source
+`framestudio_concat.py` mean/median policy applied once per input source
 **Provider:** auto; base and target branches are not configured in
 `.github/aidd-config.yml`
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
@@ -107,7 +107,7 @@ analysis-failure behavior, and source-level inheritance rule.
 - Every PHASE-005 audio entry condition has an explicit decision or is marked
   blocked with its reason.
 - The policy implementation and fixture matrix match the legacy
-  `resolve_concat.py` mean/median gain calculation.
+  `framestudio_concat.py` mean/median gain calculation.
 - The policy is available as a shared source-level contract for analysis,
   preview, and export work.
 

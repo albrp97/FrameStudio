@@ -34,7 +34,7 @@ PHASE-003 -> FEAT-008 -> TICKET-014`
   save/reopen preserves the project contract.
 - **Observed:** 5 tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/cli.py`,
+- **Artifacts:** `framestudio/cli.py`,
   `tests/test_editor_cli_editing.py`.
 - **Failure:** none.
 - **Fix:** none.
@@ -50,8 +50,8 @@ PHASE-003 -> FEAT-008 -> TICKET-014`
 - **Observed:** The flow completed successfully and produced the expected
   structured command results; disposable files were removed.
 - **Status:** passed
-- **Artifacts:** disposable CLI smoke output; `resolve_editor/model.py`,
-  `resolve_editor/persistence.py`.
+- **Artifacts:** disposable CLI smoke output; `framestudio/model.py`,
+  `framestudio/persistence.py`.
 - **Failure:** none.
 - **Fix:** none.
 

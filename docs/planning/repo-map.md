@@ -17,20 +17,21 @@ tickets.
 
 | Surface | Path | Responsibility | Evidence / status |
 |---|---|---|---|
-| Resolve media preparation | `resolve_media.py` | Probes media, classifies Resolve compatibility, converts unsupported media, manages safe partial outputs, and provides a curses TUI. | Observed and tested. |
-| Concatenation and FPS workflow | `resolve_concat.py` | Selects videos, probes clips, analyzes audio, chooses stream-copy or normalization, joins clips, and invokes FPS enhancement. | Observed and tested. |
-| FPS enhancement | `resolve_fps.py` | Runs the RIFE/VapourSynth or REAL-Video-Enhancer pipeline, preserves/remuxes audio, validates frame rate/count, and reports progress. | Observed and tested. |
-| Installation wrappers | `install.sh` | Installs `resolve-media`, `resolve-concat`, and `resolve-fps` wrappers into `~/bin`. | Observed. |
+| FrameStudio media preparation | `framestudio_media.py` | Probes media, classifies Resolve compatibility, converts unsupported media, manages safe partial outputs, and provides a curses TUI. | Observed and tested. |
+| Concatenation and FPS workflow | `framestudio_concat.py` | Selects videos, probes clips, analyzes audio, chooses stream-copy or normalization, joins clips, and invokes FPS enhancement. | Observed and tested. |
+| FPS enhancement | `framestudio_fps.py` | Runs the RIFE/VapourSynth or REAL-Video-Enhancer pipeline, preserves/remuxes audio, validates frame rate/count, and reports progress. | Observed and tested. |
+| Installation wrappers | `install.sh` | Installs canonical FrameStudio commands and legacy `resolve-*` aliases into `~/bin`. | Observed. |
 | Benchmark harness | `benchmarks/fps.vpy`, `benchmarks/vsrawpipe.py` | Supports the validated FPS processing path and benchmark reproduction. | Observed. |
-| Editor application facade | `resolve_editor/app.py` | GTK application lifecycle and compatibility-preserving orchestration for source loading, playback, timeline actions, and export. | Implemented; `make check`, smoke, and UI evidence. |
-| Editor application modules | `resolve_editor/app_*.py` | Focused UI construction, project lifecycle, timeline actions, playback, and export workflows used by the application facade. | Implemented; stable callback seams covered by editor tests. |
-| Editor domain model | `resolve_editor/model_*.py` | Source/segment value objects, timeline invariants and operations, project lifecycle, serialization-facing behavior, and compatibility exports through `model.py`. | Implemented; model and mixed-source tests. |
-| Timeline rendering | `resolve_editor/timeline*.py` | Pure geometry/drawing helpers and GTK timeline canvas behavior, retained through `timeline.py`. | Implemented; timeline interaction and drawing tests. |
-| Export pipeline | `resolve_editor/export_*.py` | Export policy/value objects, planning, FFmpeg command/process execution, validation, and atomic publication, retained through `export.py`. | Implemented; export and source-safety tests. |
-| Playback backend | `resolve_editor/ffmpeg_playback.py`, `resolve_editor/playback.py` | Raw-frame FFmpeg playback backend and playback state controller. | Implemented; playback and smoke coverage. |
-| Editor project storage | `resolve_editor/persistence.py` | Versioned JSON project persistence, source-safety checks, and atomic save behavior. | Implemented; persistence and round-trip tests. |
-| Editor CLI facade | `resolve_editor/cli.py` | Deterministic command dispatch, JSON output/error contract, and compatibility patch seams. | Implemented; `make contract` and CLI parity tests. |
-| Editor CLI modules | `resolve_editor/cli_parser.py`, `resolve_editor/cli_export.py`, `resolve_editor/cli_payload.py`, `resolve_editor/cli_types.py` | Focused parser, export handler, payload serialization, and contract definitions used by the CLI facade. | Implemented; CLI contract and editing tests. |
+| Editor application facade | `framestudio/app.py` | GTK application lifecycle and compatibility-preserving orchestration for source loading, playback, timeline actions, and export. | Implemented; `make check`, smoke, and UI evidence. |
+| Editor application modules | `framestudio/app_*.py` | Focused UI construction, project lifecycle, timeline actions, playback, and export workflows used by the application facade. | Implemented; stable callback seams covered by editor tests. |
+| Editor domain model | `framestudio/model_*.py` | Source/segment value objects, timeline invariants and operations, project lifecycle, serialization-facing behavior, and compatibility exports through `model.py`. | Implemented; model and mixed-source tests. |
+| Timeline rendering | `framestudio/timeline*.py` | Pure geometry/drawing helpers and GTK timeline canvas behavior, retained through `timeline.py`. | Implemented; timeline interaction and drawing tests. |
+| Export pipeline | `framestudio/export_*.py` | Export policy/value objects, planning, FFmpeg command/process execution, validation, and atomic publication, retained through `export.py`. | Implemented; export and source-safety tests. |
+| Playback backend | `framestudio/ffmpeg_playback.py`, `framestudio/playback.py` | Raw-frame FFmpeg playback backend and playback state controller. | Implemented; playback and smoke coverage. |
+| Editor project storage | `framestudio/persistence.py` | Versioned JSON project persistence, source-safety checks, and atomic save behavior. | Implemented; persistence and round-trip tests. |
+| Editor CLI facade | `framestudio/cli.py` | Deterministic command dispatch, JSON output/error contract, and compatibility patch seams. | Implemented; `make contract` and CLI parity tests. |
+| Editor CLI modules | `framestudio/cli_parser.py`, `framestudio/cli_export.py`, `framestudio/cli_payload.py`, `framestudio/cli_types.py` | Focused parser, export handler, payload serialization, and contract definitions used by the CLI facade. | Implemented; CLI contract and editing tests. |
+| Compatibility surfaces | `resolve_editor/`, `resolve_editor.py`, `resolve_media.py`, `resolve_concat.py`, `resolve_fps.py` | Forward legacy imports and scripts to the canonical FrameStudio implementation without duplicating behavior. | Implemented; compatibility tests. |
 
 ## Test Surfaces
 
@@ -84,16 +85,16 @@ Baseline command:
 ## Current Commands
 
 - `python3 -m unittest discover -s tests`
-- `python3 -m py_compile resolve_media.py resolve_concat.py resolve_fps.py resolve_editor.py resolve_editor/*.py tests/*.py tools/*.py`
+- `python3 -m py_compile framestudio_media.py framestudio_concat.py framestudio_fps.py framestudio.py framestudio/*.py tests/*.py tools/*.py`
 - `make check`
 - `make contract`
 - `make smoke`
 - `make quality PYTHON=.venv/bin/python`
 - `./install.sh`
-- `./resolve_editor.py --help`
-- `./resolve_media.py --help`
-- `./resolve_media.py --dry-run --root <directory>`
-- `resolve-concat --dry-run <directory>`
+- `./framestudio.py --help`
+- `./framestudio_media.py --help`
+- `./framestudio_media.py --dry-run --root <directory>`
+- `framestudio-concat --dry-run <directory>`
 
 The media-dependent script commands require suitable media/tooling; no claim
 is made that they pass for every environment.

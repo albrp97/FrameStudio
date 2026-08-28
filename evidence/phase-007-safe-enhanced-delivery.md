@@ -49,9 +49,9 @@ FEAT-023 -> TICKET-056/TICKET-057/TICKET-058`
   no introduced findings.
 - **Observed:** Formatting, Ruff lint, complexity, duplication, dependency
   checks, pip-audit, Bandit, and churn completed successfully. The quality
-  target stops at mypy with four existing errors in `resolve_concat.py:27`,
-  `resolve_concat.py:291`, `resolve_fps.py:1081`, and
-  `resolve_fps.py:1084`; those legacy files were not changed in this work.
+  target stops at mypy with four existing errors in `framestudio_concat.py:27`,
+  `framestudio_concat.py:291`, `framestudio_fps.py:1081`, and
+  `framestudio_fps.py:1084`; those legacy files were not changed in this work.
 - **Status:** blocked
 - **Failure:** Required type-check command exits non-zero on the four
   pre-existing legacy-script findings.
@@ -77,8 +77,8 @@ FEAT-023 -> TICKET-056/TICKET-057/TICKET-058`
   churn checks all passed.
 - **Status:** passed
 - **Fix:** Added an explicit typed boundary around the legacy curses wrapper
-  result in `resolve_concat.py`; no editor behavior changed.
-- **Artifacts:** `resolve_concat.py`, `evidence/static-analysis`
+  result in `framestudio_concat.py`; no editor behavior changed.
+- **Artifacts:** `framestudio_concat.py`, `evidence/static-analysis`
 
 ### E-007-DELIVERY-003 — Local-to-PR parity and remote checks
 
@@ -133,9 +133,9 @@ evidence, and target-workstation/user validation remain non-terminal.
   explicit FFmpeg fallback estimation, requested executable validation, and
   inactive mixed-source filtering.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/export_estimates.py`,
-  `resolve_editor/interpolation.py`, `resolve_editor/export_planning.py`,
-  `resolve_editor/export_panel.py`, and the focused editor test modules.
+- **Artifacts:** `framestudio/export_estimates.py`,
+  `framestudio/interpolation.py`, `framestudio/export_planning.py`,
+  `framestudio/export_panel.py`, and the focused editor test modules.
 
 ### E-007-DELIVERY-007 — Superseding configured quality and smoke run
 
@@ -204,13 +204,13 @@ gates remain non-terminal.
   confirm the window is mapped and accepts input, and capture the current
   editor surface without exposing private media paths.
 - **Commands/steps:** Generated a temporary FFmpeg test clip; launched
-  `python3 resolve_editor.py --source /tmp/resolve-phase-007-validation.mp4`;
+  `python3 framestudio.py --source /tmp/resolve-phase-007-validation.mp4`;
   verified the active window with `hyprctl activewindow -j`; captured
   `make screenshot LABEL=phase-007-editor-open`; stopped the process and
   removed the temporary clip.
 - **Expected:** The editor opens the media in a responsive GTK window and
   cleanup leaves no disposable process or media behind.
-- **Observed:** The mapped `io.github.resolve_media.editor` window accepted
+- **Observed:** The mapped `io.github.framestudio_media.editor` window accepted
   input, the screenshot was captured at 1701x684, and the disposable process
   and clip were removed. This flow did not exercise the export-panel controls
   or RVE backend.

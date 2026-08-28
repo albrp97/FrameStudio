@@ -3,10 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.export_panel import prepare_export_panel
-from resolve_editor.fps_policy import rate_choice_labels
-from resolve_editor.interpolation import BackendValidation
-from resolve_editor.model import Project
+from framestudio.export_panel import prepare_export_panel
+from framestudio.fps_policy import rate_choice_labels
+from framestudio.interpolation import BackendValidation
+from framestudio.model import Project
 
 
 def make_project(root: Path) -> Project:
@@ -58,7 +58,7 @@ class EditorExportPanelTests(unittest.TestCase):
             state = prepare_export_panel(
                 make_project(Path(temporary_directory)),
                 Path(temporary_directory),
-                project_path=Path(temporary_directory) / "edit.resolve.json",
+                project_path=Path(temporary_directory) / "edit.framestudio.json",
             )
 
         self.assertTrue(state.valid)
@@ -87,7 +87,7 @@ class EditorExportPanelTests(unittest.TestCase):
                 choice="60",
                 enhancement_enabled=False,
                 backend="ffmpeg-minterpolate",
-                project_path=root / "edit.resolve.json",
+                project_path=root / "edit.framestudio.json",
             )
 
         self.assertTrue(state.valid)
@@ -109,13 +109,13 @@ class EditorExportPanelTests(unittest.TestCase):
             (root / "edit-edited-ffmpeg-minterpolate-60fps.mp4").write_bytes(b"existing")
 
             with patch(
-                "resolve_editor.export_panel.validate_interpolation_backend",
+                "framestudio.export_panel.validate_interpolation_backend",
                 side_effect=unavailable_rve_validation,
             ):
                 state = prepare_export_panel(
                     make_project(root),
                     root,
-                    project_path=root / "edit.resolve.json",
+                    project_path=root / "edit.framestudio.json",
                 )
 
         self.assertTrue(state.valid)
@@ -127,7 +127,7 @@ class EditorExportPanelTests(unittest.TestCase):
             root = Path(temporary_directory)
 
             with patch(
-                "resolve_editor.export_panel.validate_interpolation_backend",
+                "framestudio.export_panel.validate_interpolation_backend",
                 side_effect=unavailable_rve_validation,
             ):
                 state = prepare_export_panel(
@@ -135,7 +135,7 @@ class EditorExportPanelTests(unittest.TestCase):
                     root,
                     choice="60",
                     enhancement_enabled=True,
-                    project_path=root / "edit.resolve.json",
+                    project_path=root / "edit.framestudio.json",
                 )
 
         self.assertTrue(state.valid)
@@ -148,7 +148,7 @@ class EditorExportPanelTests(unittest.TestCase):
             root = Path(temporary_directory)
 
             with patch(
-                "resolve_editor.export_panel.validate_interpolation_backend",
+                "framestudio.export_panel.validate_interpolation_backend",
                 side_effect=unavailable_rve_validation,
             ):
                 state = prepare_export_panel(
@@ -157,7 +157,7 @@ class EditorExportPanelTests(unittest.TestCase):
                     choice="60",
                     enhancement_enabled=True,
                     backend="rve-custom",
-                    project_path=root / "edit.resolve.json",
+                    project_path=root / "edit.framestudio.json",
                 )
 
         self.assertTrue(state.valid)
@@ -172,7 +172,7 @@ class EditorExportPanelTests(unittest.TestCase):
                 choice="60",
                 enhancement_enabled=True,
                 backend="ffmpeg-minterpolate",
-                project_path=root / "edit.resolve.json",
+                project_path=root / "edit.framestudio.json",
             )
 
         self.assertTrue(state.valid)

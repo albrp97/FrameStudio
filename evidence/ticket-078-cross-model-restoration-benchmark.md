@@ -794,7 +794,7 @@ remote-check policy are resolved; no commit, push, or pull request exists.
 - **Requirement:** A future benchmark invocation must discover the pinned
   Video2X AppImage even when no `video2x` command is present on `PATH`.
 - **Change:** Added the configured
-  `~/.cache/resolve-fps/benchmark-tools/Video2X-6.4.0-x86_64.AppImage`
+  `~/.cache/framestudio-fps/benchmark-tools/Video2X-6.4.0-x86_64.AppImage`
   executable path to the manifest and taught runtime discovery to report
   explicitly configured executable paths without exposing an absolute home
   directory.

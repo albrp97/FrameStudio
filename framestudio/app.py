@@ -159,7 +159,7 @@ def run_gui(
         gi.require_version("Gtk", "4.0")
         from gi.repository import Gdk, GLib, Gtk
     except (ImportError, ValueError) as error:
-        raise RuntimeError("GTK 4 and PyGObject are required for resolve-editor") from error
+        raise RuntimeError("GTK 4 and PyGObject are required for framestudio-editor") from error
 
     class EditorWindow(Gtk.ApplicationWindow):
         def __init__(
@@ -301,7 +301,7 @@ def run_gui(
                 return
             dialog = Gtk.FileDialog.new()
             dialog.set_title("Save editor project")
-            dialog.set_initial_name(f"{Path(self.project.source.path).stem}.resolve.json")
+            dialog.set_initial_name(f"{Path(self.project.source.path).stem}.framestudio.json")
             dialog.save(self, None, self._on_save_dialog_done, None)
 
         def _on_save_dialog_done(self, dialog, result, _data) -> None:
@@ -520,7 +520,7 @@ def run_gui(
             return end_smoke_test(self)
 
     application = Gtk.Application(
-        application_id="io.github.resolve_media.editor",
+        application_id="io.github.framestudio.editor",
     )
 
     def on_activate(app) -> None:

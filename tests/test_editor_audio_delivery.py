@@ -4,16 +4,16 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.export import execute_export, plan_export, plan_mixed_export
-from resolve_editor.export_ffmpeg import fallback_filter, mixed_fallback_filter
-from resolve_editor.media import MediaProbe, probe_media
-from resolve_editor.model import Segment, SegmentTimeline
-from resolve_editor.operations import (
+from framestudio.export import execute_export, plan_export, plan_mixed_export
+from framestudio.export_ffmpeg import fallback_filter, mixed_fallback_filter
+from framestudio.media import MediaProbe, probe_media
+from framestudio.model import Segment, SegmentTimeline
+from framestudio.operations import (
     analyze_project_audio,
     create_project_from_sources,
     plan_project_export,
 )
-from resolve_editor.upscale_policy import UpscalePolicy
+from framestudio.upscale_policy import UpscalePolicy
 
 
 def make_probe(

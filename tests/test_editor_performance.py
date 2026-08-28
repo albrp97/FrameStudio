@@ -5,9 +5,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from resolve_editor.app_export import cancel_export, run_export_job, start_export
-from resolve_editor.export import ExportExecutionError
-from resolve_editor.performance import PerformanceMode
+from framestudio.app_export import cancel_export, run_export_job, start_export
+from framestudio.export import ExportExecutionError
+from framestudio.performance import PerformanceMode
 
 
 def fake_performance_mode_factory(events):
@@ -58,10 +58,10 @@ class EditorPerformanceModeTests(unittest.TestCase):
 
         with (
             patch(
-                "resolve_editor.app_export.run_export_job",
+                "framestudio.app_export.run_export_job",
                 return_value=(destination, plan),
             ) as run_job,
-            patch("resolve_editor.app_export.threading.Thread") as thread,
+            patch("framestudio.app_export.threading.Thread") as thread,
         ):
             start_export(window, destination, glib)
             snapshot = window._export_project_snapshot
@@ -76,10 +76,8 @@ class EditorPerformanceModeTests(unittest.TestCase):
         commands = performance_profile_commands()
 
         with (
-            patch(
-                "resolve_editor.performance.shutil.which", return_value="/usr/bin/powerprofilesctl"
-            ),
-            patch("resolve_editor.performance.subprocess.run", side_effect=commands) as run,
+            patch("framestudio.performance.shutil.which", return_value="/usr/bin/powerprofilesctl"),
+            patch("framestudio.performance.subprocess.run", side_effect=commands) as run,
         ):
             with PerformanceMode("on"):
                 pass
@@ -98,10 +96,8 @@ class EditorPerformanceModeTests(unittest.TestCase):
         commands = performance_profile_commands()
 
         with (
-            patch(
-                "resolve_editor.performance.shutil.which", return_value="/usr/bin/powerprofilesctl"
-            ),
-            patch("resolve_editor.performance.subprocess.run", side_effect=commands) as run,
+            patch("framestudio.performance.shutil.which", return_value="/usr/bin/powerprofilesctl"),
+            patch("framestudio.performance.subprocess.run", side_effect=commands) as run,
         ):
             with self.assertRaisesRegex(RuntimeError, "export failed"):
                 with PerformanceMode("on"):
@@ -117,10 +113,10 @@ class EditorPerformanceModeTests(unittest.TestCase):
                 fake_performance_mode = fake_performance_mode_factory(events)
 
                 with (
-                    patch("resolve_editor.app_export.PerformanceMode", fake_performance_mode),
-                    patch("resolve_editor.app_export.plan_project_export", return_value="plan"),
+                    patch("framestudio.app_export.PerformanceMode", fake_performance_mode),
+                    patch("framestudio.app_export.plan_project_export", return_value="plan"),
                     patch(
-                        "resolve_editor.app_export.execute_export",
+                        "framestudio.app_export.execute_export",
                         return_value=Path("output.mp4") if outcome == "success" else None,
                         side_effect=None
                         if outcome == "success"

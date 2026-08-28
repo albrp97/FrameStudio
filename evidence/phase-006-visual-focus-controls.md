@@ -12,9 +12,9 @@ terminal
 ### E-039-001 - Focus controls and clean action
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/model_timeline.py`,
-  `resolve_editor/operations.py`, `resolve_editor/app_ui.py`,
-  `resolve_editor/app_timeline_actions.py`, `tests/test_editor_composition.py`
+- **Source references:** `framestudio/model_timeline.py`,
+  `framestudio/operations.py`, `framestudio/app_ui.py`,
+  `framestudio/app_timeline_actions.py`, `tests/test_editor_composition.py`
 - **Expected:** One or more selected segments accept validated zoom/X/Y
   values; clean restores defaults without changing timing or identity.
 - **Observed:** Shared domain operations apply focus values to the current

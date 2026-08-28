@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.cli import cli_main
-from resolve_editor.model import Project
-from resolve_editor.persistence import load_project, save_project
+from framestudio.cli import cli_main
+from framestudio.model import Project
+from framestudio.persistence import load_project, save_project
 
 
 def metadata(duration, width, height, frame_rate):
@@ -45,7 +45,7 @@ class MixedSourceCliTests(unittest.TestCase):
     def test_inspect_exposes_sources_and_redacts_every_path(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "mixed.resolve.json"
+            project_path = root / "mixed.framestudio.json"
             save_project(self.make_project(root), project_path)
 
             result, stdout, stderr = run_cli("inspect", str(project_path))
@@ -69,7 +69,7 @@ class MixedSourceCliTests(unittest.TestCase):
     def test_move_and_paste_are_deterministic_and_persisted(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "mixed.resolve.json"
+            project_path = root / "mixed.framestudio.json"
             project = self.make_project(root)
             save_project(project, project_path)
             first_id = project.timeline.blocks[0].segment_id
@@ -124,7 +124,7 @@ class MixedSourceCliTests(unittest.TestCase):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             project = self.make_project(root)
-            project_path = root / "mixed.resolve.json"
+            project_path = root / "mixed.framestudio.json"
             save_project(project, project_path)
             source = project.sources[0]
             old_path = Path(source.path)

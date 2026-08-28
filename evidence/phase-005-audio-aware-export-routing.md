@@ -15,7 +15,7 @@ validation is required before closure
 - **Requirement:** Source-level audio changes and mixed-source composition
   select a validated fallback route; eligible unchanged one-source edits
   retain stream copy.
-- **Command or source:** `resolve_editor/export_planning.py`,
+- **Command or source:** `framestudio/export_planning.py`,
   `tests/test_editor_audio_delivery.py`
 - **Expected:** Route and every material reason are exposed before execution.
 - **Observed:** Gain changes add the source-level normalization reason; fixed

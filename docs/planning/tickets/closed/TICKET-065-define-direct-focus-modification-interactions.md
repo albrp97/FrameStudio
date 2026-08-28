@@ -17,9 +17,9 @@ semantics were implemented and validated.
 requires the configured preimplementation and approval gates
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/features/closed/FEAT-025-streamlining-segment-focus-modifications.md`,
-`docs/specs/future-product-direction.md`, `resolve_editor/app_ui.py`,
-`resolve_editor/app_timeline_actions.py`, `resolve_editor/composition.py`,
-`resolve_editor/model_types.py`, `tests/test_editor_ui_helpers.py`,
+`docs/specs/future-product-direction.md`, `framestudio/app_ui.py`,
+`framestudio/app_timeline_actions.py`, `framestudio/composition.py`,
+`framestudio/model_types.py`, `tests/test_editor_ui_helpers.py`,
 `.github/aidd-config.yml`
 **Dependencies:** PHASE-006 focus/triplicate model; existing timeline
 selection and wheel routing; GTK event behavior on the target workstation

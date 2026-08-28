@@ -18,8 +18,8 @@ requires the configured preimplementation and approval gates
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
 `docs/planning/tickets/closed/TICKET-069-define-comparable-mixed-fps-render-benchmarks.md`,
-`resolve_editor/export_smart_render.py`, `resolve_editor/export_interpolation.py`,
-`resolve_editor/export_delivery.py`, `tests/test_editor_smart_render.py`,
+`framestudio/export_smart_render.py`, `framestudio/export_interpolation.py`,
+`framestudio/export_delivery.py`, `tests/test_editor_smart_render.py`,
 `tests/test_editor_export_execution.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-069 protocol; PHASE-005 audio/delivery policy;
 PHASE-007 interpolation fallback and verification

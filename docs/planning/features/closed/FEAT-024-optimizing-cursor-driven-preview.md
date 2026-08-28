@@ -14,9 +14,9 @@ target-workstation user validation were accepted.
 execution remains separately gated by the configured approval policy
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
-`docs/specs/future-product-direction.md`, `resolve_editor/app_playback.py`,
-`resolve_editor/ffmpeg_playback.py`, `resolve_editor/timeline.py`,
-`resolve_editor/timeline_geometry.py`, `tests/test_editor_playback.py`,
+`docs/specs/future-product-direction.md`, `framestudio/app_playback.py`,
+`framestudio/ffmpeg_playback.py`, `framestudio/timeline.py`,
+`framestudio/timeline_geometry.py`, `tests/test_editor_playback.py`,
 `tests/test_editor_timeline.py`, `.github/aidd-config.yml`
 **Dependencies:** PHASE-006 preview and focus behavior; current FFmpeg raw-frame
 playback; target-workstation media access; disposable Lossless Cut research

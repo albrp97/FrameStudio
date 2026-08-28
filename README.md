@@ -1,9 +1,16 @@
-# Resolve Media TUI
+# FrameStudio
 
-`resolve-media` is a dependency-free Python/curses browser and preparation tool
-for DaVinci Resolve on Linux Free. It starts in `~/Documents/edit`, or accepts a
-different root with `--root`. The default profile is optimized for speed and
-editing compatibility rather than mathematical losslessness.
+FrameStudio is a local Linux video editor with a deterministic CLI, GTK
+playback UI, timeline editing, and safe FFmpeg export. Its supporting
+`framestudio-media` command is a dependency-free Python/curses browser and
+preparation tool for Resolve-compatible media workflows. It starts in
+`~/Documents/edit`, or accepts a different root with `--root`. The default
+profile is optimized for speed and editing compatibility rather than
+mathematical losslessness.
+
+The canonical editor command is `framestudio`. `framestudio-editor` remains an
+explicit alias, and the legacy `resolve-*` commands and Python entrypoints
+continue to forward to the same implementation for existing workflows.
 
 ## Safety and codec policy
 
@@ -45,31 +52,31 @@ required. It writes FFV1 video and PCM audio to Matroska (`.mkv`). The legacy
 ## Usage
 
 ```sh
-resolve-media
-resolve-media --root ~/Videos/to-edit
-resolve-media --dry-run --root ~/Documents/edit
-resolve-media --profile fast --root ~/Videos/to-edit
-resolve-media --profile lossless --root ~/Videos/to-edit --gpu on
-resolve-media --jobs 1                 # force sequential processing
-resolve-media --performance-mode off   # leave the current system profile alone
-resolve-media --keep-originals    # opt out of the default Trash move
-resolve-media --gpu off            # disable NVIDIA acceleration for lossless mode
-resolve-media --gpu auto           # quiet GPU detection with CPU fallback
-resolve-media --version
+framestudio-media
+framestudio-media --root ~/Videos/to-edit
+framestudio-media --dry-run --root ~/Documents/edit
+framestudio-media --profile fast --root ~/Videos/to-edit
+framestudio-media --profile lossless --root ~/Videos/to-edit --gpu on
+framestudio-media --jobs 1                 # force sequential processing
+framestudio-media --performance-mode off   # leave the current system profile alone
+framestudio-media --keep-originals    # opt out of the default Trash move
+framestudio-media --gpu off            # disable NVIDIA acceleration for lossless mode
+framestudio-media --gpu auto           # quiet GPU detection with CPU fallback
+framestudio-media --version
 ```
 
 To open the combined concat-and-FPS selector anywhere in a terminal:
 
 ```sh
-resolve-concat
+framestudio-concat
 ```
 
 To open the focused one-source editor:
 
 ```sh
-resolve-editor
-resolve-editor --source ~/Videos/source.mp4
-resolve-editor --project ~/Videos/source.resolve.json
+framestudio
+framestudio --source ~/Videos/source.mp4
+framestudio --project ~/Videos/source.framestudio.json
 ```
 
 The same executable also provides deterministic, machine-readable editor
@@ -77,35 +84,35 @@ operations. Successful commands emit versioned JSON on stdout; errors emit
 structured JSON on stderr with a non-zero status:
 
 ```sh
-resolve-editor import ~/Videos/source.mp4 --project ~/Videos/source.resolve.json
-resolve-editor import ~/Videos/landscape.mp4 ~/Videos/portrait.mp4 \
-  --project ~/Videos/mixed.resolve.json
-resolve-editor inspect ~/Videos/source.resolve.json
-resolve-editor analyze-audio ~/Videos/source.resolve.json
-resolve-editor split ~/Videos/source.resolve.json --at 12.5
-resolve-editor delete ~/Videos/source.resolve.json --segment SEGMENT_ID
-resolve-editor restore ~/Videos/source.resolve.json --segment SEGMENT_ID
-resolve-editor move ~/Videos/source.resolve.json --segment SEGMENT_ID \
+framestudio import ~/Videos/source.mp4 --project ~/Videos/source.framestudio.json
+framestudio import ~/Videos/landscape.mp4 ~/Videos/portrait.mp4 \
+  --project ~/Videos/mixed.framestudio.json
+framestudio inspect ~/Videos/source.framestudio.json
+framestudio analyze-audio ~/Videos/source.framestudio.json
+framestudio split ~/Videos/source.framestudio.json --at 12.5
+framestudio delete ~/Videos/source.framestudio.json --segment SEGMENT_ID
+framestudio restore ~/Videos/source.framestudio.json --segment SEGMENT_ID
+framestudio move ~/Videos/source.framestudio.json --segment SEGMENT_ID \
   --direction left
-resolve-editor copy ~/Videos/mixed.resolve.json --segment SEGMENT_ID
-resolve-editor paste ~/Videos/mixed.resolve.json --segment SEGMENT_ID --at 0
-resolve-editor focus ~/Videos/source.resolve.json --segment SEGMENT_ID \
+framestudio copy ~/Videos/mixed.framestudio.json --segment SEGMENT_ID
+framestudio paste ~/Videos/mixed.framestudio.json --segment SEGMENT_ID --at 0
+framestudio focus ~/Videos/source.framestudio.json --segment SEGMENT_ID \
   --zoom 2 --offset-x 120 --offset-y -80
-resolve-editor copy-focus ~/Videos/source.resolve.json \
+framestudio copy-focus ~/Videos/source.framestudio.json \
   --source-segment SOURCE_SEGMENT_ID --segment DESTINATION_SEGMENT_ID
-resolve-editor triplicate-enable ~/Videos/source.resolve.json --segment SEGMENT_ID
-resolve-editor triplicate-disable ~/Videos/source.resolve.json --segment SEGMENT_ID
-resolve-editor clean-focus ~/Videos/source.resolve.json --segment SEGMENT_ID
-resolve-editor relink ~/Videos/mixed.resolve.json --source SOURCE_ID \
+framestudio triplicate-enable ~/Videos/source.framestudio.json --segment SEGMENT_ID
+framestudio triplicate-disable ~/Videos/source.framestudio.json --segment SEGMENT_ID
+framestudio clean-focus ~/Videos/source.framestudio.json --segment SEGMENT_ID
+framestudio relink ~/Videos/mixed.framestudio.json --source SOURCE_ID \
   --path ~/Videos/relocated.mp4
-resolve-editor duration ~/Videos/source.resolve.json
-resolve-editor set-fps-policy ~/Videos/source.resolve.json --choice 60 \
+framestudio duration ~/Videos/source.framestudio.json
+framestudio set-fps-policy ~/Videos/source.framestudio.json --choice 60 \
   --enhance-fps --fps-backend ffmpeg-minterpolate
-resolve-editor set-upscale-policy ~/Videos/source.resolve.json \
+framestudio set-upscale-policy ~/Videos/source.framestudio.json \
   --enable-upscale --upscale-model SuperUltraCompact \
   --upscale-backend rve-restoration
-resolve-editor export-plan ~/Videos/source.resolve.json
-resolve-editor export ~/Videos/source.resolve.json --output ~/Videos/edited.mp4 \
+framestudio export-plan ~/Videos/source.framestudio.json
+framestudio export ~/Videos/source.framestudio.json --output ~/Videos/edited.mp4 \
   --upscale-enhancement
 ```
 
@@ -113,7 +120,7 @@ Use `--full-paths` only when automation needs local paths; output redacts them
 by default. Export emits structured progress events followed by a verified
 final result. The complete contract is documented in
 [`docs/specs/cli-contract.md`](docs/specs/cli-contract.md). From the
-repository, use `make cli ARGS="inspect /absolute/path/to/project.resolve.json"`.
+repository, use `make cli ARGS="inspect /absolute/path/to/project.framestudio.json"`.
 
 Upscale enhancement is enabled by default for eligible sources. The export
 panel and CLI still expose an explicit opt-out with `--no-upscale-enhancement`;
@@ -143,7 +150,7 @@ using the legacy mean/median policy and the same decision is reused by every
 included segment from that source. Missing `ffplay` or an audio preview
 process failure is reported explicitly; it is not silently treated as a
 successful audio preview.
-The implementation keeps the public `resolve_editor.model`, `export`, `app`,
+The implementation keeps the public `framestudio.model`, `export`, `app`,
 `timeline`, and `cli` paths as compatibility facades over focused model,
 export, playback, application, timeline, and CLI modules.
 Every project uses a fixed 1920x1080 (1080p) canvas. Inputs with another
@@ -172,7 +179,7 @@ frames, FPS, elapsed time, and ETA. The editor keeps this area compact; click
 **Key bindings** to open the complete keyboard and timeline-control reference.
 
 The `.mp4` file selected in the editor is source media. **Save project** writes
-a `.resolve.json` editor project. **Export video** writes a separate edited
+a `.framestudio.json` editor project. **Export video** writes a separate edited
 video only after FFmpeg/ffprobe verify its playability, duration, dimensions,
 audio-stream presence, sample rate, and channels; the source is never
 overwritten.
@@ -205,8 +212,8 @@ make help
 make start
 make editor
 make editor ARGS="--source /absolute/path/to/video.mp4"
-make editor ARGS="--project /absolute/path/to/project.resolve.json"
-make cli ARGS="inspect /absolute/path/to/project.resolve.json"
+make editor ARGS="--project /absolute/path/to/project.framestudio.json"
+make cli ARGS="inspect /absolute/path/to/project.framestudio.json"
 make smoke
 make restoration-benchmark ARGS="--source /absolute/path/to/video.mp4"
 make test
@@ -334,11 +341,11 @@ Use a short disposable MP4 or a copy of a local source:
     one second instead of moving the horizontal scrollbar.
 19. Hold **Alt** or **Shift** while scrolling, or use a horizontal secondary
     wheel, and confirm the zoomed timeline viewport moves left/right.
-20. Click **Save project**, choose a path ending in `.resolve.json`, and
+20. Click **Save project**, choose a path ending in `.framestudio.json`, and
    confirm the status reports a saved project. Verify the source file's size
    and modification time are unchanged.
 21. Click **Reopen project**, or close the app and run
-   `make editor ARGS="--project /absolute/path/to/project.resolve.json"`.
+   `make editor ARGS="--project /absolute/path/to/project.framestudio.json"`.
    Confirm the same source, duration, and saved playhead reopen.
 22. Save the project, close/reopen it, and confirm the clip deleted/included
     state is preserved.
@@ -365,7 +372,7 @@ Use a short disposable MP4 or a copy of a local source:
     state, and the selected output duration are preserved.
 26. For a mixed-source project with different audio levels, confirm the
    **Audio decisions** status shown after import/open. For an explicit CLI
-   refresh, run `resolve-editor analyze-audio` and inspect each source's
+   refresh, run `framestudio analyze-audio` and inspect each source's
    status, measurement, and gain decision. Split and reorder segments from one
    source, then confirm the decision remains source-level rather than becoming
    a per-segment setting. Preview and export the project, confirm the same
@@ -374,8 +381,8 @@ Use a short disposable MP4 or a copy of a local source:
    confirm the editor reports that dependency failure instead of claiming
    audio preview succeeded.
 27. Check an error path safely with an invalid disposable project:
-   `printf '{' > /tmp/invalid.resolve.json`, then run
-   `make editor ARGS="--project /tmp/invalid.resolve.json"`. Confirm the
+   `printf '{' > /tmp/invalid.framestudio.json`, then run
+   `make editor ARGS="--project /tmp/invalid.framestudio.json"`. Confirm the
    status shows an actionable error and does not replace valid state.
 28. Select one or more clips and use the **Focus** controls. Apply zoom and
     X/Y offsets, confirm the preview changes without changing clip duration,
@@ -402,12 +409,12 @@ press `Enter` to run the complete workflow. One selected video goes directly
 to FPS enhancement with audio stream-copy; multiple selected videos are
 concatenated once and then enhanced globally. `a` selects every video in the
 current folder, `n` clears the selection, and `Left/h/Backspace` goes up. Use
-`resolve-concat --root ~/Videos` to start in a different folder.
+`framestudio-concat --root ~/Videos` to start in a different folder.
 
 For a non-interactive run, pass the folder directly:
 
 ```sh
-resolve-concat ~/Documents/edit/copy
+framestudio-concat ~/Documents/edit/copy
 ```
 
 For a multiple-video run it chooses the most common resolution and the lowest
@@ -463,9 +470,9 @@ Folders process recursively. If nothing is selected, `Enter` processes the
 current folder recursively.
 
 Only files needing preparation are converted. Output is deterministic:
-`<stem>.resolve-ready.mxf` for video conversion, or
-`<stem>.resolve-ready.mkv` for audio-only preparation. The explicit lossless
-profile writes `<stem>.resolve-lossless.mkv`. Existing generated outputs,
+`<stem>.framestudio-ready.mxf` for video conversion, or
+`<stem>.framestudio-ready.mkv` for audio-only preparation. The explicit lossless
+profile writes `<stem>.framestudio-lossless.mkv`. Existing generated outputs,
 including outputs from the older lossless default, are recognized and skipped;
 when deletion is enabled, their source can be removed after verification.
 Conversion writes a unique `.partial-*` file, uses FFmpeg progress output,
@@ -493,11 +500,11 @@ Use `--concat-only` to reproduce the older one-process concat behavior.
 
 ### FPS enhancement: concatenate first, then interpolate once
 
-The single-tool production workflow is `resolve-concat`; the installed
-`resolve-fps` command remains available for direct FPS-only use:
+The single-tool production workflow is `framestudio-concat`; the installed
+`framestudio-fps` command remains available for direct FPS-only use:
 
 ```sh
-resolve-concat
+framestudio-concat
 ```
 
 Select one video and it goes directly to the selected FPS backend: no
@@ -505,7 +512,7 @@ concatenation and no audio transformation are performed; the original audio
 stream is copied into the final MP4. When multiple videos are selected, they
 are concatenated once with audio normalization disabled, then one global FPS
 enhancement pass runs over the temporary master. Use
-`resolve-fps /path/to/video.mp4 --force` only when a separate FPS-only command
+`framestudio-fps /path/to/video.mp4 --force` only when a separate FPS-only command
 is desired. Run `./install.sh` once to install both
 commands into `~/bin`.
 
@@ -521,14 +528,14 @@ selects the FFmpeg fallback automatically.
 The RVE backend expects the validated local setup at these paths:
 
 ```text
-~/.cache/resolve-fps/trt/bin/python
-~/.cache/resolve-fps/REAL-Video-Enhancer
-~/.cache/resolve-fps/rve-models-pixel-fallback/rife4.26.pkl
-~/.cache/resolve-fps/rve-shims
+~/.cache/framestudio-fps/trt/bin/python
+~/.cache/framestudio-fps/REAL-Video-Enhancer
+~/.cache/framestudio-fps/rve-models-pixel-fallback/rife4.26.pkl
+~/.cache/framestudio-fps/rve-shims
 ```
 
 Override them with `--rve-root`, `--rve-model`, and `--rve-shims`, or set
-`RESOLVE_RVE_ROOT`, `RESOLVE_RVE_MODEL`, and `RESOLVE_RVE_SHIMS`. RVE output is
+`FRAMESTUDIO_RVE_ROOT`, `FRAMESTUDIO_RVE_MODEL`, and `FRAMESTUDIO_RVE_SHIMS`. RVE output is
 padded or trimmed to the existing rational target-frame policy, so a
 29.97-to-60 conversion preserves the timeline (for example, 900 input frames
 become 1,802 output frames). Constant-frame-rate fractional conversions such
@@ -551,7 +558,7 @@ as an intermediate image sequence. The RVE backend uses a temporary encoded
 video inside its private temporary directory so it can remux the original
 audio exactly; that file is removed after success or cancellation. The
 TensorRT engine cache is intentionally kept for faster future runs. A forced
-`SIGKILL` or power loss can prevent cleanup, so inspect `/tmp/resolve-fps-*`,
+`SIGKILL` or power loss can prevent cleanup, so inspect `/tmp/framestudio-fps-*`,
 the RVE temporary directories, and hidden `.partial` files if the machine is
 forcibly stopped.
 
@@ -571,12 +578,12 @@ INPUT_DIR="$HOME/Documents/edit/copy"
 MASTER="$HOME/Documents/edit/copy-concatenated-29.97fps.mp4"
 OUTPUT="$HOME/Documents/edit/copy-concatenated-rife4.26-60fps.mp4"
 
-resolve-concat "$INPUT_DIR" --concat-only --output "$MASTER" --mode auto \
+framestudio-concat "$INPUT_DIR" --concat-only --output "$MASTER" --mode auto \
   --audio-normalization off --performance-mode off --force
 
 # This is the normal integrated command; it concatenates once and uses RVE
 # when available, otherwise the validated FFmpeg fallback.
-resolve-concat "$INPUT_DIR" --engine rve --output "$OUTPUT" \
+framestudio-concat "$INPUT_DIR" --engine rve --output "$OUTPUT" \
   --performance-mode auto --force
 ```
 
@@ -587,11 +594,11 @@ master with `--concat-only`, then run:
 INPUT_FRAMES=$(ffprobe -v error -select_streams v:0 \
   -show_entries stream=nb_frames -of csv=p=0 "$MASTER")
 TARGET_FRAMES=$((INPUT_FRAMES * 2))
-FPS_PYTHON="$HOME/.cache/resolve-fps/trt/bin/python"
-FPS_SITE="$HOME/.cache/resolve-fps/trt/lib/python3.13/site-packages"
-FPS_SCRIPT="$HOME/.cache/resolve-fps/benchmark.vpy"
-TRT_CACHE="$HOME/.cache/resolve-fps/engines-pixel-fallback"
-BESTSOURCE="$HOME/.cache/resolve-fps/plugins/usr/lib/python3.14/site-packages/vapoursynth/plugins/libbestsource.so"
+FPS_PYTHON="$HOME/.cache/framestudio-fps/trt/bin/python"
+FPS_SITE="$HOME/.cache/framestudio-fps/trt/lib/python3.13/site-packages"
+FPS_SCRIPT="$HOME/.cache/framestudio-fps/benchmark.vpy"
+TRT_CACHE="$HOME/.cache/framestudio-fps/engines-pixel-fallback"
+BESTSOURCE="$HOME/.cache/framestudio-fps/plugins/usr/lib/python3.14/site-packages/vapoursynth/plugins/libbestsource.so"
 PARTIAL="$OUTPUT.partial.mp4"
 
 SOURCE="$MASTER" MODEL=4.26 TRT_CACHE="$TRT_CACHE" INPUT_FORMAT=RGBH \
@@ -646,7 +653,7 @@ nvidia-smi
 ffmpeg -hide_banner -decoders | grep cuvid
 ffmpeg -hide_banner -encoders | grep -E 'dnxhd|ffv1_vulkan'
 powerprofilesctl get
-resolve-media --dry-run --root ~/Documents/edit
+framestudio-media --dry-run --root ~/Documents/edit
 ```
 
 The implementation keeps the source safe by using atomic partial outputs,
@@ -654,7 +661,7 @@ ffprobe verification, automatic GPU-to-CPU fallback for lossless mode, and
 `gio trash` only after successful verification. Performance mode restoration is
 also guarded so a profile changed externally is not overwritten. If the TUI or
 conversion path misbehaves, rerun with
-`resolve-media --profile fast --gpu off --keep-originals`; this gives a
+`framestudio-media --profile fast --gpu off --keep-originals`; this gives a
 non-destructive recovery path. Use `--profile lossless --gpu off` to force the
 CPU lossless encoder.
 
@@ -666,17 +673,19 @@ From this directory:
 ./install.sh
 ```
 
-This creates `~/bin/resolve-media` and `~/bin/resolve-concat`; the requested
-environment already has `~/bin` on `PATH`. It also installs
-`~/bin/resolve-editor`. FFmpeg (`ffmpeg` and `ffprobe`) and the GTK 4/PyGObject
+This creates `~/bin/framestudio`, `~/bin/framestudio-media`,
+`~/bin/framestudio-concat`, and `~/bin/framestudio-fps`; the requested
+environment already has `~/bin` on `PATH`. `framestudio-editor` is an explicit
+editor alias, and the four legacy `resolve-*` command names are installed as
+compatibility aliases. FFmpeg (`ffmpeg` and `ffprobe`) and the GTK 4/PyGObject
 runtime must be installed for the editor.
 
 ## Checks
 
 ```sh
-python3 -m py_compile resolve_media.py tests/test_classification.py
+python3 -m py_compile framestudio_media.py tests/test_classification.py
 python3 -m unittest discover -s tests
-./resolve_media.py --help
-./resolve_media.py --dry-run --root ~/Documents/edit
-resolve-concat --dry-run ~/Documents/edit/copy
+./framestudio_media.py --help
+./framestudio_media.py --dry-run --root ~/Documents/edit
+framestudio-concat --dry-run ~/Documents/edit/copy
 ```

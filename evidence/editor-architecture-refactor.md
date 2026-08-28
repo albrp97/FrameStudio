@@ -12,7 +12,7 @@ commit complete
 ## Outcome
 
 The editor now uses focused implementation modules behind the established
-`resolve_editor.app`, `cli`, `model`, `export`, and `timeline` compatibility
+`framestudio.app`, `cli`, `model`, `export`, and `timeline` compatibility
 paths. Existing GUI, CLI, persistence, playback, editing, export, and legacy
 script behavior remains covered by the protected regression suite.
 
@@ -23,12 +23,12 @@ values are working-tree line counts.
 
 | Compatibility surface | Baseline | Post-change | Focused responsibility |
 |---|---:|---:|---|
-| `resolve_editor/app.py` | 1060 | 463 | GTK application lifecycle and orchestration |
-| `resolve_editor/cli.py` | 693 | 532 | CLI dispatch and compatibility seams |
-| `resolve_editor/model.py` | 533 | 34 | Model compatibility facade |
-| `resolve_editor/export.py` | 936 | 31 | Export compatibility facade |
-| `resolve_editor/timeline.py` | 648 | 490 | GTK timeline compatibility surface |
-| `resolve_editor/ffmpeg_playback.py` | 473 | 576 | Raw-frame playback backend |
+| `framestudio/app.py` | 1060 | 463 | GTK application lifecycle and orchestration |
+| `framestudio/cli.py` | 693 | 532 | CLI dispatch and compatibility seams |
+| `framestudio/model.py` | 533 | 34 | Model compatibility facade |
+| `framestudio/export.py` | 936 | 31 | Export compatibility facade |
+| `framestudio/timeline.py` | 648 | 490 | GTK timeline compatibility surface |
+| `framestudio/ffmpeg_playback.py` | 473 | 576 | Raw-frame playback backend |
 
 Focused implementation modules are below the agreed approximate 600-line
 target. The largest is `ffmpeg_playback.py` at 576 lines.

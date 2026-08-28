@@ -5,9 +5,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.cli import cli_main
-from resolve_editor.model import Project
-from resolve_editor.persistence import load_project, save_project
+from framestudio.cli import cli_main
+from framestudio.model import Project
+from framestudio.persistence import load_project, save_project
 
 
 def make_project(root: Path) -> Project:
@@ -44,10 +44,10 @@ class EditorCliEditingTests(unittest.TestCase):
             root = Path(temporary_directory)
             source = root / "source.mp4"
             source.write_bytes(b"fixture")
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
 
             with patch(
-                "resolve_editor.cli.create_project_from_source",
+                "framestudio.cli.create_project_from_source",
                 return_value=make_project(root),
             ):
                 result, stdout, stderr = run_cli(
@@ -73,7 +73,7 @@ class EditorCliEditingTests(unittest.TestCase):
     def test_split_delete_restore_and_duration_round_trip_by_stable_ids(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             save_project(make_project(root), project_path)
 
             result, stdout, stderr = run_cli(
@@ -132,7 +132,7 @@ class EditorCliEditingTests(unittest.TestCase):
     def test_repeated_delete_is_idempotent_and_does_not_change_segment_identity(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             project.segment_timeline.split(4.0)
             segment_id = project.segment_timeline.segments[1].segment_id
@@ -168,7 +168,7 @@ class EditorCliEditingTests(unittest.TestCase):
     def test_one_source_paste_accepts_the_project_and_expands_the_timeline(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             project.segment_timeline.split(3.0)
             project.segment_timeline.split(6.0)
@@ -205,7 +205,7 @@ class EditorCliEditingTests(unittest.TestCase):
     def test_invalid_split_preserves_the_last_valid_project(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             save_project(make_project(root), project_path)
             before = project_path.read_bytes()
 
@@ -226,8 +226,8 @@ class EditorCliEditingTests(unittest.TestCase):
     def test_save_and_reopen_use_the_same_persisted_project_contract(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
-            copy_path = root / "copy.resolve.json"
+            project_path = root / "edit.framestudio.json"
+            copy_path = root / "copy.framestudio.json"
             save_project(make_project(root), project_path)
 
             result, stdout, stderr = run_cli(

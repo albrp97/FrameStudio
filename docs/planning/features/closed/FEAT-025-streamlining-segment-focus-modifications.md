@@ -15,9 +15,9 @@ after the default-zoom triplicate offset correction request.
 execution remains separately gated by the configured approval policy
 **Last updated:** 2026-08-28
 **Source paths:** `docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
-`docs/specs/future-product-direction.md`, `resolve_editor/app_ui.py`,
-`resolve_editor/app_timeline_actions.py`, `resolve_editor/composition.py`,
-`resolve_editor/model_types.py`, `resolve_editor/operations.py`,
+`docs/specs/future-product-direction.md`, `framestudio/app_ui.py`,
+`framestudio/app_timeline_actions.py`, `framestudio/composition.py`,
+`framestudio/model_types.py`, `framestudio/operations.py`,
 `tests/test_editor_composition.py`, `tests/test_editor_operations.py`,
 `.github/aidd-config.yml`
 **Dependencies:** PHASE-006 visual-modification and triplicate semantics;

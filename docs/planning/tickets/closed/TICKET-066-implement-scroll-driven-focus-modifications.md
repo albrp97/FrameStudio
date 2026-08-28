@@ -18,8 +18,8 @@ requires the configured preimplementation and approval gates
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/features/closed/FEAT-025-streamlining-segment-focus-modifications.md`,
 `docs/planning/tickets/closed/TICKET-065-define-direct-focus-modification-interactions.md`,
-`resolve_editor/app_ui.py`, `resolve_editor/app_timeline_actions.py`,
-`resolve_editor/composition.py`, `resolve_editor/operations.py`,
+`framestudio/app_ui.py`, `framestudio/app_timeline_actions.py`,
+`framestudio/composition.py`, `framestudio/operations.py`,
 `tests/test_editor_composition.py`, `tests/test_editor_operations.py`,
 `tests/test_editor_ui_helpers.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-065 approved interaction contract; existing focus

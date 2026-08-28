@@ -17,8 +17,8 @@ and recorded.
 requires the configured preimplementation and approval gates
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
-`resolve_editor/export_smart_render.py`, `resolve_editor/export_interpolation.py`,
-`resolve_editor/export_delivery.py`, `resolve_concat.py`, `resolve_fps.py`,
+`framestudio/export_smart_render.py`, `framestudio/export_interpolation.py`,
+`framestudio/export_delivery.py`, `framestudio_concat.py`, `framestudio_fps.py`,
 `benchmarks/`, `tests/test_editor_smart_render.py`,
 `tests/test_editor_interpolation.py`, `.github/aidd-config.yml`
 **Dependencies:** PHASE-005 audio policy; PHASE-007 export/interpolation

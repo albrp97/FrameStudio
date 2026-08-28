@@ -78,9 +78,9 @@ terminal.
   single-source interpolation results are verified and published without a
   second fallback render. README behavior documentation was updated.
 - **Status:** passed
-- **Source references:** `resolve_editor/fps_policy.py`,
-  `resolve_editor/export_panel.py`, `resolve_editor/export_estimates.py`,
-  `resolve_editor/export_interpolation.py`, `resolve_editor/app_export.py`,
+- **Source references:** `framestudio/fps_policy.py`,
+  `framestudio/export_panel.py`, `framestudio/export_estimates.py`,
+  `framestudio/export_interpolation.py`, `framestudio/app_export.py`,
   `README.md`
 
 ### E-060-REGRESSION-002 - Focused export regression and real-media coverage
@@ -167,9 +167,9 @@ terminal.
   explicit `ffmpeg-minterpolate` engine selection, rational target-rate
   filtering with bounded frame output, progress reporting, atomic partial
   publication, cleanup, and process cancellation handling. The unified
-  `resolve-concat` parser accepts the same explicit fallback backend.
+  `framestudio-concat` parser accepts the same explicit fallback backend.
 - **Status:** passed
-- **Source references:** `resolve_fps.py`, `resolve_concat.py`,
+- **Source references:** `framestudio_fps.py`, `framestudio_concat.py`,
   `tests/test_fps.py`, `README.md`
 
 ### E-060-FIX-REGRESSION-002 - Missing-RVE fallback regression is green
@@ -204,7 +204,7 @@ terminal.
   and dependency checks completed, but mypy rejected `select_engine` for
   returning the dynamically typed `argparse.Namespace.engine` value.
 - **Status:** failed
-- **Failure:** `resolve_fps.py:1063` reported `no-any-return`.
+- **Failure:** `framestudio_fps.py:1063` reported `no-any-return`.
 - **Fix:** Added an explicit string type guard before returning the selected
   engine.
 
@@ -214,7 +214,7 @@ terminal.
 - **Category:** functionality
 - **Setup:** GTK 4/PyGObject imported successfully; a temporary 320x180,
   10-FPS, 2-second FFmpeg test source was opened with
-  `resolve_editor.py --source`.
+  `framestudio.py --source`.
 - **Steps:** Opened **Export video**, inspected the export summary, opened the
   output-FPS dropdown, and started the export with the default settings.
 - **Expected:** The panel is readable without an assumptions wall of text,
@@ -323,7 +323,7 @@ second render.
   `rve-4.26`; after the focused fix, all 7 export-panel tests passed and the
   notice names the requested backend.
 - **Status:** passed
-- **Source references:** `resolve_editor/export_panel.py`,
+- **Source references:** `framestudio/export_panel.py`,
   `tests/test_editor_export_panel.py`
 
 ### E-060-QUALITY-002 - Quality suite after final panel fix
@@ -399,8 +399,8 @@ second render.
   cancellation, artifact validation, verification, cleanup, and atomic
   publication.
 - **Status:** passed
-- **Source references:** `resolve_editor/interpolation.py`,
-  `resolve_editor/export_interpolation.py`,
+- **Source references:** `framestudio/interpolation.py`,
+  `framestudio/export_interpolation.py`,
   `tests/test_editor_interpolation.py`,
   `tests/test_editor_export_execution.py`
 
@@ -559,11 +559,11 @@ second render.
   concatenate prepared media at the slowest input FPS, and invoke interpolation
   exactly once on the unified master.
 - **Observed:** The new regression module could not import the not-yet-created
-  `resolve_editor.export_smart_render` surface. This is the expected failing
+  `framestudio.export_smart_render` surface. This is the expected failing
   regression before implementation.
 - **Status:** failed-before-fix
 - **Failure:** `ModuleNotFoundError: No module named
-  'resolve_editor.export_smart_render'`
+  'framestudio.export_smart_render'`
 
 ### E-060-IMPLEMENTATION-003 - Concat-first smart-render staging
 
@@ -578,8 +578,8 @@ second render.
   prepared master to interpolation. Non-keyframe boundaries retain the
   decoded safe route.
 - **Status:** passed
-- **Source references:** `resolve_editor/export_smart_render.py`,
-  `resolve_editor/export_interpolation.py`,
+- **Source references:** `framestudio/export_smart_render.py`,
+  `framestudio/export_interpolation.py`,
   `tests/test_editor_smart_render.py`,
   `tests/test_editor_export_execution.py`
 
@@ -675,14 +675,14 @@ second render.
   FPS command should select the validated FFmpeg fallback and continue without
   changing the source.
 - **Command:** Generate a disposable 10-FPS fixture and run
-  `python3 resolve_fps.py <fixture> --output <output> --performance-mode off`.
+  `python3 framestudio_fps.py <fixture> --output <output> --performance-mode off`.
 - **Expected:** The command selects a usable fallback or reports a clear
   fallback-specific blocker; it must not fail solely because the preferred RVE
   environment is absent.
 - **Observed:** The command exited with status 1 before processing and printed
   `RVE Python environment was not found`.
 - **Status:** failed
-- **Failure:** `resolve_fps.py` always dispatches the default `rve` engine
+- **Failure:** `framestudio_fps.py` always dispatches the default `rve` engine
   directly and has no legacy-command FFmpeg fallback.
 
 ### E-060-FIX-BASELINE-001 - Protected checks before the corrective regression
@@ -727,7 +727,7 @@ second render.
 - **Timestamp:** 2026-08-25T20:54:27+02:00
 - **Category:** functionality
 - **Command:** Generated a disposable 10-FPS, 0.5-second source with AAC
-  audio and ran `python3 resolve_fps.py <source> --output <output>
+  audio and ran `python3 framestudio_fps.py <source> --output <output>
   --encoder libx264 --performance-mode off`.
 - **Expected:** The missing RVE environment is reported, the FFmpeg fallback
   completes at 60 FPS, source media is unchanged, and partial output is
@@ -773,10 +773,10 @@ second render.
 - **Category:** review
 - **Expected:** The corrective scope is technically reviewed against the
   active ticket, protected behavior, configured analysis, and delivery gates.
-- **Observed:** `resolve_fps.py` keeps RVE as the preferred backend, selects
+- **Observed:** `framestudio_fps.py` keeps RVE as the preferred backend, selects
   the validated FFmpeg fallback when RVE prerequisites are absent, and
   preserves atomic output, cleanup, source safety, audio copying, and exact
-  frame limits. `resolve_concat.py` accepts the explicit fallback engine.
+  frame limits. `framestudio_concat.py` accepts the explicit fallback engine.
   The local quality command and `.github/workflows/quality.yml` use the same
   `make quality PYTHON=.venv/bin/python` workflow. No Git remote or upstream
   is configured, so remote checks cannot run.
@@ -803,7 +803,7 @@ second render.
   TensorRT 10.14.1.48.post1 with RIFE 4.26 and the selective
   `aten.pixel_shuffle` PyTorch fallback.
 - **Status:** passed
-- **Source references:** `resolve_fps.py`, `tests/test_fps.py`,
+- **Source references:** `framestudio_fps.py`, `tests/test_fps.py`,
   `FPS-ENHANCEMENT-RESEARCH.md`, `tools/rve-corrected-profile.patch`
 
 ### E-060-FUNCTIONALITY-006 - Corrected RVE one-minute 1080p benchmark
@@ -931,8 +931,8 @@ second render.
   frame count, while direct and legacy interpolation retain their existing
   source-derived behavior and validation.
 - **Status:** passed
-- **Source references:** `resolve_editor/export_smart_render.py`,
-  `resolve_editor/export_interpolation.py`,
+- **Source references:** `framestudio/export_smart_render.py`,
+  `framestudio/export_interpolation.py`,
   `tests/test_editor_smart_render.py`
 
 ### E-060-FIX-REGRESSION-006 - Frame-count correction focused verification
@@ -1042,7 +1042,7 @@ second render.
   `run_export_job` integration surface.
 - **Status:** failed-before-fix
 - **Failure:** `ImportError: cannot import name 'run_export_job' from
-  resolve_editor.app_export`.
+  framestudio.app_export`.
 
 ### E-060-FIX-IMPLEMENTATION-004 - Temporary editor export performance mode
 
@@ -1051,15 +1051,15 @@ second render.
 - **Requirement:** When an editor export starts, select the system
   performance profile for the worker lifetime and restore the captured
   profile on every terminal path.
-- **Observed:** Added the shared `resolve_editor.performance` helper,
+- **Observed:** Added the shared `framestudio.performance` helper,
   retained the legacy scripts' public `PerformanceMode` import behavior,
   wrapped editor planning and execution in `run_export_job`, and routed
   profile errors through the existing GTK completion/error path. If
   `powerprofilesctl` is unavailable, the export continues without claiming
   that a profile change occurred.
 - **Status:** passed
-- **Source references:** `resolve_editor/performance.py`,
-  `resolve_editor/app_export.py`, `resolve_concat.py`,
+- **Source references:** `framestudio/performance.py`,
+  `framestudio/app_export.py`, `framestudio_concat.py`,
   `tests/test_editor_performance.py`
 
 ### E-060-FIX-REGRESSION-008 - Performance restoration focused verification
@@ -1090,7 +1090,7 @@ second render.
 - **Status:** failed
 - **Failure:** Ruff format-check and lint findings in
   `tests/test_editor_performance.py` and import ordering in
-  `resolve_editor/app_export.py`.
+  `framestudio/app_export.py`.
 - **Fix:** Applied the repository Ruff formatter and made the focused lint
   corrections.
 
@@ -1156,8 +1156,8 @@ second render.
   without leaving the system in the temporary performance profile.
 - **Observed:** User response: `works perfect`.
 - **Status:** passed
-- **Source references:** `resolve_editor/app_export.py`,
-  `resolve_editor/performance.py`
+- **Source references:** `framestudio/app_export.py`,
+  `framestudio/performance.py`
 
 ### E-060-FIX-REVIEW-005 - User-validation gate resolved
 

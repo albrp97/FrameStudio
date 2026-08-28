@@ -38,8 +38,8 @@ FEAT-026 -> TICKET-076`
   `-map 0:v:0 -an -c:v copy` before concat-demuxer stream copy, and validates
   frame count and duration before accepting the join.
 - **Status:** passed
-- **Source references:** `resolve_editor/export_interpolation.py`,
-  `resolve_editor/export_smart_render.py`,
+- **Source references:** `framestudio/export_interpolation.py`,
+  `framestudio/export_smart_render.py`,
   `tests/test_editor_smart_render.py`,
   `tests/test_editor_export_execution.py`
 

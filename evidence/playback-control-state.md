@@ -8,8 +8,8 @@
 **Status:** passedWithConcerns
 **Planning chain:** `OBJ-001 -> SCOPE-001 -> CAP-002/CAP-012 -> PHASE-001 ->
 FEAT-002 -> TICKET-003`
-**Source references:** `resolve_editor/playback.py`,
-`resolve_editor/ffmpeg_playback.py`, `tests/test_editor_playback.py`,
+**Source references:** `framestudio/playback.py`,
+`framestudio/ffmpeg_playback.py`, `tests/test_editor_playback.py`,
 `tests/test_editor_ffmpeg_playback.py`
 **Evidence path:** `evidence/playback-control-state.md`
 

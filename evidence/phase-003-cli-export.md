@@ -31,7 +31,7 @@ PHASE-003 -> FEAT-008 -> TICKET-015`
   failures are reported without a false final success.
 - **Observed:** 2 tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/cli.py`,
+- **Artifacts:** `framestudio/cli.py`,
   `tests/test_editor_cli_export.py`.
 - **Failure:** none.
 - **Fix:** none.
@@ -41,15 +41,15 @@ PHASE-003 -> FEAT-008 -> TICKET-015`
 - **Category:** functionality
 - **Command or steps:** Generated a one-second source with FFmpeg, imported,
   split, deleted a segment, and exported through
-  `python3 resolve_editor.py export`.
+  `python3 framestudio.py export`.
 - **Expected:** The selected route and verification state are reported; the
   published output is probeable and the source remains unchanged.
 - **Observed:** The command reported `stream-copy` and `verified: true`.
   FFprobe found a playable 320x180 H.264 video output; temporary artifacts
   were removed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/export.py`,
-  `resolve_editor/operations.py`, disposable FFmpeg/ffprobe output.
+- **Artifacts:** `framestudio/export.py`,
+  `framestudio/operations.py`, disposable FFmpeg/ffprobe output.
 - **Failure:** none.
 - **Fix:** none.
 - **Accepted warning:** Stream-copy timing follows the existing conservative
@@ -71,7 +71,7 @@ PHASE-003 -> FEAT-008 -> TICKET-015`
 - **Requirement:** Given an export destination that resolves to the project
   file, the CLI should reject the request before planning or executing FFmpeg
   and preserve the project bytes.
-- **Fix:** Added a destination guard in `resolve_editor/cli.py` and a regression
+- **Fix:** Added a destination guard in `framestudio/cli.py` and a regression
   test in `tests/test_editor_cli_export.py`.
 - **Focused baseline:** The new regression initially failed with
   `AssertionError: 0 != 3`, confirming the unsafe behavior.

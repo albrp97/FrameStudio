@@ -22,7 +22,7 @@ unavailable and are recorded as an accepted warning.
 `docs/specs/capability-map.md`,
 `docs/planning/phases/open/PHASE-002-cutting-and-exporting-one-source-safely.md`,
 `docs/planning/features/open/FEAT-004-removing-unwanted-portions-from-one-source.md`,
-`resolve_editor/app.py`, `resolve_editor/model.py`, and the user-provided
+`framestudio/app.py`, `framestudio/model.py`, and the user-provided
 failure screenshot
 **Dependencies:** TICKET-007 and TICKET-008; existing shared movement
 operation and timeline persistence

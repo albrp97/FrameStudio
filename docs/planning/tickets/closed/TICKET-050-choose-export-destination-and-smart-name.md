@@ -20,8 +20,8 @@ ticket-execution approval
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/features/closed/FEAT-021-planning-export-destination-and-estimates.md`,
 `docs/planning/tickets/closed/TICKET-048-define-target-fps-selection-and-enhancement-scope.md`,
-`resolve_editor/app_export.py`, `resolve_editor/app_ui.py`,
-`resolve_editor/operations.py`, `resolve_editor/persistence.py`,
+`framestudio/app_export.py`, `framestudio/app_ui.py`,
+`framestudio/operations.py`, `framestudio/persistence.py`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-048; current destination conflict guard; GTK
 file-selection support; project/source naming information

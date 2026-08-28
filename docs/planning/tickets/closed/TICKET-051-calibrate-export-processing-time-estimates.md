@@ -20,7 +20,7 @@ ticket-execution approval
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/features/closed/FEAT-021-planning-export-destination-and-estimates.md`,
 `docs/planning/tickets/closed/TICKET-048-define-target-fps-selection-and-enhancement-scope.md`,
-`resolve_editor/export_process.py`, `resolve_fps.py`, `resolve_concat.py`,
+`framestudio/export_process.py`, `framestudio_fps.py`, `framestudio_concat.py`,
 `FPS-ENHANCEMENT-RESEARCH.md`, `benchmarks/`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-048; measured local interpolation and export
 throughput; source duration and frame-rate probes; existing progress metrics

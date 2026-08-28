@@ -17,9 +17,9 @@ and work and modify"
 **Source paths:** `README.md`, `AGENTS.md`, `.github/aidd-config.yml`,
 `docs/planning/phases.md`, `docs/planning/features.md`,
 `docs/planning/backlog.md`, `docs/planning/repo-map.md`,
-`resolve_editor/model.py`, `resolve_editor/export.py`,
-`resolve_editor/app.py`, `resolve_editor/cli.py`,
-`resolve_editor/timeline.py`, `resolve_editor/ffmpeg_playback.py`
+`framestudio/model.py`, `framestudio/export.py`,
+`framestudio/app.py`, `framestudio/cli.py`,
+`framestudio/timeline.py`, `framestudio/ffmpeg_playback.py`
 **Affected IDs:** PHASE-004A, FEAT-013, TICKET-030, PHASE-005,
 PHASE-006, PHASE-007, CAP-012
 **Last updated:** 2026-08-22
@@ -45,9 +45,9 @@ objective, output contract, editing semantics, or future feature scope.
    verifiable refactor outcome.
 3. Extract focused implementation modules for the domain model, export and
    playback, GUI and timeline, and CLI boundaries.
-4. Keep `resolve_editor.model`, `resolve_editor.export`,
-   `resolve_editor.app`, `resolve_editor.cli`, `resolve_editor.timeline`, and
-   `resolve_editor.ffmpeg_playback` as compatibility facades where existing
+4. Keep `framestudio.model`, `framestudio.export`,
+   `framestudio.app`, `framestudio.cli`, `framestudio.timeline`, and
+   `framestudio.ffmpeg_playback` as compatibility facades where existing
    tests and callers rely on those paths.
 5. Preserve the current GUI, CLI, persistence, playback, editing, export,
    legacy-script, and source-safety behavior. No new product capability is

@@ -14,8 +14,8 @@ validation is required before closure
 - **Category:** implementation
 - **Requirement:** Preview and export apply one persisted decision to every
   segment from the same source.
-- **Command or source:** `resolve_editor/export_ffmpeg.py`,
-  `resolve_editor/ffmpeg_playback.py`,
+- **Command or source:** `framestudio/export_ffmpeg.py`,
+  `framestudio/ffmpeg_playback.py`,
   `tests/test_editor_audio_delivery.py`,
   `tests/test_editor_ffmpeg_playback.py`
 - **Expected:** Every source audio filter uses the source decision; no
@@ -92,7 +92,7 @@ validation is required before closure
 - **Requirement:** Audio helper processes are reaped even when they exit
   between lifecycle checks or when preview startup fails.
 - **Command:** `python3 -m unittest tests.test_editor_ffmpeg_playback`;
-  `.venv/bin/python -m ruff check resolve_editor/ffmpeg_playback.py`
+  `.venv/bin/python -m ruff check framestudio/ffmpeg_playback.py`
 - **Expected:** Cleanup remains explicit, typed, and free of uncaught process
   lifecycle errors.
 - **Observed:** 8 playback tests passed and Ruff reported no findings after

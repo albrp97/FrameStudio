@@ -23,8 +23,8 @@ PHASE-006 ticket set; the completed outcome was confirmed by the user on
 `docs/planning/tickets/open/TICKET-045-expose-focused-edits-through-cli-and-gui-parity.md`,
 `docs/planning/features/open/FEAT-019-delivering-focused-compositions-safely.md`,
 `docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`,
-`resolve_editor/export_planning.py`, `resolve_editor/export_ffmpeg.py`,
-`resolve_editor/export_delivery.py`, `.github/aidd-config.yml`
+`framestudio/export_planning.py`, `framestudio/export_ffmpeg.py`,
+`framestudio/export_delivery.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-044 and TICKET-045; PHASE-005 delivery policy and
 fixed 1920x1080 render profile
 **Risks:** composition may be routed through unsafe stream copy, transforms

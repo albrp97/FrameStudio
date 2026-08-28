@@ -248,7 +248,7 @@ def load_source(
     worker = threading.Thread(
         target=_load_source_worker,
         args=(window, selected_paths, generation, glib),
-        name="resolve-editor-source-loader",
+        name="framestudio-editor-source-loader",
         daemon=True,
     )
     try:

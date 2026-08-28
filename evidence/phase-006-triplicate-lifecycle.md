@@ -12,8 +12,8 @@ terminal
 ### E-043-001 - Linked-group lifecycle
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/model_timeline.py`,
-  `resolve_editor/model_types.py`, `resolve_editor/operations.py`,
+- **Source references:** `framestudio/model_timeline.py`,
+  `framestudio/model_types.py`, `framestudio/operations.py`,
   `tests/test_editor_composition.py`
 - **Expected:** Split and copy/paste create independent groups; move,
   delete/restore, reorder, clean, and disable keep group membership atomic.

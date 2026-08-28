@@ -18,8 +18,8 @@ requires the configured preimplementation and approval gates
 **Source paths:** `docs/planning/features/closed/FEAT-025-streamlining-segment-focus-modifications.md`,
 `docs/planning/tickets/closed/TICKET-066-implement-scroll-driven-focus-modifications.md`,
 `docs/planning/tickets/closed/TICKET-067-correct-zoomed-focus-coordinate-bounds.md`,
-`resolve_editor/persistence.py`, `resolve_editor/cli.py`,
-`resolve_editor/cli_payload.py`, `resolve_editor/operations.py`,
+`framestudio/persistence.py`, `framestudio/cli.py`,
+`framestudio/cli_payload.py`, `framestudio/operations.py`,
 `tests/test_editor_persistence.py`, `tests/test_editor_cli_editing.py`,
 `tests/test_editor_cli_parity.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-066 and TICKET-067; existing versioned project and

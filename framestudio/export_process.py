@@ -296,7 +296,7 @@ def run_ffmpeg(
 
         cancellation_watcher = threading.Thread(
             target=watch_cancellation,
-            name="resolve-editor-ffmpeg-cancel",
+            name="framestudio-editor-ffmpeg-cancel",
             daemon=True,
         )
         cancellation_watcher.start()

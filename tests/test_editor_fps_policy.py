@@ -1,7 +1,7 @@
 import unittest
 from fractions import Fraction
 
-from resolve_editor.fps_policy import (
+from framestudio.fps_policy import (
     FrameRatePolicyError,
     canonical_rate,
     resolve_frame_rate_policy,

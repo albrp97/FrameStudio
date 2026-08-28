@@ -86,7 +86,7 @@ does not claim editor behavior has been implemented.
 
 ## Protected behavior
 
-The existing `resolve_media.py`, `resolve_concat.py`, and `resolve_fps.py`
+The existing `framestudio_media.py`, `framestudio_concat.py`, and `framestudio_fps.py`
 commands, their tests, existing installation wrappers, and source-safe
 output behavior remain available and unchanged.
 

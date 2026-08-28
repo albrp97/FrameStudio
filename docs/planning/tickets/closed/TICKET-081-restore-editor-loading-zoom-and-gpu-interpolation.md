@@ -13,10 +13,10 @@
 **Approval:** User-requested regression fix; execution remains subject to the
 configured evidence, review, user-validation, and delivery gates
 **Last updated:** 2026-08-28
-**Source paths:** `resolve_editor/app.py`, `resolve_editor/app_project.py`,
-`resolve_editor/app_timeline_actions.py`, `resolve_editor/interpolation.py`,
-`resolve_editor/fps_policy.py`, `resolve_editor/timeline_geometry.py`,
-`resolve_editor/timeline.py`, `.github/aidd-config.yml`
+**Source paths:** `framestudio/app.py`, `framestudio/app_project.py`,
+`framestudio/app_timeline_actions.py`, `framestudio/interpolation.py`,
+`framestudio/fps_policy.py`, `framestudio/timeline_geometry.py`,
+`framestudio/timeline.py`, `.github/aidd-config.yml`
 **Dependencies:** existing PHASE-008 editor lifecycle; validated RVE runtime;
 FFmpeg/ffprobe; representative local media
 **Risks:** worker/UI races can attach stale projects, sub-100% geometry can

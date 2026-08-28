@@ -80,15 +80,15 @@ terminal.
   than falling back to the persisted project policy.
 - **Baseline:** The new regression test failed with
   `enhancement_enabled` reported as `True` despite `--no-enhance-fps`.
-- **Fix:** `resolve_editor/cli_export.py` now preserves `FrameRatePolicy`
+- **Fix:** `framestudio/cli_export.py` now preserves `FrameRatePolicy`
   instances when selecting the policy used for export reporting and estimates.
 - **Focused test:** `python3 -m unittest tests.test_editor_cli_export.EditorCliExportTests.test_export_plan_reports_frame_rate_policy_object_override`
 - **Observed:** 1 test passed.
 - **Regression suite:** `python3 -m unittest tests.test_editor_cli_export`
 - **Observed:** 10 tests passed.
-- **Compilation:** `python3 -m py_compile resolve_editor/cli_export.py tests/test_editor_cli_export.py`
+- **Compilation:** `python3 -m py_compile framestudio/cli_export.py tests/test_editor_cli_export.py`
 - **Observed:** passed.
-- **Real CLI check:** `python3 resolve_editor.py export-plan ... --no-enhance-fps --upscale-enhancement`
+- **Real CLI check:** `python3 framestudio.py export-plan ... --no-enhance-fps --upscale-enhancement`
 - **Observed:** emitted `enhancement_enabled: false`.
 - **Remaining gaps:** Mixed-source frame-rate conversion, portrait/triplicate
   real-media export, user validation, review, and configured delivery gates
@@ -112,7 +112,7 @@ terminal.
 - **Affected suites:** `python3 -m unittest tests.test_editor_export_execution tests.test_editor_smart_render tests.test_editor_export`
 - **Observed:** 39 tests passed.
 - **Real-media fixture:** Exported
-  `mixed.resolve.json` with `--no-enhance-fps --upscale-enhancement` to
+  `mixed.framestudio.json` with `--no-enhance-fps --upscale-enhancement` to
   `/tmp/mixed-upscale-fixed-2.mp4`.
 - **Observed:** playable MP4, 1920x1080, `60/1`, 240 video frames, no partial
   output remained; the 4.021333-second container duration is within the

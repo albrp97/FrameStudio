@@ -33,8 +33,8 @@ FEAT-021 -> TICKET-050/TICKET-051/TICKET-052`
 - **Expected:** Planning and panel tests pass without creating output media.
 - **Observed:** 235 tests passed; compilation and diff checks passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/export_naming.py`,
-  `resolve_editor/export_estimates.py`, `resolve_editor/export_panel.py`,
+- **Artifacts:** `framestudio/export_naming.py`,
+  `framestudio/export_estimates.py`, `framestudio/export_panel.py`,
   `tests/test_editor_export_planning.py`,
   `tests/test_editor_export_panel.py`
 
@@ -48,7 +48,7 @@ FEAT-021 -> TICKET-050/TICKET-051/TICKET-052`
 - **Expected:** Estimate calculations remain deterministic and monotonic.
 - **Observed:** The focused export-planning suite passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/export_estimates.py`
+- **Artifacts:** `framestudio/export_estimates.py`
 
 ### E-007-PLAN-003 — Export-panel user validation
 

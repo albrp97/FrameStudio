@@ -18,8 +18,8 @@ requires the configured preimplementation and approval gates
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/features/closed/FEAT-024-optimizing-cursor-driven-preview.md`,
 `docs/planning/tickets/closed/TICKET-061-research-lossless-cut-preview-architecture.md`,
-`resolve_editor/app_playback.py`, `resolve_editor/ffmpeg_playback.py`,
-`resolve_editor/timeline.py`, `benchmarks/`, `tests/test_editor_playback.py`,
+`framestudio/app_playback.py`, `framestudio/ffmpeg_playback.py`,
+`framestudio/timeline.py`, `benchmarks/`, `tests/test_editor_playback.py`,
 `tests/test_editor_timeline.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-061 research notes; representative local media;
 repeatable pointer-event or harness input; target workstation

@@ -28,7 +28,7 @@ documentation, and future phase entry conditions
 
 Maintainers can locate and modify one editor responsibility without navigating
 an oversized module, while existing callers continue to use the established
-`resolve_editor` module paths.
+`framestudio` module paths.
 
 ## Scope
 

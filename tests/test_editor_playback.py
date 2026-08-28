@@ -1,6 +1,6 @@
 import unittest
 
-from resolve_editor.playback import (
+from framestudio.playback import (
     PlaybackBackendError,
     PlaybackController,
     PlaybackState,

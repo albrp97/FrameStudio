@@ -23,7 +23,7 @@ PHASE-006 ticket set; the completed outcome was confirmed by the user on
 `docs/planning/tickets/open/TICKET-039-implement-segment-focus-controls.md`,
 `docs/planning/features/open/FEAT-017-editing-reusable-visual-focus-controls.md`,
 `docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`,
-`resolve_editor/operations.py`, `resolve_editor/model_project.py`,
+`framestudio/operations.py`, `framestudio/model_project.py`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-038 and TICKET-039; existing atomic block
 movement, split, delete/restore, selection, and copy/paste operations

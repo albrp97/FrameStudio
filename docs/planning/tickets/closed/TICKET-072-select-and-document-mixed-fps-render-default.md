@@ -19,8 +19,8 @@ requires the configured preimplementation and approval gates
 **Source paths:** `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
 `docs/planning/tickets/closed/TICKET-070-benchmark-concat-first-enhancement-strategy.md`,
 `docs/planning/tickets/closed/TICKET-071-benchmark-per-source-enhancement-strategy.md`,
-`resolve_editor/export_planning.py`, `resolve_editor/export_smart_render.py`,
-`resolve_editor/export_interpolation.py`, `README.md`,
+`framestudio/export_planning.py`, `framestudio/export_smart_render.py`,
+`framestudio/export_interpolation.py`, `README.md`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-070 and TICKET-071 terminal comparison evidence;
 review and user approval for any production routing change

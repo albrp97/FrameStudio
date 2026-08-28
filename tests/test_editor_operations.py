@@ -3,11 +3,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.export import ExportPlan
-from resolve_editor.fps_policy import FrameRatePolicy
-from resolve_editor.media import MediaProbe
-from resolve_editor.model import Project, ProjectValidationError
-from resolve_editor.operations import (
+from framestudio.export import ExportPlan
+from framestudio.fps_policy import FrameRatePolicy
+from framestudio.media import MediaProbe
+from framestudio.model import Project, ProjectValidationError
+from framestudio.operations import (
     copy_segments,
     create_project_from_source,
     export_destination_conflicts_with_project,
@@ -53,13 +53,13 @@ class EditorOperationsTests(unittest.TestCase):
     def test_export_destination_conflict_uses_resolved_project_paths(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project_path.write_text("project", encoding="utf-8")
 
             self.assertTrue(
                 export_destination_conflicts_with_project(
                     project_path,
-                    root / "." / "edit.resolve.json",
+                    root / "." / "edit.framestudio.json",
                 )
             )
             self.assertFalse(
@@ -82,7 +82,7 @@ class EditorOperationsTests(unittest.TestCase):
             source.write_bytes(b"fixture")
 
             with patch(
-                "resolve_editor.operations.probe_media",
+                "framestudio.operations.probe_media",
                 return_value=make_probe(root),
             ) as probe:
                 project = create_project_from_source(source)
@@ -155,11 +155,11 @@ class EditorOperationsTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.operations.probe_media",
+                    "framestudio.operations.probe_media",
                     return_value=make_probe(root),
                 ),
                 patch(
-                    "resolve_editor.operations.plan_export",
+                    "framestudio.operations.plan_export",
                     return_value=expected,
                 ) as plan,
             ):
@@ -224,18 +224,18 @@ class EditorOperationsTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.operations.probe_media",
+                    "framestudio.operations.probe_media",
                     side_effect=(
                         make_probe(root),
                         make_probe(root),
                     ),
                 ),
                 patch(
-                    "resolve_editor.operations.ensure_project_audio_analysis",
+                    "framestudio.operations.ensure_project_audio_analysis",
                     return_value={},
                 ),
                 patch(
-                    "resolve_editor.operations.plan_mixed_export",
+                    "framestudio.operations.plan_mixed_export",
                     return_value=expected,
                 ) as plan,
             ):

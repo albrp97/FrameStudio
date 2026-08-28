@@ -17,8 +17,8 @@ target-specific checks remain recorded as accepted warnings.
 **Provider:** auto; base and target branches are not configured in
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/tickets/closed/TICKET-008-split-delete-editor-workflow.md`,
-`resolve_editor/app_playback.py`, `resolve_editor/app_timeline_actions.py`,
-`resolve_editor/model_timeline.py`, and the user-reported B-key failure
+`framestudio/app_playback.py`, `framestudio/app_timeline_actions.py`,
+`framestudio/model_timeline.py`, and the user-reported B-key failure
 **Dependencies:** Existing split/delete editor workflow and playback/timeline
 position mapping
 **Risks:** splitting at the wrong coordinate could corrupt segment boundaries,

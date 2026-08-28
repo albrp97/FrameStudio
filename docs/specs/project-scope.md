@@ -126,7 +126,7 @@ children.
 - New timeline/edit-state model.
 - New export planning and FFmpeg integration.
 - New CLI/agent automation surface.
-- Existing `resolve_media.py`, `resolve_concat.py`, and `resolve_fps.py` as
+- Existing `framestudio_media.py`, `framestudio_concat.py`, and `framestudio_fps.py` as
   retained compatibility surfaces.
 - Existing tests and documentation.
 

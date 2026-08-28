@@ -51,7 +51,7 @@ The corrected full-minute output and telemetry are outside this repository:
 
 ```text
 /home/ghiki/Documents/edit/copy-concatenated-29.97fps-parallel-rife-4.26-tensorrt-fp32-corrected-60fps.mp4
-/home/ghiki/.cache/resolve-fps/results/60s-4.26-fp32-corrected-gpu.csv
+/home/ghiki/.cache/framestudio-fps/results/60s-4.26-fp32-corrected-gpu.csv
 ```
 
 Its interpolation stage produced 3,600 frames in 41.61 seconds (86.52
@@ -144,7 +144,7 @@ torch_executed_ops=(
 Use a separate TensorRT cache directory because the normal engine filename
 does not encode the PyTorch fallback set. Run the corrected harness with
 `INPUT_FORMAT=RGBH`, `TRT_TORCH_PIXEL=1`, and a new cache such as
-`/home/ghiki/.cache/resolve-fps/engines-pixel-fallback`. If this patch stops
+`/home/ghiki/.cache/framestudio-fps/engines-pixel-fallback`. If this patch stops
 working after a TensorRT or Torch-TensorRT upgrade, rebuild the engine and
 repeat the raw-frame smoke test before using it for a long render. If it
 fails, use the documented FP32/RGBS path.

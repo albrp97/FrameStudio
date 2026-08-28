@@ -19,8 +19,8 @@ requires the configured preimplementation and approval gates
 **Source paths:** `docs/planning/features/closed/FEAT-024-optimizing-cursor-driven-preview.md`,
 `docs/planning/tickets/closed/TICKET-062-benchmark-current-preview-latency.md`,
 `docs/planning/tickets/closed/TICKET-063-experiment-with-preview-rendering-strategies.md`,
-`resolve_editor/app_playback.py`, `resolve_editor/ffmpeg_playback.py`,
-`resolve_editor/timeline.py`, `README.md`, `tests/test_editor_playback.py`,
+`framestudio/app_playback.py`, `framestudio/ffmpeg_playback.py`,
+`framestudio/timeline.py`, `README.md`, `tests/test_editor_playback.py`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-063 comparison evidence; review of regressions and
 target-workstation behavior

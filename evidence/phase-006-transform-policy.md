@@ -14,9 +14,9 @@ terminal
 - **Category:** implementation
 - **Requirement:** Define deterministic segment-owned visual state on the
   fixed 1920x1080 canvas.
-- **Source references:** `resolve_editor/composition.py`,
-  `resolve_editor/model_types.py`, `resolve_editor/model_project.py`,
-  `resolve_editor/composition_render.py`, `README.md`
+- **Source references:** `framestudio/composition.py`,
+  `framestudio/model_types.py`, `framestudio/model_project.py`,
+  `framestudio/composition_render.py`, `README.md`
 - **Expected:** Zoom, X/Y offsets, defaults, bounds, serialization,
   non-stretching aspect-ratio behavior, and triplicate roles are explicit and
   shared by preview and export.

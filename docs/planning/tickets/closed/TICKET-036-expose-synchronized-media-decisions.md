@@ -17,16 +17,16 @@ remote checks remain unavailable and are recorded as an accepted warning.
 **Owner:** repository planning and implementation in the active worktree
 **Approval:** user-authorized on 2026-08-22 to implement all approved
 PHASE-005 tickets, including source-level audio balancing, with the legacy
-`resolve_concat.py` mean/median policy applied once per input source
+`framestudio_concat.py` mean/median policy applied once per input source
 **Provider:** auto; base and target branches are not configured in
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/features/open/FEAT-016-synchronizing-media-decisions-and-verification.md`,
 `docs/planning/tickets/open/TICKET-032-analyze-and-persist-source-audio-decisions.md`,
 `docs/planning/tickets/open/TICKET-034-benchmark-and-document-delivery-profiles.md`,
 `docs/planning/tickets/open/TICKET-035-route-audio-aware-and-mixed-source-exports-safely.md`,
-`docs/specs/cli-contract.md`, `resolve_editor/app.py`,
-`resolve_editor/cli.py`, `resolve_editor/model.py`,
-`resolve_editor/export.py`, `.github/aidd-config.yml`
+`docs/specs/cli-contract.md`, `framestudio/app.py`,
+`framestudio/cli.py`, `framestudio/model.py`,
+`framestudio/export.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-032, TICKET-034, and TICKET-035; PHASE-004 GUI/CLI
 parity and persistence contracts
 **Risks:** UI, CLI, project state, and exporter can drift; status labels may

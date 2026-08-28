@@ -31,7 +31,7 @@ implementation work.
 | CAP-005 | Rendering fast, valid, and safe outputs | First, then expanded | draft | `project-scope.md`, `FAST-CONCAT-RESEARCH.md` |
 | CAP-006 | Automating the project through a deterministic CLI | First, then expanded | draft | `project-scope.md`, `future-product-direction.md` |
 | CAP-007 | Supporting multiple mixed-media sources | Future | draft | `future-product-direction.md` |
-| CAP-008 | Handling audio per source input | Future | draft | `future-product-direction.md`, `resolve_concat.py` |
+| CAP-008 | Handling audio per source input | Future | draft | `future-product-direction.md`, `framestudio_concat.py` |
 | CAP-009 | Applying reusable visual modifications | Future | draft | `future-product-direction.md` |
 | CAP-010 | Composing linked triplicate focused-action layouts | Future | draft | `future-product-direction.md` |
 | CAP-011 | Enhancing frame rate to 60 FPS | Future | draft | `future-product-direction.md`, `FPS-ENHANCEMENT-RESEARCH.md` |
@@ -41,9 +41,9 @@ implementation work.
 
 ### CAP-001 - Managing projects and source media
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** First  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** First
+**Status:** draft
 **Outcome:** The user can start a project from one source video, inspect the
 source, and keep the source reference separate from the editable project
 state.
@@ -57,19 +57,19 @@ state.
 - Given a project with a source reference, the application should expose the
   source metadata needed for playback, timeline, and export decisions.
 
-**Affected surfaces:** project model, media probing, interface, CLI, FFmpeg.  
-**Dependencies:** `python3`, `ffprobe`, local filesystem, project schema.  
+**Affected surfaces:** project model, media probing, interface, CLI, FFmpeg.
+**Dependencies:** `python3`, `ffprobe`, local filesystem, project schema.
 **Risks:** moved or renamed sources; unsupported codecs; variable-frame-rate
-media; incomplete metadata.  
+media; incomplete metadata.
 **Evidence:** `project-scope.md` current horizon and dependencies;
-`resolve_media.py` and `resolve_concat.py` probing behavior.  
+`framestudio_media.py` and `framestudio_concat.py` probing behavior.
 **Coverage:** first-horizon import and source inspection.
 
 ### CAP-002 - Playing and navigating an edit timeline
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** First  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** First
+**Status:** draft
 **Outcome:** The user can see the edit in real time and control playback
 position through a timeline.
 
@@ -84,18 +84,18 @@ position through a timeline.
   or an unavailable backend prevents immediate output.
 
 **Affected surfaces:** editor interface, playback backend, timeline model,
-manual test harness.  
-**Dependencies:** GUI/runtime choice, playback backend, source media access.  
+manual test harness.
+**Dependencies:** GUI/runtime choice, playback backend, source media access.
 **Risks:** seek latency, frame-accurate positioning, variable-frame-rate
-behavior, UI responsiveness.  
-**Evidence:** `project-scope.md` acceptance outcomes and verification plan.  
+behavior, UI responsiveness.
+**Evidence:** `project-scope.md` acceptance outcomes and verification plan.
 **Coverage:** first-horizon real-time playback, seek, and duration display.
 
 ### CAP-003 - Editing segments non-destructively
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** First, then expanded  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** First, then expanded
+**Status:** draft
 **Outcome:** The user can change which portions of the source appear in the
 edit without changing the source file.
 
@@ -123,19 +123,19 @@ edit without changing the source file.
 - Keep source-level settings distinct from segment-level modifications.
 
 **Affected surfaces:** timeline/edit-state model, interface, project storage,
-CLI, export planner.  
-**Dependencies:** timeline coordinate model, project schema, cut semantics.  
+CLI, export planner.
+**Dependencies:** timeline coordinate model, project schema, cut semantics.
 **Risks:** exact frame boundaries, ripple behavior, gap semantics, invalid
-source ranges, stream-copy limitations.  
+source ranges, stream-copy limitations.
 **Evidence:** `project-scope.md`; `future-product-direction.md` segment editing
-and reusable modifications.  
+and reusable modifications.
 **Coverage:** first-horizon split/delete; future segment operations.
 
 ### CAP-004 - Persisting and reopening edit state
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** First, with future expansion  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** First, with future expansion
+**Status:** draft
 **Outcome:** The user can save an edit and later reopen it with the same
 source reference and decisions.
 
@@ -151,19 +151,19 @@ source reference and decisions.
   audio decisions, transforms, linked triplicate instances, and export
   settings.
 
-**Affected surfaces:** project storage, interface, CLI, migration logic.  
-**Dependencies:** schema/version policy, source relinking policy.  
+**Affected surfaces:** project storage, interface, CLI, migration logic.
+**Dependencies:** schema/version policy, source relinking policy.
 **Risks:** moved files, schema migration, partial writes, incompatible future
-  features.  
+  features.
 **Evidence:** `project-scope.md` definition of done and
-`future-product-direction.md` project-file requirements.  
+`future-product-direction.md` project-file requirements.
 **Coverage:** first-horizon save/reopen; future project evolution.
 
 ### CAP-005 - Rendering fast, valid, and safe outputs
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** First, then expanded  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** First, then expanded
+**Status:** draft
 **Outcome:** The application exports the edited result using the fastest
   valid route without exposing corrupt output or changing the source.
 
@@ -182,20 +182,20 @@ source reference and decisions.
   container, pixel-format, color, audio, and hardware settings.
 
 **Affected surfaces:** export planner, FFmpeg integration, output validation,
-interface, CLI.  
-**Dependencies:** cut semantics, codec/container support, FFmpeg.  
+interface, CLI.
+**Dependencies:** cut semantics, codec/container support, FFmpeg.
 **Risks:** keyframe boundaries, timestamp drift, incompatible streams,
-  hardware-specific behavior, false success from fast but invalid commands.  
+  hardware-specific behavior, false success from fast but invalid commands.
 **Evidence:** `project-scope.md`; `FAST-CONCAT-RESEARCH.md`; existing atomic
-partial-output and verification behavior in `resolve_media.py`.  
+partial-output and verification behavior in `framestudio_media.py`.
 **Coverage:** first-horizon cut export; future smart rendering and delivery
 profiles.
 
 ### CAP-006 - Automating the project through a deterministic CLI
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** First, then expanded  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** First, then expanded
+**Status:** draft
 **Outcome:** Copilot or another agent can inspect and modify the same project
 state that the interface edits.
 
@@ -212,19 +212,19 @@ state that the interface edits.
   unsafe render plans should return structured errors and non-success status.
 
 **Affected surfaces:** CLI, project schema, timeline model, export planner,
-automation tests.  
-**Dependencies:** stable project schema and command/error contract.  
+automation tests.
+**Dependencies:** stable project schema and command/error contract.
 **Risks:** GUI/CLI behavioral drift, ambiguous partial operations, unstable
-  schema, unclear idempotency.  
+  schema, unclear idempotency.
 **Evidence:** `project-scope.md`; `future-product-direction.md` project and
-agent-control requirements.  
+agent-control requirements.
 **Coverage:** first-horizon agentable operations; future full editing model.
 
 ### CAP-007 - Supporting multiple mixed-media sources
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** Future  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** Future
+**Status:** draft
 **Outcome:** The project can combine one or several videos with different
   dimensions, orientations, frame rates, codecs, and audio characteristics
   into a composed timeline.
@@ -240,18 +240,18 @@ agent-control requirements.
 - The final duration should reflect ordering, gaps, and deleted segments.
 
 **Affected surfaces:** project model, timeline, media normalization, preview,
-  export, CLI.  
-**Dependencies:** timeline/track model, output profile, codec policy.  
+  export, CLI.
+**Dependencies:** timeline/track model, output profile, codec policy.
 **Risks:** incompatible timestamps, aspect-ratio decisions, sync drift,
-  normalization cost, unclear multi-track semantics.  
-**Evidence:** `future-product-direction.md` multi-video timeline.  
+  normalization cost, unclear multi-track semantics.
+**Evidence:** `future-product-direction.md` multi-video timeline.
 **Coverage:** future multi-source workflow; not part of first-horizon scope.
 
 ### CAP-008 - Handling audio per source input
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** Future  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** Future
+**Status:** draft
 **Outcome:** The application can automatically handle audio level per input
   video while preserving a consistent decision across that source's
   segments.
@@ -268,20 +268,20 @@ agent-control requirements.
   error, not silent success.
 
 **Affected surfaces:** media analysis, source model, audio pipeline, preview,
-  export, CLI.  
-**Dependencies:** target loudness policy, peak/channel rules, output profile.  
+  export, CLI.
+**Dependencies:** target loudness policy, peak/channel rules, output profile.
 **Risks:** inconsistent source material, clipping, channel layouts, analysis
-  cost, mismatch between preview and final output.  
+  cost, mismatch between preview and final output.
 **Evidence:** `future-product-direction.md`; existing per-clip analysis in
-`resolve_concat.py`.  
+`framestudio_concat.py`.
 **Coverage:** future per-input audio handling; first horizon preserves source
 audio only unless separately approved.
 
 ### CAP-009 - Applying reusable visual modifications
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** Future  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** Future
+**Status:** draft
 **Outcome:** The user can apply visual modifications to one or several
   segments and reuse those modifications elsewhere.
 
@@ -302,20 +302,20 @@ audio only unless separately approved.
 - The system should distinguish shared changes from per-segment overrides.
 
 **Affected surfaces:** transform model, timeline selection, interface,
-  project storage, preview, export, CLI.  
+  project storage, preview, export, CLI.
 **Dependencies:** segment identity, selection model, transform schema, and
   PHASE-004 block-clone semantics.
 **Risks:** conflicting pasted settings, source-versus-segment scope, reset
   behavior for linked groups, preview performance, and future keyframe
   behavior.
-**Evidence:** `future-product-direction.md` segment-level visual controls.  
+**Evidence:** `future-product-direction.md` segment-level visual controls.
 **Coverage:** future reusable segment modifications.
 
 ### CAP-010 - Composing linked triplicate focused-action layouts
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** Future  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** Future
+**Status:** draft
 **Outcome:** The user can activate a three-copy composition that presents
   portrait or vertically focused action in a landscape output.
 
@@ -339,20 +339,20 @@ audio only unless separately approved.
   configurable after their behavior is designed and tested.
 
 **Affected surfaces:** composition model, transform/selection model, preview,
-  timeline, project storage, export, CLI.  
+  timeline, project storage, export, CLI.
 **Dependencies:** multi-source composition, reusable modifications, output
-  canvas policy.  
+  canvas policy.
 **Risks:** linked-state conflicts, aspect-ratio/crop choices, preview cost,
-  automatic focus quality, render complexity.  
+  automatic focus quality, render complexity.
 **Evidence:** `future-product-direction.md` triplicate portrait and
-focused-action mode.  
+focused-action mode.
 **Coverage:** future triplicate feature; no first-horizon implementation.
 
 ### CAP-011 - Enhancing frame rate to 60 FPS
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** Future  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** Future
+**Status:** draft
 **Outcome:** The application can optionally produce a validated 60 FPS result
   using motion interpolation rather than simple frame duplication.
 
@@ -369,20 +369,20 @@ focused-action mode.
   defined.
 
 **Affected surfaces:** timing model, interpolation pipeline, preview, export,
-  CLI, GPU/runtime integration.  
+  CLI, GPU/runtime integration.
 **Dependencies:** multi-source timing semantics, interpolation backend,
-  output profile, local GPU/runtime versions.  
+  output profile, local GPU/runtime versions.
 **Risks:** hallucinated motion, scene-cut artifacts, frame-count drift,
-  hardware-specific failures, high render cost.  
+  hardware-specific failures, high render cost.
 **Evidence:** `FPS-ENHANCEMENT-RESEARCH.md`, `FLOWFRAMES-RESEARCH.md`,
-  `future-product-direction.md`.  
+  `future-product-direction.md`.
 **Coverage:** future optional FPS enhancement.
 
 ### CAP-012 - Protecting media, state, and failure recovery
 
-**Parent links:** OBJ-001, SCOPE-001  
-**Horizon:** Cross-cutting  
-**Status:** draft  
+**Parent links:** OBJ-001, SCOPE-001
+**Horizon:** Cross-cutting
+**Status:** draft
 **Outcome:** Every editing and rendering operation is safe, observable, and
   recoverable.
 
@@ -399,12 +399,12 @@ focused-action mode.
   environment-dependent limitations.
 
 **Affected surfaces:** all editor layers, existing scripts, project storage,
-  export, CLI, tests, evidence.  
-**Dependencies:** error contract, output validation, persistence strategy.  
+  export, CLI, tests, evidence.
+**Dependencies:** error contract, output validation, persistence strategy.
 **Risks:** partial writes, silent subprocess failures, stale project state,
-  unsafe fallback behavior.  
+  unsafe fallback behavior.
 **Evidence:** `vision.md`, `project-scope.md`, `AGENTS.md`, and existing
-  partial-output/verification behavior in the Python scripts.  
+  partial-output/verification behavior in the Python scripts.
 **Coverage:** all first-horizon and future capabilities.
 
 ## Coverage Against Approved Scope
@@ -472,5 +472,5 @@ created by this artifact.
 - [`FAST-CONCAT-RESEARCH.md`](../../FAST-CONCAT-RESEARCH.md)
 - [`FLOWFRAMES-RESEARCH.md`](../../FLOWFRAMES-RESEARCH.md)
 - [`FPS-ENHANCEMENT-RESEARCH.md`](../../FPS-ENHANCEMENT-RESEARCH.md)
-- Existing implementation surfaces: `resolve_media.py`, `resolve_concat.py`,
-  `resolve_fps.py`, and `tests/`.
+- Existing implementation surfaces: `framestudio_media.py`, `framestudio_concat.py`,
+  `framestudio_fps.py`, and `tests/`.

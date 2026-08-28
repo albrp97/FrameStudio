@@ -3,17 +3,18 @@ FFMPEG ?= ffmpeg
 NPX ?= npx
 NPM ?= npm
 STATIC_ANALYSIS_DIR ?= evidence/static-analysis
-QUALITY_PATHS = resolve_editor.py resolve_editor tests/test_editor_*.py \
+QUALITY_PATHS = framestudio.py framestudio tests/test_editor_*.py \
+	tests/test_framestudio_compatibility.py \
 	benchmarks/restoration_benchmark.py tests/test_restoration_benchmark.py \
 	benchmarks/render_strategy_benchmark.py tests/test_render_strategy_benchmark.py \
 	tools/check_dependencies.py
-COMPLEXITY_PATHS = resolve_editor.py resolve_editor/cli.py resolve_editor/operations.py \
+COMPLEXITY_PATHS = framestudio.py framestudio/cli.py framestudio/operations.py \
 	benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py
 
 .PHONY: help setup test compile diff-check check format-check lint type-check \
 	complexity duplication dependency-check dependency-audit security churn \
 	static-analysis quality contract screenshot start editor cli smoke media \
-	concat fps restoration-benchmark install
+		concat fps restoration-benchmark install framestudio
 
 help:
 	@printf '%s\n' \
@@ -24,12 +25,13 @@ help:
 		'make quality    Run all local quality checks and churn analysis' \
 		'make screenshot LABEL=name  Capture the active Wayland window' \
 		'make start      Launch the editor for in-app video selection' \
+		'make framestudio Launch the canonical FrameStudio editor' \
 		'make editor     Launch the GTK editor (pass ARGS="...")' \
 		'make cli        Run deterministic editor CLI commands (pass ARGS="...")' \
 		'make smoke      Run generated-media editor smoke flows' \
-		'make media      Run resolve_media.py (pass ARGS="...")' \
-		'make concat     Run resolve_concat.py (pass ARGS="...")' \
-		'make fps        Run resolve_fps.py (pass ARGS="...")' \
+		'make media      Run framestudio_media.py (pass ARGS="...")' \
+		'make concat     Run framestudio_concat.py (pass ARGS="...")' \
+		'make fps        Run framestudio_fps.py (pass ARGS="...")' \
 		'make restoration-benchmark  Run the research benchmark (pass ARGS="...")' \
 		'make install    Install command wrappers into ~/bin'
 
@@ -42,8 +44,10 @@ test:
 	$(PYTHON) -m unittest discover -s tests
 
 compile:
-	$(PYTHON) -m py_compile resolve_media.py resolve_concat.py resolve_fps.py \
-		resolve_editor.py resolve_editor/*.py benchmarks/*.py tests/*.py tools/*.py
+	$(PYTHON) -m py_compile framestudio_media.py framestudio_concat.py framestudio_fps.py \
+		framestudio.py framestudio/*.py resolve_media.py resolve_concat.py \
+		resolve_fps.py resolve_editor.py resolve_editor/__init__.py \
+		benchmarks/*.py tests/*.py tools/*.py
 
 diff-check:
 	git diff --check
@@ -57,8 +61,8 @@ lint:
 	$(PYTHON) -m ruff check $(QUALITY_PATHS)
 
 type-check:
-	$(PYTHON) -m mypy --config-file pyproject.toml resolve_editor
-	$(PYTHON) -m mypy --config-file pyproject.toml resolve_editor.py
+	$(PYTHON) -m mypy --config-file pyproject.toml framestudio
+	$(PYTHON) -m mypy --config-file pyproject.toml framestudio.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/restoration_benchmark.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/render_strategy_benchmark.py
 	$(PYTHON) -m mypy --config-file pyproject.toml tools/check_dependencies.py
@@ -82,7 +86,7 @@ dependency-audit:
 
 security:
 	@mkdir -p $(STATIC_ANALYSIS_DIR)
-	$(PYTHON) -m bandit -r resolve_editor.py resolve_editor \
+	$(PYTHON) -m bandit -r framestudio.py framestudio \
 		benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py \
 		tools/check_dependencies.py \
 		--configfile pyproject.toml --format json \
@@ -123,32 +127,35 @@ screenshot:
 
 start: editor
 
+framestudio:
+	$(PYTHON) framestudio.py $(ARGS)
+
 editor:
-	$(PYTHON) resolve_editor.py $(ARGS)
+	$(PYTHON) framestudio.py $(ARGS)
 
 cli:
-	$(PYTHON) resolve_editor.py $(ARGS)
+	$(PYTHON) framestudio.py $(ARGS)
 
 smoke:
 	@set -eu; \
-	fixture="$${TMPDIR:-/tmp}/resolve-editor-make-smoke.mp4"; \
-	project="$${TMPDIR:-/tmp}/resolve-editor-make-smoke.resolve.json"; \
+	fixture="$${TMPDIR:-/tmp}/framestudio-editor-make-smoke.mp4"; \
+	project="$${TMPDIR:-/tmp}/framestudio-editor-make-smoke.framestudio.json"; \
 	trap 'rm -f "$$fixture" "$$project"' EXIT INT TERM; \
 	$(FFMPEG) -hide_banner -loglevel error -y \
 		-f lavfi -i testsrc=size=320x180:rate=10 -t 1 \
 		-pix_fmt yuv420p "$$fixture"; \
-	$(PYTHON) resolve_editor.py --source "$$fixture" \
+	$(PYTHON) framestudio.py --source "$$fixture" \
 		--smoke-test --smoke-project "$$project"; \
-	$(PYTHON) resolve_editor.py --project "$$project" --smoke-test
+	$(PYTHON) framestudio.py --project "$$project" --smoke-test
 
 media:
-	$(PYTHON) resolve_media.py $(ARGS)
+	$(PYTHON) framestudio_media.py $(ARGS)
 
 concat:
-	$(PYTHON) resolve_concat.py $(ARGS)
+	$(PYTHON) framestudio_concat.py $(ARGS)
 
 fps:
-	$(PYTHON) resolve_fps.py $(ARGS)
+	$(PYTHON) framestudio_fps.py $(ARGS)
 
 restoration-benchmark:
 	$(PYTHON) benchmarks/restoration_benchmark.py $(ARGS)

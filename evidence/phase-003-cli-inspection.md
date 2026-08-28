@@ -33,7 +33,7 @@ PHASE-003 -> FEAT-007 -> TICKET-013`
   missing sources fail without stdout success output.
 - **Observed:** 3 tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/cli.py`,
+- **Artifacts:** `framestudio/cli.py`,
   `tests/test_editor_cli_inspection.py`.
 - **Failure:** none.
 - **Fix:** none.
@@ -42,7 +42,7 @@ PHASE-003 -> FEAT-007 -> TICKET-013`
 
 - **Category:** functionality
 - **Command or steps:** Generated disposable FFmpeg media, imported it through
-  `python3 resolve_editor.py import`, inspected the saved project, and
+  `python3 framestudio.py import`, inspected the saved project, and
   verified the JSON flow completed without exposing the temporary absolute
   path by default.
 - **Expected:** The executable dispatches inspection through the documented

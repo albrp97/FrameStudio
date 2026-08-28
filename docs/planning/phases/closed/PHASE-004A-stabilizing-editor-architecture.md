@@ -19,7 +19,7 @@ unavailable and are recorded as an accepted warning.
 `docs/planning/repo-map.md`, `docs/planning/reviews/CHG-003-editor-architecture-stabilization.md`,
 `.github/aidd-config.yml`
 **Dependencies:** PHASE-004 complete; `make check` baseline
-**Affected surfaces:** `resolve_editor` module boundaries, tests, Makefile
+**Affected surfaces:** `framestudio` module boundaries, tests, Makefile
 quality paths, README architecture notes, and future phase readiness
 **Evidence path:** `evidence/editor-architecture-refactor.md`
 **Last updated:** 2026-08-22

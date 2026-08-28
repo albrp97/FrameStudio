@@ -6,21 +6,21 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.audio import (
+from framestudio.audio import (
     AudioStats,
     analyze_audio,
     analyze_source_audio,
     audio_filter,
     audio_gain_db,
 )
-from resolve_editor.model import Project, SourceReference
-from resolve_editor.operations import (
+from framestudio.model import Project, SourceReference
+from framestudio.operations import (
     analyze_project_audio,
     copy_segments,
     ensure_project_audio_analysis,
     paste_segments,
 )
-from resolve_editor.persistence import load_project, save_project
+from framestudio.persistence import load_project, save_project
 
 
 def source_reference(
@@ -192,7 +192,7 @@ class EditorAudioPolicyTests(unittest.TestCase):
             settings["status"] = "ready"
             settings["gain_db"] = 1.25
             project.set_source_audio_settings(project.source.source_id, settings)
-            destination = root / "project.resolve.json"
+            destination = root / "project.framestudio.json"
 
             save_project(project, destination)
             restored = load_project(destination)

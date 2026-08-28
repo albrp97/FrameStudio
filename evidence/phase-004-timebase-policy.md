@@ -27,7 +27,7 @@
 
 ### INVARIANTS-001
 
-- Evidence: `resolve_editor/model.py`,
+- Evidence: `framestudio/model.py`,
   `tests/test_editor_mixed_source.py`, and
   `docs/planning/reviews/CHG-001-atomic-segment-block-editing.md`.
 - Observed: Mixed-source identity, timebase, placement, split inheritance,

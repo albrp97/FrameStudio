@@ -19,7 +19,7 @@
 
 ### IMPLEMENTATION-001
 
-- Observed: `resolve_editor/cli.py` exposes mixed import, inspection, movement,
+- Observed: `framestudio/cli.py` exposes mixed import, inspection, movement,
   copying, pasting, relinking, split coordinates, and block state. GUI and CLI
   use shared operations for mutations.
 - Status: `passed`

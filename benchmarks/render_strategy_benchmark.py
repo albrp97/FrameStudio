@@ -559,7 +559,7 @@ def _concat_command(
         raise ValueError("concat target rate and frame count are required for matched benchmark")
     if not paths:
         raise ValueError("concat requires at least one input")
-    from resolve_editor.export_smart_render import build_concat_copy_command
+    from framestudio.export_smart_render import build_concat_copy_command
 
     return build_concat_copy_command(list_path, destination, has_audio=True, ffmpeg_path=ffmpeg)
 
@@ -729,7 +729,7 @@ def _bounded_recommendation(
 
 def _rve_context() -> tuple[list[str], dict[str, str], str] | None:
     try:
-        from resolve_fps import (
+        from framestudio_fps import (
             DEFAULT_FPS_PYTHON,
             DEFAULT_FPS_SITE,
             DEFAULT_RVE_RESTORATION_MODEL,
@@ -880,7 +880,7 @@ def _run_rve_stage(
             )
         )
         return current
-    from resolve_fps import (
+    from framestudio_fps import (
         DEFAULT_FPS_PYTHON,
         DEFAULT_FPS_SITE,
         DEFAULT_RVE_ROOT,

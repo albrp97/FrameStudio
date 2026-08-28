@@ -6,18 +6,18 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.export import (
+from framestudio.export import (
     ExportExecutionError,
     execute_export,
     plan_export,
     plan_mixed_export,
 )
-from resolve_editor.export_interpolation import execute_enhanced_export
-from resolve_editor.export_process import publish_verified_export, run_ffmpeg
-from resolve_editor.fps_policy import FrameRatePolicy
-from resolve_editor.media import MediaProbe, probe_media
-from resolve_editor.model import Segment, SegmentTimeline
-from resolve_editor.upscale_policy import UpscalePolicy
+from framestudio.export_interpolation import execute_enhanced_export
+from framestudio.export_process import publish_verified_export, run_ffmpeg
+from framestudio.fps_policy import FrameRatePolicy
+from framestudio.media import MediaProbe, probe_media
+from framestudio.model import Segment, SegmentTimeline
+from framestudio.upscale_policy import UpscalePolicy
 
 
 @unittest.skipUnless(
@@ -191,7 +191,7 @@ class EditorExportExecutionTests(unittest.TestCase):
                 return probe_media(output)
 
             with patch(
-                "resolve_editor.export_smart_render._run_source_restoration",
+                "framestudio.export_smart_render._run_source_restoration",
                 side_effect=fake_restore,
             ):
                 result = execute_export(plan)
@@ -355,7 +355,7 @@ class EditorExportExecutionTests(unittest.TestCase):
                 return probe_media(output)
 
             with patch(
-                "resolve_editor.export_smart_render._run_source_restoration",
+                "framestudio.export_smart_render._run_source_restoration",
                 side_effect=fake_restore,
             ):
                 result = execute_export(plan)
@@ -365,8 +365,8 @@ class EditorExportExecutionTests(unittest.TestCase):
             self.assertAlmostEqual(output.duration_seconds, 2.0, delta=0.15)
 
     def test_video_only_assembly_stream_copies_audio_bearing_segments(self):
-        from resolve_editor.export_interpolation import _execute_enhanced_clip_assembly
-        from resolve_editor.export_types import OutputPolicy
+        from framestudio.export_interpolation import _execute_enhanced_clip_assembly
+        from framestudio.export_types import OutputPolicy
 
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -491,15 +491,15 @@ class EditorExportExecutionTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.export_interpolation.prepare_export_sources",
+                    "framestudio.export_interpolation.prepare_export_sources",
                     return_value=((source.stat(),), (probe,)),
                 ),
                 patch(
-                    "resolve_editor.export_interpolation._interpolate_probe",
+                    "framestudio.export_interpolation._interpolate_probe",
                     side_effect=fake_interpolate,
                 ),
                 patch(
-                    "resolve_editor.export_interpolation.execute_fallback",
+                    "framestudio.export_interpolation.execute_fallback",
                     side_effect=fake_fallback,
                 ) as fallback,
             ):
@@ -538,7 +538,7 @@ class EditorExportExecutionTests(unittest.TestCase):
             )
 
             with patch(
-                "resolve_editor.export_interpolation.execute_fallback",
+                "framestudio.export_interpolation.execute_fallback",
                 side_effect=AssertionError("direct interpolation must not reencode"),
             ):
                 result = execute_export(plan)
@@ -741,7 +741,7 @@ class EditorExportExecutionTests(unittest.TestCase):
 
         process = Process()
         with patch(
-            "resolve_editor.export_process.subprocess.Popen",
+            "framestudio.export_process.subprocess.Popen",
             return_value=process,
         ):
             with self.assertRaisesRegex(ExportExecutionError, "cancelled"):

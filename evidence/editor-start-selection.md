@@ -35,7 +35,7 @@ that follows the approved phase limit.
 - **Expected:** The new source-selection tests fail because the helper is not
   implemented yet.
 - **Observed:** Import failed for the missing
-  `resolve_editor.app.validate_source_selection` helper.
+  `framestudio.app.validate_source_selection` helper.
 - **Status:** passedWithConcerns
 - **Artifacts:** terminal output.
 - **Failure:** expected missing implementation.
@@ -61,10 +61,10 @@ that follows the approved phase limit.
   `Gtk.FileDialog.open_multiple` and `open_multiple_finish`.
 - **Expected:** `make start` delegates to the editor, help documents it, and
   the installed GTK version supports multi-file selection.
-- **Observed:** `make start` resolves to `python3 resolve_editor.py`, the help
+- **Observed:** `make start` resolves to `python3 framestudio.py`, the help
   target lists it, and both GTK APIs are available.
 - **Status:** passed
-- **Artifacts:** `Makefile`, `resolve_editor/app.py`, and `README.md`.
+- **Artifacts:** `Makefile`, `framestudio/app.py`, and `README.md`.
 - **Failure:** none
 - **Fix:** none
 

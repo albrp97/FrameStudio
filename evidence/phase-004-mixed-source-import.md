@@ -16,8 +16,8 @@
 - Observed: Schema 3 projects contain two ordered source entries with distinct
   stable IDs, dimensions, orientation, frame rate, codec, duration, and audio
   presence. Source-level settings are keyed by source ID.
-- Evidence: `resolve_editor/model.py`, `resolve_editor/media.py`,
-  `resolve_editor/operations.py`, and
+- Evidence: `framestudio/model.py`, `framestudio/media.py`,
+  `framestudio/operations.py`, and
   `tests/test_editor_mixed_source.py`.
 - Status: `passed`
 

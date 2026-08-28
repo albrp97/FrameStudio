@@ -21,9 +21,9 @@ unavailable and are recorded as an accepted warning.
 **Source paths:** `docs/planning/reviews/CHG-003-editor-architecture-stabilization.md`,
 `docs/planning/phases/open/PHASE-004A-stabilizing-editor-architecture.md`,
 `docs/planning/features/open/FEAT-013-modular-editor-architecture.md`,
-`resolve_editor/model.py`, `resolve_editor/export.py`,
-`resolve_editor/app.py`, `resolve_editor/cli.py`,
-`resolve_editor/timeline.py`, `resolve_editor/ffmpeg_playback.py`
+`framestudio/model.py`, `framestudio/export.py`,
+`framestudio/app.py`, `framestudio/cli.py`,
+`framestudio/timeline.py`, `framestudio/ffmpeg_playback.py`
 **Dependencies:** `make check` baseline; PHASE-004 complete
 **Risks:** circular imports, broken monkeypatch seams, changed GTK/FFmpeg
 lifecycles, and behavior drift hidden by mechanical moves
@@ -42,12 +42,12 @@ editing, playback, persistence, CLI, export, or legacy-script behavior.
 
 1. Preserve the protected `make check` baseline and record the current module
    size and import/patch seams.
-2. Extract model responsibilities while keeping `resolve_editor.model`
+2. Extract model responsibilities while keeping `framestudio.model`
    imports stable.
 3. Extract export and playback responsibilities while keeping
-   `resolve_editor.export` and `resolve_editor.ffmpeg_playback` imports stable.
+   `framestudio.export` and `framestudio.ffmpeg_playback` imports stable.
 4. Extract timeline/UI and CLI responsibilities while keeping
-   `resolve_editor.timeline`, `resolve_editor.app`, and `resolve_editor.cli`
+   `framestudio.timeline`, `framestudio.app`, and `framestudio.cli`
    imports and command behavior stable.
 5. Reformat changed files, update directly related documentation/configuration,
    and add focused compatibility coverage where needed.
@@ -58,10 +58,10 @@ editing, playback, persistence, CLI, export, or legacy-script behavior.
 
 - Given current tests or external callers import a public symbol from an
   established facade, the symbol remains available with the same behavior.
-- Given current tests patch `resolve_editor.operations.probe_media`,
-  `resolve_editor.operations.plan_export`, `resolve_editor.cli.probe_media`,
-  `resolve_editor.cli.plan_project_export`, or
-  `resolve_editor.cli.execute_export`, those seams remain effective.
+- Given current tests patch `framestudio.operations.probe_media`,
+  `framestudio.operations.plan_export`, `framestudio.cli.probe_media`,
+  `framestudio.cli.plan_project_export`, or
+  `framestudio.cli.execute_export`, those seams remain effective.
 - Given a segment is split, moved, copied, pasted, deleted, or persisted, its
   existing identity, color, modification, and source-safety behavior is
   unchanged.

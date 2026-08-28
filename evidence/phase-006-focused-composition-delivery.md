@@ -31,14 +31,14 @@ required.
 ### E-006-002 - Implementation coverage
 
 - **Category:** implementation
-- **Source references:** `resolve_editor/composition.py`,
-  `resolve_editor/composition_render.py`, `resolve_editor/model_types.py`,
-  `resolve_editor/model_timeline.py`, `resolve_editor/model_project.py`,
-  `resolve_editor/operations.py`, `resolve_editor/app_ui.py`,
-  `resolve_editor/app_timeline_actions.py`, `resolve_editor/app_project.py`,
-  `resolve_editor/ffmpeg_playback.py`, `resolve_editor/export_planning.py`,
-  `resolve_editor/export_ffmpeg.py`, `resolve_editor/cli.py`,
-  `resolve_editor/cli_parser.py`, `resolve_editor/cli_payload.py`,
+- **Source references:** `framestudio/composition.py`,
+  `framestudio/composition_render.py`, `framestudio/model_types.py`,
+  `framestudio/model_timeline.py`, `framestudio/model_project.py`,
+  `framestudio/operations.py`, `framestudio/app_ui.py`,
+  `framestudio/app_timeline_actions.py`, `framestudio/app_project.py`,
+  `framestudio/ffmpeg_playback.py`, `framestudio/export_planning.py`,
+  `framestudio/export_ffmpeg.py`, `framestudio/cli.py`,
+  `framestudio/cli_parser.py`, `framestudio/cli_payload.py`,
   `tests/test_editor_composition.py`, `README.md`,
   `docs/specs/cli-contract.md`
 - **Expected:** All approved PHASE-006 tickets are implemented across the
@@ -160,9 +160,9 @@ required.
 ### E-006-011 - Corrective regression verification
 
 - **Category:** regression
-- **Source references:** `resolve_editor/app_ui.py`,
-  `resolve_editor/app_timeline_actions.py`,
-  `resolve_editor/app_project.py`, `resolve_editor/app_playback.py`,
+- **Source references:** `framestudio/app_ui.py`,
+  `framestudio/app_timeline_actions.py`,
+  `framestudio/app_project.py`, `framestudio/app_playback.py`,
   `tests/test_editor_composition.py`
 - **Commands:** `python3 -m unittest tests.test_editor_composition -q`;
   `make quality PYTHON=.venv/bin/python`
@@ -203,9 +203,9 @@ required.
 ### E-006-013 - Corrective GTK functionality flow
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/app_ui.py`,
-  `resolve_editor/app_timeline_actions.py`,
-  `resolve_editor/app_project.py`, `resolve_editor/ffmpeg_playback.py`,
+- **Source references:** `framestudio/app_ui.py`,
+  `framestudio/app_timeline_actions.py`,
+  `framestudio/app_project.py`, `framestudio/ffmpeg_playback.py`,
   `evidence/screenshots/phase006-before.png`,
   `evidence/screenshots/phase006-after.png`
 - **Steps:** Launch the GTK editor with a generated video-only fixture; change
@@ -274,9 +274,9 @@ required.
 ### E-006-017 - Corrective implementation
 
 - **Category:** implementation
-- **Source references:** `resolve_editor/model_timeline.py`,
-  `resolve_editor/app_playback.py`, `resolve_editor/app_project.py`,
-  `resolve_editor/ffmpeg_playback.py`, `resolve_editor/app.py`,
+- **Source references:** `framestudio/model_timeline.py`,
+  `framestudio/app_playback.py`, `framestudio/app_project.py`,
+  `framestudio/ffmpeg_playback.py`, `framestudio/app.py`,
   `tests/test_editor_composition.py`, and
   `tests/test_editor_ffmpeg_playback.py`
 - **Expected:** Visible timeline positions should map to concatenated output
@@ -376,7 +376,7 @@ move to `closed` before those results are recorded.
 - **Requirement:** Given a paused composed preview whose playhead is inside a
   triplicated segment, clicking **Play** should begin delivering composed
   frames without waiting for unrelated earlier timeline blocks to render.
-- **Source references:** `resolve_editor/ffmpeg_playback.py`,
+- **Source references:** `framestudio/ffmpeg_playback.py`,
   `tests/test_editor_ffmpeg_playback.py`
 - **Command:** `.venv/bin/python -m unittest
   tests.test_editor_ffmpeg_playback.FfmpegPlaybackTests.test_composed_command_starts_from_requested_output_position`
@@ -388,8 +388,8 @@ move to `closed` before those results are recorded.
 ### E-006-023 - Triplicate playback seek implementation
 
 - **Category:** implementation
-- **Source references:** `resolve_editor/ffmpeg_playback.py`,
-  `resolve_editor/composition_render.py`,
+- **Source references:** `framestudio/ffmpeg_playback.py`,
+  `framestudio/composition_render.py`,
   `tests/test_editor_ffmpeg_playback.py`
 - **Expected:** Composed preview and audio start from the requested edited
   position without rendering completed output blocks.
@@ -546,7 +546,7 @@ warning.
   pull-request workflow, with matching configured paths and reports. No
   actionable introduced findings remain.
 - **Status:** passedWithConcerns
-- **Accepted warning:** `resolve_editor/ffmpeg_playback.py` remains a large
+- **Accepted warning:** `framestudio/ffmpeg_playback.py` remains a large
   implementation boundary and should receive a future maintainability review.
   No remote or upstream is configured, so the required provider-side checks
   and publication cannot run.

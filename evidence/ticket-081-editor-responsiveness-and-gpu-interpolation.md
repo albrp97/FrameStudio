@@ -46,11 +46,11 @@ private path.
 - **Requirement:** The editor must remain responsive during source loading,
   expose progress, support below-100% timeline zoom, and select GPU encoding
   for RVE interpolation.
-- **Changed surfaces:** `resolve_editor/app.py`,
-  `resolve_editor/app_project.py`, `resolve_editor/app_helpers.py`,
-  `resolve_editor/app_timeline_actions.py`, `resolve_editor/operations.py`,
-  `resolve_editor/timeline.py`, `resolve_editor/timeline_geometry.py`,
-  `resolve_editor/interpolation.py`, and focused editor tests.
+- **Changed surfaces:** `framestudio/app.py`,
+  `framestudio/app_project.py`, `framestudio/app_helpers.py`,
+  `framestudio/app_timeline_actions.py`, `framestudio/operations.py`,
+  `framestudio/timeline.py`, `framestudio/timeline_geometry.py`,
+  `framestudio/interpolation.py`, and focused editor tests.
 - **Observed:** Source probing and audio analysis now execute in a daemon
   worker; GTK updates are scheduled through `GLib.idle_add`; progress is
   reported as `Loading clip i/x (percentage)` across probe and audio phases;

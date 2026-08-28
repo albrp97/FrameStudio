@@ -24,19 +24,26 @@ the first horizon without an approved scope change.
 
 ## Existing repository surfaces
 
-- `resolve_media.py`: Resolve-compatible media preparation and curses TUI.
-- `resolve_concat.py`: video selection, concatenation, audio analysis, and
+- `framestudio_media.py`: FrameStudio/Resolve-compatible media preparation and
+  curses TUI.
+- `framestudio_concat.py`: video selection, concatenation, audio analysis, and
   integrated FPS workflow.
-- `resolve_fps.py`: direct and integrated RIFE/FPS processing.
+- `framestudio_fps.py`: direct and integrated RIFE/FPS processing.
 - `tests/`: Python `unittest` coverage for the existing scripts.
 - `benchmarks/`: FPS pipeline harnesses.
 - `FAST-CONCAT-RESEARCH.md`, `FLOWFRAMES-RESEARCH.md`, and
   `FPS-ENHANCEMENT-RESEARCH.md`: research evidence, not automatic product
   requirements.
-- `install.sh`: installs the existing command wrappers into `~/bin`.
+- `install.sh`: installs canonical FrameStudio commands and legacy aliases into
+  `~/bin`.
+
+FrameStudio is the canonical product identity. The `resolve_*` scripts,
+`resolve-*` commands, legacy `resolve_editor` imports, and `.resolve.json`
+projects are compatibility surfaces and must continue to work unless an
+approved migration removes them.
 
 The editor UI, project model, playback layer, and editor CLI now live under
-`resolve_editor/` and `resolve_editor.py`. The approved foundation uses GTK 4,
+`framestudio/` and `framestudio.py`. The approved foundation uses GTK 4,
 PyGObject, FFmpeg raw-frame playback, and versioned JSON project files. Do not
 claim later segment, multi-source, composition, audio, or FPS behavior before
 the relevant planning/architecture work is approved.
@@ -56,7 +63,9 @@ Existing validation commands:
 
 ```sh
 python3 -m unittest discover -s tests
-python3 -m py_compile resolve_media.py resolve_concat.py resolve_fps.py tests/*.py
+python3 -m py_compile framestudio_media.py framestudio_concat.py framestudio_fps.py \
+  framestudio.py framestudio/*.py resolve_media.py resolve_concat.py \
+  resolve_fps.py resolve_editor.py resolve_editor/__init__.py tests/*.py
 ```
 
 The Makefile provides equivalent shortcuts plus editor workflows:
@@ -74,9 +83,9 @@ Existing operational commands documented in `README.md` include:
 
 ```sh
 ./install.sh
-./resolve_media.py --help
-./resolve_media.py --dry-run --root <directory>
-resolve-concat --dry-run <directory>
+./framestudio_media.py --help
+./framestudio_media.py --dry-run --root <directory>
+framestudio-concat --dry-run <directory>
 ```
 
 Do not add a formatter, linter, type checker, build system, or dependency

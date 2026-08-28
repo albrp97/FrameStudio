@@ -3,14 +3,14 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.model import (
+from framestudio.model import (
     Project,
     ProjectValidationError,
     Segment,
     SegmentTimeline,
 )
-from resolve_editor.operations import copy_segments, paste_segments
-from resolve_editor.persistence import load_project, save_project
+from framestudio.operations import copy_segments, paste_segments
+from framestudio.persistence import load_project, save_project
 
 
 def metadata(duration=12.5):
@@ -202,7 +202,7 @@ class EditorModelTests(unittest.TestCase):
             self.assertEqual(project.timeline.timeline_duration_seconds, 14.0)
             self.assertEqual(project.timeline.source_duration_seconds, 10.0)
 
-            destination = root / "pasted.resolve.json"
+            destination = root / "pasted.framestudio.json"
             save_project(project, destination)
             restored = load_project(destination)
 

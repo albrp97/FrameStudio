@@ -8,15 +8,15 @@
 **Status:** passedWithConcerns
 **Planning chain:** `OBJ-001 -> SCOPE-001 -> CAP-002/CAP-012 -> PHASE-001 ->
 FEAT-002 -> TICKET-004`
-**Source references:** `resolve_editor/app.py`, `resolve_editor/ui.py`,
-`resolve_editor.py`, `tests/test_editor_ui_helpers.py`
+**Source references:** `framestudio/app.py`, `framestudio/ui.py`,
+`framestudio.py`, `tests/test_editor_ui_helpers.py`
 **Evidence path:** `evidence/preview-timeline-interaction.md`
 
 ## E-401 - Editor startup and source preview smoke
 
 - **Category:** functionality
 - **Steps:** Generate a temporary MP4 and run
-  `python3 resolve_editor.py --source <fixture> --smoke-test
+  `python3 framestudio.py --source <fixture> --smoke-test
   --smoke-project <project>`.
 - **Expected:** The primary GTK application opens the source, initializes
   preview/timeline state, exercises play, pause, and seek, and exits.
@@ -33,7 +33,7 @@ FEAT-002 -> TICKET-004`
 
 - **Category:** functionality
 - **Steps:** Run
-  `python3 resolve_editor.py --project <project> --smoke-test` against the
+  `python3 framestudio.py --project <project> --smoke-test` against the
   project produced by E-401.
 - **Expected:** The saved source and playhead reopen and the preview lifecycle
   remains usable.
@@ -72,7 +72,7 @@ the configured visual screenshot gate is an environment coverage gap.
 - **Blocked:** E-403 blocks the required target-workstation UI gate.
 - **Skipped:** screenshot capture and independent manual interaction because
   X11 is unavailable.
-- **Artifacts:** `resolve_editor/app.py`, `resolve_editor/ui.py`, and this
+- **Artifacts:** `framestudio/app.py`, `framestudio/ui.py`, and this
   evidence record.
 
 ## E-404 - User-confirmed target-workstation interaction

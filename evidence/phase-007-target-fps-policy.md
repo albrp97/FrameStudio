@@ -50,7 +50,7 @@ FEAT-020 -> TICKET-048/TICKET-049`
 - **Observed:** The focused policy suite passed, including the regression for
   a custom rate supplied with `highest`.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/fps_policy.py`,
+- **Artifacts:** `framestudio/fps_policy.py`,
   `tests/test_editor_fps_policy.py`
 
 ### E-007-POLICY-003 — User validation
@@ -77,7 +77,7 @@ FEAT-020 -> TICKET-048/TICKET-049`
 - **Observed:** Tests, compilation, formatting, lint, type-check, complexity,
   duplication, dependency, audit, security, and churn checks all passed.
 - **Status:** passed
-- **Artifacts:** `resolve_concat.py`, `evidence/static-analysis`
+- **Artifacts:** `framestudio_concat.py`, `evidence/static-analysis`
 
 ## Readiness
 

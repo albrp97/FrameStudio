@@ -12,8 +12,8 @@ terminal
 ### E-041-001 - Triplicate group and layout policy
 
 - **Category:** implementation
-- **Source references:** `resolve_editor/composition.py`,
-  `resolve_editor/composition_render.py`, `resolve_editor/model_project.py`,
+- **Source references:** `framestudio/composition.py`,
+  `framestudio/composition_render.py`, `framestudio/model_project.py`,
   `README.md`
 - **Expected:** Group identity, center/left/right roles, shared controls,
   aspect-ratio behavior, background, bounds, and lifecycle semantics are

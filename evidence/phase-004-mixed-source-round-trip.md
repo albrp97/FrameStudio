@@ -78,7 +78,7 @@
 - Observed: The generated project persisted color slots for all blocks;
   movement and copy/paste retained the source block color, and model/project
   round-trip tests restored the same color slots.
-- Evidence: `resolve_editor/model.py`, `resolve_editor/cli.py`,
+- Evidence: `framestudio/model.py`, `framestudio/cli.py`,
   `tests/test_editor_mixed_source.py`,
   `evidence/screenshots/phase-004-colors-before.png`,
   `evidence/screenshots/phase-004-colors-moved.png`, and
@@ -94,7 +94,7 @@
 - Observed: The full regression suite passed with persisted color fields,
   explicit color slots remained stable through model/project round trips, and
   refreshed GUI artifacts exercised movement and copy/paste preservation.
-- Evidence: `resolve_editor/model.py`,
+- Evidence: `framestudio/model.py`,
   `tests/test_editor_model.py`, `tests/test_editor_mixed_source.py`,
   `evidence/screenshots/phase-004-colors-before.png`,
   `evidence/screenshots/phase-004-colors-moved.png`, and

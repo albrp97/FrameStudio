@@ -6,14 +6,14 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.cli import cli_main
-from resolve_editor.model import Project, ProjectValidationError
-from resolve_editor.operations import (
+from framestudio.cli import cli_main
+from framestudio.model import Project, ProjectValidationError
+from framestudio.operations import (
     apply_visual_transform,
     set_segment_deleted,
     split_segment,
 )
-from resolve_editor.persistence import load_project, save_project
+from framestudio.persistence import load_project, save_project
 
 
 def make_project(root: Path) -> Project:
@@ -59,8 +59,8 @@ class EditorCliParityTests(unittest.TestCase):
     def test_cli_mutations_match_shared_gui_domain_operations(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            gui_path = root / "gui.resolve.json"
-            cli_path = root / "cli.resolve.json"
+            gui_path = root / "gui.framestudio.json"
+            cli_path = root / "cli.framestudio.json"
             original = make_project(root)
             save_project(original, gui_path)
             save_project(original, cli_path)
@@ -112,7 +112,7 @@ class EditorCliParityTests(unittest.TestCase):
     def test_cli_move_supports_one_source_blocks(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             project.segment_timeline.split(3.0)
             project.segment_timeline.split(7.0)
@@ -149,7 +149,7 @@ class EditorCliParityTests(unittest.TestCase):
     def test_repeated_delete_and_reopen_keep_a_deterministic_project_state(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             project.segment_timeline.split(4.0)
             segment_id = project.segment_timeline.segments[1].segment_id
@@ -182,7 +182,7 @@ class EditorCliParityTests(unittest.TestCase):
     def test_invalid_domain_operation_and_cli_operation_preserve_state(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             save_project(project, project_path)
             before = project_path.read_bytes()
@@ -208,7 +208,7 @@ class EditorCliParityTests(unittest.TestCase):
     def test_cli_focus_clamps_to_zoom_dependent_bounds_like_domain_operation(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             segment_id = project.timeline.segments[0].segment_id
             save_project(project, project_path)
@@ -243,7 +243,7 @@ class EditorCliParityTests(unittest.TestCase):
     def test_cli_focus_supports_default_zoom_triplicate_horizontal_offset(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             segment_id = project.timeline.segments[0].segment_id
             save_project(project, project_path)
@@ -280,13 +280,13 @@ class EditorCliParityTests(unittest.TestCase):
     def test_executable_dispatches_non_gui_subcommands(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             save_project(make_project(root), project_path)
 
             result = subprocess.run(
                 [
                     sys.executable,
-                    "resolve_editor.py",
+                    "framestudio.py",
                     "duration",
                     str(project_path),
                 ],

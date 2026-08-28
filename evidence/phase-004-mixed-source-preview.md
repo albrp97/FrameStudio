@@ -16,8 +16,8 @@
 - Observed: `FfmpegComposedPlaybackBackend` composes source streams using the
   output policy, maps the global timeline to source intervals, and returns a
   complete RGBA frame for the mixed fixture.
-- Evidence: `resolve_editor/ffmpeg_playback.py`,
-  `resolve_editor/app.py`, and `tests/test_editor_mixed_source.py`.
+- Evidence: `framestudio/ffmpeg_playback.py`,
+  `framestudio/app.py`, and `tests/test_editor_mixed_source.py`.
 - Status: `passed`
 
 ### GUI-001
@@ -44,8 +44,8 @@
 - Observed: The one-source GTK playback backend now scales and letterboxes
   decoded frames into the fixed 1920x1080 canvas, matching composed preview
   behavior.
-- Evidence: `resolve_editor/app.py`,
-  `resolve_editor/ffmpeg_playback.py`, and
+- Evidence: `framestudio/app.py`,
+  `framestudio/ffmpeg_playback.py`, and
   `tests/test_editor_ffmpeg_playback.py`.
 - Status: `passed`
 

@@ -13,9 +13,9 @@ for rendering after reviewing the corrected 1920x1080/60 FPS comparison.
 `evidence/phase-008-render-strategy-comparison.json`,
 `docs/planning/tickets/closed/TICKET-072-select-and-document-mixed-fps-render-default.md`,
 `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
-`resolve_editor/export_interpolation.py`,
-`resolve_editor/export_smart_render.py`,
-`resolve_editor/export_delivery.py`,
+`framestudio/export_interpolation.py`,
+`framestudio/export_smart_render.py`,
+`framestudio/export_delivery.py`,
 `.github/aidd-config.yml`
 **Affected IDs:** FEAT-026, TICKET-076, PHASE-008, CAP-005, CAP-011, CAP-012
 **Last updated:** 2026-08-26

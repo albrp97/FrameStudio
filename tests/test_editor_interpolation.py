@@ -5,14 +5,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
-from resolve_editor.export_types import ExportExecutionError
-from resolve_editor.interpolation import (
+from framestudio.export_types import ExportExecutionError
+from framestudio.interpolation import (
     BackendValidation,
     build_ffmpeg_interpolation_command,
     run_source_interpolation,
     validate_interpolation_backend,
 )
-from resolve_editor.interpolation_artifacts import check_artifact_samples
+from framestudio.interpolation_artifacts import check_artifact_samples
 
 
 class EditorInterpolationTests(unittest.TestCase):
@@ -95,9 +95,9 @@ class EditorInterpolationTests(unittest.TestCase):
             rve_model.touch()
             rve_root.mkdir()
             with (
-                patch("resolve_fps.validate_rve_checkout"),
+                patch("framestudio_fps.validate_rve_checkout"),
                 patch(
-                    "resolve_fps.rve_unavailable_reason",
+                    "framestudio_fps.rve_unavailable_reason",
                     return_value="RVE CUDA/TensorRT preflight failed",
                 ),
             ):
@@ -127,7 +127,7 @@ class EditorInterpolationTests(unittest.TestCase):
 
     def test_ffmpeg_profile_validates_the_requested_executable(self):
         with patch(
-            "resolve_editor.interpolation.shutil.which",
+            "framestudio.interpolation.shutil.which",
             side_effect=lambda value: "/custom/ffmpeg" if value == "/custom/ffmpeg" else None,
         ):
             result = validate_interpolation_backend(
@@ -146,7 +146,7 @@ class EditorInterpolationTests(unittest.TestCase):
 
         with (
             patch(
-                "resolve_editor.interpolation.require_validated_backend",
+                "framestudio.interpolation.require_validated_backend",
                 return_value=BackendValidation(
                     backend="ffmpeg-minterpolate",
                     available=True,
@@ -157,7 +157,7 @@ class EditorInterpolationTests(unittest.TestCase):
                     target_rate=Fraction(20, 1),
                 ),
             ),
-            patch("resolve_editor.export_process.run_ffmpeg") as run_ffmpeg,
+            patch("framestudio.export_process.run_ffmpeg") as run_ffmpeg,
         ):
             run_source_interpolation(
                 Path("source.mp4"),
@@ -180,7 +180,7 @@ class EditorInterpolationTests(unittest.TestCase):
         cancel_event = threading.Event()
         with (
             patch(
-                "resolve_editor.interpolation.require_validated_backend",
+                "framestudio.interpolation.require_validated_backend",
                 return_value=BackendValidation(
                     backend="rve-4.26",
                     available=True,
@@ -189,7 +189,7 @@ class EditorInterpolationTests(unittest.TestCase):
                     target_rate=Fraction(60, 1),
                 ),
             ),
-            patch("resolve_fps.run_interpolation_rve") as run_interpolation_rve,
+            patch("framestudio_fps.run_interpolation_rve") as run_interpolation_rve,
         ):
             run_source_interpolation(
                 Path("source.mp4"),
@@ -212,7 +212,7 @@ class EditorInterpolationTests(unittest.TestCase):
         export_progress = Mock()
         with (
             patch(
-                "resolve_editor.interpolation.require_validated_backend",
+                "framestudio.interpolation.require_validated_backend",
                 return_value=BackendValidation(
                     backend="rve-4.26",
                     available=True,
@@ -221,7 +221,7 @@ class EditorInterpolationTests(unittest.TestCase):
                     target_rate=Fraction(60, 1),
                 ),
             ),
-            patch("resolve_fps.run_interpolation_rve") as run_interpolation_rve,
+            patch("framestudio_fps.run_interpolation_rve") as run_interpolation_rve,
         ):
             run_source_interpolation(
                 Path("source.mp4"),
@@ -249,7 +249,7 @@ class EditorInterpolationTests(unittest.TestCase):
     def test_rve_interpolation_defaults_to_gpu_encoder(self):
         with (
             patch(
-                "resolve_editor.interpolation.require_validated_backend",
+                "framestudio.interpolation.require_validated_backend",
                 return_value=BackendValidation(
                     backend="rve-4.26",
                     available=True,
@@ -258,7 +258,7 @@ class EditorInterpolationTests(unittest.TestCase):
                     target_rate=Fraction(60, 1),
                 ),
             ),
-            patch("resolve_fps.run_interpolation_rve") as run_interpolation_rve,
+            patch("framestudio_fps.run_interpolation_rve") as run_interpolation_rve,
         ):
             run_source_interpolation(
                 Path("source.mp4"),
@@ -276,7 +276,7 @@ class EditorInterpolationTests(unittest.TestCase):
 
     def test_unsafe_profile_is_not_silently_accepted(self):
         with patch(
-            "resolve_editor.interpolation.validate_interpolation_backend",
+            "framestudio.interpolation.validate_interpolation_backend",
             return_value=BackendValidation(
                 backend="rve-4.26",
                 available=True,
@@ -289,7 +289,7 @@ class EditorInterpolationTests(unittest.TestCase):
                 target_rate=Fraction(60, 1),
             ),
         ):
-            from resolve_editor.interpolation import require_validated_backend
+            from framestudio.interpolation import require_validated_backend
 
             with self.assertRaises(ExportExecutionError):
                 require_validated_backend(
@@ -301,7 +301,7 @@ class EditorInterpolationTests(unittest.TestCase):
     def test_legacy_interpolation_failures_use_export_error_boundary(self):
         with (
             patch(
-                "resolve_editor.interpolation.require_validated_backend",
+                "framestudio.interpolation.require_validated_backend",
                 return_value=BackendValidation(
                     backend="vs-rife",
                     available=True,
@@ -311,7 +311,7 @@ class EditorInterpolationTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "resolve_fps.run_interpolation",
+                "framestudio_fps.run_interpolation",
                 side_effect=RuntimeError("legacy interpolation failed"),
             ),
         ):

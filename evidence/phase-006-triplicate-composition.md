@@ -12,9 +12,9 @@ terminal
 ### E-042-001 - Linked triplicate implementation
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/composition.py`,
-  `resolve_editor/composition_render.py`, `resolve_editor/model_timeline.py`,
-  `resolve_editor/app_ui.py`, `resolve_editor/app_timeline_actions.py`,
+- **Source references:** `framestudio/composition.py`,
+  `framestudio/composition_render.py`, `framestudio/model_timeline.py`,
+  `framestudio/app_ui.py`, `framestudio/app_timeline_actions.py`,
   `tests/test_editor_composition.py`
 - **Expected:** Enabling triplicate creates one linked center and two side
   instances, shared focus values update the group, and unsupported states
@@ -60,7 +60,7 @@ open until the user validates the visible composition behavior.
 - **Requirement:** Given a paused composed preview whose playhead is inside a
   triplicated segment, clicking **Play** should begin delivering composed
   frames without waiting for unrelated earlier timeline blocks to render.
-- **Source references:** `resolve_editor/ffmpeg_playback.py`,
+- **Source references:** `framestudio/ffmpeg_playback.py`,
   `tests/test_editor_ffmpeg_playback.py`
 - **Command:** `.venv/bin/python -m unittest
   tests.test_editor_ffmpeg_playback.FfmpegPlaybackTests.test_composed_command_starts_from_requested_output_position`
@@ -73,8 +73,8 @@ open until the user validates the visible composition behavior.
 ### E-042-005 - Composed playback seek correction
 
 - **Category:** implementation
-- **Source references:** `resolve_editor/ffmpeg_playback.py`,
-  `resolve_editor/composition_render.py`,
+- **Source references:** `framestudio/ffmpeg_playback.py`,
+  `framestudio/composition_render.py`,
   `tests/test_editor_ffmpeg_playback.py`
 - **Expected:** Starting composed playback at a later edited position should
   build only the current-and-later render blocks, seek each required source

@@ -60,7 +60,7 @@ tests remain available.
 - **Expected:** The new segment requirements fail because the segment model
   has not been implemented.
 - **Observed:** Test collection failed because `SegmentTimeline` was not yet
-  available from `resolve_editor.model`.
+  available from `framestudio.model`.
 - **Status:** passedWithConcerns
 - **Artifacts:** terminal output.
 - **Failure:** expected missing implementation.
@@ -75,7 +75,7 @@ tests remain available.
   operations, invalid positions, and identifier validation pass.
 - **Observed:** 11 focused model tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/model.py`, `tests/test_editor_model.py`.
+- **Artifacts:** `framestudio/model.py`, `tests/test_editor_model.py`.
 - **Failure:** none.
 - **Fix:** none.
 
@@ -131,7 +131,7 @@ tests remain available.
   regression evidence are present. Downstream behavior remains explicitly
   outside this ticket.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/model.py`,
+- **Artifacts:** `framestudio/model.py`,
   `tests/test_editor_model.py`,
   `docs/specs/phase-002-cut-semantics.md`.
 - **Failure:** none.
@@ -158,7 +158,7 @@ tests remain available.
 - **Observed:** 12 focused model tests passed, including the atomic
   replacement regression.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/model.py`,
+- **Artifacts:** `framestudio/model.py`,
   `tests/test_editor_model.py`.
 - **Failure:** none.
 - **Fix:** validate candidate segments before committing them and restore the

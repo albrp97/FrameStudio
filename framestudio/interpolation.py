@@ -53,7 +53,7 @@ class BackendValidation:
 
 
 def _rve_defaults() -> dict[str, Path]:
-    from resolve_fps import (
+    from framestudio_fps import (
         DEFAULT_FPS_PYTHON,
         DEFAULT_FPS_SITE,
         DEFAULT_RVE_MODEL,
@@ -163,7 +163,7 @@ def validate_interpolation_backend(
             reason = f"RIFE model was not found: {rve_model}"
         else:
             try:
-                from resolve_fps import rve_unavailable_reason
+                from framestudio_fps import rve_unavailable_reason
 
                 runtime_reason = rve_unavailable_reason(
                     argparse.Namespace(
@@ -584,7 +584,7 @@ def _run_interpolation_backend(
         raise ExportExecutionError(
             f"Backend {backend!r} cannot provide boundary-safe interpolation for multiple ranges"
         )
-    from resolve_fps import (
+    from framestudio_fps import (
         DEFAULT_BESTSOURCE,
         DEFAULT_FPS_PYTHON,
         DEFAULT_FPS_SITE,
@@ -679,7 +679,7 @@ def _run_artifact_preflight(
         raise ExportExecutionError("Export cancelled")
     from .interpolation_artifacts import run_artifact_gate
 
-    with tempfile.TemporaryDirectory(prefix="resolve-interpolation-artifact-") as directory:
+    with tempfile.TemporaryDirectory(prefix="framestudio-interpolation-artifact-") as directory:
         temporary = Path(directory)
         sample_source = temporary / "source.mp4"
         sample_output = temporary / "output.mp4"

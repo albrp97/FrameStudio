@@ -410,7 +410,7 @@
           "video2x"
         ],
         "executable_paths": [
-          "~/.cache/resolve-fps/benchmark-tools/Video2X-6.4.0-x86_64.AppImage"
+          "~/.cache/framestudio-fps/benchmark-tools/Video2X-6.4.0-x86_64.AppImage"
         ],
         "modules": [],
         "weight_patterns": [

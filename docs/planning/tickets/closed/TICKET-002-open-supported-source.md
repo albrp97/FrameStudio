@@ -84,8 +84,8 @@ without changing the source or replacing the last valid project state.
 
 ## Protected behavior
 
-Existing command names, `resolve_media.py`, `resolve_concat.py`,
-`resolve_fps.py`, their tests, and source-safe partial-output behavior remain
+Existing command names, `framestudio_media.py`, `framestudio_concat.py`,
+`framestudio_fps.py`, their tests, and source-safe partial-output behavior remain
 available and unchanged.
 
 ## Definition of done

@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-PACKAGE = "resolve_editor"
+PACKAGE = "framestudio"
 PACKAGE_PATH = Path(__file__).resolve().parents[1] / PACKAGE
 ADAPTERS = {
     f"{PACKAGE}.app",

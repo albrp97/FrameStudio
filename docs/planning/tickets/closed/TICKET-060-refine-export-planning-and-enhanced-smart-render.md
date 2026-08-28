@@ -17,11 +17,11 @@ remain recorded as accepted warnings.
 **Approval:** user-reported and implementation-authorized on 2026-08-24
 **Provider:** auto; base and target branches are not configured in
 `.github/aidd-config.yml`
-**Source paths:** `resolve_editor/app_export.py`,
-`resolve_editor/export_panel.py`, `resolve_editor/export_estimates.py`,
-`resolve_editor/fps_policy.py`, `resolve_editor/interpolation.py`,
-`resolve_editor/export_interpolation.py`, `resolve_editor/export_delivery.py`,
-`resolve_editor/performance.py`, `resolve_concat.py`,
+**Source paths:** `framestudio/app_export.py`,
+`framestudio/export_panel.py`, `framestudio/export_estimates.py`,
+`framestudio/fps_policy.py`, `framestudio/interpolation.py`,
+`framestudio/export_interpolation.py`, `framestudio/export_delivery.py`,
+`framestudio/performance.py`, `framestudio_concat.py`,
 `tests/test_editor_export_panel.py`, `tests/test_editor_fps_policy.py`,
 `tests/test_editor_export_execution.py`, `tests/test_editor_performance.py`,
 and the user-reported export-panel behavior

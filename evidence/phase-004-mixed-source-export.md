@@ -11,7 +11,7 @@
 
 ### REALMEDIA-001
 
-- Command: `resolve-editor export <mixed-project> --output <output>.mp4`
+- Command: `framestudio export <mixed-project> --output <output>.mp4`
 - Observed: Progress events reached 100 percent for 60 frames and the final
   result reported route `fallback`, `verified: true`, 4.0 seconds, 320x320,
   15 FPS, H.264 video, and AAC audio.
@@ -50,8 +50,8 @@ for the superseded mixed-source policy.
 ### REALMEDIA-002
 
 - Commands: Generated 320x180 landscape and 180x320 portrait MP4 fixtures,
-  imported both with `resolve_editor.py import`, exported with
-  `resolve_editor.py export`, and inspected with `ffprobe`.
+  imported both with `framestudio.py import`, exported with
+  `framestudio.py export`, and inspected with `ffprobe`.
 - Observed: The mixed export completed with a verified fallback route,
   2.2-second duration, 1920x1080 H.264 video, 15 FPS, and no audio stream.
   Progress reported 33 total frames and reached 100 percent.

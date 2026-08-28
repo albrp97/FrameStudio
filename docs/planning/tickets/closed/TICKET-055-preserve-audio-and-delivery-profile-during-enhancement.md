@@ -22,8 +22,8 @@ approval
 **Source paths:** `docs/planning/features/closed/FEAT-022-running-validated-motion-interpolation.md`,
 `docs/planning/tickets/closed/TICKET-054-implement-exact-target-fps-interpolation.md`,
 `docs/planning/features/closed/FEAT-014-balancing-each-source-consistently.md`,
-`resolve_editor/audio.py`, `resolve_editor/export_ffmpeg.py`,
-`resolve_editor/export_delivery.py`, `resolve_fps.py`, `resolve_concat.py`,
+`framestudio/audio.py`, `framestudio/export_ffmpeg.py`,
+`framestudio/export_delivery.py`, `framestudio_fps.py`, `framestudio_concat.py`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-054; PHASE-005 source-level audio decisions and
 fixed delivery profile; existing audio remux and output verification seams

@@ -17,14 +17,14 @@ review gates.
 **Source paths:** `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`,
 `docs/planning/features/open/FEAT-028-adding-optional-upscale-enhancement.md`,
 `docs/planning/tickets/open/TICKET-076-adopt-per-source-render-strategy.md`,
-`resolve_fps.py`, `resolve_editor/model_project.py`,
-`resolve_editor/fps_policy.py`, `resolve_editor/export_types.py`,
-`resolve_editor/export_planning.py`, `resolve_editor/export_smart_render.py`,
-`resolve_editor/export_interpolation.py`, `resolve_editor/export_delivery.py`,
-`resolve_editor/export_ffmpeg.py`, `resolve_editor/composition_render.py`,
-`resolve_editor/export_panel.py`, `resolve_editor/app_export.py`,
-`resolve_editor/cli_parser.py`, `resolve_editor/cli.py`,
-`resolve_editor/cli_export.py`, `.github/aidd-config.yml`
+`framestudio_fps.py`, `framestudio/model_project.py`,
+`framestudio/fps_policy.py`, `framestudio/export_types.py`,
+`framestudio/export_planning.py`, `framestudio/export_smart_render.py`,
+`framestudio/export_interpolation.py`, `framestudio/export_delivery.py`,
+`framestudio/export_ffmpeg.py`, `framestudio/composition_render.py`,
+`framestudio/export_panel.py`, `framestudio/app_export.py`,
+`framestudio/cli_parser.py`, `framestudio/cli.py`,
+`framestudio/cli_export.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-076; local RVE TensorRT environment and
 SuperUltraCompact weights; FFmpeg/ffprobe; existing export and composition
 tests

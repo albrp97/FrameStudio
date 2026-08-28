@@ -53,9 +53,9 @@ export, legacy scripts, and source-preservation behavior remain protected.
   edited-output position directly to the source split path and reported
   `Split position must be strictly inside the selected block`.
 - **Status:** failed
-- **Artifacts:** user-reported GTK failure; `resolve_editor/app_playback.py`,
-  `resolve_editor/app_timeline_actions.py`,
-  `resolve_editor/model_timeline.py`, and the new regression test.
+- **Artifacts:** user-reported GTK failure; `framestudio/app_playback.py`,
+  `framestudio/app_timeline_actions.py`,
+  `framestudio/model_timeline.py`, and the new regression test.
 - **Failure:** Edited playback position `4.0` was used for a selected source
   block whose visible timeline interval was `7.0` to `10.0`.
 - **Fix:** none.
@@ -72,7 +72,7 @@ export, legacy scripts, and source-preservation behavior remain protected.
   visible timeline position, and the post-split selection/status remained
   correct.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/app_timeline_actions.py`,
+- **Artifacts:** `framestudio/app_timeline_actions.py`,
   `tests/test_editor_composition.py`.
 - **Failure:** none after the fix.
 - **Fix:** Convert the playback position with
@@ -96,7 +96,7 @@ export, legacy scripts, and source-preservation behavior remain protected.
   suite passed formatting, lint, type, complexity, duplication, dependency,
   security, audit, and churn checks.
 - **Status:** passedWithConcerns
-- **Artifacts:** terminal output; `resolve_editor/app_timeline_actions.py`,
+- **Artifacts:** terminal output; `framestudio/app_timeline_actions.py`,
   `tests/test_editor_composition.py`, and generated quality reports.
 - **Failure:** none.
 - **Fix:** none after the focused coordinate-mapping change.
@@ -140,7 +140,7 @@ export, legacy scripts, and source-preservation behavior remain protected.
   `evidence/static-analysis/dependencies.json`,
   `evidence/static-analysis/pip-audit.json`,
   `evidence/static-analysis/bandit.json`,
-  `resolve_editor/app_timeline_actions.py`, and
+  `framestudio/app_timeline_actions.py`, and
   `tests/test_editor_composition.py`.
 - **Failure:** None.
 - **Fix:** None required.

@@ -4,41 +4,41 @@ The editor executable keeps the GTK workflow as its default mode and exposes
 deterministic one-source and mixed-source operations as JSON commands:
 
 ```sh
-resolve-editor inspect PROJECT
-resolve-editor import SOURCE [SOURCE ...] --project PROJECT
-resolve-editor split PROJECT --at SECONDS
-resolve-editor delete PROJECT --segment SEGMENT_ID
-resolve-editor restore PROJECT --segment SEGMENT_ID
-resolve-editor toggle-delete PROJECT --segment SEGMENT_ID
-resolve-editor move PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+framestudio inspect PROJECT
+framestudio import SOURCE [SOURCE ...] --project PROJECT
+framestudio split PROJECT --at SECONDS
+framestudio delete PROJECT --segment SEGMENT_ID
+framestudio restore PROJECT --segment SEGMENT_ID
+framestudio toggle-delete PROJECT --segment SEGMENT_ID
+framestudio move PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
   --direction {left,right}
-resolve-editor copy PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
-resolve-editor paste PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+framestudio copy PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
+framestudio paste PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
   --at SECONDS
-resolve-editor focus PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+framestudio focus PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
   [--zoom ZOOM] [--offset-x PIXELS] [--offset-y PIXELS]
-resolve-editor copy-focus PROJECT --source-segment SEGMENT_ID \
+framestudio copy-focus PROJECT --source-segment SEGMENT_ID \
   --segment SEGMENT_ID [--segment SEGMENT_ID ...]
-resolve-editor clean-focus PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
-resolve-editor triplicate-enable PROJECT --segment SEGMENT_ID \
+framestudio clean-focus PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
+framestudio triplicate-enable PROJECT --segment SEGMENT_ID \
   [--segment SEGMENT_ID ...]
-resolve-editor triplicate-disable PROJECT --segment SEGMENT_ID \
+framestudio triplicate-disable PROJECT --segment SEGMENT_ID \
   [--segment SEGMENT_ID ...]
-resolve-editor relink PROJECT --source SOURCE_ID --path SOURCE
-resolve-editor duration PROJECT
-resolve-editor save PROJECT [--output PROJECT]
-resolve-editor reopen PROJECT
-resolve-editor set-fps-policy PROJECT --choice {lowest,highest,custom,60} \
+framestudio relink PROJECT --source SOURCE_ID --path SOURCE
+framestudio duration PROJECT
+framestudio save PROJECT [--output PROJECT]
+framestudio reopen PROJECT
+framestudio set-fps-policy PROJECT --choice {lowest,highest,custom,60} \
   [--custom-fps FPS] [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND]
-resolve-editor set-upscale-policy PROJECT \
+framestudio set-upscale-policy PROJECT \
   (--enable-upscale|--disable-upscale) [--upscale-model MODEL] \
   [--upscale-backend BACKEND]
-resolve-editor export-plan PROJECT [--output VIDEO] \
+framestudio export-plan PROJECT [--output VIDEO] \
   [--fps-choice {lowest,highest,custom,60}] [--custom-fps FPS] \
   [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND] \
   [--upscale-enhancement|--no-upscale-enhancement] \
   [--upscale-model MODEL] [--upscale-backend BACKEND]
-resolve-editor export PROJECT --output VIDEO \
+framestudio export PROJECT --output VIDEO \
   [--fps-choice {lowest,highest,custom,60}] [--custom-fps FPS] \
   [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND] \
   [--upscale-enhancement|--no-upscale-enhancement] \
@@ -46,7 +46,10 @@ resolve-editor export PROJECT --output VIDEO \
 ```
 
 The same commands can be run from the repository with
-`python3 resolve_editor.py ...` or `make cli ARGS="..."`.
+`python3 framestudio.py ...` or `make cli ARGS="..."`.
+The installed `framestudio-editor` command is an equivalent explicit alias;
+legacy `resolve-editor` and `resolve_editor.py` invocations remain supported
+through compatibility forwarding.
 
 ## Success output
 

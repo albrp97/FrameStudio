@@ -12,7 +12,7 @@ evaluation, concat/interpolation integration benchmark, and end-to-end
 30-second pipeline comparison are now included below.
 Performance numbers are labeled as local measurements, upstream measurements,
 or estimates. The corrected RVE adapter is now the default backend for the
-unified `resolve-concat` workflow; the earlier isolated renders remain useful
+unified `framestudio-concat` workflow; the earlier isolated renders remain useful
 as reproducible comparison points.
 
 ## Executive decision
@@ -312,7 +312,7 @@ The corrected preferred outputs are:
 The two interpolated outputs are exactly 60 seconds with 3,600 video frames
 and copied AAC audio. The comparison is a 1920x360 three-way video with equal
 640x360 original, standard, and heavy panels. The experimental harness is
-`/home/ghiki/.cache/resolve-fps/benchmark.vpy`; its `INPUT_FORMAT`, explicit
+`/home/ghiki/.cache/framestudio-fps/benchmark.vpy`; its `INPUT_FORMAT`, explicit
 limited-range handling, scene markers, and `TARGET_FRAMES` trim are the
 important corrections. A production tool should render a short raw-frame
 smoke test and reject any backend that shows periodic grid/block corruption
@@ -330,7 +330,7 @@ torch_executed_ops=(
 ```
 
 Set `INPUT_FORMAT=RGBH`, `TRT_TORCH_PIXEL=1`, and use a new engine cache such
-as `/home/ghiki/.cache/resolve-fps/engines-pixel-fallback`. The cache must be
+as `/home/ghiki/.cache/framestudio-fps/engines-pixel-fallback`. The cache must be
 separate because its normal key does not include the PyTorch-executed
 operator set. If a TensorRT or Torch-TensorRT upgrade breaks this path,
 rebuild it and repeat the raw-frame gate; use the documented `RGBS`/FP32
@@ -383,10 +383,10 @@ source AAC padding, not progressive sync drift.
 The benchmark outputs and inspection sheets are in:
 
 ```text
-/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/outputs/postconcat-rife.mp4
-/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/outputs/fused-rife.mp4
-/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/outputs/perclip-rife.mp4
-/home/ghiki/.cache/resolve-fps/concat-vfi-benchmark-20260820/inspect/boundary/boundary-comparison.jpg
+/home/ghiki/.cache/framestudio-fps/concat-vfi-benchmark-20260820/outputs/postconcat-rife.mp4
+/home/ghiki/.cache/framestudio-fps/concat-vfi-benchmark-20260820/outputs/fused-rife.mp4
+/home/ghiki/.cache/framestudio-fps/concat-vfi-benchmark-20260820/outputs/perclip-rife.mp4
+/home/ghiki/.cache/framestudio-fps/concat-vfi-benchmark-20260820/inspect/boundary/boundary-comparison.jpg
 ```
 
 The one-pass concat-first and fused outputs are bit-for-bit identical and
@@ -412,11 +412,11 @@ the global rational timeline rather than blindly using `2 * input_frames`.
 
 The installed system VSPipe embeds Python 3.14, while the validated RIFE
 environment is Python 3.13. The benchmark therefore evaluated the same
-VapourSynth graph through `/home/ghiki/.cache/resolve-fps/trt/bin/python`
+VapourSynth graph through `/home/ghiki/.cache/framestudio-fps/trt/bin/python`
 with the environment's `site-packages` on `PYTHONPATH`; mixing the system
 VSPipe with the RIFE environment reproduces the initialization or NumPy ABI
 failure. The persistent graph harness is
-`/home/ghiki/.cache/resolve-fps/benchmark.vpy`; `BOUNDARIES=900,1800` enables
+`/home/ghiki/.cache/framestudio-fps/benchmark.vpy`; `BOUNDARIES=900,1800` enables
 the explicit splice markers.
 
 ## End-to-end 30-second pipeline benchmark
@@ -454,10 +454,10 @@ interpolation-only benchmark and is not comparable to a final encoded file.
 The benchmark workspace and outputs are retained outside the repository:
 
 ```text
-/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/source-30s-900f.mp4
-/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/streamed.mp4
-/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/streamed-qp18.mp4
-/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/staged.mp4
+/home/ghiki/.cache/framestudio-fps/approach-benchmark-30s/source-30s-900f.mp4
+/home/ghiki/.cache/framestudio-fps/approach-benchmark-30s/streamed.mp4
+/home/ghiki/.cache/framestudio-fps/approach-benchmark-30s/streamed-qp18.mp4
+/home/ghiki/.cache/framestudio-fps/approach-benchmark-30s/staged.mp4
 ```
 
 **Decision:** keep the production architecture as one concat-first master
@@ -503,9 +503,9 @@ synthesized frames.
 The RVE output and a frame comparison sheet are retained here:
 
 ```text
-/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/rve-4.26-q18.mp4
-/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/rve-vs-production-frames.jpg
-/home/ghiki/.cache/resolve-fps/approach-benchmark-30s/rve-4.26-q18.log
+/home/ghiki/.cache/framestudio-fps/approach-benchmark-30s/rve-4.26-q18.mp4
+/home/ghiki/.cache/framestudio-fps/approach-benchmark-30s/rve-vs-production-frames.jpg
+/home/ghiki/.cache/framestudio-fps/approach-benchmark-30s/rve-4.26-q18.log
 ```
 
 **Result:** RVE is the fastest measured implementation of this model on the
@@ -516,10 +516,10 @@ enough evidence to replace the production path; the integrated benchmark
 below applies the exact timeline, audio, cleanup, and artifact safeguards
 before selecting a default.
 
-### Integrated `resolve-concat` RVE benchmark
+### Integrated `framestudio-concat` RVE benchmark
 
 The corrected adapter was then wired into the repository's unified
-`resolve-concat` workflow and benchmarked against the existing `vs-rife`
+`framestudio-concat` workflow and benchmarked against the existing `vs-rife`
 implementation. Both engines used RIFE 4.26, selective TensorRT FP16 with
 the PyTorch `aten.pixel_shuffle` fallback, scene detection, NVENC preset
 `p1`, constant QP 18, copied AAC, and temporary performance mode. The
@@ -546,16 +546,16 @@ frame count before the hidden partial output is atomically renamed.
 The integrated benchmark artifacts are retained here:
 
 ```text
-/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/rve-one-final.mp4
-/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/rve-three-final.mp4
-/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/vs-one.mp4
-/home/ghiki/.cache/resolve-fps/rve-integration-benchmark/vs-three.mp4
+/home/ghiki/.cache/framestudio-fps/rve-integration-benchmark/rve-one-final.mp4
+/home/ghiki/.cache/framestudio-fps/rve-integration-benchmark/rve-three-final.mp4
+/home/ghiki/.cache/framestudio-fps/rve-integration-benchmark/vs-one.mp4
+/home/ghiki/.cache/framestudio-fps/rve-integration-benchmark/vs-three.mp4
 ```
 
 The default command is now:
 
 ```sh
-resolve-concat [folder-or-video]
+framestudio-concat [folder-or-video]
 ```
 
 Use `--engine vs-rife` for the fallback. The RVE adapter requires the corrected
@@ -1372,9 +1372,9 @@ joining files. A future command should make the operation explicit, for
 example:
 
 ```text
-resolve-fps --input source.mp4 --target-fps 60 --profile fast
-resolve-fps --input source.mp4 --target-fps 60 --profile quality
-resolve-fps --input source.mp4 --target-fps 60 --profile anime
+framestudio-fps --input source.mp4 --target-fps 60 --profile fast
+framestudio-fps --input source.mp4 --target-fps 60 --profile quality
+framestudio-fps --input source.mp4 --target-fps 60 --profile anime
 ```
 
 The command should preserve the original by default, use a unique partial
@@ -1431,7 +1431,7 @@ file with invented objects.
 
 The integrated production design is now complete:
 
-1. `resolve-concat` is the single user-facing workflow. One input skips
+1. `framestudio-concat` is the single user-facing workflow. One input skips
    concatenation; multiple inputs are stream-copy concatenated once and then
    interpolated globally.
 2. The default backend is corrected RVE RIFE 4.26 with selective TensorRT FP16

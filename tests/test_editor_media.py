@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.media import MediaProbeError, probe_media
+from framestudio.media import MediaProbeError, probe_media
 
 
 class EditorMediaTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class EditorMediaTests(unittest.TestCase):
                 "Completed", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""}
             )()
 
-            with patch("resolve_editor.media.subprocess.run", return_value=completed):
+            with patch("framestudio.media.subprocess.run", return_value=completed):
                 result = probe_media(source)
 
         self.assertEqual(result.duration_seconds, 12.5)
@@ -54,7 +54,7 @@ class EditorMediaTests(unittest.TestCase):
                 "Completed", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""}
             )()
 
-            with patch("resolve_editor.media.subprocess.run", return_value=completed):
+            with patch("framestudio.media.subprocess.run", return_value=completed):
                 with self.assertRaisesRegex(MediaProbeError, "video stream"):
                     probe_media(source)
 
@@ -64,7 +64,7 @@ class EditorMediaTests(unittest.TestCase):
             source.write_bytes(b"fixture")
 
             with patch(
-                "resolve_editor.media.subprocess.run",
+                "framestudio.media.subprocess.run",
                 side_effect=FileNotFoundError,
             ):
                 with self.assertRaisesRegex(MediaProbeError, "ffprobe"):

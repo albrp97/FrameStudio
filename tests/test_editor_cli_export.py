@@ -5,17 +5,17 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.cli import cli_main
-from resolve_editor.export import (
+from framestudio.cli import cli_main
+from framestudio.export import (
     ExportExecutionError,
     ExportPlan,
     ExportProgress,
 )
-from resolve_editor.fps_policy import resolve_frame_rate_policy
-from resolve_editor.media import MediaProbe
-from resolve_editor.model import Project
-from resolve_editor.persistence import save_project
-from resolve_editor.upscale_policy import UpscalePolicy, resolve_upscale_policy
+from framestudio.fps_policy import resolve_frame_rate_policy
+from framestudio.media import MediaProbe
+from framestudio.model import Project
+from framestudio.persistence import save_project
+from framestudio.upscale_policy import UpscalePolicy, resolve_upscale_policy
 
 
 def make_project(root: Path) -> Project:
@@ -63,7 +63,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_export_resolves_unavailable_default_rve_to_ffmpeg_fallback(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             destination = root / "edited.mp4"
             project = make_project(root)
             save_project(project, project_path)
@@ -90,11 +90,11 @@ class EditorCliExportTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.cli.resolve_frame_rate_policy_with_fallback",
+                    "framestudio.cli.resolve_frame_rate_policy_with_fallback",
                     return_value=(fallback, (), "RVE unavailable"),
                 ),
                 patch(
-                    "resolve_editor.cli.plan_project_export",
+                    "framestudio.cli.plan_project_export",
                     return_value=plan,
                 ) as plan_export,
             ):
@@ -120,7 +120,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_export_plan_can_resolve_smart_destination_without_starting_execution(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             save_project(project, project_path)
             plan = ExportPlan(
@@ -136,11 +136,11 @@ class EditorCliExportTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.cli.plan_project_export",
+                    "framestudio.cli.plan_project_export",
                     return_value=plan,
                 ) as plan_export,
                 patch(
-                    "resolve_editor.cli.execute_export",
+                    "framestudio.cli.execute_export",
                 ) as execute,
             ):
                 result, stdout, stderr = run_cli(
@@ -164,7 +164,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_set_fps_policy_persists_a_machine_readable_policy(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             save_project(make_project(root), project_path)
 
             result, stdout, stderr = run_cli(
@@ -189,7 +189,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_set_fps_policy_keeps_existing_enhancement_when_toggle_is_omitted(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             project.set_frame_rate_policy(
                 {
@@ -219,7 +219,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_set_upscale_policy_persists_the_enhancement_policy(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             save_project(make_project(root), project_path)
 
             result, stdout, stderr = run_cli(
@@ -244,7 +244,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_export_plan_accepts_upscale_override_and_reports_decisions(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             save_project(project, project_path)
             destination = root / "edited.mp4"
@@ -271,7 +271,7 @@ class EditorCliExportTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.cli.resolve_frame_rate_policy_with_fallback",
+                    "framestudio.cli.resolve_frame_rate_policy_with_fallback",
                     return_value=(
                         resolve_frame_rate_policy(
                             (
@@ -288,7 +288,7 @@ class EditorCliExportTests(unittest.TestCase):
                     ),
                 ) as fps_policy,
                 patch(
-                    "resolve_editor.cli.plan_project_export",
+                    "framestudio.cli.plan_project_export",
                     return_value=plan,
                 ) as plan_export,
             ):
@@ -317,7 +317,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_export_plan_reports_frame_rate_policy_object_override(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             destination = root / "edited.mp4"
             project = make_project(root)
             save_project(project, project_path)
@@ -343,11 +343,11 @@ class EditorCliExportTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.cli.resolve_frame_rate_policy_with_fallback",
+                    "framestudio.cli.resolve_frame_rate_policy_with_fallback",
                     return_value=(policy, (), None),
                 ),
                 patch(
-                    "resolve_editor.cli.plan_project_export",
+                    "framestudio.cli.plan_project_export",
                     return_value=plan,
                 ),
             ):
@@ -367,7 +367,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_export_reports_progress_route_and_verified_output(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             destination = root / "edited.mp4"
             project = make_project(root)
             save_project(project, project_path)
@@ -399,15 +399,15 @@ class EditorCliExportTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.cli.probe_media",
+                    "framestudio.cli.probe_media",
                     return_value=output_probe,
                 ),
                 patch(
-                    "resolve_editor.cli.plan_project_export",
+                    "framestudio.cli.plan_project_export",
                     return_value=plan,
                 ),
                 patch(
-                    "resolve_editor.cli.execute_export",
+                    "framestudio.cli.execute_export",
                     side_effect=fake_execute,
                 ),
             ):
@@ -432,7 +432,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_export_failure_returns_structured_error_without_success_result(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             destination = root / "edited.mp4"
             project = make_project(root)
             save_project(project, project_path)
@@ -451,15 +451,15 @@ class EditorCliExportTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.cli.probe_media",
+                    "framestudio.cli.probe_media",
                     return_value=source_probe,
                 ),
                 patch(
-                    "resolve_editor.cli.plan_project_export",
+                    "framestudio.cli.plan_project_export",
                     return_value=plan,
                 ),
                 patch(
-                    "resolve_editor.cli.execute_export",
+                    "framestudio.cli.execute_export",
                     side_effect=ExportExecutionError("validation failed"),
                 ),
             ):
@@ -481,7 +481,7 @@ class EditorCliExportTests(unittest.TestCase):
     def test_export_rejects_project_path_without_replacing_project(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             save_project(project, project_path)
             before = project_path.read_bytes()
@@ -497,15 +497,15 @@ class EditorCliExportTests(unittest.TestCase):
 
             with (
                 patch(
-                    "resolve_editor.cli.plan_project_export",
+                    "framestudio.cli.plan_project_export",
                     return_value=plan,
                 ) as plan_export,
                 patch(
-                    "resolve_editor.cli.execute_export",
+                    "framestudio.cli.execute_export",
                     return_value=project_path,
                 ) as execute,
                 patch(
-                    "resolve_editor.cli.probe_media",
+                    "framestudio.cli.probe_media",
                     return_value=source_probe,
                 ) as probe,
             ):

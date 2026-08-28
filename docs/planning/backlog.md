@@ -893,8 +893,8 @@ protected throughout PHASE-007.
 - `docs/planning/features/closed/FEAT-023-verifying-safe-enhanced-delivery.md`
 - `FPS-ENHANCEMENT-RESEARCH.md`
 - `FLOWFRAMES-RESEARCH.md`
-- `resolve_concat.py`
-- `resolve_fps.py`
+- `framestudio_concat.py`
+- `framestudio_fps.py`
 - `.github/aidd-config.yml`
 
 ## PHASE-008 - Responsive Preview and Media Strategy Ticket Set
@@ -1033,10 +1033,10 @@ available as evidence and safe fallback behavior where required.
 - `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`
 - `docs/planning/features/closed/FEAT-027-researching-video-restoration-and-upscaling.md`
 - `docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`
-- `resolve_editor/app_playback.py`
-- `resolve_editor/ffmpeg_playback.py`
-- `resolve_editor/export_smart_render.py`
-- `resolve_editor/export_interpolation.py`
+- `framestudio/app_playback.py`
+- `framestudio/ffmpeg_playback.py`
+- `framestudio/export_smart_render.py`
+- `framestudio/export_interpolation.py`
 - `FAST-CONCAT-RESEARCH.md`
 - `FPS-ENHANCEMENT-RESEARCH.md`
 - `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`

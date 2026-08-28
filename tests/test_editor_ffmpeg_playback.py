@@ -7,13 +7,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_editor.ffmpeg_playback import (
+from framestudio.ffmpeg_playback import (
     FfmpegComposedPlaybackBackend,
     FfmpegPlaybackBackend,
     VideoFrame,
 )
-from resolve_editor.model import Segment, TriplicateGroup
-from resolve_editor.playback import PlaybackBackendError
+from framestudio.model import Segment, TriplicateGroup
+from framestudio.playback import PlaybackBackendError
 
 
 @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is required")
@@ -424,7 +424,7 @@ class FfmpegPlaybackTests(unittest.TestCase):
         try:
             decode_result = []
             with patch(
-                "resolve_editor.ffmpeg_playback.subprocess.Popen",
+                "framestudio.ffmpeg_playback.subprocess.Popen",
                 side_effect=fake_popen,
             ):
                 decode_thread = threading.Thread(
@@ -496,7 +496,7 @@ class FfmpegPlaybackTests(unittest.TestCase):
         try:
             with (
                 patch(
-                    "resolve_editor.ffmpeg_playback.subprocess.Popen",
+                    "framestudio.ffmpeg_playback.subprocess.Popen",
                     return_value=process,
                 ),
                 self.assertRaisesRegex(PlaybackBackendError, "pipe closed"),
@@ -732,7 +732,7 @@ class FfmpegPlaybackTests(unittest.TestCase):
         )
 
         try:
-            with patch("resolve_editor.ffmpeg_playback.shutil.which", return_value=None):
+            with patch("framestudio.ffmpeg_playback.shutil.which", return_value=None):
                 with self.assertRaisesRegex(PlaybackBackendError, "ffplay is required"):
                     backend._start_audio_preview_locked(0.0)
         finally:

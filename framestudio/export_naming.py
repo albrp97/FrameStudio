@@ -7,6 +7,8 @@ from pathlib import Path
 from .fps_policy import FrameRatePolicy, rate_label
 
 VIDEO_SUFFIXES = frozenset({".mkv", ".mov", ".mp4", ".webm"})
+PROJECT_SUFFIX = ".framestudio.json"
+LEGACY_PROJECT_SUFFIX = ".resolve.json"
 
 
 class ExportDestinationError(ValueError):
@@ -14,7 +16,7 @@ class ExportDestinationError(ValueError):
 
 
 def _strip_project_suffix(stem: str) -> str:
-    for suffix in (".resolve", ".project", ".editor"):
+    for suffix in (".framestudio", ".resolve", ".project", ".editor"):
         if stem.casefold().endswith(suffix):
             return stem[: -len(suffix)]
     return stem

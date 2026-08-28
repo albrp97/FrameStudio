@@ -14,9 +14,9 @@ validation is required before closure
 - **Category:** implementation
 - **Requirement:** GUI, CLI, and reopened project expose one source-level
   decision model without implying per-segment levels.
-- **Source:** `resolve_editor/app_helpers.py`,
-  `resolve_editor/app_ui.py`, `resolve_editor/cli_payload.py`,
-  `resolve_editor/model_project.py`
+- **Source:** `framestudio/app_helpers.py`,
+  `framestudio/app_ui.py`, `framestudio/cli_payload.py`,
+  `framestudio/model_project.py`
 - **Expected:** Status, gain, stale state, diagnostics, policy version, and
   source identity derive from persisted source settings.
 - **Observed:** The GUI displays source-level audio decision labels; CLI

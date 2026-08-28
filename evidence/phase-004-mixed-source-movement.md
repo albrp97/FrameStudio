@@ -16,8 +16,8 @@
 - Observed: Shared movement operations reorder complete blocks, reflow
   sequential timeline placement, recalculate duration, and return
   deterministic invalid-operation errors.
-- Evidence: `resolve_editor/model.py`, `resolve_editor/operations.py`,
-  `resolve_editor/app.py`, and `tests/test_editor_mixed_source.py`.
+- Evidence: `framestudio/model.py`, `framestudio/operations.py`,
+  `framestudio/app.py`, and `tests/test_editor_mixed_source.py`.
 - Status: `passed`
 
 ### CONTRACT-001

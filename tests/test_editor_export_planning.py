@@ -3,20 +3,20 @@ from fractions import Fraction
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.export_estimates import (
+from framestudio.export_estimates import (
     RVE_CALIBRATION,
     SourceWorkload,
     estimate_export,
     estimate_project_export,
 )
-from resolve_editor.export_naming import (
+from framestudio.export_naming import (
     ExportDestinationError,
     collision_safe_destination,
     smart_export_name,
     validate_export_destination,
 )
-from resolve_editor.fps_policy import resolve_frame_rate_policy
-from resolve_editor.model import Project
+from framestudio.fps_policy import resolve_frame_rate_policy
+from framestudio.model import Project
 
 
 class EditorExportPlanningTests(unittest.TestCase):
@@ -61,7 +61,7 @@ class EditorExportPlanningTests(unittest.TestCase):
     def test_destination_validation_rejects_project_source_directory_and_invalid_suffix(self):
         with TemporaryDirectory() as temporary_directory:
             folder = Path(temporary_directory)
-            project = folder / "edit.resolve.json"
+            project = folder / "edit.framestudio.json"
             source = folder / "source.mp4"
             project.write_bytes(b"project")
             source.write_bytes(b"source")

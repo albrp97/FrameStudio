@@ -16,7 +16,7 @@ validation is required before closure
   remain authoritative; source codec/container names do not silently select a
   different output profile.
 - **Source:** `docs/specs/phase-002-export-policy.md`,
-  `resolve_editor/export_types.py`
+  `framestudio/export_types.py`
 - **Expected:** MP4, H.264, AAC when audio is present, `yuv420p`, 1920x1080,
   and explicit fallback reasons.
 - **Observed:** `OutputPolicy` and fallback routes retain those values.

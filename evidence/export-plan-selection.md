@@ -50,7 +50,7 @@ behavior remain protected.
 - **Category:** baseline
 - **Command:** `python3 -m unittest tests.test_editor_export`
 - **Expected:** New planner requirements fail before the export planner exists.
-- **Observed:** Test collection failed because `resolve_editor.export` did not
+- **Observed:** Test collection failed because `framestudio.export` did not
   exist.
 - **Status:** passedWithConcerns
 - **Artifacts:** terminal output.
@@ -66,7 +66,7 @@ behavior remain protected.
   deterministic planning cases are handled explicitly.
 - **Observed:** 8 focused planner tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/export.py`,
+- **Artifacts:** `framestudio/export.py`,
   `tests/test_editor_export.py`.
 - **Failure:** none.
 - **Fix:** none.
@@ -108,7 +108,7 @@ behavior remain protected.
   `docs/specs/phase-002-export-policy.md` agree; command execution and
   output publication remain outside TICKET-010.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/export.py`,
+- **Artifacts:** `framestudio/export.py`,
   `docs/specs/phase-002-export-policy.md`.
 - **Failure:** none.
 - **Fix:** none.

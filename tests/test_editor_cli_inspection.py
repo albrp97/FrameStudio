@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.cli import cli_main
-from resolve_editor.model import Project
-from resolve_editor.persistence import save_project
+from framestudio.cli import cli_main
+from framestudio.model import Project
+from framestudio.persistence import save_project
 
 
 def make_project(root: Path) -> Project:
@@ -36,7 +36,7 @@ class EditorCliInspectionTests(unittest.TestCase):
     def test_inspect_reports_stable_project_timeline_and_redacted_source(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             save_project(project, project_path)
             before = project_path.read_bytes()
@@ -82,7 +82,7 @@ class EditorCliInspectionTests(unittest.TestCase):
         stderr = io.StringIO()
 
         result = cli_main(
-            ["inspect", "/tmp/missing.resolve.json"],
+            ["inspect", "/tmp/missing.framestudio.json"],
             stdout=stdout,
             stderr=stderr,
         )
@@ -97,7 +97,7 @@ class EditorCliInspectionTests(unittest.TestCase):
     def test_inspect_missing_source_returns_structured_error(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             project = make_project(root)
             save_project(project, project_path)
             (root / "source.mp4").unlink()
@@ -134,7 +134,7 @@ class EditorCliInspectionTests(unittest.TestCase):
                     "format_name": "mp4",
                 },
             )
-            project_path = root / "edit.resolve.json"
+            project_path = root / "edit.framestudio.json"
             save_project(project, project_path)
             stdout = io.StringIO()
             stderr = io.StringIO()

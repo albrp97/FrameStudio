@@ -408,8 +408,8 @@ remain protected throughout PHASE-007.
 - `docs/planning/phases/closed/PHASE-007-producing-validated-60-fps-edits.md`
 - `FPS-ENHANCEMENT-RESEARCH.md`
 - `FLOWFRAMES-RESEARCH.md`
-- `resolve_concat.py`
-- `resolve_fps.py`
+- `framestudio_concat.py`
+- `framestudio_fps.py`
 - `.github/aidd-config.yml`
 
 ## Source references
@@ -588,8 +588,8 @@ validation and closeout on 2026-08-28
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/specs/future-product-direction.md`,
 `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
-`resolve_editor/app_playback.py`, `resolve_editor/app_timeline_actions.py`,
-`resolve_editor/export_smart_render.py`, `resolve_editor/export_interpolation.py`,
+`framestudio/app_playback.py`, `framestudio/app_timeline_actions.py`,
+`framestudio/export_smart_render.py`, `framestudio/export_interpolation.py`,
 `README.md`,
 `docs/planning/reviews/CHG-006-real-video-enhancer-restoration-benchmark.md`,
 `docs/planning/reviews/CHG-007-expand-restoration-benchmark-matrix.md`,
@@ -680,10 +680,10 @@ preservation remain protected throughout PHASE-008.
 - `docs/specs/capability-map.md`
 - `docs/specs/future-product-direction.md`
 - `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`
-- `resolve_editor/app_playback.py`
-- `resolve_editor/ffmpeg_playback.py`
-- `resolve_editor/export_smart_render.py`
-- `resolve_editor/export_interpolation.py`
+- `framestudio/app_playback.py`
+- `framestudio/ffmpeg_playback.py`
+- `framestudio/export_smart_render.py`
+- `framestudio/export_interpolation.py`
 - `FAST-CONCAT-RESEARCH.md`
 - `FPS-ENHANCEMENT-RESEARCH.md`
 - `.github/aidd-config.yml`

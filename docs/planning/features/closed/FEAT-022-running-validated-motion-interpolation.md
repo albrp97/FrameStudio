@@ -14,7 +14,7 @@ warnings.
 **Approval:** user-authorized on 2026-08-24 to break down PHASE-007; ticket
 execution remains separately gated by the configured approval policy
 **Source paths:** `docs/planning/phases/closed/PHASE-007-producing-validated-60-fps-edits.md`,
-`resolve_fps.py`, `resolve_concat.py`, `FPS-ENHANCEMENT-RESEARCH.md`,
+`framestudio_fps.py`, `framestudio_concat.py`, `FPS-ENHANCEMENT-RESEARCH.md`,
 `FLOWFRAMES-RESEARCH.md`, `benchmarks/fps.vpy`, `.github/aidd-config.yml`
 **Dependencies:** FEAT-020 target-rate policy; PHASE-005 audio and output
 policy; validated RIFE/RVE research; target-workstation runtime and GPU
@@ -82,7 +82,7 @@ synchronization, or scene-cut safety.
 
 ## Protected behaviors
 
-Legacy `resolve_fps.py` and `resolve_concat.py` command names and behavior,
+Legacy `framestudio_fps.py` and `framestudio_concat.py` command names and behavior,
 source-level audio decisions, fixed 1920x1080 output, source preservation,
 partial-output cleanup, and existing non-enhanced editor exports remain
 protected.

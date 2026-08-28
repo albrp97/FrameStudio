@@ -50,7 +50,7 @@ the complete repository test suite remain protected.
 - **Command:** `python3 -m unittest tests.test_editor_cli_contract`
 - **Expected:** New contract tests fail because the CLI contract has not yet
   been implemented.
-- **Observed:** Test collection failed because `resolve_editor.cli` does not
+- **Observed:** Test collection failed because `framestudio.cli` does not
   exist.
 - **Status:** passedWithConcerns
 - **Artifacts:** `tests/test_editor_cli_contract.py`; terminal output.
@@ -66,7 +66,7 @@ the complete repository test suite remain protected.
   opt-in, and malformed-argument handling pass.
 - **Observed:** 5 tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/cli.py`,
+- **Artifacts:** `framestudio/cli.py`,
   `tests/test_editor_cli_contract.py`.
 - **Failure:** The initial parser implementation passed an unsupported
   `parser_class` keyword to `add_parser`.
@@ -85,7 +85,7 @@ the complete repository test suite remain protected.
   `docs/specs/cli-contract.md` and linked from `README.md`.
 - **Status:** passed
 - **Artifacts:** `docs/specs/cli-contract.md`, `README.md`,
-  `Makefile`, `resolve_editor.py`.
+  `Makefile`, `framestudio.py`.
 - **Failure:** none.
 - **Fix:** none.
 

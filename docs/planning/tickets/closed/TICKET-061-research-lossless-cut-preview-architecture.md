@@ -18,8 +18,8 @@ requires the configured preimplementation and approval gates
 **Provider:** auto; base and target branches are not configured
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/features/closed/FEAT-024-optimizing-cursor-driven-preview.md`,
-`resolve_editor/app_playback.py`, `resolve_editor/ffmpeg_playback.py`,
-`resolve_editor/timeline.py`, `docs/specs/future-product-direction.md`,
+`framestudio/app_playback.py`, `framestudio/ffmpeg_playback.py`,
+`framestudio/timeline.py`, `docs/specs/future-product-direction.md`,
 [Lossless Cut repository](https://github.com/mifi/lossless-cut.git),
 `.github/aidd-config.yml`
 **Dependencies:** target-workstation access; a disposable research location;

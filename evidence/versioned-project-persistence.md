@@ -8,8 +8,8 @@
 **Status:** passed
 **Planning chain:** `OBJ-001 -> SCOPE-001 -> CAP-004/CAP-012 -> PHASE-001 ->
 FEAT-003 -> TICKET-005`
-**Source references:** `resolve_editor/model.py`,
-`resolve_editor/persistence.py`, `tests/test_editor_persistence.py`
+**Source references:** `framestudio/model.py`,
+`framestudio/persistence.py`, `tests/test_editor_persistence.py`
 **Evidence path:** `evidence/versioned-project-persistence.md`
 
 ## E-501 - Persistence focused tests
@@ -62,5 +62,5 @@ covered by round-trip and failure-path tests.
 - **Failed:** none.
 - **Blocked:** none for persistence.
 - **Skipped:** none for the automated persistence scope.
-- **Artifacts:** `resolve_editor/model.py`,
-  `resolve_editor/persistence.py`, and this evidence record.
+- **Artifacts:** `framestudio/model.py`,
+  `framestudio/persistence.py`, and this evidence record.

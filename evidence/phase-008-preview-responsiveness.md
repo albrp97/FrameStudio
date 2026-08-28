@@ -66,8 +66,8 @@ preview, source preservation, export, persistence, and legacy scripts.
   recovery, latest-request delivery, cache hit/eviction, and stale-frame
   accounting.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/preview_strategy.py`,
-  `resolve_editor/ffmpeg_playback.py`, `tests/test_editor_preview_strategy.py`,
+- **Artifacts:** `framestudio/preview_strategy.py`,
+  `framestudio/ffmpeg_playback.py`, `tests/test_editor_preview_strategy.py`,
   `tests/test_editor_ffmpeg_playback.py`,
   `docs/specs/preview-responsiveness-strategy.md`
 - **Limit:** target-workstation GTK interaction and paint timing remain
@@ -75,8 +75,8 @@ preview, source preservation, export, persistence, and legacy scripts.
 
 ## Additional verification
 
-- `python3 -m py_compile resolve_editor/preview_strategy.py
-  resolve_editor/ffmpeg_playback.py benchmarks/preview_responsiveness.py
+- `python3 -m py_compile framestudio/preview_strategy.py
+  framestudio/ffmpeg_playback.py benchmarks/preview_responsiveness.py
   tests/test_editor_preview_strategy.py` — passed.
 - Existing playback/timeline baseline before edits — 27 tests passed.
 - `python3 -m unittest discover -s tests` after edits — 273 tests passed.
@@ -181,9 +181,9 @@ mixed-source, and render-strategy benchmark artifacts reported terminal
 
 **Status:** passedWithConcerns
 
-**Artifacts:** `resolve_editor/export_process.py`,
-`resolve_editor/export_delivery.py`, `resolve_editor/export_interpolation.py`,
-`resolve_editor/app_export.py`, `resolve_fps.py`,
+**Artifacts:** `framestudio/export_process.py`,
+`framestudio/export_delivery.py`, `framestudio/export_interpolation.py`,
+`framestudio/app_export.py`, `framestudio_fps.py`,
 `tests/test_editor_export_execution.py`, `tests/test_editor_performance.py`,
 `tests/test_fps.py`, `evidence/phase-008-preview-benchmark-one-source.json`,
 `evidence/phase-008-preview-benchmark-mixed-source.json`,

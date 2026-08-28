@@ -12,8 +12,8 @@ terminal
 ### E-044-001 - Versioned focused-state persistence
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/model_project.py`,
-  `resolve_editor/model_types.py`, `resolve_editor/model_timeline.py`,
+- **Source references:** `framestudio/model_project.py`,
+  `framestudio/model_types.py`, `framestudio/model_timeline.py`,
   `tests/test_editor_composition.py`
 - **Expected:** Transform bundles, group identities, roles, status, and
   ordinary editing state survive save/reopen and older projects remain usable.

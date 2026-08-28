@@ -1,8 +1,8 @@
 import unittest
 
-from resolve_editor.app import is_split_key
-from resolve_editor.model import Segment, SegmentTimeline
-from resolve_editor.timeline import (
+from framestudio.app import is_split_key
+from framestudio.model import Segment, SegmentTimeline
+from framestudio.timeline import (
     SELECTED_CLIP_BORDER_COLOR,
     TimelineClipGeometry,
     clamp_timeline_zoom,

@@ -21,7 +21,7 @@ set; implementation is not authorized by this planning-only request
 `docs/planning/features/closed/FEAT-020-choosing-target-frame-rate-delivery.md`,
 `docs/specs/project-scope.md`, `docs/specs/capability-map.md`,
 `docs/specs/cli-contract.md`, `FPS-ENHANCEMENT-RESEARCH.md`,
-`resolve_fps.py`, `resolve_concat.py`, `.github/aidd-config.yml`
+`framestudio_fps.py`, `framestudio_concat.py`, `.github/aidd-config.yml`
 **Dependencies:** PHASE-005 audio/output policy; PHASE-006 timeline and
 segment timing semantics; source frame-rate metadata; current versioned
 project settings

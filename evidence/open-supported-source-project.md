@@ -8,8 +8,8 @@
 **Status:** passedWithConcerns
 **Planning chain:** `OBJ-001 -> SCOPE-001 -> CAP-001/CAP-012 -> PHASE-001 ->
 FEAT-001 -> TICKET-002`
-**Source references:** `resolve_editor/media.py`,
-`resolve_editor/model.py`, `resolve_editor/app.py`,
+**Source references:** `framestudio/media.py`,
+`framestudio/model.py`, `framestudio/app.py`,
 `tests/test_editor_media.py`, `tests/test_editor_model.py`
 **Evidence path:** `evidence/open-supported-source-project.md`
 
@@ -41,7 +41,7 @@ FEAT-001 -> TICKET-002`
 
 - **Category:** functionality
 - **Steps:** Generate a temporary 320x180 H.264 MP4 with FFmpeg and run
-  `python3 resolve_editor.py --source <fixture> --smoke-test
+  `python3 framestudio.py --source <fixture> --smoke-test
   --smoke-project <project>`.
 - **Expected:** The editor probes the source, creates a project, initializes
   the preview, and writes valid project state.

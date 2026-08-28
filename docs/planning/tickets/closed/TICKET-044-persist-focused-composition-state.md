@@ -23,7 +23,7 @@ PHASE-006 ticket set; the completed outcome was confirmed by the user on
 `docs/planning/tickets/open/TICKET-040-preserve-visual-modifications-through-block-edits.md`,
 `docs/planning/tickets/open/TICKET-043-preserve-triplicate-group-lifecycle.md`,
 `docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`,
-`resolve_editor/model_project.py`, `resolve_editor/operations.py`,
+`framestudio/model_project.py`, `framestudio/operations.py`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-040 and TICKET-043; existing versioned project
 schema and save/reopen behavior

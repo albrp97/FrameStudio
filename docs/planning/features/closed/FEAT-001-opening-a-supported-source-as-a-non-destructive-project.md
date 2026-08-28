@@ -72,6 +72,6 @@ preview and timeline, without changing the source.
 
 ### Protected behavior
 
-Existing commands, `resolve_media.py`, `resolve_concat.py`,
-`resolve_fps.py`, their tests, and source-safe output behavior remain
+Existing commands, `framestudio_media.py`, `framestudio_concat.py`,
+`framestudio_fps.py`, their tests, and source-safe output behavior remain
 available and unchanged.

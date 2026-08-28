@@ -9,7 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
-from resolve_fps import (
+from framestudio_fps import (
     DEFAULT_FALLBACK_ENGINE,
     build_encode_command,
     build_rve_custom_encoder,
@@ -138,7 +138,7 @@ class FpsTests(unittest.TestCase):
                 "RVE_TRT_TORCH_PIXEL",
                 encoding="utf-8",
             )
-            with patch("resolve_fps.require_tool", return_value="ffmpeg"):
+            with patch("framestudio_fps.require_tool", return_value="ffmpeg"):
                 command = build_rve_restoration_command(
                     root / "source.mp4",
                     root / "output.partial.mp4",
@@ -158,8 +158,8 @@ class FpsTests(unittest.TestCase):
         process = Mock(returncode=0)
         process.communicate.return_value = ("", "")
         with (
-            patch("resolve_fps.require_tool", return_value="ffmpeg"),
-            patch("resolve_fps.subprocess.Popen", return_value=process) as popen,
+            patch("framestudio_fps.require_tool", return_value="ffmpeg"),
+            patch("framestudio_fps.subprocess.Popen", return_value=process) as popen,
         ):
             remux_rve_audio(
                 Path("source.mp4"),
@@ -189,7 +189,7 @@ class FpsTests(unittest.TestCase):
                 "CUDA device=NVIDIA GeForce RTX 5070 Ti; model=loaded\n",
                 "",
             )
-            with patch("resolve_fps.subprocess.run", return_value=completed) as run:
+            with patch("framestudio_fps.subprocess.run", return_value=completed) as run:
                 reason = rve_runtime_unavailable_reason(arguments)
 
             self.assertIsNone(reason)
@@ -224,7 +224,7 @@ class FpsTests(unittest.TestCase):
         arguments = parse_arguments([])
 
         with self.assertRaisesRegex(RuntimeError, "Export cancelled"):
-            from resolve_fps import run_interpolation_rve
+            from framestudio_fps import run_interpolation_rve
 
             run_interpolation_rve(
                 Path("source.mp4"),
@@ -304,12 +304,12 @@ class FpsTests(unittest.TestCase):
                 finished.set()
 
             with (
-                patch("resolve_fps.subprocess.Popen", side_effect=(writer, encoder)),
-                patch("resolve_fps.build_encode_command", return_value=["encoder"]),
-                patch("resolve_fps.drain_stderr", side_effect=drain),
+                patch("framestudio_fps.subprocess.Popen", side_effect=(writer, encoder)),
+                patch("framestudio_fps.build_encode_command", return_value=["encoder"]),
+                patch("framestudio_fps.drain_stderr", side_effect=drain),
             ):
                 with self.assertRaisesRegex(RuntimeError, "Export cancelled"):
-                    from resolve_fps import run_interpolation
+                    from framestudio_fps import run_interpolation
 
                     run_interpolation(
                         source,
@@ -343,11 +343,11 @@ class FpsTests(unittest.TestCase):
             )
             with (
                 patch(
-                    "resolve_fps.probe_video",
+                    "framestudio_fps.probe_video",
                     return_value=(Fraction(30000, 1001), 900),
                 ),
-                patch("resolve_fps.concatenate") as concatenate,
-                patch("resolve_fps.run_interpolation") as run_interpolation,
+                patch("framestudio_fps.concatenate") as concatenate,
+                patch("framestudio_fps.run_interpolation") as run_interpolation,
             ):
                 run_pipeline([source], root, arguments)
             concatenate.assert_not_called()

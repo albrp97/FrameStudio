@@ -18,7 +18,7 @@ class JsonArgumentParser(argparse.ArgumentParser):
 
 def build_cli_parser() -> argparse.ArgumentParser:
     parser = JsonArgumentParser(
-        prog="resolve-editor",
+        prog="framestudio",
         description="Deterministic machine-readable editor operations.",
     )
     commands = parser.add_subparsers(

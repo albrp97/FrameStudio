@@ -21,8 +21,8 @@ ticket-execution approval
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/tickets/closed/TICKET-048-define-target-fps-selection-and-enhancement-scope.md`,
 `docs/planning/features/closed/FEAT-020-choosing-target-frame-rate-delivery.md`,
-`resolve_editor/model_project.py`, `resolve_editor/persistence.py`,
-`resolve_editor/cli_parser.py`, `resolve_editor/cli.py`,
+`framestudio/model_project.py`, `framestudio/persistence.py`,
+`framestudio/cli_parser.py`, `framestudio/cli.py`,
 `docs/specs/cli-contract.md`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-048; existing versioned project schema and atomic
 save/reopen behavior

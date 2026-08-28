@@ -16,8 +16,8 @@ execution remains separately gated by the configured approval policy
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`,
 `docs/planning/phases/closed/PHASE-007-producing-validated-60-fps-edits.md`,
-`resolve_editor/app_export.py`, `resolve_editor/export_process.py`,
-`resolve_concat.py`, `resolve_fps.py`, `FPS-ENHANCEMENT-RESEARCH.md`,
+`framestudio/app_export.py`, `framestudio/export_process.py`,
+`framestudio_concat.py`, `framestudio_fps.py`, `FPS-ENHANCEMENT-RESEARCH.md`,
 `.github/aidd-config.yml`
 **Dependencies:** FEAT-020 target-rate policy; current export destination
 guard; source probing; existing progress metrics; local benchmark evidence

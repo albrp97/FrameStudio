@@ -36,7 +36,7 @@ FEAT-022 -> TICKET-053/TICKET-054/TICKET-055`
 - **Observed:** Seven interpolation tests passed, including the periodic-grid
   rejection.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/interpolation_artifacts.py`,
+- **Artifacts:** `framestudio/interpolation_artifacts.py`,
   `tests/test_editor_interpolation.py`
 
 ### E-007-MOTION-002 — Enhanced export functionality
@@ -52,9 +52,9 @@ FEAT-022 -> TICKET-053/TICKET-054/TICKET-055`
   sampling paths executed as part of the enhanced route; temporary media was
   cleaned up.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/interpolation.py`,
-  `resolve_editor/export_interpolation.py`,
-  `resolve_editor/export_delivery.py`,
+- **Artifacts:** `framestudio/interpolation.py`,
+  `framestudio/export_interpolation.py`,
+  `framestudio/export_delivery.py`,
   `tests/test_editor_export_execution.py`
 
 ### E-007-MOTION-003 — Target-workstation RVE evidence

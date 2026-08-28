@@ -19,7 +19,7 @@ requires the configured preimplementation and approval gates
 **Last updated:** 2026-08-26
 **Source paths:** `docs/planning/features/open/FEAT-027-researching-video-restoration-and-upscaling.md`,
 `docs/specs/future-product-direction.md`, `FAST-CONCAT-RESEARCH.md`,
-`FPS-ENHANCEMENT-RESEARCH.md`, `resolve_concat.py`, `resolve_fps.py`,
+`FPS-ENHANCEMENT-RESEARCH.md`, `framestudio_concat.py`, `framestudio_fps.py`,
 `.github/aidd-config.yml`
 **Dependencies:** public technical/model documentation; license information;
 local GPU/runtime constraints; representative degradation classes

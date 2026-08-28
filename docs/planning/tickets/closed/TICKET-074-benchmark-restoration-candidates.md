@@ -18,7 +18,7 @@ requires the configured preimplementation and approval gates
 **Last updated:** 2026-08-28
 **Source paths:** `docs/planning/features/open/FEAT-027-researching-video-restoration-and-upscaling.md`,
 `docs/planning/tickets/open/TICKET-073-survey-video-upscaling-denoise-and-compression-recovery.md`,
-`resolve_editor/export_delivery.py`, `resolve_editor/export_smart_render.py`,
+`framestudio/export_delivery.py`, `framestudio/export_smart_render.py`,
 `benchmarks/`, `FAST-CONCAT-RESEARCH.md`, `FPS-ENHANCEMENT-RESEARCH.md`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-073 candidate matrix; representative degraded or

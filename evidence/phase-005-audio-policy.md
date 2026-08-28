@@ -27,7 +27,7 @@ validation is required before closure
 - **Category:** implementation
 - **Requirement:** The policy defines deterministic measurements, targets,
   peak protection, output audio profile, and explicit exceptional states.
-- **Command or source:** `resolve_editor/audio.py`,
+- **Command or source:** `framestudio/audio.py`,
   `tests/test_editor_audio.py`
 - **Expected:** Mean, median, peak, gain, policy version, source fingerprint,
   audio metadata, and diagnostics are represented in one shared contract.
@@ -35,7 +35,7 @@ validation is required before closure
   approved contract. Statuses are `pending`, `ready`, `silent`, `unsupported`,
   `failed`, and `not-applicable`.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/audio.py`,
+- **Artifacts:** `framestudio/audio.py`,
   `tests/test_editor_audio.py`
 
 ### E-031-002 - Policy regression
@@ -58,7 +58,7 @@ validation is required before closure
   decisions.
 - **Steps:** Generated disposable landscape and portrait MP4 fixtures with
   AAC stereo audio at different sample rates, imported both, and ran
-  `python3 resolve_editor.py analyze-audio <project>`.
+  `python3 framestudio.py analyze-audio <project>`.
 - **Expected:** Both sources receive independent `ready` decisions with
   measurements and policy version `legacy-concat-v1`.
 - **Observed:** Both sources returned `ready` decisions with independent

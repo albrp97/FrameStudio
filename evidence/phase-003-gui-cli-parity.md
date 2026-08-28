@@ -30,7 +30,7 @@ PHASE-003 -> FEAT-009 -> TICKET-016`
   planning boundaries preserve model invariants.
 - **Observed:** 3 tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/operations.py`,
+- **Artifacts:** `framestudio/operations.py`,
   `tests/test_editor_operations.py`.
 - **Failure:** none.
 - **Fix:** none.
@@ -38,7 +38,7 @@ PHASE-003 -> FEAT-009 -> TICKET-016`
 ## E-1602 - GUI adapter routing
 
 - **Category:** review
-- **Command or steps:** Updated `resolve_editor/app.py` to use shared
+- **Command or steps:** Updated `framestudio/app.py` to use shared
   operations for source creation, split, delete/restore toggle, and export
   planning while retaining UI-specific state, playback, and status handling.
 - **Expected:** GUI and CLI use equivalent domain decisions without changing
@@ -46,8 +46,8 @@ PHASE-003 -> FEAT-009 -> TICKET-016`
 - **Observed:** The existing GUI helper tests and the complete repository
   suite remained green.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/app.py`,
-  `resolve_editor/operations.py`.
+- **Artifacts:** `framestudio/app.py`,
+  `framestudio/operations.py`.
 - **Failure:** none.
 - **Fix:** none.
 
@@ -77,7 +77,7 @@ round trips, and the real executable path.
 - **Observed:** 4 tests passed.
 - **Status:** passed
 - **Artifacts:** `tests/test_editor_cli_parity.py`,
-  `resolve_editor.py`.
+  `framestudio.py`.
 - **Failure:** none.
 - **Fix:** none.
 

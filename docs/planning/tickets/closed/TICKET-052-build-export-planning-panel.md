@@ -22,8 +22,8 @@ ticket-execution approval
 `docs/planning/tickets/closed/TICKET-049-persist-and-expose-frame-rate-policy.md`,
 `docs/planning/tickets/closed/TICKET-050-choose-export-destination-and-smart-name.md`,
 `docs/planning/tickets/closed/TICKET-051-calibrate-export-processing-time-estimates.md`,
-`resolve_editor/app.py`, `resolve_editor/app_export.py`,
-`resolve_editor/app_ui.py`, `.github/aidd-config.yml`
+`framestudio/app.py`, `framestudio/app_export.py`,
+`framestudio/app_ui.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-049, TICKET-050, and TICKET-051; existing GTK
 application lifecycle and export progress panel
 **Risks:** dense controls can hide safety information, stale estimates can

@@ -21,9 +21,9 @@ PHASE-006 ticket set; the completed outcome was confirmed by the user on
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/tickets/open/TICKET-044-persist-focused-composition-state.md`,
 `docs/planning/features/open/FEAT-019-delivering-focused-compositions-safely.md`,
-`docs/specs/cli-contract.md`, `resolve_editor/cli.py`,
-`resolve_editor/cli_payload.py`, `resolve_editor/app_ui.py`,
-`resolve_editor/operations.py`, `.github/aidd-config.yml`
+`docs/specs/cli-contract.md`, `framestudio/cli.py`,
+`framestudio/cli_payload.py`, `framestudio/app_ui.py`,
+`framestudio/operations.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-044; existing deterministic CLI and shared GUI/CLI
 domain operations
 **Risks:** CLI and GUI can expose different defaults, structured errors can

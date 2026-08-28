@@ -14,8 +14,8 @@ validation is required before closure
 - **Category:** implementation
 - **Requirement:** One decision is stored per source and survives save/reopen
   without becoming segment state.
-- **Command or source:** `resolve_editor/model_project.py`,
-  `resolve_editor/operations.py`, `tests/test_editor_audio.py`
+- **Command or source:** `framestudio/model_project.py`,
+  `framestudio/operations.py`, `tests/test_editor_audio.py`
 - **Expected:** Source settings contain measurements, decision, policy version,
   diagnostics, audio metadata, and source fingerprint.
 - **Observed:** Decisions persist under

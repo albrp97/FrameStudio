@@ -56,7 +56,7 @@ class RestorationBenchmarkContractTests(unittest.TestCase):
         self.assertEqual(candidate["configuration"]["max_b_frames"], 0)
         self.assertEqual(
             candidate["runtime_probe"]["executable_paths"],
-            ["~/.cache/resolve-fps/benchmark-tools/Video2X-6.4.0-x86_64.AppImage"],
+            ["~/.cache/framestudio-fps/benchmark-tools/Video2X-6.4.0-x86_64.AppImage"],
         )
 
     def test_candidate_result_retains_pinned_runtime_configuration(self):

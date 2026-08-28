@@ -15,8 +15,8 @@ user-validation, review, and delivery gates.
 **Source paths:** `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`,
 `docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
 `docs/specs/future-product-direction.md`, `FPS-ENHANCEMENT-RESEARCH.md`,
-`resolve_editor/export_planning.py`, `resolve_editor/export_delivery.py`,
-`resolve_editor/composition_render.py`, `.github/aidd-config.yml`
+`framestudio/export_planning.py`, `framestudio/export_delivery.py`,
+`framestudio/composition_render.py`, `.github/aidd-config.yml`
 **Dependencies:** PHASE-007 FPS/export behavior; PHASE-006 composition;
 TICKET-076 per-source render strategy; local RVE runtime and
 SuperUltraCompact weights; FFmpeg/ffprobe

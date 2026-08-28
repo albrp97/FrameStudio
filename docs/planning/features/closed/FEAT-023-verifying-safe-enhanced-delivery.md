@@ -14,9 +14,9 @@ warnings.
 **Approval:** user-authorized on 2026-08-24 to break down PHASE-007; ticket
 execution remains separately gated by the configured approval policy
 **Source paths:** `docs/planning/phases/closed/PHASE-007-producing-validated-60-fps-edits.md`,
-`docs/specs/cli-contract.md`, `resolve_editor/app.py`,
-`resolve_editor/app_export.py`, `resolve_editor/cli.py`,
-`resolve_editor/export_delivery.py`, `resolve_editor/export_process.py`,
+`docs/specs/cli-contract.md`, `framestudio/app.py`,
+`framestudio/app_export.py`, `framestudio/cli.py`,
+`framestudio/export_delivery.py`, `framestudio/export_process.py`,
 `.github/aidd-config.yml`
 **Dependencies:** FEAT-020 policy; FEAT-021 export planning; FEAT-022
 interpolation; existing project persistence, CLI, export verification, and

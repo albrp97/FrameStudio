@@ -12,9 +12,9 @@ terminal
 ### E-045-001 - GUI and CLI parity
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/cli.py`,
-  `resolve_editor/cli_parser.py`, `resolve_editor/cli_payload.py`,
-  `resolve_editor/operations.py`, `resolve_editor/app_ui.py`,
+- **Source references:** `framestudio/cli.py`,
+  `framestudio/cli_parser.py`, `framestudio/cli_payload.py`,
+  `framestudio/operations.py`, `framestudio/app_ui.py`,
   `docs/specs/cli-contract.md`, `README.md`
 - **Expected:** GUI and CLI expose the same focused state, operations,
   structured diagnostics, and persisted values without changing existing

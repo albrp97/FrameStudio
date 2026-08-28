@@ -93,7 +93,7 @@ TICKET-001`
 - **Expected:** The new isolated editor tests fail before the implementation
   exists, for the intended missing-module reason.
 - **Observed:** Five test modules failed to import because the
-  `resolve_editor` package did not yet exist.
+  `framestudio` package did not yet exist.
 - **Status:** passedWithConcerns
 - **Artifacts:** terminal output from the focused test command.
 - **Failure:** editor implementation modules were not present.
@@ -105,9 +105,9 @@ TICKET-001`
 
 - **Category:** functionality
 - **Commands:** Generate a local 320x180 H.264 MP4 with FFmpeg, then run:
-  `python3 resolve_editor.py --source <fixture> --smoke-test
+  `python3 framestudio.py --source <fixture> --smoke-test
   --smoke-project <project>` and
-  `python3 resolve_editor.py --project <project> --smoke-test`.
+  `python3 framestudio.py --project <project> --smoke-test`.
 - **Expected:** The editor opens the source/project, exercises play, pause,
   seek, save, and project reopen, then exits cleanly.
 - **Observed:** Both smoke runs exited successfully and the saved JSON
@@ -141,7 +141,7 @@ TICKET-001`
 - **Category:** implementation
 - **Commands:**
   - `python3 -m unittest discover -s tests`
-  - `python3 -m py_compile resolve_editor.py resolve_editor/*.py
+  - `python3 -m py_compile framestudio.py framestudio/*.py
     tests/test_editor_*.py`
   - `git diff --check`
 - **Expected:** The selected foundation is implemented without regressing
@@ -175,7 +175,7 @@ and manual validation path are recorded in
 
 ## Protected flows
 
-- Existing `resolve_media.py`, `resolve_concat.py`, and `resolve_fps.py`
+- Existing `framestudio_media.py`, `framestudio_concat.py`, and `framestudio_fps.py`
   command behavior.
 - Existing unittest coverage and safe partial-output behavior.
 - Original source media remains untouched.

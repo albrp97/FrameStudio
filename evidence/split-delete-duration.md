@@ -61,7 +61,7 @@ behavior remain protected.
 - **Expected:** New segment-label and action-state tests fail because the
   helpers and UI state wiring do not exist.
 - **Observed:** Test collection failed because `format_segment_label` was not
-  yet available from `resolve_editor.app`.
+  yet available from `framestudio.app`.
 - **Status:** passedWithConcerns
 - **Artifacts:** terminal output.
 - **Failure:** expected missing implementation.
@@ -77,7 +77,7 @@ behavior remain protected.
 - **Observed:** 11 focused UI-helper tests passed; the existing PyGObject
   deprecation warning was emitted.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/app.py`,
+- **Artifacts:** `framestudio/app.py`,
   `tests/test_editor_ui_helpers.py`.
 - **Failure:** none.
 - **Fix:** none.
@@ -161,8 +161,8 @@ behavior remain protected.
 ## E-808 - Visual clip timeline implementation
 
 - **Category:** implementation
-- **Command or steps:** Added `resolve_editor/timeline.py` and replaced the
-  segment list/seek scale in `resolve_editor/app.py` with a visual clip track.
+- **Command or steps:** Added `framestudio/timeline.py` and replaced the
+  segment list/seek scale in `framestudio/app.py` with a visual clip track.
   Added included/deleted clip styling, click selection, playhead rendering,
   B-key splitting, zoom controls, and horizontal scrolling.
 - **Expected:** Ordered source clips remain visible, deleted clips are
@@ -172,7 +172,7 @@ behavior remain protected.
   geometry, deleted-state, hit-testing, zoom, position mapping, and B-key
   behavior.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/timeline.py`, `resolve_editor/app.py`,
+- **Artifacts:** `framestudio/timeline.py`, `framestudio/app.py`,
   `tests/test_editor_timeline.py`, `README.md`.
 - **Failure:** none in automated coverage.
 - **Fix:** none after the green focused run.
@@ -190,7 +190,7 @@ behavior remain protected.
   `make smoke` exited successfully. The existing PyGObject deprecation
   warning remained non-failing.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/timeline.py`, `resolve_editor/app.py`,
+- **Artifacts:** `framestudio/timeline.py`, `framestudio/app.py`,
   `tests/`, `README.md`.
 - **Failure:** none.
 - **Fix:** none.
@@ -268,7 +268,7 @@ behavior remain protected.
 - **Expected:** Focused tests for Delete, frame-step direction/position, and
   final-output labeling fail before their helpers exist.
 - **Observed:** Test collection failed because
-  `format_output_duration_label` was not available from `resolve_editor.app`.
+  `format_output_duration_label` was not available from `framestudio.app`.
 - **Status:** passedWithConcerns
 - **Artifacts:** `tests/test_editor_ui_helpers.py`.
 - **Failure:** Intentional missing implementation.
@@ -283,7 +283,7 @@ behavior remain protected.
   Space/B shortcut guidance; removed redundant Play/Split/Delete buttons;
   moved final output duration into the timeline toolbar; retained compact
   Restore access; and added GTK drag gesture seeking in
-  `resolve_editor/timeline.py`.
+  `framestudio/timeline.py`.
 - **Expected:** The editor uses keyboard shortcuts for common actions, reports
   the included-clip output duration in the timeline, steps by the source frame
   rate, and continuously seeks while dragging.
@@ -291,7 +291,7 @@ behavior remain protected.
   Delete key mapping, frame-step clamping, and final-output labeling.
   Compilation, diff checks, and GTK generated-media smoke passed.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/app.py`, `resolve_editor/timeline.py`,
+- **Artifacts:** `framestudio/app.py`, `framestudio/timeline.py`,
   `tests/test_editor_ui_helpers.py`, `README.md`.
 - **Failure:** none in automated coverage.
 - **Fix:** none after the focused green run.
@@ -308,7 +308,7 @@ behavior remain protected.
   media smoke flow completed successfully. The existing PyGObject warning
   remained non-failing.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/app.py`, `resolve_editor/timeline.py`,
+- **Artifacts:** `framestudio/app.py`, `framestudio/timeline.py`,
   `tests/`, `README.md`.
 - **Failure:** none.
 - **Fix:** none.
@@ -355,8 +355,8 @@ behavior remain protected.
   diff checks, and generated-media GTK smoke. The existing PyGObject
   deprecation warning remained non-failing.
 - **Status:** passedWithConcerns
-- **Artifacts:** E-815 terminal output; `resolve_editor/app.py`,
-  `resolve_editor/timeline.py`, `resolve_editor/export.py`.
+- **Artifacts:** E-815 terminal output; `framestudio/app.py`,
+  `framestudio/timeline.py`, `framestudio/export.py`.
 - **Failure:** none.
 - **Fix:** none.
 - **Accepted warning:** Existing `GLib.unix_signal_add_full` deprecation.
@@ -395,8 +395,8 @@ behavior remain protected.
   fallback exports reported progress through completion, including total
   frames, FPS, and the final stage.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/app.py`, `resolve_editor/timeline.py`,
-  `resolve_editor/export.py`, `tests/test_editor_ui_helpers.py`,
+- **Artifacts:** `framestudio/app.py`, `framestudio/timeline.py`,
+  `framestudio/export.py`, `tests/test_editor_ui_helpers.py`,
   `tests/test_editor_export.py`, `tests/test_editor_export_execution.py`,
   `README.md`.
 - **Failure:** none in automated coverage.
@@ -415,7 +415,7 @@ behavior remain protected.
   the generated-media GTK smoke flow exited successfully. The existing
   PyGObject deprecation warning remained non-failing.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/`, `tests/`, `README.md`.
+- **Artifacts:** `framestudio/`, `tests/`, `README.md`.
 - **Failure:** none.
 - **Fix:** Corrected the GTK 4 Alt modifier lookup from the unavailable
   `MOD1_MASK` name to `ALT_MASK` before the successful gate run.
@@ -486,7 +486,7 @@ behavior remain protected.
 - **Observed:** 96 tests passed; Python compilation and diff checks passed.
   The existing PyGObject deprecation warning remained non-failing.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/`, `tests/`, E-822.
+- **Artifacts:** `framestudio/`, `tests/`, E-822.
 - **Failure:** none.
 - **Fix:** none.
 - **Accepted warning:** Target-workstation visual interaction remains
@@ -522,8 +522,8 @@ behavior remain protected.
   asynchronous frame delivery and a coalescing test that suppresses an older
   blocked render after a newer request arrives.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/ffmpeg_playback.py`,
-  `resolve_editor/timeline.py`, `resolve_editor/app.py`,
+- **Artifacts:** `framestudio/ffmpeg_playback.py`,
+  `framestudio/timeline.py`, `framestudio/app.py`,
   `tests/test_editor_ffmpeg_playback.py`, `tests/test_editor_timeline.py`,
   `README.md`.
 - **Failure:** none in automated coverage.
@@ -543,7 +543,7 @@ behavior remain protected.
   generated-media GTK smoke exited successfully. The existing PyGObject
   deprecation warning remained non-failing.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/`, `tests/`, `README.md`.
+- **Artifacts:** `framestudio/`, `tests/`, `README.md`.
 - **Failure:** none.
 - **Fix:** none after the focused green run.
 - **Accepted warning:** Live pointer/keyboard interaction and screenshots

@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resolve_concat import (
+from framestudio_concat import (
     AudioStats,
     Clip,
     audio_gain_db,
@@ -158,9 +158,9 @@ class ConcatTests(unittest.TestCase):
             parts_directory = root / "parts"
             parts_directory.mkdir()
             with (
-                patch("resolve_concat.tempfile.mkdtemp", return_value=str(parts_directory)),
-                patch("resolve_concat.run_parallel_commands"),
-                patch("resolve_concat.run_ffmpeg"),
+                patch("framestudio_concat.tempfile.mkdtemp", return_value=str(parts_directory)),
+                patch("framestudio_concat.run_parallel_commands"),
+                patch("framestudio_concat.run_ffmpeg"),
             ):
                 run_normalization(
                     [clip("fixture.mp4")],
@@ -183,9 +183,9 @@ class ConcatTests(unittest.TestCase):
             parts_directory = root / "parts"
             parts_directory.mkdir()
             with (
-                patch("resolve_concat.tempfile.mkdtemp", return_value=str(parts_directory)),
+                patch("framestudio_concat.tempfile.mkdtemp", return_value=str(parts_directory)),
                 patch(
-                    "resolve_concat.run_parallel_commands",
+                    "framestudio_concat.run_parallel_commands",
                     side_effect=RuntimeError("worker failed"),
                 ),
             ):

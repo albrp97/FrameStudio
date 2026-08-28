@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from resolve_editor.app import (
+from framestudio.app import (
     KEYCODE_SPACE,
     _metadata_float,
     create_play_pause_key_controller,
@@ -24,14 +24,14 @@ from resolve_editor.app import (
     toggle_segment_deleted_state,
     validate_source_selection,
 )
-from resolve_editor.app_timeline_actions import (
+from framestudio.app_timeline_actions import (
     FOCUS_SCROLL_FIELDS,
     focus_scroll_value,
 )
-from resolve_editor.export import ExportProgress
-from resolve_editor.model import SegmentTimeline
-from resolve_editor.playback import PlaybackState
-from resolve_editor.ui import format_duration
+from framestudio.export import ExportProgress
+from framestudio.model import SegmentTimeline
+from framestudio.playback import PlaybackState
+from framestudio.ui import format_duration
 
 
 class EditorUiHelperTests(unittest.TestCase):

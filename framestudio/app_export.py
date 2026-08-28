@@ -414,7 +414,7 @@ def start_export(
 
     threading.Thread(
         target=export_worker,
-        name="resolve-editor-export",
+        name="framestudio-editor-export",
         daemon=True,
     ).start()
 

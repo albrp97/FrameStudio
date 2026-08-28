@@ -16,8 +16,8 @@ to the configured evidence, review, user-validation, and delivery gates
 **Source paths:** `docs/planning/features/open/FEAT-025-streamlining-segment-focus-modifications.md`,
 `docs/planning/tickets/closed/TICKET-067-correct-zoomed-focus-coordinate-bounds.md`,
 `docs/planning/tickets/closed/TICKET-068-verify-focus-control-persistence-and-parity.md`,
-`resolve_editor/composition.py`, `resolve_editor/composition_render.py`,
-`resolve_editor/app_timeline_actions.py`, `resolve_editor/operations.py`,
+`framestudio/composition.py`, `framestudio/composition_render.py`,
+`framestudio/app_timeline_actions.py`, `framestudio/operations.py`,
 `tests/test_editor_composition.py`, `tests/test_editor_cli_parity.py`,
 `tests/test_editor_persistence.py`, `.github/aidd-config.yml`
 **Dependencies:** existing focus bounds and triplicate composition semantics;

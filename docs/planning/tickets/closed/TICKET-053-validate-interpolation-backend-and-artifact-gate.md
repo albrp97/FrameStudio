@@ -20,7 +20,7 @@ ticket-execution approval
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/features/closed/FEAT-022-running-validated-motion-interpolation.md`,
 `docs/planning/phases/closed/PHASE-007-producing-validated-60-fps-edits.md`,
-`resolve_fps.py`, `resolve_concat.py`, `FPS-ENHANCEMENT-RESEARCH.md`,
+`framestudio_fps.py`, `framestudio_concat.py`, `FPS-ENHANCEMENT-RESEARCH.md`,
 `FLOWFRAMES-RESEARCH.md`, `benchmarks/fps.vpy`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-048; representative raw and encoded fixtures;
 supported target workstation; corrected REAL-Video-Enhancer checkout or

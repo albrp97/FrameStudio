@@ -17,15 +17,15 @@ remote checks remain unavailable and are recorded as an accepted warning.
 **Owner:** repository planning and implementation in the active worktree
 **Approval:** user-authorized on 2026-08-22 to implement all approved
 PHASE-005 tickets, including source-level audio balancing, with the legacy
-`resolve_concat.py` mean/median policy applied once per input source
+`framestudio_concat.py` mean/median policy applied once per input source
 **Provider:** auto; base and target branches are not configured in
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/features/open/FEAT-014-balancing-each-source-consistently.md`,
 `docs/planning/tickets/open/TICKET-032-analyze-and-persist-source-audio-decisions.md`,
 `docs/planning/phases/open/PHASE-005-balancing-sources-and-delivering-consistent-media.md`,
 `docs/planning/tickets/closed/TICKET-024-defining-mixed-source-output-canvas-and-timing-policy.md`,
-`resolve_editor/export.py`, `resolve_editor/ffmpeg_playback.py`,
-`resolve_editor/operations.py`, `.github/aidd-config.yml`
+`framestudio/export.py`, `framestudio/ffmpeg_playback.py`,
+`framestudio/operations.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-032; PHASE-004 fixed 1920x1080 output and current
 timing policy; validated preview and export boundaries
 **Risks:** filtering may alter duration or channel layout, preview and export

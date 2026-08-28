@@ -21,8 +21,8 @@ ticket-execution approval
 **Source paths:** `docs/planning/features/closed/FEAT-022-running-validated-motion-interpolation.md`,
 `docs/planning/tickets/closed/TICKET-048-define-target-fps-selection-and-enhancement-scope.md`,
 `docs/planning/tickets/closed/TICKET-053-validate-interpolation-backend-and-artifact-gate.md`,
-`resolve_fps.py`, `resolve_concat.py`, `resolve_editor/export_planning.py`,
-`resolve_editor/export_ffmpeg.py`, `benchmarks/`, `.github/aidd-config.yml`
+`framestudio_fps.py`, `framestudio_concat.py`, `framestudio/export_planning.py`,
+`framestudio/export_ffmpeg.py`, `benchmarks/`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-048 target eligibility; TICKET-053 validated backend;
 PHASE-004 mixed-source timing; existing editor export plan and partial-output
 boundaries

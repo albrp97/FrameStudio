@@ -61,8 +61,8 @@ protected.
 - **Category:** implementation
 - **Command or steps:** Implemented `execute_export`, output verification,
   temporary partial paths, atomic publication, source-stat checks, failure
-  cleanup, and the GTK **Export video** action in `resolve_editor/export.py`
-  and `resolve_editor/app.py`.
+  cleanup, and the GTK **Export video** action in `framestudio/export.py`
+  and `framestudio/app.py`.
 - **Expected:** An export command must not publish output until the candidate
   is playable and matches the edited duration, dimensions, and source audio
   presence; source and existing destination remain protected on failure.
@@ -71,7 +71,7 @@ protected.
   publishes it. Existing destinations and source files are preserved when
   execution fails.
 - **Status:** passedWithConcerns
-- **Artifacts:** `resolve_editor/export.py`, `resolve_editor/app.py`,
+- **Artifacts:** `framestudio/export.py`, `framestudio/app.py`,
   `tests/test_editor_export_execution.py`
 - **Failure:** none in the implementation path.
 - **Fix:** Added explicit audio-stream presence tracking so an unknown audio
@@ -125,7 +125,7 @@ protected.
   present and its size was unchanged during the flow.
 - **Status:** passed
 - **Artifacts:** `/home/ghiki/Videos/editor-test-1m.mp4` (pre-existing local
-  fixture; not committed), `resolve_editor/export.py`
+  fixture; not committed), `framestudio/export.py`
 - **Failure:** none.
 - **Fix:** none.
 

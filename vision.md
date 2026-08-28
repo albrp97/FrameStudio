@@ -1,4 +1,4 @@
-# Project Vision
+# FrameStudio Project Vision
 
 > This document is the source of truth for project direction.
 > Revisit when goals, users, or constraints change.
@@ -9,9 +9,9 @@
 
 ## Overview
 
-This project is a local Linux video-editing tool for one user. It replaces the
-basic cut-and-export workflow currently performed in DaVinci Resolve without
-attempting to become a full replacement for Resolve.
+FrameStudio is a local Linux video-editing tool for one user. It replaces the
+basic cut-and-export workflow currently performed in a traditional editor
+without attempting to become a full replacement for DaVinci Resolve.
 
 The normal workflow is an interface with real-time video playback and a
 timeline. A deterministic CLI and machine-readable project format provide an
@@ -117,6 +117,13 @@ future planning in the future product direction record.
 | Prefer smart rendering/stream copy when valid, with an explicit fallback encode. | The user's priority is the fastest export, while mixed codecs and frame-accurate cuts may require decoding or re-encoding. |
 | Keep the GUI primary and the CLI deterministic and machine-readable. | The user edits interactively but wants Copilot/agents to be able to inspect and modify projects. |
 | Use Python/PyGObject with GTK 4, FFmpeg raw-frame playback, and versioned JSON projects. | The target workstation has a working GTK 4/PyGObject runtime and FFmpeg/ffprobe. GStreamer cannot decode the generated MP4 probe fixture because the required demuxer plugins are unavailable, so the initial preview uses a managed FFmpeg pipe. |
+
+## Product identity and compatibility
+
+FrameStudio is the canonical product, Python package, command-line identity,
+application ID, and project-file naming convention. Existing `resolve_*`
+scripts, `resolve-*` commands, imports, cache locations, and `.resolve.json`
+projects remain supported as compatibility surfaces while users migrate.
 
 ## User Experience Principles
 

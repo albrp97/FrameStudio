@@ -76,8 +76,8 @@ previous tests remain protected.
   inconsistent durations fail, and atomic saves remain safe.
 - **Observed:** 18 focused model and persistence tests passed.
 - **Status:** passed
-- **Artifacts:** `resolve_editor/model.py`,
-  `resolve_editor/persistence.py`,
+- **Artifacts:** `framestudio/model.py`,
+  `framestudio/persistence.py`,
   `tests/test_editor_model.py`,
   `tests/test_editor_persistence.py`.
 - **Failure:** none.

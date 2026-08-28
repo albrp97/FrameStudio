@@ -38,8 +38,8 @@ one-source editor without changing product behavior.
 - **Observed:** Each target delegates to the corresponding existing script;
   no script implementation or argument contract was changed.
 - **Status:** passedWithConcerns
-- **Artifacts:** `Makefile`, `resolve_media.py`, `resolve_concat.py`,
-  `resolve_fps.py`, and `install.sh`.
+- **Artifacts:** `Makefile`, `framestudio_media.py`, `framestudio_concat.py`,
+  `framestudio_fps.py`, and `install.sh`.
 - **Failure:** no full media-processing run was performed because it would
   require user media and can alter workflow outputs.
 - **Fix:** none

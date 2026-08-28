@@ -3,11 +3,11 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.export import plan_export
-from resolve_editor.media import MediaProbe
-from resolve_editor.model import Project, SegmentTimeline
-from resolve_editor.persistence import load_project, save_project
-from resolve_editor.upscale_policy import (
+from framestudio.export import plan_export
+from framestudio.media import MediaProbe
+from framestudio.model import Project, SegmentTimeline
+from framestudio.persistence import load_project, save_project
+from framestudio.upscale_policy import (
     UpscalePolicy,
     resolve_upscale_policy,
 )
@@ -91,7 +91,7 @@ class EditorUpscalePolicyTests(unittest.TestCase):
             source = root / "source.mp4"
             source.write_bytes(b"fixture")
             project = Project.create(source, {**metadata(), "duration_seconds": 10.0})
-            destination = root / "project.resolve.json"
+            destination = root / "project.framestudio.json"
 
             self.assertTrue(project.get_upscale_policy().enhancement_enabled)
             project.set_upscale_policy(UpscalePolicy(enhancement_enabled=False))

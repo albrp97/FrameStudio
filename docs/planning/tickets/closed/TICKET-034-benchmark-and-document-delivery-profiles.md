@@ -17,7 +17,7 @@ unavailable and are recorded as an accepted warning.
 **Owner:** repository planning and implementation in the active worktree
 **Approval:** user-authorized on 2026-08-22 to implement all approved
 PHASE-005 tickets, including source-level audio balancing, with the legacy
-`resolve_concat.py` mean/median policy applied once per input source
+`framestudio_concat.py` mean/median policy applied once per input source
 **Provider:** auto; base and target branches are not configured in
 `.github/aidd-config.yml`
 **Source paths:** `docs/planning/features/open/FEAT-015-selecting-tested-delivery-routes.md`,

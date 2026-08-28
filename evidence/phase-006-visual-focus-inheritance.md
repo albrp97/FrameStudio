@@ -12,8 +12,8 @@ terminal
 ### E-040-001 - Modification inheritance through block edits
 
 - **Category:** functionality
-- **Source references:** `resolve_editor/model_timeline.py`,
-  `resolve_editor/model_types.py`, `resolve_editor/operations.py`,
+- **Source references:** `framestudio/model_timeline.py`,
+  `framestudio/model_types.py`, `framestudio/operations.py`,
   `tests/test_editor_composition.py`
 - **Expected:** Movement preserves identity and values; split and structural
   copy/paste clone values with fresh identities; delete/restore preserves

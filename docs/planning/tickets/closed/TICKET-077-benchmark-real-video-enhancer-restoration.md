@@ -18,7 +18,7 @@ and proceed without pausing for separate user acceptance.
 `docs/research/video-restoration-strategies.md`,
 `evidence/phase-008-restoration-research.md`,
 `https://github.com/TNTwise/REAL-Video-Enhancer/tree/2.4.1`,
-`/home/ghiki/.cache/resolve-fps/REAL-Video-Enhancer`,
+`/home/ghiki/.cache/framestudio-fps/REAL-Video-Enhancer`,
 `.github/aidd-config.yml`
 **Dependencies:** TICKET-073 survey; supplied local compressed source;
 FFmpeg/FFprobe; NVIDIA GPU if available; compatible RVE models and runtime

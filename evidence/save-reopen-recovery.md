@@ -8,8 +8,8 @@
 **Status:** passedWithConcerns
 **Planning chain:** `OBJ-001 -> SCOPE-001 -> CAP-004/CAP-012 -> PHASE-001 ->
 FEAT-003 -> TICKET-006`
-**Source references:** `resolve_editor/app.py`, `resolve_editor/persistence.py`,
-`resolve_editor.py`, `tests/test_editor_persistence.py`
+**Source references:** `framestudio/app.py`, `framestudio/persistence.py`,
+`framestudio.py`, `tests/test_editor_persistence.py`
 **Evidence path:** `evidence/save-reopen-recovery.md`
 
 ## E-601 - Save and reopen application smoke
@@ -59,8 +59,8 @@ concern is environment-dependent visual UI evidence, not persistence logic.
 - **Blocked:** target-workstation visual/manual UI evidence.
 - **Skipped:** screenshot and independent manual interaction because X11 is
   unavailable.
-- **Artifacts:** `resolve_editor/app.py`,
-  `resolve_editor/persistence.py`, and this evidence record.
+- **Artifacts:** `framestudio/app.py`,
+  `framestudio/persistence.py`, and this evidence record.
 
 ## E-603 - User-confirmed target-workstation interaction
 

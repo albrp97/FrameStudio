@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from resolve_media import (
+from framestudio_media import (
     Classification,
     MediaInfo,
     build_parser,

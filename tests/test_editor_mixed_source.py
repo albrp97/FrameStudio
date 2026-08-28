@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from resolve_editor.export import resolve_output_policy
-from resolve_editor.model import (
+from framestudio.export import resolve_output_policy
+from framestudio.model import (
     Project,
     ProjectTimeline,
     ProjectValidationError,
@@ -11,13 +11,13 @@ from resolve_editor.model import (
     seconds_to_ticks,
     ticks_to_seconds,
 )
-from resolve_editor.operations import (
+from framestudio.operations import (
     copy_segments,
     move_segment,
     paste_segments,
     split_segment,
 )
-from resolve_editor.persistence import load_project, save_project
+from framestudio.persistence import load_project, save_project
 
 
 def metadata(duration, width, height, frame_rate):
@@ -228,7 +228,7 @@ class MixedSourceModelTests(unittest.TestCase):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             project = Project.create_multi(self.make_sources(root))
-            destination = root / "mixed.resolve.json"
+            destination = root / "mixed.framestudio.json"
 
             save_project(project, destination)
             restored = load_project(destination)

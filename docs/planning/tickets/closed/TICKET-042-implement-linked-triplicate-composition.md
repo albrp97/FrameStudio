@@ -22,8 +22,8 @@ PHASE-006 ticket set; user validation returned PASS on 2026-08-23
 `docs/planning/tickets/open/TICKET-039-implement-segment-focus-controls.md`,
 `docs/planning/features/open/FEAT-018-creating-linked-triplicate-compositions.md`,
 `docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`,
-`resolve_editor/model_project.py`, `resolve_editor/app_ui.py`,
-`resolve_editor/operations.py`, `.github/aidd-config.yml`
+`framestudio/model_project.py`, `framestudio/app_ui.py`,
+`framestudio/operations.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-041; TICKET-039; approved group and layout policy
 **Risks:** one instance can drift from the group, selection can become
 misleading, and preview state can diverge from the domain model

@@ -14,12 +14,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from resolve_editor.ffmpeg_playback import (
+from framestudio.ffmpeg_playback import (
     FfmpegComposedPlaybackBackend,
     FfmpegPlaybackBackend,
     VideoFrame,
 )
-from resolve_editor.model import Segment
+from framestudio.model import Segment
 
 TRACE = (
     ("cursor", 0.10),

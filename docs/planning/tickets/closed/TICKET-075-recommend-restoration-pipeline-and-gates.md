@@ -18,8 +18,8 @@ requires the configured preimplementation and approval gates
 **Source paths:** `docs/planning/features/open/FEAT-027-researching-video-restoration-and-upscaling.md`,
 `docs/planning/tickets/open/TICKET-073-survey-video-upscaling-denoise-and-compression-recovery.md`,
 `docs/planning/tickets/open/TICKET-074-benchmark-restoration-candidates.md`,
-`resolve_editor/export_smart_render.py`, `resolve_editor/export_interpolation.py`,
-`resolve_editor/export_delivery.py`, `README.md`, `.github/aidd-config.yml`
+`framestudio/export_smart_render.py`, `framestudio/export_interpolation.py`,
+`framestudio/export_delivery.py`, `README.md`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-073 survey and TICKET-074 benchmark evidence;
 review of licenses, runtime constraints, and source-safety boundaries
 **Risks:** a recommendation can become an accidental commitment if integration

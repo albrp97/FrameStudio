@@ -23,9 +23,9 @@ configured ticket-execution approval
 `docs/planning/tickets/closed/TICKET-049-persist-and-expose-frame-rate-policy.md`,
 `docs/planning/tickets/closed/TICKET-052-build-export-planning-panel.md`,
 `docs/planning/tickets/closed/TICKET-055-preserve-audio-and-delivery-profile-during-enhancement.md`,
-`resolve_editor/app.py`, `resolve_editor/app_export.py`,
-`resolve_editor/cli.py`, `resolve_editor/cli_export.py`,
-`resolve_editor/export_process.py`, `.github/aidd-config.yml`
+`framestudio/app.py`, `framestudio/app_export.py`,
+`framestudio/cli.py`, `framestudio/cli_export.py`,
+`framestudio/export_process.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-049, TICKET-052, and TICKET-055; validated
 interpolation route; existing export worker, cancellation, and progress
 boundaries
