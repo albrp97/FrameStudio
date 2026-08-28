@@ -4,7 +4,7 @@
 **Parent objective:** OBJ-001
 **Parent scope:** SCOPE-001
 **Status:** confirmed context; deferred from the first horizon
-**Last updated:** 2026-08-21
+**Last updated:** 2026-08-26
 
 ## Purpose
 
@@ -144,6 +144,23 @@ change, and render an edit.
   existing RIFE/RVE research records current local findings.
 - Decide whether enhancement is project-wide, per source input, or
   segment-selectable after multi-video timing semantics are defined.
+
+### Responsive preview and evidence-based media processing
+
+- Optimize preview feedback while the user moves the cursor, clicks, or
+  scrolls along the timeline through measured experiments on the target
+  workstation.
+- Inspect the public Lossless Cut implementation as a research reference,
+  while keeping its checkout disposable and separate from the runtime.
+- Compare the current concat-first mixed-FPS enhancement route with a
+  per-source smart-render, enhancement, and final-concatenation route using
+  matched timing, correctness, storage, and quality measurements.
+- Research classical and AI approaches for upscaling, denoising, deblocking,
+  deblurring, and low-bitrate artifact recovery before selecting any future
+  production model or dependency.
+- Keep restoration research separate from implementation until quality,
+  temporal stability, performance, licensing, runtime, and fallback gates are
+  explicit.
 
 ### Project files and agent control
 

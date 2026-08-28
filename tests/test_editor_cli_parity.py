@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from resolve_editor.cli import cli_main
 from resolve_editor.model import Project, ProjectValidationError
 from resolve_editor.operations import (
+    apply_visual_transform,
     set_segment_deleted,
     split_segment,
 )
@@ -203,6 +204,78 @@ class EditorCliParityTests(unittest.TestCase):
                 "invalid_operation",
             )
             self.assertEqual(project_path.read_bytes(), before)
+
+    def test_cli_focus_clamps_to_zoom_dependent_bounds_like_domain_operation(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project_path = root / "edit.resolve.json"
+            project = make_project(root)
+            segment_id = project.timeline.segments[0].segment_id
+            save_project(project, project_path)
+
+            expected = apply_visual_transform(
+                project,
+                [segment_id],
+                zoom=4.0,
+                offset_x=99999.0,
+                offset_y=-99999.0,
+            )
+            result, stdout, stderr = run_cli(
+                "focus",
+                str(project_path),
+                "--segment",
+                segment_id,
+                "--zoom",
+                "4",
+                "--offset-x",
+                "99999",
+                "--offset-y",
+                "-99999",
+            )
+
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            payload = json.loads(stdout.getvalue())
+            transform = payload["project"]["timeline"]["segments"][0]["visual_transform"]
+            self.assertEqual(transform["offset_x"], expected.offset_x)
+            self.assertEqual(transform["offset_y"], expected.offset_y)
+
+    def test_cli_focus_supports_default_zoom_triplicate_horizontal_offset(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project_path = root / "edit.resolve.json"
+            project = make_project(root)
+            segment_id = project.timeline.segments[0].segment_id
+            save_project(project, project_path)
+
+            result, _stdout, stderr = run_cli(
+                "triplicate-enable",
+                str(project_path),
+                "--segment",
+                segment_id,
+            )
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr.getvalue(), "")
+
+            result, stdout, stderr = run_cli(
+                "focus",
+                str(project_path),
+                "--segment",
+                segment_id,
+                "--offset-x",
+                "640",
+            )
+
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            payload = json.loads(stdout.getvalue())
+            transform = payload["project"]["timeline"]["segments"][0]["visual_transform"]
+            self.assertEqual(transform["zoom"], 1.0)
+            self.assertEqual(transform["offset_x"], 640.0)
+            self.assertEqual(
+                payload["project"]["timeline"]["segments"][0]["triplicate"]["shared_transform"],
+                transform,
+            )
 
     def test_executable_dispatches_non_gui_subcommands(self):
         with TemporaryDirectory() as temporary_directory:

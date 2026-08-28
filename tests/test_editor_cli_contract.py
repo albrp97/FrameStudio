@@ -81,6 +81,11 @@ class EditorCliContractTests(unittest.TestCase):
                 10.0,
             )
             self.assertEqual(len(payload["timeline"]["segments"]), 1)
+            self.assertTrue(payload["upscale_policy"]["enhancement_enabled"])
+            self.assertEqual(
+                payload["upscale_policy"]["decisions"][0]["action"],
+                "enhance",
+            )
 
     def test_project_payload_can_explicitly_include_full_paths(self):
         with TemporaryDirectory() as temporary_directory:

@@ -1,0 +1,660 @@
+{
+  "harness": "benchmarks/preview_responsiveness.py",
+  "python": "3.14.7",
+  "platform": "Linux-7.2.0-1-cachyos-x86_64-with-glibc2.44",
+  "ffmpeg": "ffmpeg version n9.0.1 Copyright (c) 2000-2026 the FFmpeg developers",
+  "source_names": [
+    "source-a.mp4"
+  ],
+  "duration_seconds": 1.0,
+  "frame_rate": 10.0,
+  "trace": [
+    {
+      "action": "cursor",
+      "position_fraction": 0.1
+    },
+    {
+      "action": "cursor",
+      "position_fraction": 0.2
+    },
+    {
+      "action": "cursor",
+      "position_fraction": 0.3
+    },
+    {
+      "action": "click",
+      "position_fraction": 0.5
+    },
+    {
+      "action": "seek",
+      "position_fraction": 0.7
+    },
+    {
+      "action": "scroll",
+      "position_fraction": 0.4
+    },
+    {
+      "action": "scroll",
+      "position_fraction": 0.6
+    },
+    {
+      "action": "click",
+      "position_fraction": 0.2
+    }
+  ],
+  "failure_probe": {
+    "reported": true,
+    "errors": [
+      "ffmpeg is not installed or not on PATH: ffmpeg-preview-benchmark-missing"
+    ],
+    "stats": {
+      "requests": 1,
+      "cache_hits": 0,
+      "cache_misses": 1,
+      "cache_evictions": 0,
+      "stale_frames": 0,
+      "cancelled_requests": 0,
+      "coalesced_requests": 0,
+      "failures": 1
+    }
+  },
+  "conditions": {
+    "cold": {
+      "cache_size": 0,
+      "samples": [
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.1,
+          "displayed_position_seconds": 0.1,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.632,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.777,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.3,
+          "displayed_position_seconds": 0.3,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.774,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.5,
+          "displayed_position_seconds": 0.5,
+          "decoded_position_seconds": null,
+          "latency_ms": 31.316,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "seek",
+          "requested_position_seconds": 0.7,
+          "displayed_position_seconds": 0.7,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.978,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.4,
+          "displayed_position_seconds": 0.4,
+          "decoded_position_seconds": null,
+          "latency_ms": 36.913,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.6,
+          "displayed_position_seconds": 0.6,
+          "decoded_position_seconds": null,
+          "latency_ms": 38.401,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 42.184,
+          "failure": null
+        }
+      ],
+      "rapid_pointer": {
+        "submitted_requests": 5,
+        "visible_frames": 1,
+        "last_requested_position_seconds": 0.45,
+        "newest_request_rendered": true,
+        "last_displayed_position_seconds": 0.45,
+        "last_decoded_position_seconds": null,
+        "latency_ms": 41.759
+      },
+      "errors": [],
+      "backend_preview_stats": {
+        "requests": 13,
+        "cache_hits": 0,
+        "cache_misses": 13,
+        "cache_evictions": 0,
+        "stale_frames": 0,
+        "cancelled_requests": 4,
+        "coalesced_requests": 4,
+        "failures": 0
+      },
+      "successful_samples": 8,
+      "failed_samples": 0,
+      "latency_ms": [
+        34.632,
+        34.777,
+        34.774,
+        31.316,
+        34.978,
+        36.913,
+        38.401,
+        42.184
+      ]
+    },
+    "repeated_current_no_cache": {
+      "cache_size": 0,
+      "samples": [
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.1,
+          "displayed_position_seconds": 0.1,
+          "decoded_position_seconds": null,
+          "latency_ms": 32.562,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 35.379,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.3,
+          "displayed_position_seconds": 0.3,
+          "decoded_position_seconds": null,
+          "latency_ms": 35.189,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.5,
+          "displayed_position_seconds": 0.5,
+          "decoded_position_seconds": null,
+          "latency_ms": 33.916,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "seek",
+          "requested_position_seconds": 0.7,
+          "displayed_position_seconds": 0.7,
+          "decoded_position_seconds": null,
+          "latency_ms": 35.943,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.4,
+          "displayed_position_seconds": 0.4,
+          "decoded_position_seconds": null,
+          "latency_ms": 36.131,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.6,
+          "displayed_position_seconds": 0.6,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.274,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 38.537,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "cursor",
+          "requested_position_seconds": 0.1,
+          "displayed_position_seconds": 0.1,
+          "decoded_position_seconds": null,
+          "latency_ms": 37.098,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "cursor",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 38.906,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "cursor",
+          "requested_position_seconds": 0.3,
+          "displayed_position_seconds": 0.3,
+          "decoded_position_seconds": null,
+          "latency_ms": 43.567,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "click",
+          "requested_position_seconds": 0.5,
+          "displayed_position_seconds": 0.5,
+          "decoded_position_seconds": null,
+          "latency_ms": 39.123,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "seek",
+          "requested_position_seconds": 0.7,
+          "displayed_position_seconds": 0.7,
+          "decoded_position_seconds": null,
+          "latency_ms": 44.151,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "scroll",
+          "requested_position_seconds": 0.4,
+          "displayed_position_seconds": 0.4,
+          "decoded_position_seconds": null,
+          "latency_ms": 43.562,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "scroll",
+          "requested_position_seconds": 0.6,
+          "displayed_position_seconds": 0.6,
+          "decoded_position_seconds": null,
+          "latency_ms": 40.242,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "click",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 39.623,
+          "failure": null
+        }
+      ],
+      "rapid_pointer": {
+        "submitted_requests": 5,
+        "visible_frames": 1,
+        "last_requested_position_seconds": 0.45,
+        "newest_request_rendered": true,
+        "last_displayed_position_seconds": 0.45,
+        "last_decoded_position_seconds": null,
+        "latency_ms": 36.461
+      },
+      "errors": [],
+      "backend_preview_stats": {
+        "requests": 21,
+        "cache_hits": 0,
+        "cache_misses": 21,
+        "cache_evictions": 0,
+        "stale_frames": 0,
+        "cancelled_requests": 4,
+        "coalesced_requests": 4,
+        "failures": 0
+      },
+      "successful_samples": 16,
+      "failed_samples": 0,
+      "latency_ms": [
+        32.562,
+        35.379,
+        35.189,
+        33.916,
+        35.943,
+        36.131,
+        34.274,
+        38.537,
+        37.098,
+        38.906,
+        43.567,
+        39.123,
+        44.151,
+        43.562,
+        40.242,
+        39.623
+      ]
+    },
+    "cold_cached_candidate": {
+      "cache_size": 8,
+      "samples": [
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.1,
+          "displayed_position_seconds": 0.1,
+          "decoded_position_seconds": null,
+          "latency_ms": 33.669,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.492,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.3,
+          "displayed_position_seconds": 0.3,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.269,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.5,
+          "displayed_position_seconds": 0.5,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.411,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "seek",
+          "requested_position_seconds": 0.7,
+          "displayed_position_seconds": 0.7,
+          "decoded_position_seconds": null,
+          "latency_ms": 33.663,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.4,
+          "displayed_position_seconds": 0.4,
+          "decoded_position_seconds": null,
+          "latency_ms": 35.244,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.6,
+          "displayed_position_seconds": 0.6,
+          "decoded_position_seconds": null,
+          "latency_ms": 39.28,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": 0.2,
+          "latency_ms": 0.031,
+          "failure": null
+        }
+      ],
+      "rapid_pointer": {
+        "submitted_requests": 5,
+        "visible_frames": 5,
+        "last_requested_position_seconds": 0.45,
+        "newest_request_rendered": true,
+        "last_displayed_position_seconds": 0.45,
+        "last_decoded_position_seconds": 0.5,
+        "latency_ms": 0.032
+      },
+      "errors": [],
+      "backend_preview_stats": {
+        "requests": 13,
+        "cache_hits": 6,
+        "cache_misses": 7,
+        "cache_evictions": 0,
+        "stale_frames": 0,
+        "cancelled_requests": 0,
+        "coalesced_requests": 0,
+        "failures": 0
+      },
+      "successful_samples": 8,
+      "failed_samples": 0,
+      "latency_ms": [
+        33.669,
+        34.492,
+        34.269,
+        34.411,
+        33.663,
+        35.244,
+        39.28,
+        0.031
+      ]
+    },
+    "warm_cached_candidate": {
+      "cache_size": 8,
+      "samples": [
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.1,
+          "displayed_position_seconds": 0.1,
+          "decoded_position_seconds": null,
+          "latency_ms": 37.383,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": null,
+          "latency_ms": 38.481,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "cursor",
+          "requested_position_seconds": 0.3,
+          "displayed_position_seconds": 0.3,
+          "decoded_position_seconds": null,
+          "latency_ms": 48.378,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.5,
+          "displayed_position_seconds": 0.5,
+          "decoded_position_seconds": null,
+          "latency_ms": 35.312,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "seek",
+          "requested_position_seconds": 0.7,
+          "displayed_position_seconds": 0.7,
+          "decoded_position_seconds": null,
+          "latency_ms": 34.596,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.4,
+          "displayed_position_seconds": 0.4,
+          "decoded_position_seconds": null,
+          "latency_ms": 33.846,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "scroll",
+          "requested_position_seconds": 0.6,
+          "displayed_position_seconds": 0.6,
+          "decoded_position_seconds": null,
+          "latency_ms": 36.104,
+          "failure": null
+        },
+        {
+          "repetition": 1,
+          "action": "click",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": 0.2,
+          "latency_ms": 0.022,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "cursor",
+          "requested_position_seconds": 0.1,
+          "displayed_position_seconds": 0.1,
+          "decoded_position_seconds": 0.1,
+          "latency_ms": 0.006,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "cursor",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": 0.2,
+          "latency_ms": 0.004,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "cursor",
+          "requested_position_seconds": 0.3,
+          "displayed_position_seconds": 0.3,
+          "decoded_position_seconds": 0.3,
+          "latency_ms": 0.003,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "click",
+          "requested_position_seconds": 0.5,
+          "displayed_position_seconds": 0.5,
+          "decoded_position_seconds": 0.5,
+          "latency_ms": 0.003,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "seek",
+          "requested_position_seconds": 0.7,
+          "displayed_position_seconds": 0.7,
+          "decoded_position_seconds": 0.7,
+          "latency_ms": 0.003,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "scroll",
+          "requested_position_seconds": 0.4,
+          "displayed_position_seconds": 0.4,
+          "decoded_position_seconds": 0.4,
+          "latency_ms": 0.003,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "scroll",
+          "requested_position_seconds": 0.6,
+          "displayed_position_seconds": 0.6,
+          "decoded_position_seconds": 0.6,
+          "latency_ms": 0.002,
+          "failure": null
+        },
+        {
+          "repetition": 2,
+          "action": "click",
+          "requested_position_seconds": 0.2,
+          "displayed_position_seconds": 0.2,
+          "decoded_position_seconds": 0.2,
+          "latency_ms": 0.002,
+          "failure": null
+        }
+      ],
+      "rapid_pointer": {
+        "submitted_requests": 5,
+        "visible_frames": 5,
+        "last_requested_position_seconds": 0.45,
+        "newest_request_rendered": true,
+        "last_displayed_position_seconds": 0.45,
+        "last_decoded_position_seconds": 0.5,
+        "latency_ms": 0.013
+      },
+      "errors": [],
+      "backend_preview_stats": {
+        "requests": 21,
+        "cache_hits": 14,
+        "cache_misses": 7,
+        "cache_evictions": 0,
+        "stale_frames": 0,
+        "cancelled_requests": 0,
+        "coalesced_requests": 0,
+        "failures": 0
+      },
+      "successful_samples": 16,
+      "failed_samples": 0,
+      "latency_ms": [
+        37.383,
+        38.481,
+        48.378,
+        35.312,
+        34.596,
+        33.846,
+        36.104,
+        0.022,
+        0.006,
+        0.004,
+        0.003,
+        0.003,
+        0.003,
+        0.003,
+        0.002,
+        0.002
+      ]
+    }
+  },
+  "status": "passed"
+}

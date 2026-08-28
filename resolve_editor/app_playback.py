@@ -71,6 +71,7 @@ def on_key_pressed(
         direction = frame_step_direction(keyval)
         if direction is None:
             return False
+
         if shift_pressed and not control_pressed:
             window._move_selected_segments("left" if direction < 0 else "right")
             return True
@@ -225,9 +226,19 @@ def _timeline_position(window: Any, edited_position: float | None = None) -> flo
     return float(window.segment_timeline.edited_to_timeline_position(position))
 
 
-def on_frame(window: Any, frame: VideoFrame, GLib: Any) -> None:
+def on_frame(
+    window: Any,
+    frame: VideoFrame,
+    GLib: Any,
+    generation: int | None = None,
+) -> None:
     with window._frame_lock:
+        if generation is not None and generation != getattr(
+            window, "_playback_generation", generation
+        ):
+            return
         window._latest_frame = frame
+        window._latest_frame_generation = generation
         if window._frame_delivery_scheduled:
             return
         window._frame_delivery_scheduled = True
@@ -237,9 +248,17 @@ def on_frame(window: Any, frame: VideoFrame, GLib: Any) -> None:
 def deliver_latest_frame(window: Any, Gdk: Any, GLib: Any) -> bool:
     with window._frame_lock:
         frame = window._latest_frame
+        generation = getattr(window, "_latest_frame_generation", None)
         window._latest_frame = None
+        window._latest_frame_generation = None
     if frame is None:
         with window._frame_lock:
+            window._frame_delivery_scheduled = False
+        return False
+    if generation is not None and generation != getattr(window, "_playback_generation", generation):
+        with window._frame_lock:
+            if window._latest_frame is not None:
+                return True
             window._frame_delivery_scheduled = False
         return False
     texture = Gdk.MemoryTexture.new(

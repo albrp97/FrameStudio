@@ -5,7 +5,8 @@
 **Capability links:** CAP-003, CAP-012
 **Status:** complete
 **Closure:** user-approved on 2026-08-22 after successful implementation,
-review evidence, and target-workstation validation; remote checks remain
+review evidence, and target-workstation validation; the subsequent TICKET-059
+B-key correction was accepted and closed on 2026-08-26. Remote checks remain
 unavailable and are recorded as an accepted warning.
 **Path history:** `features/open/FEAT-004-removing-unwanted-portions-from-one-source.md`
 -> `features/closed/FEAT-004-removing-unwanted-portions-from-one-source.md`

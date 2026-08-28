@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from .audio import (
@@ -15,9 +16,18 @@ from .export import (
     ExportPlan,
     plan_export,
     plan_mixed_export,
-    resolve_output_policy,
 )
-from .media import probe_media
+from .export_estimates import (
+    calibration_for_policy,
+    estimate_project_export,
+)
+from .fps_policy import (
+    FrameRatePolicy,
+    FrameRatePolicyError,
+    ResolvedFrameRatePolicy,
+    resolved_from_policy,
+)
+from .media import MediaProbe, probe_media
 from .model import (
     Project,
     ProjectValidationError,
@@ -25,14 +35,25 @@ from .model import (
     SegmentTimeline,
     SourceReference,
 )
+from .upscale_policy import (
+    ResolvedUpscalePolicy,
+    UpscalePolicy,
+    UpscalePolicyError,
+)
+from .upscale_policy import (
+    resolved_from_policy as resolved_upscale_from_policy,
+)
 
 
 def create_project_from_source(
     source_path: Path,
     *,
     ffprobe_path: str = "ffprobe",
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> Project:
     media = probe_media(source_path, ffprobe_path)
+    if progress_callback is not None:
+        progress_callback(1, 1, "probe")
     return Project.create(source_path, media.metadata())
 
 
@@ -40,11 +61,17 @@ def create_project_from_sources(
     source_paths: Sequence[Path],
     *,
     ffprobe_path: str = "ffprobe",
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> Project:
     paths = tuple(Path(path).expanduser() for path in source_paths)
     if not paths:
         raise ProjectValidationError("At least one source is required")
-    probes = tuple(probe_media(path, ffprobe_path) for path in paths)
+    probes: list[MediaProbe] = []
+    total = len(paths)
+    for index, path in enumerate(paths, start=1):
+        probes.append(probe_media(path, ffprobe_path))
+        if progress_callback is not None:
+            progress_callback(index, total, "probe")
     return Project.create_multi(
         tuple((probe.path, probe.metadata()) for probe in probes),
     )
@@ -253,12 +280,17 @@ def analyze_project_audio(
     project: Project,
     *,
     ffmpeg_path: str = "ffmpeg",
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> dict[str, AudioDecision]:
     decisions: dict[str, AudioDecision] = {}
-    for source in project.sources or (project.source,):
+    sources = project.sources or (project.source,)
+    total = len(sources)
+    for index, source in enumerate(sources, start=1):
         decision = analyze_source_audio(source, ffmpeg_path=ffmpeg_path)
         project.set_source_audio_settings(source.source_id, decision.to_dict())
         decisions[source.source_id] = decision
+        if progress_callback is not None:
+            progress_callback(index, total, "audio")
     project.validate()
     return decisions
 
@@ -285,12 +317,109 @@ def ensure_project_audio_analysis(
     return decisions
 
 
+def resolve_project_frame_rate_policy(
+    project: Project,
+    policy: FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, object] | None = None,
+) -> ResolvedFrameRatePolicy:
+    if isinstance(policy, ResolvedFrameRatePolicy):
+        return policy
+    if policy is None:
+        return project.resolve_frame_rate_policy()
+    try:
+        normalized = (
+            policy if isinstance(policy, FrameRatePolicy) else FrameRatePolicy.from_dict(policy)
+        )
+        return resolved_from_policy(
+            tuple(
+                {
+                    **source.metadata,
+                    "source_id": source.source_id,
+                }
+                for source in (project.sources or (project.source,))
+            ),
+            normalized,
+        )
+    except FrameRatePolicyError as error:
+        raise ProjectValidationError(
+            f"Invalid output frame-rate policy: {error}",
+        ) from error
+
+
+def resolve_project_upscale_policy(
+    project: Project,
+    policy: UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, object] | None = None,
+) -> ResolvedUpscalePolicy:
+    if isinstance(policy, ResolvedUpscalePolicy):
+        return policy
+    if policy is None:
+        return project.resolve_upscale_policy()
+    try:
+        normalized = (
+            policy if isinstance(policy, UpscalePolicy) else UpscalePolicy.from_dict(policy)
+        )
+        return resolved_upscale_from_policy(
+            tuple(
+                {
+                    **source.metadata,
+                    "source_id": source.source_id,
+                }
+                for source in (project.sources or (project.source,))
+            ),
+            normalized,
+        )
+    except UpscalePolicyError as error:
+        raise ProjectValidationError(
+            f"Invalid output upscale policy: {error}",
+        ) from error
+
+
+def plan_project_export_with_estimate(
+    project: Project,
+    destination: Path,
+    *,
+    ffprobe_path: str = "ffprobe",
+    ffmpeg_path: str = "ffmpeg",
+    frame_rate_policy: (
+        FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, object] | None
+    ) = None,
+    upscale_policy: (UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, object] | None) = None,
+) -> ExportPlan:
+    plan = plan_project_export(
+        project,
+        destination,
+        ffprobe_path=ffprobe_path,
+        ffmpeg_path=ffmpeg_path,
+        frame_rate_policy=frame_rate_policy,
+        upscale_policy=upscale_policy,
+    )
+    resolved = resolve_project_frame_rate_policy(project, frame_rate_policy)
+    resolved_upscale = resolve_project_upscale_policy(project, upscale_policy)
+    calibration = calibration_for_policy(resolved)
+    return replace(
+        plan,
+        frame_rate_policy=resolved.policy,
+        rate_decisions=resolved.decisions,
+        upscale_policy=resolved_upscale.policy,
+        upscale_decisions=resolved_upscale.decisions,
+        estimate=estimate_project_export(
+            project,
+            resolved,
+            calibration=calibration,
+        ).to_dict(),
+    )
+
+
 def plan_project_export(
     project: Project,
     destination: Path,
     *,
     ffprobe_path: str = "ffprobe",
     ffmpeg_path: str = "ffmpeg",
+    frame_rate_policy: FrameRatePolicy
+    | ResolvedFrameRatePolicy
+    | Mapping[str, object]
+    | None = None,
+    upscale_policy: UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, object] | None = None,
 ) -> ExportPlan:
     if project.segment_timeline is None:
         raise ValueError("Project segment timeline is required")
@@ -298,20 +427,26 @@ def plan_project_export(
         project,
         ffmpeg_path=ffmpeg_path,
     )
+    selected_frame_rate_policy = (
+        project.output_settings.get("frame_rate_policy")
+        if frame_rate_policy is None
+        else frame_rate_policy
+    )
+    selected_upscale_policy = (
+        project.output_settings.get("upscale_policy") if upscale_policy is None else upscale_policy
+    )
     if project.segment_timeline.mixed_source:
         probes = tuple(
             probe_media(Path(source.path), ffprobe_path) for source in project.sources or ()
-        )
-        policy = resolve_output_policy(
-            [probe.metadata() for probe in probes],
         )
         return plan_mixed_export(
             probes,
             project.segment_timeline,
             destination,
-            policy=policy,
             source_ids=tuple(source.source_id for source in project.sources or ()),
             audio_decisions=audio_decisions,
+            frame_rate_policy=selected_frame_rate_policy,
+            upscale_policy=selected_upscale_policy,
         )
     media = probe_media(Path(project.source.path), ffprobe_path)
     timeline = SegmentTimeline.from_segments(
@@ -329,4 +464,6 @@ def plan_project_export(
             source_id,
             pending_audio_decision(project.source).to_dict(),
         ),
+        frame_rate_policy=selected_frame_rate_policy,
+        upscale_policy=selected_upscale_policy,
     )

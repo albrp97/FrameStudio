@@ -13,6 +13,7 @@ from resolve_editor.operations import (
     create_project_from_sources,
     plan_project_export,
 )
+from resolve_editor.upscale_policy import UpscalePolicy
 
 
 def make_probe(
@@ -71,7 +72,7 @@ class EditorAudioDeliveryTests(unittest.TestCase):
 
         self.assertEqual(plan.route, "stream-copy")
 
-    def test_one_source_filter_reuses_the_same_decision_for_each_segment(self):
+    def test_one_source_filter_normalizes_audio_before_segment_splits(self):
         segments = (
             Segment.create(0.0, 1.0),
             Segment.create(1.0, 2.0),
@@ -83,8 +84,10 @@ class EditorAudioDeliveryTests(unittest.TestCase):
             audio_decision={"status": "ready", "gain_db": 2.5},
         )
 
-        self.assertEqual(rendered.count("volume=2.50dB"), 2)
-        self.assertEqual(rendered.count("[0:a]atrim"), 2)
+        self.assertEqual(rendered.count("volume=2.50dB"), 1)
+        self.assertEqual(rendered.count("[0:a]"), 1)
+        self.assertIn("[normalized_audio]asplit=2", rendered)
+        self.assertEqual(rendered.count("atrim=start="), 2)
 
     def test_mixed_source_filter_uses_each_source_decision(self):
         first = make_probe(Path("/tmp/first.mp4"))
@@ -99,9 +102,16 @@ class EditorAudioDeliveryTests(unittest.TestCase):
             (
                 Segment.create(
                     0.0,
-                    2.0,
+                    1.0,
                     source_id=first_id,
                     timeline_start_seconds=0.0,
+                    timeline_end_seconds=1.0,
+                ),
+                Segment.create(
+                    1.0,
+                    2.0,
+                    source_id=first_id,
+                    timeline_start_seconds=1.0,
                     timeline_end_seconds=2.0,
                 ),
                 Segment.create(
@@ -128,14 +138,65 @@ class EditorAudioDeliveryTests(unittest.TestCase):
 
         rendered = mixed_fallback_filter(plan, (first, second))
 
-        self.assertIn("[0:a:0]atrim=start=0.000000:duration=2.000000", rendered)
+        self.assertIn("[normalized_audio_0_0]atrim=start=0.000000:duration=1.000000", rendered)
         self.assertIn("volume=2.00dB", rendered)
-        self.assertIn("[1:a:0]atrim=start=0.000000:duration=2.000000", rendered)
+        self.assertIn("[normalized_audio_0_1]atrim=start=1.000000:duration=1.000000", rendered)
+        self.assertIn("[normalized_audio_1]atrim=start=0.000000:duration=2.000000", rendered)
         self.assertIn("volume=-3.00dB", rendered)
+        self.assertEqual(rendered.count("volume=2.00dB"), 1)
+        self.assertEqual(rendered.count("volume=-3.00dB"), 1)
+        self.assertIn("[normalized_audio_0]asplit=2", rendered)
         self.assertEqual(
             set(plan.to_dict()["audio_decisions"]),
             {first_id, second_id},
         )
+
+    def test_mixed_plan_excludes_sources_without_active_timeline_segments(self):
+        first_id = "first"
+        second_id = "second"
+        unused_id = "unused"
+        first_path = Path("/tmp/first.mp4")
+        second_path = Path("/tmp/second.mp4")
+        unused_path = Path("/tmp/unused.mp4")
+        first = make_probe(first_path)
+        second = make_probe(second_path, width=720, height=1280)
+        unused = make_probe(unused_path, width=640, height=360)
+        timeline = SegmentTimeline.from_blocks(
+            (
+                Segment.create(
+                    0.0,
+                    1.0,
+                    source_id=first_id,
+                    timeline_start_seconds=0.0,
+                    timeline_end_seconds=1.0,
+                ),
+                Segment.create(
+                    0.0,
+                    1.0,
+                    source_id=second_id,
+                    timeline_start_seconds=1.0,
+                    timeline_end_seconds=2.0,
+                ),
+            ),
+            duration_seconds=2.0,
+            source_durations={first_id: 2.0, second_id: 2.0, unused_id: 2.0},
+        )
+
+        plan = plan_mixed_export(
+            (first, second, unused),
+            timeline,
+            Path("/tmp/mixed.mp4"),
+            source_ids=(first_id, second_id, unused_id),
+            audio_decisions={
+                first_id: {"status": "ready", "gain_db": 0.0},
+                second_id: {"status": "ready", "gain_db": 0.0},
+                unused_id: {"status": "ready", "gain_db": 0.0},
+            },
+        )
+
+        self.assertEqual(plan.source_ids, (first_id, second_id))
+        self.assertEqual(plan.source_paths, (first_path.resolve(), second_path.resolve()))
+        self.assertEqual(set(plan.to_dict()["audio_decisions"]), {first_id, second_id})
 
     @unittest.skipUnless(
         shutil.which("ffmpeg") and shutil.which("ffprobe"),
@@ -189,7 +250,11 @@ class EditorAudioDeliveryTests(unittest.TestCase):
                 coordinate="timeline",
             )
             destination = root / "mixed.mp4"
-            plan = plan_project_export(project, destination)
+            plan = plan_project_export(
+                project,
+                destination,
+                upscale_policy=UpscalePolicy(enhancement_enabled=False),
+            )
             execute_export(plan)
 
             output_probe = probe_media(destination)

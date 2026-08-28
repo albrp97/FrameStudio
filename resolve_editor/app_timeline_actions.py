@@ -4,9 +4,12 @@ from pathlib import Path
 from typing import Any
 
 from .app_helpers import (
+    FOCUS_SCROLL_FIELDS,
+    editing_is_locked,
+    focus_scroll_value,
     format_output_duration_label,
 )
-from .composition import VisualTransform
+from .composition import VisualTransform, focus_offset_bounds
 from .model import ProjectValidationError
 from .operations import (
     apply_visual_transform,
@@ -21,6 +24,10 @@ from .operations import (
 )
 from .timeline import timeline_zoom_label
 from .ui import format_duration
+
+
+def _editing_locked(window: Any) -> bool:
+    return editing_is_locked(window)
 
 
 def on_timeline_segment_selected(window: Any, segment_id: str) -> None:
@@ -131,8 +138,16 @@ def center_timeline_on_playhead(window: Any) -> None:
 
 
 def update_segment_controls(window: Any) -> None:
-    enabled = not window._export_in_progress
+    enabled = not (window._export_in_progress or getattr(window, "_source_load_in_progress", False))
     window.export_button.set_sensitive(window.project is not None and enabled)
+    for control in (
+        window.open_source_button,
+        window.open_project_button,
+        window.save_button,
+        window.reopen_button,
+    ):
+        control.set_sensitive(enabled)
+    window.timeline_canvas.set_sensitive(enabled)
     has_selection = (
         window.project is not None
         and window.segment_timeline is not None
@@ -157,6 +172,15 @@ def update_segment_controls(window: Any) -> None:
             was_updating = getattr(window, "_updating_focus_controls", False)
             window._updating_focus_controls = True
             try:
+                (min_x, max_x), (min_y, max_y) = focus_offset_bounds(transform.zoom)
+                for control, lower, upper in (
+                    (window.focus_offset_x_spin, min_x, max_x),
+                    (window.focus_offset_y_spin, min_y, max_y),
+                ):
+                    adjustment = getattr(control, "get_adjustment", lambda: None)()
+                    if adjustment is not None:
+                        adjustment.set_lower(lower)
+                        adjustment.set_upper(upper)
                 window.focus_zoom_spin.set_value(transform.zoom)
                 window.focus_offset_x_spin.set_value(transform.offset_x)
                 window.focus_offset_y_spin.set_value(transform.offset_y)
@@ -191,6 +215,8 @@ def update_segment_controls(window: Any) -> None:
 
 
 def _apply_focus_from_controls(window: Any) -> VisualTransform | None:
+    if _editing_locked(window):
+        return None
     if window.project is None or not window.selected_segment_ids:
         window._show_error("Select a clip before changing focus")
         return None
@@ -221,6 +247,49 @@ def on_focus_control_changed(window: Any, _control: Any) -> None:
     )
 
 
+def on_focus_control_scroll(
+    window: Any,
+    field: str,
+    _controller: Any,
+    delta_x: float,
+    delta_y: float,
+) -> bool:
+    if field not in FOCUS_SCROLL_FIELDS:
+        return False
+    delta = delta_y if abs(delta_y) > 0.01 else delta_x
+    if abs(delta) <= 0.01:
+        return False
+    if _editing_locked(window):
+        return True
+    if window.project is None or not window.selected_segment_ids:
+        window._show_error("Select a clip before changing focus")
+        return True
+    try:
+        selected = window.segment_timeline.find(window.selected_segment_id)
+        current = selected.visual_transform
+        values = {
+            "zoom": current.zoom,
+            "offset_x": current.offset_x,
+            "offset_y": current.offset_y,
+        }
+        values[field] = focus_scroll_value(field, values[field], delta)
+        transform = apply_visual_transform(
+            window.project,
+            window.selected_segment_ids,
+            **values,
+        )
+    except (ProjectValidationError, AttributeError) as error:
+        window._show_error(str(error))
+        return True
+    window._refresh_timeline(window.selected_segment_id)
+    window._set_status(
+        f"Adjusted focus {field.replace('_', ' ')} for "
+        f"{len(window.selected_segment_ids)} selected clip(s): "
+        f"{transform.zoom:.2f}x, X {transform.offset_x:.0f}, Y {transform.offset_y:.0f}",
+    )
+    return True
+
+
 def on_apply_focus_clicked(window: Any, _button: Any) -> None:
     transform = _apply_focus_from_controls(window)
     if transform is None:
@@ -232,6 +301,8 @@ def on_apply_focus_clicked(window: Any, _button: Any) -> None:
 
 
 def on_clean_visual_clicked(window: Any, _button: Any) -> None:
+    if _editing_locked(window):
+        return
     if window.project is None or not window.selected_segment_ids:
         window._show_error("Select a clip before cleaning visual modifications")
         return
@@ -247,6 +318,8 @@ def on_clean_visual_clicked(window: Any, _button: Any) -> None:
 
 
 def on_copy_focus_clicked(window: Any, _button: Any) -> None:
+    if _editing_locked(window):
+        return
     if window.project is None or len(window.selected_segment_ids) < 2:
         window._show_error("Select a source clip and at least one destination clip")
         return
@@ -274,6 +347,8 @@ def on_copy_focus_clicked(window: Any, _button: Any) -> None:
 
 
 def on_triplicate_clicked(window: Any, _button: Any) -> None:
+    if _editing_locked(window):
+        return
     if window.project is None or not window.selected_segment_ids:
         window._show_error("Select a clip before changing triplicate mode")
         return
@@ -299,10 +374,15 @@ def on_triplicate_clicked(window: Any, _button: Any) -> None:
 
 
 def on_split_clicked(window: Any, _button: Any) -> None:
+    if _editing_locked(window):
+        return
     if window.segment_timeline is None or window.controller is None:
         window._show_error("Open a source before splitting segments")
         return
-    position = window.controller.snapshot().position_seconds
+    playback_position = window.controller.snapshot().position_seconds
+    position = window.segment_timeline.edited_to_timeline_position(
+        playback_position,
+    )
     try:
         segment_id = window.selected_segment_id
         coordinate = "source"
@@ -331,6 +411,8 @@ def on_split_clicked(window: Any, _button: Any) -> None:
 
 
 def on_delete_segment_clicked(window: Any, _button: Any) -> None:
+    if _editing_locked(window):
+        return
     if window.segment_timeline is None or not window.selected_segment_ids:
         window._show_error("Select a clip before toggling its deleted state")
         return
@@ -350,6 +432,8 @@ def on_delete_segment_clicked(window: Any, _button: Any) -> None:
 
 
 def move_selected_segments(window: Any, direction: str) -> None:
+    if _editing_locked(window):
+        return
     if window.project is None or window.segment_timeline is None:
         return
     if not window.selected_segment_ids:
@@ -373,6 +457,8 @@ def move_selected_segments(window: Any, direction: str) -> None:
 
 
 def copy_selected_segments(window: Any) -> None:
+    if _editing_locked(window):
+        return
     if window.project is None or not window.selected_segment_ids:
         window._show_error("Select a clip before copying blocks")
         return
@@ -388,6 +474,8 @@ def copy_selected_segments(window: Any) -> None:
 
 
 def paste_selected_segments(window: Any) -> None:
+    if _editing_locked(window):
+        return
     if window.project is None or not window._segment_clipboard:
         window._show_error("Copy a clip before pasting")
         return

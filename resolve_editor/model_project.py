@@ -9,6 +9,15 @@ from typing import Any, Mapping, Sequence
 
 from .audio import pending_audio_decision
 from .composition import COMPOSITION_SCHEMA_VERSION
+from .fps_policy import (
+    FrameRatePolicy,
+    FrameRatePolicyError,
+    ResolvedFrameRatePolicy,
+    resolved_from_policy,
+)
+from .fps_policy import (
+    resolve_frame_rate_policy as resolve_fps_policy,
+)
 from .model_timeline import SegmentTimeline
 from .model_types import (
     _TIME_EPSILON,
@@ -19,6 +28,14 @@ from .model_types import (
     Segment,
     SourceReference,
     _finite_float,
+)
+from .upscale_policy import (
+    ResolvedUpscalePolicy,
+    UpscalePolicy,
+    UpscalePolicyError,
+)
+from .upscale_policy import (
+    resolve_upscale_policy as resolve_upscale,
 )
 
 
@@ -405,6 +422,109 @@ class Project:
             raise ProjectValidationError(
                 "Project segment timeline duration must match project duration"
             )
+        self._validate_output_settings()
+
+    def _frame_rate_metadata(self) -> tuple[dict[str, Any], ...]:
+        return tuple(
+            {
+                **source.metadata,
+                "source_id": source.source_id,
+            }
+            for source in (self.sources or (self.source,))
+        )
+
+    def _validate_output_settings(self) -> None:
+        persisted_fps = self.output_settings.get("frame_rate_policy")
+        if persisted_fps is not None:
+            try:
+                policy = FrameRatePolicy.from_dict(persisted_fps)
+                resolved_from_policy(self._frame_rate_metadata(), policy)
+            except FrameRatePolicyError as error:
+                raise ProjectValidationError(
+                    f"Invalid output frame-rate policy: {error}",
+                ) from error
+        persisted_upscale = self.output_settings.get("upscale_policy")
+        if persisted_upscale is not None:
+            try:
+                upscale_policy = UpscalePolicy.from_dict(persisted_upscale)
+                resolve_upscale(
+                    self._frame_rate_metadata(),
+                    policy=upscale_policy,
+                )
+            except UpscalePolicyError as error:
+                raise ProjectValidationError(
+                    f"Invalid output upscale policy: {error}",
+                ) from error
+
+    def resolve_frame_rate_policy(self) -> ResolvedFrameRatePolicy:
+        persisted = self.output_settings.get("frame_rate_policy")
+        try:
+            if persisted is None:
+                return resolve_fps_policy(self._frame_rate_metadata())
+            return resolved_from_policy(
+                self._frame_rate_metadata(),
+                FrameRatePolicy.from_dict(persisted),
+            )
+        except FrameRatePolicyError as error:
+            raise ProjectValidationError(
+                f"Invalid output frame-rate policy: {error}",
+            ) from error
+
+    def get_frame_rate_policy(self) -> FrameRatePolicy:
+        return self.resolve_frame_rate_policy().policy
+
+    def set_frame_rate_policy(self, policy: FrameRatePolicy | Mapping[str, Any]) -> None:
+        try:
+            normalized = (
+                policy if isinstance(policy, FrameRatePolicy) else FrameRatePolicy.from_dict(policy)
+            )
+            resolved_from_policy(self._frame_rate_metadata(), normalized)
+        except FrameRatePolicyError as error:
+            raise ProjectValidationError(
+                f"Invalid output frame-rate policy: {error}",
+            ) from error
+        previous = deepcopy(self.output_settings)
+        self.output_settings["frame_rate_policy"] = normalized.to_dict()
+        try:
+            self.validate()
+        except ProjectValidationError:
+            self.output_settings = previous
+            raise
+
+    def resolve_upscale_policy(self) -> ResolvedUpscalePolicy:
+        persisted = self.output_settings.get("upscale_policy")
+        try:
+            if persisted is None:
+                return resolve_upscale(self._frame_rate_metadata())
+            return resolve_upscale(
+                self._frame_rate_metadata(),
+                policy=UpscalePolicy.from_dict(persisted),
+            )
+        except UpscalePolicyError as error:
+            raise ProjectValidationError(
+                f"Invalid output upscale policy: {error}",
+            ) from error
+
+    def get_upscale_policy(self) -> UpscalePolicy:
+        return self.resolve_upscale_policy().policy
+
+    def set_upscale_policy(self, policy: UpscalePolicy | Mapping[str, Any]) -> None:
+        try:
+            normalized = (
+                policy if isinstance(policy, UpscalePolicy) else UpscalePolicy.from_dict(policy)
+            )
+            resolve_upscale(self._frame_rate_metadata(), policy=normalized)
+        except UpscalePolicyError as error:
+            raise ProjectValidationError(
+                f"Invalid output upscale policy: {error}",
+            ) from error
+        previous = deepcopy(self.output_settings)
+        self.output_settings["upscale_policy"] = normalized.to_dict()
+        try:
+            self.validate()
+        except ProjectValidationError:
+            self.output_settings = previous
+            raise
 
     @property
     def timeline(self) -> SegmentTimeline:

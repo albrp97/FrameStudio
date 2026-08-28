@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from fractions import Fraction
 from pathlib import Path
+from typing import Any
 
 from .audio import audio_decision_is_stale
+from .composition import MAX_ZOOM, MIN_ZOOM
 from .export import ExportProgress
 from .model import ProjectValidationError, Segment, SegmentTimeline
 from .operations import toggle_segment_deleted
@@ -14,6 +16,9 @@ from .ui import format_duration
 MAX_SOURCES_PER_PROJECT = 32
 TIMELINE_SCROLL_STEP_SECONDS = 1.0
 TIMELINE_SCROLL_PIXELS = 140.0
+FOCUS_ZOOM_SCROLL_STEP = 0.1
+FOCUS_OFFSET_SCROLL_STEP = 10.0
+FOCUS_SCROLL_FIELDS = ("zoom", "offset_x", "offset_y")
 KEYVAL_LEFT = 0xFF51
 KEYVAL_RIGHT = 0xFF53
 KEYVAL_DELETE = 0xFFFF
@@ -35,6 +40,7 @@ KEY_BINDINGS: tuple[tuple[str, str], ...] = (
     ("Horizontal wheel", "Scroll the timeline viewport"),
     ("Normal mouse wheel", "Move the playhead"),
     ("Click/drag timeline", "Seek and preview while dragging"),
+    ("Focus controls: Up / Down", "Adjust the focused Zoom, X, or Y field"),
 )
 
 __all__ = [
@@ -46,10 +52,15 @@ __all__ = [
     "KEYVAL_LEFT",
     "KEYVAL_RIGHT",
     "MAX_SOURCES_PER_PROJECT",
+    "FOCUS_OFFSET_SCROLL_STEP",
+    "FOCUS_SCROLL_FIELDS",
+    "FOCUS_ZOOM_SCROLL_STEP",
     "TIMELINE_SCROLL_PIXELS",
     "TIMELINE_SCROLL_STEP_SECONDS",
     "_metadata_float",
     "create_play_pause_key_controller",
+    "editing_is_locked",
+    "focus_control_has_keyboard_focus",
     "format_audio_decisions",
     "format_export_progress_label",
     "format_key_bindings",
@@ -69,6 +80,16 @@ __all__ = [
     "toggle_segment_deleted_state",
     "validate_source_selection",
 ]
+
+
+def editing_is_locked(window: Any) -> bool:
+    if getattr(window, "_export_in_progress", False):
+        window._set_status("Editing is disabled while export is in progress")
+        return True
+    if getattr(window, "_source_load_in_progress", False):
+        window._set_status("Editing is disabled while source is loading")
+        return True
+    return False
 
 
 def validate_source_selection(
@@ -102,6 +123,25 @@ def timeline_scroll_position(
         raise ValueError("Timeline scroll step must be greater than zero")
     target = float(position_seconds) - float(scroll_delta) * float(step_seconds)
     return max(0.0, min(float(duration_seconds), target))
+
+
+def focus_scroll_value(field: str, value: float, scroll_delta: float) -> float:
+    if field not in FOCUS_SCROLL_FIELDS:
+        raise ValueError(f"Unknown focus scroll field: {field}")
+    step = FOCUS_ZOOM_SCROLL_STEP if field == "zoom" else FOCUS_OFFSET_SCROLL_STEP
+    target = float(value) - float(scroll_delta) * step
+    if field == "zoom":
+        return max(MIN_ZOOM, min(MAX_ZOOM, target))
+    return target
+
+
+def focus_control_has_keyboard_focus(window: object) -> bool:
+    for name in ("focus_zoom_spin", "focus_offset_x_spin", "focus_offset_y_spin"):
+        control = getattr(window, name, None)
+        has_focus = getattr(control, "has_focus", None)
+        if callable(has_focus) and has_focus():
+            return True
+    return False
 
 
 def is_play_pause_key(keyval: int, keycode: int | None = None) -> bool:

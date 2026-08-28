@@ -19,12 +19,17 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
+from resolve_editor.performance import PerformanceMode
+
+curses: Any = None
 try:
-    import curses
+    import curses as _curses
 except ImportError:  # pragma: no cover - platform fallback
-    curses = None
+    pass
+else:
+    curses = _curses
 
 
 VIDEO_EXTENSIONS = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".mxf", ".webm"}
@@ -32,16 +37,22 @@ DEFAULT_TUI_ROOT = Path.home() / "Documents" / "edit"
 DEFAULT_FPS_MODEL = "4.26"
 DEFAULT_FPS_ENGINE = "rve"
 DEFAULT_RVE_ROOT = Path(
-    os.environ.get("RESOLVE_RVE_ROOT", "/tmp/REAL-Video-Enhancer")
+    os.environ.get(
+        "RESOLVE_RVE_ROOT",
+        str(Path.home() / ".cache" / "resolve-fps" / "REAL-Video-Enhancer"),
+    )
 )
 DEFAULT_RVE_MODEL = Path(
     os.environ.get(
         "RESOLVE_RVE_MODEL",
-        "/tmp/rve-models-pixel-fallback/rife4.26.pkl",
+        str(Path.home() / ".cache" / "resolve-fps" / "rve-models-pixel-fallback" / "rife4.26.pkl"),
     )
 )
 DEFAULT_RVE_SHIMS = Path(
-    os.environ.get("RESOLVE_RVE_SHIMS", "/tmp/rve-shims")
+    os.environ.get(
+        "RESOLVE_RVE_SHIMS",
+        str(Path.home() / ".cache" / "resolve-fps" / "rve-shims"),
+    )
 )
 TARGET_MEAN_RMS_DB = -35.0
 TARGET_MEDIAN_DB = -50.0
@@ -165,10 +176,7 @@ def rate_label(rate: Fraction) -> str:
 
 
 def common_resolution(clips: list[Clip]) -> tuple[int, int]:
-    resolutions = [
-        (int(clip.video["width"]), int(clip.video["height"]))
-        for clip in clips
-    ]
+    resolutions = [(int(clip.video["width"]), int(clip.video["height"])) for clip in clips]
     counts = Counter(resolutions)
     order = {resolution: index for index, resolution in enumerate(resolutions)}
     return max(
@@ -256,10 +264,7 @@ def analyze_audio(path: Path) -> AudioStats:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    histogram = [0] * (
-        int((AUDIO_MEDIAN_MAX_DB - AUDIO_MEDIAN_MIN_DB) / AUDIO_MEDIAN_STEP_DB)
-        + 1
-    )
+    histogram = [0] * (int((AUDIO_MEDIAN_MAX_DB - AUDIO_MEDIAN_MIN_DB) / AUDIO_MEDIAN_STEP_DB) + 1)
     sample_count = 0
     sum_squares = 0.0
     peak = 0.0
@@ -283,17 +288,14 @@ def analyze_audio(path: Path) -> AudioStats:
                     bucket = 0
                 else:
                     level = max(AUDIO_MEDIAN_MIN_DB, min(AUDIO_MEDIAN_MAX_DB, dbfs(magnitude)))
-                    bucket = round(
-                        (level - AUDIO_MEDIAN_MIN_DB) / AUDIO_MEDIAN_STEP_DB
-                    )
+                    bucket = round((level - AUDIO_MEDIAN_MIN_DB) / AUDIO_MEDIAN_STEP_DB)
                 histogram[bucket] += 1
     finally:
+        assert process.stderr is not None
         stderr = process.stderr.read().decode(errors="replace").strip()
         return_code = process.wait()
     if return_code != 0:
-        raise RuntimeError(
-            f"Audio analysis failed for {path.name}: {stderr or 'ffmpeg failed'}"
-        )
+        raise RuntimeError(f"Audio analysis failed for {path.name}: {stderr or 'ffmpeg failed'}")
     if sample_count == 0:
         raise RuntimeError(f"Audio analysis found no samples in {path.name}")
 
@@ -307,9 +309,7 @@ def analyze_audio(path: Path) -> AudioStats:
 
     lower = percentile_bucket((sample_count - 1) // 2)
     upper = percentile_bucket(sample_count // 2)
-    median_db = AUDIO_MEDIAN_MIN_DB + (
-        (lower + upper) / 2 * AUDIO_MEDIAN_STEP_DB
-    )
+    median_db = AUDIO_MEDIAN_MIN_DB + ((lower + upper) / 2 * AUDIO_MEDIAN_STEP_DB)
     return AudioStats(
         peak_db=dbfs(peak),
         mean_rms_db=dbfs(math.sqrt(sum_squares / sample_count)),
@@ -492,62 +492,6 @@ def run_ffmpeg(command: list[str], total_duration: float, label: str) -> None:
         raise RuntimeError(f"FFmpeg failed during {label}:\n{details}")
 
 
-class PerformanceMode:
-    def __init__(self, mode: str) -> None:
-        self.mode = mode
-        self.tool = shutil.which("powerprofilesctl")
-        self.previous: str | None = None
-        self.changed = False
-
-    def __enter__(self) -> "PerformanceMode":
-        if self.mode == "off" or not self.tool:
-            return self
-        result = subprocess.run(
-            [self.tool, "get"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            if self.mode == "on":
-                raise RuntimeError("Could not read the current power profile")
-            return self
-        self.previous = result.stdout.strip()
-        if self.previous == "performance":
-            return self
-        result = subprocess.run(
-            [self.tool, "set", "performance"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            if self.mode == "on":
-                raise RuntimeError(
-                    f"Could not enable performance mode: {result.stderr.strip()}"
-                )
-            return self
-        self.changed = True
-        return self
-
-    def __exit__(self, _type: Any, _value: Any, _traceback: Any) -> None:
-        if not self.changed or not self.previous or not self.tool:
-            return
-        current = subprocess.run(
-            [self.tool, "get"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if current.returncode == 0 and current.stdout.strip() == "performance":
-            subprocess.run(
-                [self.tool, "set", self.previous],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-
-
 def video_encoder_options(
     video_encoder: str,
     target_resolution: tuple[int, int],
@@ -555,9 +499,7 @@ def video_encoder_options(
 ) -> list[str]:
     options = ["-c:v", video_encoder]
     if video_encoder == "h264_nvenc":
-        options.extend(
-            ["-preset", "p6", "-tune", "hq", "-rc", "vbr", "-cq", "19", "-b:v", "0"]
-        )
+        options.extend(["-preset", "p6", "-tune", "hq", "-rc", "vbr", "-cq", "19", "-b:v", "0"])
     else:
         options.extend(["-preset", "slow", "-crf", "20"])
     options.extend(
@@ -695,9 +637,7 @@ def build_normalized_command(
             gain = audio_gains.get(clip.path, 0.0)
             if abs(gain) >= 0.01:
                 audio_chain += f",volume={gain:.2f}dB"
-            filters.append(
-                f"[{index}:a:0]{audio_chain},asetpts=PTS-STARTPTS[a{index}]"
-            )
+            filters.append(f"[{index}:a:0]{audio_chain},asetpts=PTS-STARTPTS[a{index}]")
         else:
             filters.append(
                 f"anullsrc=r=48000:cl=stereo,atrim=duration={clip.duration:.6f},"
@@ -705,10 +645,7 @@ def build_normalized_command(
             )
         concat_inputs.extend([f"[v{index}]", f"[a{index}]"])
 
-    filters.append(
-        "".join(concat_inputs)
-        + f"concat=n={len(clips)}:v=1:a=1[outv][outa]"
-    )
+    filters.append("".join(concat_inputs) + f"concat=n={len(clips)}:v=1:a=1[outv][outa]")
     command.extend(
         [
             "-filter_complex",
@@ -808,10 +745,7 @@ def run_normalization(
     )
     list_path: Path | None = None
     try:
-        part_paths = [
-            parts_dir / f"part-{index:04d}.mp4"
-            for index in range(len(clips))
-        ]
+        part_paths = [parts_dir / f"part-{index:04d}.mp4" for index in range(len(clips))]
         commands = [
             build_normalized_part_command(
                 clip,
@@ -828,10 +762,7 @@ def run_normalization(
             for index, command in enumerate(commands, start=1):
                 print(f"Part {index}: {' '.join(command)}")
             list_path = parts_dir / "concat-list.txt"
-            print(
-                "Final join: "
-                + " ".join(build_copy_command(list_path, partial))
-            )
+            print("Final join: " + " ".join(build_copy_command(list_path, partial)))
             return
 
         run_parallel_commands(commands, jobs)
@@ -945,11 +876,7 @@ class ConcatTUI:
             icon = "[DIR]" if entry.is_dir else "[VID]"
             label = entry.path.name + ("/" if entry.is_dir else "")
             text = f"{marker} {icon} {label}"
-            attribute = (
-                curses.A_REVERSE
-                if index == self.cursor
-                else curses.color_pair(2)
-            )
+            attribute = curses.A_REVERSE if index == self.cursor else curses.color_pair(2)
             self.stdscr.addnstr(row, 0, text, width - 1, attribute)
         self.stdscr.addnstr(
             height - 3,
@@ -1057,9 +984,7 @@ class ConcatTUI:
                 else:
                     self.selection.add(entry.path)
             elif key in (ord("a"), ord("A")):
-                self.selection.update(
-                    entry.path for entry in self.entries if not entry.is_dir
-                )
+                self.selection.update(entry.path for entry in self.entries if not entry.is_dir)
                 self.message = "Selected all videos in the current folder."
             elif key in (ord("n"), ord("N")):
                 self.selection.clear()
@@ -1076,19 +1001,18 @@ def interactive_selection(
     title: str = "| RESOLVE CONCAT + FPS // SELECT INPUT VIDEOS",
 ) -> tuple[list[Path], Path] | None:
     if curses is None:
-        raise RuntimeError(
-            "Python curses is unavailable; pass an input directory explicitly."
-        )
+        raise RuntimeError("Python curses is unavailable; pass an input directory explicitly.")
     if not root.is_dir():
         raise RuntimeError(f"TUI root directory does not exist: {root}")
-    return curses.wrapper(lambda stdscr: ConcatTUI(stdscr, root, title).run())
+    return cast(
+        tuple[list[Path], Path] | None,
+        curses.wrapper(lambda stdscr: ConcatTUI(stdscr, root, title).run()),
+    )
 
 
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Run concat-first FPS enhancement; no input opens the selector TUI."
-        )
+        description=("Run concat-first FPS enhancement; no input opens the selector TUI.")
     )
     parser.add_argument(
         "input_dir",
@@ -1114,9 +1038,12 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--engine",
-        choices=("rve", "vs-rife"),
+        choices=("rve", "vs-rife", "ffmpeg-minterpolate"),
         default=DEFAULT_FPS_ENGINE,
-        help="FPS backend (default: rve; vs-rife is the VapourSynth fallback)",
+        help=(
+            "FPS backend (default: rve; missing RVE uses the FFmpeg fallback; "
+            "vs-rife remains available)"
+        ),
     )
     parser.add_argument(
         "--rve-root",
@@ -1177,8 +1104,7 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
         choices=("on", "off"),
         default="on",
         help=(
-            "audio gain policy for --concat-only; the integrated FPS workflow "
-            "preserves audio gain"
+            "audio gain policy for --concat-only; the integrated FPS workflow preserves audio gain"
         ),
     )
     parser.add_argument(
@@ -1203,8 +1129,7 @@ def concatenate(
     target_rate = min((nominal_rate(clip) for clip in clips), key=float)
     target_resolution = common_resolution(clips)
     output = requested_output or (
-        input_dir.parent
-        / f"{input_dir.name}-concatenated-{rate_label(target_rate)}fps.mp4"
+        input_dir.parent / f"{input_dir.name}-concatenated-{rate_label(target_rate)}fps.mp4"
     )
     audio_normalization = arguments.audio_normalization == "on"
     copy_safe = can_stream_copy(clips, target_rate, target_resolution)
@@ -1217,9 +1142,7 @@ def concatenate(
             "universal H.264/AAC parameters, resolution, and frame rate, or "
             "audio normalization is enabled."
         )
-    use_copy = arguments.mode == "copy" or (
-        arguments.mode == "auto" and copy_safe
-    )
+    use_copy = arguments.mode == "copy" or (arguments.mode == "auto" and copy_safe)
     if arguments.mode == "gpu":
         use_copy = False
     if arguments.mode == "cpu":
@@ -1236,16 +1159,16 @@ def concatenate(
     total_duration = sum(clip.duration for clip in clips)
     print(f"Inputs: {len(clips)} files, {format_seconds(total_duration)} total")
     print(f"Resolution: {target_resolution[0]}x{target_resolution[1]}")
-    print(f"Frame rate: {target_rate.numerator}/{target_rate.denominator} ({rate_label(target_rate)} fps)")
+    print(
+        f"Frame rate: {target_rate.numerator}/{target_rate.denominator} ({rate_label(target_rate)} fps)"
+    )
     print(f"Output: {output}")
 
     list_path: Path | None = None
     audio_gains: dict[Path, float] = {}
     try:
         performance_context = (
-            nullcontext()
-            if arguments.dry_run
-            else PerformanceMode(arguments.performance_mode)
+            nullcontext() if arguments.dry_run else PerformanceMode(arguments.performance_mode)
         )
         with performance_context:
             if use_copy:
@@ -1280,13 +1203,10 @@ def concatenate(
                             f"median {stats.median_db + gain:+.2f} dBFS"
                         )
                 encoder = "libx264"
-                if (
-                    arguments.mode == "gpu"
-                    or (
-                        arguments.mode == "auto"
-                        and arguments.gpu != "off"
-                        and shutil.which("nvidia-smi")
-                    )
+                if arguments.mode == "gpu" or (
+                    arguments.mode == "auto"
+                    and arguments.gpu != "off"
+                    and shutil.which("nvidia-smi")
                 ):
                     encoder = "h264_nvenc"
                 print(
@@ -1349,9 +1269,7 @@ def concatenate(
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
-    requested_output = (
-        arguments.output.expanduser().resolve() if arguments.output else None
-    )
+    requested_output = arguments.output.expanduser().resolve() if arguments.output else None
     if arguments.input_dir is None:
         selection = interactive_selection(arguments.root.expanduser().resolve())
         if selection is None:

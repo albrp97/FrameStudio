@@ -1,0 +1,456 @@
+{
+  "schema_version": 1,
+  "benchmark": "ticket-078-cross-model-restoration",
+  "candidate_statuses": [
+    "passed",
+    "failed",
+    "unavailable",
+    "excluded-license",
+    "not-comparable"
+  ],
+  "protocol": {
+    "source_frame_rate_policy": "native; no interpolation",
+    "target_dimensions": "1920x1080",
+    "scale_policy": "contain with centered letterbox",
+    "video_pixel_format": "yuv420p",
+    "audio_policy": "preserve source audio when present; normalize to AAC 48 kHz stereo",
+    "container": "mp4",
+    "final_encoder": "detected h264_nvenc or libx264 fallback",
+    "quality_metrics": "only with a clean aligned reference; otherwise unavailable",
+    "visual_review_timestamps_seconds": [
+      7.0,
+      22.0,
+      37.0
+    ]
+  },
+  "candidates": [
+    {
+      "id": "ffmpeg-lanczos-control",
+      "name": "Lanczos control",
+      "category": "control",
+      "runner": "ffmpeg_filter",
+      "filter": "scale=flags=lanczos",
+      "temporal": false,
+      "license": {
+        "name": "LGPL-2.1-or-later",
+        "status": "verified",
+        "source": "FFmpeg licensing"
+      }
+    },
+    {
+      "id": "ffmpeg-hqdn3d-mild",
+      "name": "FFmpeg hqdn3d mild",
+      "category": "classical",
+      "runner": "ffmpeg_filter",
+      "filter": "hqdn3d=1.5:1.5:6:6",
+      "temporal": true,
+      "license": {
+        "name": "LGPL-2.1-or-later",
+        "status": "verified",
+        "source": "FFmpeg licensing"
+      }
+    },
+    {
+      "id": "ffmpeg-hqdn3d-strong",
+      "name": "FFmpeg hqdn3d strong",
+      "category": "classical",
+      "runner": "ffmpeg_filter",
+      "filter": "hqdn3d=3:2:12:8",
+      "temporal": true,
+      "license": {
+        "name": "LGPL-2.1-or-later",
+        "status": "verified",
+        "source": "FFmpeg licensing"
+      }
+    },
+    {
+      "id": "ffmpeg-atadenoise",
+      "name": "FFmpeg atadenoise",
+      "category": "classical",
+      "runner": "ffmpeg_filter",
+      "filter": "atadenoise=0a=0.02:0b=0.04:1a=0.02:1b=0.04",
+      "temporal": true,
+      "license": {
+        "name": "LGPL-2.1-or-later",
+        "status": "verified",
+        "source": "FFmpeg licensing"
+      }
+    },
+    {
+      "id": "ffmpeg-deblock-strong",
+      "name": "FFmpeg deblock strong",
+      "category": "classical",
+      "runner": "ffmpeg_filter",
+      "filter": "deblock=filter=strong:block=8",
+      "temporal": false,
+      "license": {
+        "name": "LGPL-2.1-or-later",
+        "status": "verified",
+        "source": "FFmpeg licensing"
+      }
+    },
+    {
+      "id": "ffmpeg-cleanup-unsharp",
+      "name": "FFmpeg cleanup plus mild unsharp",
+      "category": "classical",
+      "runner": "ffmpeg_filter",
+      "filter": "hqdn3d=1.5:1.5:6:6,deblock=filter=weak:block=8,unsharp=5:5:0.35:5:5:0",
+      "temporal": true,
+      "license": {
+        "name": "LGPL-2.1-or-later",
+        "status": "verified",
+        "source": "FFmpeg licensing"
+      }
+    },
+    {
+      "id": "rve-deh264-superultracompact",
+      "name": "RVE DeH264 SuperUltraCompact",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-deh264-superultracompact",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-deh264-rtmosr",
+      "name": "RVE DeH264 RTMoSR",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-deh264-rtmosr",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-deh264-span",
+      "name": "RVE DeH264 SPAN",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-deh264-span",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-deh264-plksr",
+      "name": "RVE DeH264 PLKSR",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-deh264-plksr",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-dncnn",
+      "name": "RVE DnCNN",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-dncnn",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-drunet",
+      "name": "RVE DRUNET",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-drunet",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-scunet",
+      "name": "RVE SCUNet",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-scunet",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-nafnet-deblur",
+      "name": "RVE NAFNet deblur",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-nafnet-deblur",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "rve-realisticvideo-upscale",
+      "name": "RVE RealisticVideo upscale",
+      "category": "historical-baseline",
+      "runner": "reuse_json",
+      "reuse_id": "rve-realisticvideo-upscale",
+      "temporal": false,
+      "license": {
+        "name": "upstream RVE and model terms",
+        "status": "recorded-in-ticket-077",
+        "source": "TICKET-077 evidence"
+      }
+    },
+    {
+      "id": "topaz-gaia",
+      "name": "Topaz Video AI Gaia",
+      "category": "commercial",
+      "runner": "external",
+      "adapter": "licensed-local-video-adapter-required",
+      "runtime_probe": {
+        "executables": [
+          "topaz-video-ai",
+          "tvai"
+        ],
+        "modules": [],
+        "weight_patterns": [
+          "**/*gaia*"
+        ]
+      },
+      "temporal": false,
+      "license": {
+        "name": "proprietary commercial",
+        "status": "local-license-required",
+        "source": "Topaz Video AI terms"
+      }
+    },
+    {
+      "id": "nomos2",
+      "name": "Nomos2",
+      "category": "single-frame-model",
+      "runner": "external",
+      "adapter": "pinned-checkpoint-adapter-required",
+      "runtime_probe": {
+        "executables": [],
+        "modules": [],
+        "weight_patterns": [
+          "**/*nomos2*"
+        ]
+      },
+      "temporal": false,
+      "license": {
+        "name": "unknown until exact checkpoint is identified",
+        "status": "unverified",
+        "source": "checkpoint and upstream terms require verification"
+      }
+    },
+    {
+      "id": "nomos2-4x-otf-esrgan",
+      "name": "4xNomos2_otf_esrgan",
+      "category": "single-frame-model",
+      "runner": "external",
+      "adapter": "pinned-checkpoint-adapter-required",
+      "runtime_probe": {
+        "executables": [],
+        "modules": [],
+        "weight_patterns": [
+          "**/*4x*nomos2*",
+          "**/*nomos2*otf*"
+        ]
+      },
+      "temporal": false,
+      "license": {
+        "name": "unknown until exact checkpoint is identified",
+        "status": "unverified",
+        "source": "checkpoint and upstream terms require verification"
+      }
+    },
+    {
+      "id": "edvr",
+      "name": "EDVR",
+      "category": "temporal-model",
+      "runner": "external",
+      "adapter": "pinned-checkpoint-adapter-required",
+      "runtime_probe": {
+        "executables": [],
+        "modules": [
+          "mmagic"
+        ],
+        "weight_patterns": [
+          "**/*edvr*"
+        ]
+      },
+      "temporal": true,
+      "license": {
+        "name": "unknown until exact checkpoint and runtime are verified",
+        "status": "unverified",
+        "source": "upstream checkpoint and code terms require verification"
+      }
+    },
+    {
+      "id": "basicvsr",
+      "name": "BasicVSR",
+      "category": "temporal-model",
+      "runner": "external",
+      "adapter": "pinned-checkpoint-adapter-required",
+      "runtime_probe": {
+        "executables": [],
+        "modules": [
+          "mmagic"
+        ],
+        "weight_patterns": [
+          "**/*basicvsr*"
+        ]
+      },
+      "temporal": true,
+      "license": {
+        "name": "Apache-2.0 code; checkpoint terms require verification",
+        "status": "partial",
+        "source": "existing restoration survey"
+      }
+    },
+    {
+      "id": "basicvsr-plus-plus",
+      "name": "BasicVSR++",
+      "category": "temporal-model",
+      "runner": "external",
+      "adapter": "pinned-checkpoint-adapter-required",
+      "runtime_probe": {
+        "executables": [],
+        "modules": [
+          "mmagic"
+        ],
+        "weight_patterns": [
+          "**/*basicvsr*plus*",
+          "**/*basicvsr++*"
+        ]
+      },
+      "temporal": true,
+      "license": {
+        "name": "Apache-2.0 code; checkpoint terms require verification",
+        "status": "partial",
+        "source": "existing restoration survey"
+      }
+    },
+    {
+      "id": "tecogan",
+      "name": "TecoGAN",
+      "category": "temporal-model",
+      "runner": "external",
+      "adapter": "pinned-checkpoint-adapter-required",
+      "runtime_probe": {
+        "executables": [
+          "tecogan"
+        ],
+        "modules": [
+          "tecogan"
+        ],
+        "weight_patterns": [
+          "**/*tecogan*"
+        ]
+      },
+      "temporal": true,
+      "license": {
+        "name": "unknown until exact checkpoint and runtime are verified",
+        "status": "unverified",
+        "source": "upstream checkpoint and code terms require verification"
+      }
+    },
+    {
+      "id": "realesrgan-x4plus",
+      "name": "RealESRGAN x4plus",
+      "category": "single-frame-model",
+      "runner": "external",
+      "adapter": "video-frame-adapter-required",
+      "runtime_probe": {
+        "executables": [
+          "realesrgan-ncnn-vulkan",
+          "realesrgan"
+        ],
+        "modules": [
+          "realesrgan"
+        ],
+        "weight_patterns": [
+          "**/*realesrgan*"
+        ]
+      },
+      "temporal": false,
+      "license": {
+        "name": "BSD-3-Clause",
+        "status": "verified-for-project-code",
+        "source": "Real-ESRGAN upstream"
+      }
+    },
+    {
+      "id": "video2x-realesrgan",
+      "name": "Video2X wrapper (RealESRGAN)",
+      "category": "wrapper-runtime",
+      "runner": "external",
+      "adapter": "pinned-video-filter-adapter-required",
+      "runtime_probe": {
+        "executables": [
+          "video2x"
+        ],
+        "executable_paths": [
+          "~/.cache/resolve-fps/benchmark-tools/Video2X-6.4.0-x86_64.AppImage"
+        ],
+        "modules": [],
+        "weight_patterns": [
+          "**/*realesrgan*",
+          "**/*video2x*"
+        ]
+      },
+      "wrapper": true,
+      "underlying_model_required": false,
+      "version": "6.4.0",
+      "backend": "ncnn/Vulkan",
+      "underlying_model": "realesr-animevideov3",
+      "configuration": {
+        "mode": "filtering/upscale only",
+        "scaling_factor": 4,
+        "device": 0,
+        "hwaccel": "none",
+        "codec": "h264_nvenc",
+        "encoder_options": {
+          "cq": 18,
+          "preset": "p5"
+        },
+        "max_b_frames": 0,
+        "boundary_adapter": "duplicate one endpoint frame before and after; remux source audio after processing"
+      },
+      "previous_configuration": {
+        "underlying_model": "realesrgan-plus",
+        "codec": "libx264",
+        "encoder_options": {
+          "crf": 18,
+          "preset": "medium"
+        }
+      },
+      "filter_mode": "upscale/filter only; frame interpolation excluded",
+      "temporal": false,
+      "license": {
+        "name": "AGPL-3.0-or-later for Video2X; RealESRGAN model terms separate",
+        "status": "wrapper-and-model-declared",
+        "source": "https://github.com/k4yt3x/video2x and Real-ESRGAN upstream terms"
+      }
+    }
+  ]
+}

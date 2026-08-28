@@ -2,6 +2,7 @@ import io
 import json
 import shutil
 import subprocess
+import threading
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,11 +11,22 @@ from unittest.mock import MagicMock, patch
 
 from resolve_editor import app_timeline_actions
 from resolve_editor.app_playback import (
+    deliver_latest_frame,
     handle_backend_end,
+    on_frame,
+    on_key_pressed,
+    on_timeline_scroll,
     request_timeline_preview,
     stop_backend,
 )
-from resolve_editor.app_project import attach_project, refresh_playback_backend
+from resolve_editor.app_project import (
+    _finish_source_load,
+    _load_source_worker,
+    attach_project,
+    load_project_path,
+    load_source,
+    refresh_playback_backend,
+)
 from resolve_editor.cli import cli_main
 from resolve_editor.composition import (
     CANVAS_HEIGHT,
@@ -24,9 +36,11 @@ from resolve_editor.composition import (
     MAX_ZOOM,
     TriplicateGroup,
     VisualTransform,
+    focus_offset_bounds,
 )
 from resolve_editor.composition_render import segment_video_filters
 from resolve_editor.export import execute_export
+from resolve_editor.ffmpeg_playback import VideoFrame
 from resolve_editor.media import probe_media
 from resolve_editor.model import Project, ProjectValidationError, SegmentTimeline
 from resolve_editor.operations import (
@@ -40,6 +54,7 @@ from resolve_editor.operations import (
 )
 from resolve_editor.persistence import load_project, save_project
 from resolve_editor.playback import PlaybackController, PlaybackState
+from resolve_editor.upscale_policy import UpscalePolicy
 
 
 def metadata(duration=10.0):
@@ -69,6 +84,210 @@ def run_cli(*arguments: str):
 
 
 class EditorCompositionTests(unittest.TestCase):
+    def test_export_disables_project_lifecycle_controls(self):
+        controls = [MagicMock() for _ in range(4)]
+        window = SimpleNamespace(
+            _export_in_progress=True,
+            project=None,
+            segment_timeline=None,
+            selected_segment_ids=(),
+            selected_segment_id=None,
+            export_button=MagicMock(),
+            timeline_canvas=MagicMock(),
+            focus_zoom_spin=MagicMock(),
+            focus_offset_x_spin=MagicMock(),
+            focus_offset_y_spin=MagicMock(),
+            copy_focus_button=MagicMock(),
+            clean_focus_button=MagicMock(),
+            triplicate_button=MagicMock(),
+            timeline_output_label=MagicMock(),
+            timeline_zoom_label=MagicMock(),
+            _update_selected_clip_label=MagicMock(),
+            open_source_button=controls[0],
+            open_project_button=controls[1],
+            save_button=controls[2],
+            reopen_button=controls[3],
+        )
+        window.timeline_canvas.get_zoom.return_value = 1.0
+
+        app_timeline_actions.update_segment_controls(window)
+
+        for control in controls:
+            control.set_sensitive.assert_called_once_with(False)
+
+    def test_source_loading_is_blocked_during_export(self):
+        window = SimpleNamespace(
+            _export_in_progress=True,
+            _set_status=MagicMock(),
+        )
+        with patch(
+            "resolve_editor.app_project.create_project_from_source",
+            side_effect=AssertionError("source loading must be blocked"),
+        ):
+            self.assertFalse(load_source(window, Path("source.mp4")))
+
+        window._set_status.assert_called_once_with(
+            "Editing is disabled while export is in progress",
+        )
+
+    def test_source_loading_starts_a_worker_and_reports_clip_progress(self):
+        window = SimpleNamespace(
+            _export_in_progress=False,
+            _source_load_in_progress=False,
+            _set_status=MagicMock(),
+            _update_segment_controls=MagicMock(),
+        )
+        glib = SimpleNamespace(idle_add=MagicMock())
+        with patch("resolve_editor.app_project.threading.Thread") as thread:
+            self.assertFalse(
+                load_source(
+                    window,
+                    (Path("first.mp4"), Path("second.mp4")),
+                    glib,
+                )
+            )
+
+        self.assertTrue(window._source_load_in_progress)
+        thread.assert_called_once()
+        window._set_status.assert_called_once_with("Loading clip 1/2 (0%)")
+
+    def test_source_loading_worker_reports_monotonic_per_clip_progress(self):
+        statuses = []
+        window = SimpleNamespace(
+            _source_load_generation=4,
+            _set_status=statuses.append,
+        )
+        glib = SimpleNamespace(
+            idle_add=lambda callback, *args: callback(*args),
+        )
+
+        def build_project(_paths, progress_callback):
+            progress_callback(1, 2, "probe")
+            progress_callback(2, 2, "probe")
+            return object()
+
+        def analyze_audio(_project, progress_callback):
+            progress_callback(1, 2, "audio")
+            progress_callback(2, 2, "audio")
+
+        with (
+            patch(
+                "resolve_editor.app_project._build_source_project",
+                side_effect=build_project,
+            ),
+            patch(
+                "resolve_editor.app_project.analyze_project_audio",
+                side_effect=analyze_audio,
+            ),
+            patch("resolve_editor.app_project._finish_source_load"),
+        ):
+            _load_source_worker(
+                window,
+                (Path("first.mp4"), Path("second.mp4")),
+                4,
+                glib,
+            )
+
+        self.assertEqual(
+            statuses,
+            [
+                "Loading clip 1/2 (25%)",
+                "Loading clip 2/2 (50%)",
+                "Loading clip 1/2 (75%)",
+                "Loading clip 2/2 (100%)",
+            ],
+        )
+
+    def test_stale_source_load_completion_does_not_replace_current_project(self):
+        current_project = object()
+        window = SimpleNamespace(
+            _source_load_generation=2,
+            _source_load_in_progress=True,
+            project=current_project,
+            _show_error=MagicMock(),
+            _update_segment_controls=MagicMock(),
+        )
+
+        self.assertFalse(
+            _finish_source_load(
+                window,
+                1,
+                (Path("stale.mp4"),),
+                object(),
+                None,
+            )
+        )
+
+        self.assertIs(window.project, current_project)
+        self.assertTrue(window._source_load_in_progress)
+        window._show_error.assert_not_called()
+        window._update_segment_controls.assert_not_called()
+
+    def test_source_load_failure_clears_loading_state(self):
+        window = SimpleNamespace(
+            _source_load_generation=1,
+            _source_load_in_progress=True,
+            _show_error=MagicMock(),
+            _update_segment_controls=MagicMock(),
+        )
+
+        self.assertFalse(
+            _finish_source_load(
+                window,
+                1,
+                (Path("broken.mp4"),),
+                None,
+                "Could not probe broken.mp4",
+            )
+        )
+
+        self.assertFalse(window._source_load_in_progress)
+        window._show_error.assert_called_once_with("Could not probe broken.mp4")
+        window._update_segment_controls.assert_called_once_with()
+
+    def test_project_loading_is_blocked_during_export(self):
+        window = SimpleNamespace(
+            _export_in_progress=True,
+            _set_status=MagicMock(),
+        )
+        with patch(
+            "resolve_editor.app_project.load_project",
+            side_effect=AssertionError("project loading must be blocked"),
+        ):
+            self.assertFalse(load_project_path(window, Path("project.resolve.json")))
+
+        window._set_status.assert_called_once_with(
+            "Editing is disabled while export is in progress",
+        )
+
+    def test_queued_frame_from_replaced_playback_generation_is_not_painted(self):
+        idle_callbacks = []
+        glib = SimpleNamespace(
+            Bytes=SimpleNamespace(new=MagicMock()),
+            idle_add=lambda callback: idle_callbacks.append(callback),
+        )
+        gdk = SimpleNamespace(
+            MemoryFormat=SimpleNamespace(R8G8B8A8="rgba"),
+            MemoryTexture=SimpleNamespace(new=MagicMock()),
+        )
+        window = SimpleNamespace(
+            _frame_lock=threading.Lock(),
+            _latest_frame=None,
+            _frame_delivery_scheduled=False,
+            _playback_generation=1,
+            _deliver_latest_frame=MagicMock(),
+            preview=MagicMock(),
+        )
+        frame = VideoFrame(b"\x00" * 4, 1, 1, 0.0)
+
+        on_frame(window, frame, glib, generation=1)
+        window._playback_generation = 2
+        self.assertEqual(len(idle_callbacks), 1)
+
+        self.assertFalse(deliver_latest_frame(window, gdk, glib))
+        gdk.MemoryTexture.new.assert_not_called()
+        window.preview.set_paintable.assert_not_called()
+
     def test_deleted_timeline_positions_map_to_edited_playback_positions(self):
         timeline = SegmentTimeline(10.0)
         timeline.split(3.0)
@@ -108,6 +327,159 @@ class EditorCompositionTests(unittest.TestCase):
             self.assertAlmostEqual(project.playhead_seconds, 8.0)
             window.timeline_canvas.set_playhead.assert_called_with(8.0)
 
+    def test_b_key_splits_at_visible_playhead_after_deleted_block(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            project.timeline.split(3.0)
+            project.timeline.split(7.0)
+            project.timeline.set_deleted(project.timeline.segments[1].segment_id, True)
+            selected = project.timeline.segments[2]
+            backend = MagicMock()
+            window = SimpleNamespace(
+                controller=PlaybackController(
+                    backend,
+                    project.timeline.edited_duration_seconds,
+                    initial_position=4.0,
+                ),
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_id=selected.segment_id,
+                selected_segment_ids=(selected.segment_id,),
+                _show_error=MagicMock(),
+                _refresh_timeline=MagicMock(),
+                _set_status=MagicMock(),
+            )
+            window._on_split_clicked = lambda button: app_timeline_actions.on_split_clicked(
+                window,
+                button,
+            )
+            gdk = SimpleNamespace(
+                ModifierType=SimpleNamespace(
+                    SHIFT_MASK=1,
+                    CONTROL_MASK=2,
+                ),
+            )
+
+            handled = on_key_pressed(window, None, ord("b"), 0, 0, gdk)
+
+            self.assertTrue(handled)
+            window._show_error.assert_not_called()
+            self.assertEqual(
+                [
+                    (segment.start_seconds, segment.end_seconds)
+                    for segment in project.timeline.segments
+                ],
+                [(0.0, 3.0), (3.0, 7.0), (7.0, 8.0), (8.0, 10.0)],
+            )
+            self.assertEqual(window.selected_segment_id, project.timeline.segments[3].segment_id)
+            window._refresh_timeline.assert_called_once_with(window.selected_segment_id)
+            window._set_status.assert_called_once_with("Split clip at 00:08")
+
+    def test_b_key_cannot_mutate_timeline_during_export(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            selected = project.timeline.segments[0]
+            backend = MagicMock()
+            window = SimpleNamespace(
+                _export_in_progress=True,
+                controller=PlaybackController(
+                    backend,
+                    project.timeline.edited_duration_seconds,
+                    initial_position=4.0,
+                ),
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_id=selected.segment_id,
+                selected_segment_ids=(selected.segment_id,),
+                _show_error=MagicMock(),
+                _refresh_timeline=MagicMock(),
+                _set_status=MagicMock(),
+            )
+            window._on_split_clicked = lambda button: app_timeline_actions.on_split_clicked(
+                window,
+                button,
+            )
+            gdk = SimpleNamespace(
+                ModifierType=SimpleNamespace(
+                    SHIFT_MASK=1,
+                    CONTROL_MASK=2,
+                ),
+            )
+
+            handled = on_key_pressed(window, None, ord("b"), 0, 0, gdk)
+
+            self.assertTrue(handled)
+            self.assertEqual(len(project.timeline.segments), 1)
+            window._set_status.assert_called_once_with(
+                "Editing is disabled while export is in progress",
+            )
+
+    def test_b_key_splits_mixed_block_at_visible_playhead_after_deleted_block(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first_source = root / "first.mp4"
+            second_source = root / "second.mp4"
+            first_source.write_bytes(b"first")
+            second_source.write_bytes(b"second")
+            project = Project.create_multi(
+                (
+                    (first_source, metadata(duration=4.0)),
+                    (second_source, metadata(duration=3.0)),
+                ),
+            )
+            project.timeline.set_deleted(project.timeline.blocks[0].segment_id, True)
+            selected = project.timeline.blocks[1]
+            backend = MagicMock()
+            window = SimpleNamespace(
+                controller=PlaybackController(
+                    backend,
+                    project.timeline.edited_duration_seconds,
+                    initial_position=1.0,
+                ),
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_id=selected.segment_id,
+                selected_segment_ids=(selected.segment_id,),
+                _show_error=MagicMock(),
+                _refresh_timeline=MagicMock(),
+                _set_status=MagicMock(),
+            )
+            window._on_split_clicked = lambda button: app_timeline_actions.on_split_clicked(
+                window,
+                button,
+            )
+            gdk = SimpleNamespace(
+                ModifierType=SimpleNamespace(
+                    SHIFT_MASK=1,
+                    CONTROL_MASK=2,
+                ),
+            )
+
+            handled = on_key_pressed(window, None, ord("B"), 0, 0, gdk)
+
+            self.assertTrue(handled)
+            window._show_error.assert_not_called()
+            self.assertEqual(
+                [
+                    (
+                        segment.source_id,
+                        segment.start_seconds,
+                        segment.end_seconds,
+                        segment.timeline_start,
+                        segment.timeline_end,
+                    )
+                    for segment in project.timeline.blocks
+                ],
+                [
+                    (project.sources[0].source_id, 0.0, 4.0, 0.0, 4.0),
+                    (project.sources[1].source_id, 0.0, 1.0, 4.0, 5.0),
+                    (project.sources[1].source_id, 1.0, 3.0, 5.0, 7.0),
+                ],
+            )
+            self.assertEqual(window.selected_segment_id, project.timeline.blocks[2].segment_id)
+            window._refresh_timeline.assert_called_once_with(window.selected_segment_id)
+            window._set_status.assert_called_once_with("Split clip at 00:05")
+
     def test_focus_control_changes_apply_immediately_without_an_apply_button(self):
         with TemporaryDirectory() as temporary_directory:
             project = make_project(Path(temporary_directory))
@@ -139,6 +511,94 @@ class EditorCompositionTests(unittest.TestCase):
                 VisualTransform(zoom=2.0, offset_x=120.0, offset_y=-80.0),
             )
             window._refresh_timeline.assert_called_once_with(segment_id)
+
+    def test_focus_scroll_updates_only_the_target_field_and_refreshes_preview(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            segment_id = project.timeline.segments[0].segment_id
+            apply_visual_transform(
+                project,
+                [segment_id],
+                zoom=2.0,
+                offset_x=100.0,
+                offset_y=-50.0,
+            )
+            window = SimpleNamespace(
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_ids=(segment_id,),
+                selected_segment_id=segment_id,
+                _refresh_timeline=MagicMock(),
+                _set_status=MagicMock(),
+                _show_error=MagicMock(),
+            )
+
+            handled = app_timeline_actions.on_focus_control_scroll(
+                window,
+                "offset_x",
+                None,
+                0.0,
+                -1.0,
+            )
+
+            self.assertTrue(handled)
+            self.assertEqual(
+                project.timeline.find(segment_id).visual_transform,
+                VisualTransform(zoom=2.0, offset_x=110.0, offset_y=-50.0),
+            )
+            window._refresh_timeline.assert_called_once_with(segment_id)
+            window._show_error.assert_not_called()
+
+    def test_focus_scroll_updates_triplicate_group_atomically(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            segment_id = project.timeline.segments[0].segment_id
+            enable_triplicate(project, [segment_id])
+            window = SimpleNamespace(
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_ids=(segment_id,),
+                selected_segment_id=segment_id,
+                _refresh_timeline=MagicMock(),
+                _set_status=MagicMock(),
+                _show_error=MagicMock(),
+            )
+
+            handled = app_timeline_actions.on_focus_control_scroll(
+                window,
+                "zoom",
+                None,
+                0.0,
+                -10.0,
+            )
+
+            segment = project.timeline.find(segment_id)
+            self.assertTrue(handled)
+            self.assertEqual(segment.visual_transform.zoom, 2.0)
+            self.assertIsNotNone(segment.triplicate)
+            self.assertEqual(segment.triplicate.shared_transform, segment.visual_transform)
+            window._refresh_timeline.assert_called_once_with(segment_id)
+
+    def test_scroll_outside_focus_controls_keeps_playhead_navigation(self):
+        backend = MagicMock()
+        window = SimpleNamespace(
+            controller=PlaybackController(backend, 60.0, initial_position=10.0),
+            _seek_timeline=MagicMock(),
+            timeline_viewport=MagicMock(),
+        )
+        event_controller = SimpleNamespace(get_current_event_state=lambda: 0)
+        gdk = SimpleNamespace(
+            ModifierType=SimpleNamespace(
+                CONTROL_MASK=1,
+                ALT_MASK=2,
+                SHIFT_MASK=4,
+            ),
+        )
+
+        handled = on_timeline_scroll(window, event_controller, 0.0, 1.0, gdk)
+
+        self.assertTrue(handled)
+        window._seek_timeline.assert_called_once_with(9.0)
 
     def test_triplicate_refresh_ignores_completion_from_replaced_backend(self):
         with TemporaryDirectory() as temporary_directory:
@@ -201,6 +661,149 @@ class EditorCompositionTests(unittest.TestCase):
             VisualTransform(zoom=0.5)
         with self.assertRaisesRegex(ValueError, "version"):
             VisualTransform.from_dict({"version": 99})
+
+    def test_zoom_dependent_focus_bounds_reach_all_canvas_edges(self):
+        self.assertEqual(focus_offset_bounds(1.0), ((-640.0, 640.0), (0.0, 0.0)))
+        self.assertEqual(focus_offset_bounds(2.0), ((-960.0, 960.0), (-540.0, 540.0)))
+        self.assertEqual(focus_offset_bounds(4.0), ((-2880.0, 2880.0), (-1620.0, 1620.0)))
+        default_clamped = VisualTransform.clamped(zoom=1.0, offset_x=99999.0)
+        self.assertEqual(default_clamped.offset_x, 640.0)
+        transform = VisualTransform.clamped(
+            zoom=4.0,
+            offset_x=99999.0,
+            offset_y=-99999.0,
+        )
+        self.assertEqual(transform.offset_x, 2880.0)
+        self.assertEqual(transform.offset_y, -1620.0)
+        with self.assertRaisesRegex(ValueError, "for zoom 1"):
+            VisualTransform(zoom=1.0, offset_x=641.0)
+        with self.assertRaisesRegex(ValueError, "for zoom 2"):
+            VisualTransform(zoom=2.0, offset_x=961.0)
+
+    def test_triplicate_default_zoom_accepts_horizontal_focus_offsets(self):
+        timeline = SegmentTimeline(10.0)
+        for offset_x in (-640.0, 640.0):
+            transform = VisualTransform(zoom=1.0, offset_x=offset_x)
+            segment = timeline.segments[0].with_triplicate(TriplicateGroup.create(transform))
+
+            grouped = segment_video_filters(
+                "[0:v:0]",
+                segment,
+                CANVAS_WIDTH,
+                CANVAS_HEIGHT,
+                "[outv]",
+            )
+
+            self.assertIn(f"{offset_x:g}", grouped[1])
+
+    def test_default_zoom_triplicate_focus_control_updates_shared_transform(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            segment_id = project.timeline.segments[0].segment_id
+            enable_triplicate(project, [segment_id])
+
+            class Spin:
+                def __init__(self, value):
+                    self.value = value
+
+                def get_value(self):
+                    return self.value
+
+            window = SimpleNamespace(
+                project=project,
+                selected_segment_ids=(segment_id,),
+                selected_segment_id=segment_id,
+                focus_zoom_spin=Spin(1.0),
+                focus_offset_x_spin=Spin(-640.0),
+                focus_offset_y_spin=Spin(0.0),
+                _refresh_timeline=MagicMock(),
+                _set_status=MagicMock(),
+                _show_error=MagicMock(),
+            )
+
+            app_timeline_actions.on_focus_control_changed(window, None)
+
+            segment = project.timeline.find(segment_id)
+            self.assertEqual(
+                segment.visual_transform,
+                VisualTransform(zoom=1.0, offset_x=-640.0),
+            )
+            self.assertIsNotNone(segment.triplicate)
+            self.assertEqual(segment.triplicate.shared_transform, segment.visual_transform)
+            window._show_error.assert_not_called()
+
+    def test_default_zoom_triplicate_focus_controls_expose_horizontal_range(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            segment_id = project.timeline.segments[0].segment_id
+            enable_triplicate(project, [segment_id])
+
+            class Adjustment:
+                def __init__(self):
+                    self.lower = None
+                    self.upper = None
+
+                def set_lower(self, value):
+                    self.lower = value
+
+                def set_upper(self, value):
+                    self.upper = value
+
+            class Spin:
+                def __init__(self):
+                    self.adjustment = Adjustment()
+                    self.value = None
+
+                def set_sensitive(self, _value):
+                    return None
+
+                def get_adjustment(self):
+                    return self.adjustment
+
+                def set_value(self, value):
+                    self.value = value
+
+            window = SimpleNamespace(
+                _export_in_progress=False,
+                _source_load_in_progress=False,
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_ids=(segment_id,),
+                selected_segment_id=segment_id,
+                export_button=MagicMock(),
+                open_source_button=MagicMock(),
+                open_project_button=MagicMock(),
+                save_button=MagicMock(),
+                reopen_button=MagicMock(),
+                timeline_canvas=MagicMock(),
+                focus_zoom_spin=Spin(),
+                focus_offset_x_spin=Spin(),
+                focus_offset_y_spin=Spin(),
+                copy_focus_button=MagicMock(),
+                clean_focus_button=MagicMock(),
+                triplicate_button=MagicMock(),
+                timeline_output_label=MagicMock(),
+                timeline_zoom_label=MagicMock(),
+                _update_selected_clip_label=MagicMock(),
+            )
+            window.timeline_canvas.get_zoom.return_value = 1.0
+
+            app_timeline_actions.update_segment_controls(window)
+
+            self.assertEqual(
+                (
+                    window.focus_offset_x_spin.adjustment.lower,
+                    window.focus_offset_x_spin.adjustment.upper,
+                ),
+                (-640.0, 640.0),
+            )
+            self.assertEqual(
+                (
+                    window.focus_offset_y_spin.adjustment.lower,
+                    window.focus_offset_y_spin.adjustment.upper,
+                ),
+                (0.0, 0.0),
+            )
 
     def test_transform_values_apply_to_selected_segments_without_timing_changes(self):
         with TemporaryDirectory() as temporary_directory:
@@ -394,6 +997,71 @@ class EditorCompositionTests(unittest.TestCase):
         self.assertIn("hstack=inputs=3", grouped[-1])
         self.assertIn("crop=640:1080", grouped[1])
 
+    def test_triplicate_focus_bounds_reach_canvas_edges_without_aspect_crop(self):
+        timeline = SegmentTimeline(10.0)
+        segment = timeline.segments[0].with_triplicate(
+            TriplicateGroup.create(
+                VisualTransform(zoom=2.0, offset_x=960.0, offset_y=540.0),
+            ),
+        )
+
+        grouped = segment_video_filters(
+            "[0:v:0]",
+            segment,
+            CANVAS_WIDTH,
+            CANVAS_HEIGHT,
+            "[outv]",
+        )
+
+        self.assertIn(
+            "scale=1920:1080:force_original_aspect_ratio=decrease",
+            grouped[1],
+        )
+        self.assertIn("scale=3840:2160", grouped[1])
+        self.assertIn("+1600", grouped[1])
+        self.assertIn("+540", grouped[1])
+
+    def test_preserve_resolution_mode_crops_or_pads_without_downscaling(self):
+        timeline = SegmentTimeline(10.0)
+        segment = timeline.segments[0]
+
+        filters = segment_video_filters(
+            "[0:v:0]",
+            segment,
+            CANVAS_WIDTH,
+            CANVAS_HEIGHT,
+            "[outv]",
+            preserve_resolution=True,
+            content_width=1080,
+            content_height=1920,
+        )
+
+        self.assertIn("scale=1080:1920", filters[0])
+        self.assertIn("crop=1080:1080", filters[0])
+        self.assertIn("pad=1920:1080", filters[0])
+        self.assertNotIn("force_original_aspect_ratio=decrease", filters[0])
+
+    def test_preserve_resolution_triplicate_crops_each_slot_without_downscaling(self):
+        timeline = SegmentTimeline(10.0)
+        segment = timeline.segments[0].with_triplicate(
+            TriplicateGroup.create(VisualTransform()),
+        )
+
+        filters = segment_video_filters(
+            "[0:v:0]",
+            segment,
+            CANVAS_WIDTH,
+            CANVAS_HEIGHT,
+            "[outv]",
+            preserve_resolution=True,
+            content_width=1080,
+            content_height=1920,
+        )
+
+        self.assertIn("scale=1080:1920", filters[1])
+        self.assertIn("crop=640:1080", filters[1])
+        self.assertNotIn("force_original_aspect_ratio=decrease", filters[1])
+
     @unittest.skipUnless(
         shutil.which("ffmpeg") and shutil.which("ffprobe"),
         "FFmpeg and ffprobe are required",
@@ -429,7 +1097,11 @@ class EditorCompositionTests(unittest.TestCase):
             source_bytes = source.read_bytes()
 
             destination = root / "triplicate.mp4"
-            plan = plan_project_export(project, destination)
+            plan = plan_project_export(
+                project,
+                destination,
+                upscale_policy=UpscalePolicy(enhancement_enabled=False),
+            )
             execute_export(plan)
             output = probe_media(destination)
 
@@ -441,6 +1113,87 @@ class EditorCompositionTests(unittest.TestCase):
                 delta=0.15,
             )
             self.assertEqual(source.read_bytes(), source_bytes)
+
+    @unittest.skipUnless(
+        shutil.which("ffmpeg") and shutil.which("ffprobe"),
+        "FFmpeg and ffprobe are required",
+    )
+    def test_default_zoom_triplicate_offsets_change_generated_media(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "asymmetric.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=c=black:s=1920x1080:r=10,"
+                    "drawbox=x=0:y=0:w=640:h=1080:color=red:t=fill,"
+                    "drawbox=x=1280:y=0:w=640:h=1080:color=blue:t=fill",
+                    "-t",
+                    "0.6",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    str(source),
+                ],
+                check=True,
+            )
+            project = Project.create(source, probe_media(source).metadata())
+            segment_id = project.timeline.segments[0].segment_id
+            enable_triplicate(project, [segment_id])
+
+            digests = {}
+            for offset_x in (-640.0, 0.0, 640.0):
+                apply_visual_transform(
+                    project,
+                    [segment_id],
+                    zoom=1.0,
+                    offset_x=offset_x,
+                    offset_y=0.0,
+                )
+                destination = root / f"triplicate-{offset_x:g}.mp4"
+                plan = plan_project_export(
+                    project,
+                    destination,
+                    upscale_policy=UpscalePolicy(enhancement_enabled=False),
+                )
+                execute_export(plan)
+                output = probe_media(destination)
+                self.assertEqual((output.width, output.height), (CANVAS_WIDTH, CANVAS_HEIGHT))
+                digest = subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        str(destination),
+                        "-frames:v",
+                        "1",
+                        "-f",
+                        "framemd5",
+                        "-",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout
+                digests[offset_x] = next(
+                    line.rsplit(",", 1)[-1]
+                    for line in reversed(digest.splitlines())
+                    if line and not line.startswith("#")
+                )
+
+            self.assertNotEqual(digests[-640.0], digests[0.0])
+            self.assertNotEqual(digests[0.0], digests[640.0])
+            self.assertNotEqual(digests[-640.0], digests[640.0])
 
     def test_composed_preview_uses_active_blocks_and_edited_duration(self):
         with TemporaryDirectory() as temporary_directory:

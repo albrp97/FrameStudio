@@ -122,6 +122,8 @@ def project_payload(
         "source_settings": dict(project.source_settings),
         "audio_decisions": audio_decisions,
         "output_settings": dict(project.output_settings),
+        "frame_rate_policy": project.resolve_frame_rate_policy().to_dict(),
+        "upscale_policy": project.resolve_upscale_policy().to_dict(),
         "export": {
             "exportable": timeline.edited_duration_seconds > 0,
             "active_segment_count": sum(not segment.deleted for segment in timeline.segment_items),

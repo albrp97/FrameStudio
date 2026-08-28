@@ -1,9 +1,12 @@
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from resolve_editor.fps_policy import FrameRatePolicy
 from resolve_editor.model import Project
+from resolve_editor.operations import apply_visual_transform, enable_triplicate
 from resolve_editor.persistence import (
     ProjectPersistenceError,
     load_project,
@@ -29,6 +32,57 @@ def make_project(root):
 
 
 class EditorPersistenceTests(unittest.TestCase):
+    def test_frame_rate_policy_survives_save_and_reopen(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            project.set_frame_rate_policy(
+                FrameRatePolicy(
+                    choice="custom",
+                    custom_rate="60/1",
+                    target_rate="60/1",
+                    enhancement_enabled=True,
+                )
+            )
+            destination = root / "edit.resolve.json"
+
+            save_project(project, destination)
+            restored = load_project(destination)
+
+            self.assertEqual(
+                restored.get_frame_rate_policy().to_dict(),
+                project.get_frame_rate_policy().to_dict(),
+            )
+            self.assertTrue(restored.get_frame_rate_policy().enhancement_enabled)
+
+    def test_projects_without_fps_settings_default_to_sixty_and_enhanced_policy(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+
+            policy = project.get_frame_rate_policy()
+
+            self.assertEqual(policy.choice, "60")
+            self.assertTrue(policy.enhancement_enabled)
+            self.assertEqual(policy.target_rate, 60)
+
+    def test_malformed_persisted_fps_policy_is_rejected(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            destination = root / "edit.resolve.json"
+            save_project(project, destination)
+            payload = json.loads(destination.read_text(encoding="utf-8"))
+            payload["output_settings"]["frame_rate_policy"] = {
+                "version": 1,
+                "choice": "custom",
+                "target_rate": "0/1",
+                "enhancement_enabled": True,
+            }
+            destination.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaises(ProjectPersistenceError):
+                load_project(destination)
+
     def test_save_and_load_round_trip(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -75,6 +129,57 @@ class EditorPersistenceTests(unittest.TestCase):
 
             with self.assertRaises(ProjectPersistenceError):
                 load_project(destination)
+
+    def test_zoom_dependent_focus_bounds_and_triplicate_survive_round_trip(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            segment_id = project.timeline.segments[0].segment_id
+            apply_visual_transform(
+                project,
+                [segment_id],
+                zoom=4.0,
+                offset_x=2880.0,
+                offset_y=-1620.0,
+            )
+            enable_triplicate(project, [segment_id])
+            destination = root / "focus.resolve.json"
+
+            save_project(project, destination)
+            restored = load_project(destination)
+
+            segment = restored.timeline.segments[0]
+            self.assertEqual(segment.visual_transform.zoom, 4.0)
+            self.assertEqual(segment.visual_transform.offset_x, 2880.0)
+            self.assertEqual(segment.visual_transform.offset_y, -1620.0)
+            self.assertIsNotNone(segment.triplicate)
+            self.assertEqual(segment.triplicate.shared_transform, segment.visual_transform)
+
+    def test_default_zoom_triplicate_horizontal_offset_survives_round_trip(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            segment_id = project.timeline.segments[0].segment_id
+            apply_visual_transform(
+                project,
+                [segment_id],
+                zoom=1.0,
+                offset_x=-640.0,
+                offset_y=0.0,
+            )
+            enable_triplicate(project, [segment_id])
+            destination = root / "default-zoom-focus.resolve.json"
+
+            save_project(project, destination)
+            restored = load_project(destination)
+
+            segment = restored.timeline.segments[0]
+            self.assertEqual(
+                segment.visual_transform,
+                project.timeline.segments[0].visual_transform,
+            )
+            self.assertIsNotNone(segment.triplicate)
+            self.assertEqual(segment.triplicate.shared_transform, segment.visual_transform)
 
 
 if __name__ == "__main__":

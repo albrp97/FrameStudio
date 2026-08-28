@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .app_export import (
+    cancel_export,
     finish_export,
     on_export_clicked,
     on_export_dialog_done,
@@ -25,6 +26,8 @@ from .app_helpers import (
     TIMELINE_SCROLL_STEP_SECONDS,
     _metadata_float,
     create_play_pause_key_controller,
+    editing_is_locked,
+    focus_control_has_keyboard_focus,
     format_export_progress_label,
     format_key_bindings,
     format_output_duration_label,
@@ -85,6 +88,7 @@ from .app_timeline_actions import (
     on_copy_focus_clicked,
     on_delete_segment_clicked,
     on_focus_control_changed,
+    on_focus_control_scroll,
     on_split_clicked,
     on_timeline_segment_selected,
     on_timeline_selection_changed,
@@ -173,6 +177,7 @@ def run_gui(
             self.controller: PlaybackController | None = None
             self._frame_lock = threading.Lock()
             self._latest_frame: VideoFrame | None = None
+            self._latest_frame_generation: int | None = None
             self._frame_delivery_scheduled = False
             self.segment_timeline: SegmentTimeline | None = None
             self.selected_segment_id: str | None = None
@@ -180,6 +185,11 @@ def run_gui(
             self._segment_clipboard: tuple[Segment, ...] = ()
             self.source_frame_rate = 30.0
             self._export_in_progress = False
+            self._source_load_in_progress = False
+            self._source_load_generation = 0
+            self._export_cancel_event = None
+            self._export_cancellation_lock = None
+            self._export_project_snapshot = None
             self._updating_focus_controls = False
             self._playback_generation = 0
             self._smoke_test = smoke_test
@@ -226,6 +236,8 @@ def run_gui(
             self._set_status(f"Error: {message}")
 
         def _on_open_source_clicked(self, _button) -> None:
+            if editing_is_locked(self):
+                return
             dialog = Gtk.FileDialog.new()
             dialog.set_title("Select source video(s)")
             dialog.open_multiple(self, None, self._on_source_dialog_done, None)
@@ -262,6 +274,8 @@ def run_gui(
                 self._load_source(selected)
 
         def _on_open_project_clicked(self, _button) -> None:
+            if editing_is_locked(self):
+                return
             dialog = Gtk.FileDialog.new()
             dialog.set_title("Open editor project")
             dialog.open(self, None, self._on_project_dialog_done, None)
@@ -277,6 +291,8 @@ def run_gui(
                 self._load_project_path(Path(selected.get_path()))
 
         def _on_save_clicked(self, _button) -> None:
+            if editing_is_locked(self):
+                return
             if self.project is None:
                 self._show_error("Open a source or project before saving")
                 return
@@ -299,10 +315,13 @@ def run_gui(
                 self._save_to(Path(selected.get_path()))
 
         def _on_export_clicked(self, _button) -> None:
-            on_export_clicked(self, Gtk)
+            on_export_clicked(self, Gtk, GLib)
 
         def _on_export_dialog_done(self, dialog, result, _data) -> None:
             on_export_dialog_done(self, dialog, result, GLib)
+
+        def _on_cancel_export_clicked(self, _button) -> None:
+            cancel_export(self)
 
         def _reset_export_progress(self) -> None:
             reset_export_progress(self)
@@ -317,20 +336,23 @@ def run_gui(
             self,
             output: Path | None,
             message: str,
+            frame_rate_policy=None,
         ) -> bool:
-            return finish_export(self, output, message)
+            return finish_export(self, output, message, frame_rate_policy)
 
         def _save_to(self, path: Path) -> None:
             save_to(self, path)
 
         def _on_reopen_clicked(self, _button) -> None:
+            if editing_is_locked(self):
+                return
             if self.project_path is None:
                 self._show_error("No project has been saved yet")
                 return
             self._load_project_path(self.project_path)
 
         def _load_source(self, paths: Path | Sequence[Path]) -> bool:
-            return load_source(self, paths)
+            return load_source(self, paths, GLib)
 
         def _load_project_path(self, path: Path) -> bool:
             return load_project_path(self, path)
@@ -381,6 +403,9 @@ def run_gui(
         def _on_focus_control_changed(self, _control) -> None:
             on_focus_control_changed(self, _control)
 
+        def _on_focus_control_scroll(self, controller, delta_x, delta_y, field) -> bool:
+            return on_focus_control_scroll(self, field, controller, delta_x, delta_y)
+
         def _on_clean_visual_clicked(self, _button) -> None:
             on_clean_visual_clicked(self, _button)
 
@@ -415,6 +440,8 @@ def run_gui(
             keycode: int,
             _state,
         ) -> bool:
+            if focus_control_has_keyboard_focus(self):
+                return False
             return on_key_pressed(self, _controller, keyval, keycode, _state, Gdk)
 
         def _step_playhead(self, direction: int) -> None:
@@ -444,8 +471,12 @@ def run_gui(
         def _update_playback_controls(self) -> None:
             update_playback_controls(self)
 
-        def _on_frame(self, frame: VideoFrame) -> None:
-            on_frame(self, frame, GLib)
+        def _on_frame(
+            self,
+            frame: VideoFrame,
+            generation: int | None = None,
+        ) -> None:
+            on_frame(self, frame, GLib, generation)
 
         def _deliver_latest_frame(self) -> bool:
             return deliver_latest_frame(self, Gdk, GLib)

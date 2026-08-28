@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import threading
 import time
 from collections.abc import Sequence
 from fractions import Fraction
@@ -33,6 +34,16 @@ def stream_maps(has_audio: bool) -> list[str]:
     return maps
 
 
+def _ffmpeg_base_command(ffmpeg_path: str) -> list[str]:
+    return [
+        ffmpeg_path,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-nostdin",
+    ]
+
+
 def execute_stream_copy(
     plan: ExportPlan,
     source_probe: MediaProbe,
@@ -41,6 +52,7 @@ def execute_stream_copy(
     *,
     progress_callback: ExportProgressCallback | None = None,
     started: float | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     has_audio = source_probe.has_audio_stream
     output_format_name = output_format(plan.destination)
@@ -48,13 +60,7 @@ def execute_stream_copy(
     total_frames = expected_export_frames(plan, source_probe)
     if len(segments) == 1:
         segment = segments[0]
-        command = [
-            ffmpeg_path,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-nostdin",
-        ]
+        command = _ffmpeg_base_command(ffmpeg_path)
         if not segment_is_full_source(
             segment,
             source_probe.duration_seconds,
@@ -96,6 +102,7 @@ def execute_stream_copy(
             command_total_frames=total_frames,
             progress_total_frames=total_frames,
             started=started,
+            cancel_event=cancel_event,
         )
         return
 
@@ -145,6 +152,7 @@ def execute_stream_copy(
                 progress_total_frames=total_frames,
                 frame_offset=frame_offset,
                 started=started,
+                cancel_event=cancel_event,
             )
             part_paths.append(part)
             progress_offset += segment.duration_seconds
@@ -186,7 +194,7 @@ def execute_stream_copy(
             started=time.monotonic() if started is None else started,
             percent_override=99.0,
         )
-        run_ffmpeg(command)
+        run_ffmpeg(command, cancel_event=cancel_event)
 
 
 def fallback_filter(
@@ -197,6 +205,15 @@ def fallback_filter(
     audio_decision: AudioDecision | Mapping[str, Any] | None = None,
 ) -> str:
     filters: list[str] = []
+    audio_labels: tuple[str, ...] = ()
+    if has_audio:
+        normalized_audio = "[normalized_audio]"
+        filters.append(f"[0:a]{audio_filter(audio_decision)}{normalized_audio}")
+        if len(segments) == 1:
+            audio_labels = (normalized_audio,)
+        else:
+            audio_labels = tuple(f"[normalized_audio_{index}]" for index in range(len(segments)))
+            filters.append(f"{normalized_audio}asplit={len(audio_labels)}{''.join(audio_labels)}")
     for index, segment in enumerate(segments):
         start = f"{segment.start_seconds:.6f}"
         end = f"{segment.end_seconds:.6f}"
@@ -215,8 +232,7 @@ def fallback_filter(
             filters.append(f"[0:v:0]trim=start={start}:end={end},setpts=PTS-STARTPTS[v{index}]")
         if has_audio:
             filters.append(
-                f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS,"
-                f"{audio_filter(audio_decision)}[a{index}]"
+                f"{audio_labels[index]}atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{index}]"
             )
     if has_audio:
         inputs = "".join(f"[v{index}][a{index}]" for index in range(len(segments)))
@@ -242,6 +258,34 @@ def mixed_fallback_filter(
     audio_inputs: list[str] = []
     audio_decisions = dict(plan.audio_decisions)
     target_rate = policy.frame_rate
+    audio_labels_by_segment: dict[int, str] = {}
+    segment_indexes_by_source: dict[int, list[int]] = {}
+    for index, segment in enumerate(plan.segments):
+        source_index = source_indexes.get(segment.source_id or "")
+        if source_index is None:
+            raise ExportExecutionError(
+                f"Mixed export block references unknown source: {segment.source_id}"
+            )
+        segment_indexes_by_source.setdefault(source_index, []).append(index)
+    for source_index, segment_indexes in segment_indexes_by_source.items():
+        if not probes[source_index].has_audio_stream:
+            continue
+        source_id = plan.source_ids[source_index]
+        normalized_audio = f"[normalized_audio_{source_index}]"
+        filters.append(
+            f"[{source_index}:a:0]{audio_filter(audio_decisions.get(source_id))}{normalized_audio}"
+        )
+        audio_labels: tuple[str, ...]
+        if len(segment_indexes) == 1:
+            audio_labels = (normalized_audio,)
+        else:
+            audio_labels = tuple(
+                f"[normalized_audio_{source_index}_{index}]"
+                for index in range(len(segment_indexes))
+            )
+            filters.append(f"{normalized_audio}asplit={len(audio_labels)}{''.join(audio_labels)}")
+        for segment_index, audio_label in zip(segment_indexes, audio_labels, strict=True):
+            audio_labels_by_segment[segment_index] = audio_label
     for index, segment in enumerate(plan.segments):
         source_index = source_indexes.get(segment.source_id or "")
         if source_index is None:
@@ -264,9 +308,8 @@ def mixed_fallback_filter(
         if policy.audio_stream_present:
             if probes[source_index].has_audio_stream:
                 filters.append(
-                    f"[{source_index}:a:0]atrim=start={start}:duration={duration},"
-                    "asetpts=PTS-STARTPTS,"
-                    f"{audio_filter(audio_decisions.get(segment.source_id or ''))}[a{index}]"
+                    f"{audio_labels_by_segment[index]}atrim=start={start}:duration={duration},"
+                    f"asetpts=PTS-STARTPTS[a{index}]"
                 )
             else:
                 filters.append(
@@ -288,10 +331,16 @@ def expected_mixed_export_frames(plan: ExportPlan) -> tuple[int, float]:
     if plan.output_policy is None:
         raise ExportExecutionError("Mixed export is missing its output policy")
     try:
-        rate = float(Fraction(plan.output_policy.frame_rate))
+        rate_value = Fraction(plan.output_policy.frame_rate)
+        duration_value = Fraction(str(plan.expected_duration_seconds))
     except (ValueError, ZeroDivisionError) as error:
         raise ExportExecutionError("Mixed export output frame rate is invalid") from error
-    return max(1, round(plan.expected_duration_seconds * rate)), rate
+    exact_frames = duration_value * rate_value
+    frames = max(
+        1,
+        (exact_frames.numerator + exact_frames.denominator // 2) // exact_frames.denominator,
+    )
+    return frames, float(rate_value)
 
 
 def execute_mixed_fallback(
@@ -302,6 +351,7 @@ def execute_mixed_fallback(
     *,
     progress_callback: ExportProgressCallback | None = None,
     started: float | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     policy = plan.output_policy
     if policy is None:
@@ -365,6 +415,7 @@ def execute_mixed_fallback(
         command_total_frames=total_frames,
         progress_total_frames=total_frames,
         started=started,
+        cancel_event=cancel_event,
     )
 
 
@@ -376,14 +427,10 @@ def execute_fallback(
     *,
     progress_callback: ExportProgressCallback | None = None,
     started: float | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     has_audio = source_probe.has_audio_stream
-    command = [
-        ffmpeg_path,
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-nostdin",
+    command = _ffmpeg_base_command(ffmpeg_path) + [
         "-i",
         str(plan.source),
         "-filter_complex",
@@ -437,4 +484,5 @@ def execute_fallback(
         command_total_frames=total_frames,
         progress_total_frames=total_frames,
         started=started,
+        cancel_event=cancel_event,
     )

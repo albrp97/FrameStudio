@@ -4,13 +4,16 @@ NPX ?= npx
 NPM ?= npm
 STATIC_ANALYSIS_DIR ?= evidence/static-analysis
 QUALITY_PATHS = resolve_editor.py resolve_editor tests/test_editor_*.py \
+	benchmarks/restoration_benchmark.py tests/test_restoration_benchmark.py \
+	benchmarks/render_strategy_benchmark.py tests/test_render_strategy_benchmark.py \
 	tools/check_dependencies.py
-COMPLEXITY_PATHS = resolve_editor.py resolve_editor/cli.py resolve_editor/operations.py
+COMPLEXITY_PATHS = resolve_editor.py resolve_editor/cli.py resolve_editor/operations.py \
+	benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py
 
 .PHONY: help setup test compile diff-check check format-check lint type-check \
 	complexity duplication dependency-check dependency-audit security churn \
 	static-analysis quality contract screenshot start editor cli smoke media \
-	concat fps install
+	concat fps restoration-benchmark install
 
 help:
 	@printf '%s\n' \
@@ -27,6 +30,7 @@ help:
 		'make media      Run resolve_media.py (pass ARGS="...")' \
 		'make concat     Run resolve_concat.py (pass ARGS="...")' \
 		'make fps        Run resolve_fps.py (pass ARGS="...")' \
+		'make restoration-benchmark  Run the research benchmark (pass ARGS="...")' \
 		'make install    Install command wrappers into ~/bin'
 
 setup:
@@ -39,7 +43,7 @@ test:
 
 compile:
 	$(PYTHON) -m py_compile resolve_media.py resolve_concat.py resolve_fps.py \
-		resolve_editor.py resolve_editor/*.py tests/*.py tools/*.py
+		resolve_editor.py resolve_editor/*.py benchmarks/*.py tests/*.py tools/*.py
 
 diff-check:
 	git diff --check
@@ -55,6 +59,8 @@ lint:
 type-check:
 	$(PYTHON) -m mypy --config-file pyproject.toml resolve_editor
 	$(PYTHON) -m mypy --config-file pyproject.toml resolve_editor.py
+	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/restoration_benchmark.py
+	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/render_strategy_benchmark.py
 	$(PYTHON) -m mypy --config-file pyproject.toml tools/check_dependencies.py
 
 complexity:
@@ -76,7 +82,9 @@ dependency-audit:
 
 security:
 	@mkdir -p $(STATIC_ANALYSIS_DIR)
-	$(PYTHON) -m bandit -r resolve_editor.py resolve_editor tools/check_dependencies.py \
+	$(PYTHON) -m bandit -r resolve_editor.py resolve_editor \
+		benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py \
+		tools/check_dependencies.py \
 		--configfile pyproject.toml --format json \
 		--output $(STATIC_ANALYSIS_DIR)/bandit.json
 
@@ -141,6 +149,9 @@ concat:
 
 fps:
 	$(PYTHON) resolve_fps.py $(ARGS)
+
+restoration-benchmark:
+	$(PYTHON) benchmarks/restoration_benchmark.py $(ARGS)
 
 install:
 	./install.sh

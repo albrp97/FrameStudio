@@ -6,7 +6,8 @@
 **Sequence:** 2
 **Status:** complete
 **Closure:** user-approved on 2026-08-22 after successful implementation,
-review evidence, and target-workstation validation; remote checks remain
+review evidence, and target-workstation validation; the subsequent TICKET-059
+B-key correction was accepted and closed on 2026-08-26. Remote checks remain
 unavailable and are recorded as an accepted warning.
 **Path history:** `phases/open/PHASE-002-cutting-and-exporting-one-source-safely.md`
 -> `phases/closed/PHASE-002-cutting-and-exporting-one-source-safely.md`

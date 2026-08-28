@@ -105,6 +105,31 @@ audio through a final remux, and verifies the exact target frame rate/count.
 The earlier isolated comparison was slower because it used a different
 diagnostic path; the integrated benchmark below measures the final adapter.
 
+### RTX 5070 Ti runtime validation
+
+The restored RVE adapter was rerun against
+`/home/ghiki/Videos/editor-test-1m.mp4` after replacing the incompatible
+CUDA 12.6/PyTorch 2.7 runtime with PyTorch 2.10.0+cu128,
+Torch-TensorRT 2.10.0, and TensorRT 10.14.1.48.post1. The source is
+1920x1080, 30 FPS, 1,800 frames, and 60 seconds. With the TensorRT engines
+warm, the corrected RVE command completed in 32.341 seconds, reported
+122.74 end-to-end output FPS, and achieved 111.31 effective output FPS
+including preflight and process startup.
+
+GPU telemetry during the run measured 60.25% average utilization, 81% peak
+utilization, 166.68 W average power, 210.32 W peak power, and 3,482 MiB peak
+VRAM. The result contained exactly 3,600 frames at 60 FPS, preserved AAC
+audio at 48 kHz, and remained 1920x1080 with BT.709 limited-range tags. These
+local measurements meet or exceed the earlier integrated reference of
+approximately 109.1 effective output FPS and are specific to this driver,
+runtime, source, and workstation; 100% GPU utilization is not the target.
+
+The earlier CUDA 12.6/PyTorch 2.7 environment was not usable on this GPU:
+`torch.cuda.is_available()` returned true, but a real CUDA tensor operation
+failed with `no kernel image is available for execution on the device`.
+The repository preflight now executes that kernel probe and configures the
+CUDA 13/TensorRT library paths before selecting RVE.
+
 To reproduce the TensorRT part of the corrected RVE run, patch
 `backend/src/pytorch/TensorRTHandler.py` inside `build_engine` and use a new
 model directory for the engine cache:
@@ -540,6 +565,31 @@ produce the grid artifact. RVE is archived upstream, so those local files
 remain an operational dependency and should be backed up or reproducibly
 repaired before migrating the machine.
 
+### Fractional constant-frame-rate targets in the editor
+
+The editor now keeps constant-frame-rate sources on the GPU path when the
+target requires a fractional interpolation factor. For a 23.976-to-60
+conversion, the adapter runs RVE at the next safe integer rate (3x, or
+approximately 71.928 FPS for a 24000/1001 source), then normalizes the
+intermediate video to exact 60 FPS with FFmpeg's GPU NVENC path. The adapter
+pads or trims the normalized stream to the rational target frame count before
+remuxing audio and publishing the verified output.
+
+On the RTX 5070 Ti, a real 924x520, 24000/1001 FPS, 10.05-second source
+completed through the editor export route in 25.73 seconds. The plan reported
+route `enhanced` and backend `rve-4.26`; the verified output was 1920x1080,
+60/1 FPS, H.264/AAC, 603 frames, and 10.05 seconds. Preflight reported the
+CUDA/TensorRT model loaded. Across 106 `nvidia-smi` samples, observed GPU
+utilization averaged 19.0% and peaked at 93%, with 3,348 MiB peak VRAM and
+219.41 W peak board power. The average includes preparation, delivery, audio,
+and verification; the high-utilization inference samples and loaded-model
+preflight are the relevant evidence that the neural path is active.
+
+Variable-frame-rate input remains outside this strategy because it requires
+explicit timing normalization before neural interpolation. It must continue
+to be blocked or routed to an explicitly labeled fallback rather than being
+presented as fractional GPU interpolation.
+
 ### GMFSS Fortuna
 
 GMFSS Fortuna is explicitly dedicated to anime video frame interpolation. Its
@@ -690,6 +740,13 @@ benchmark.
 | PyTorch eager | Useful correctness baseline | NVIDIA CUDA | High package footprint | Debugging and reference |
 | ComfyUI native PyTorch | Official FILM/RIFE models with adaptive memory handling | Linux, Windows, macOS through ComfyUI | ComfyUI dependency; image-only output | Correctness and memory baseline |
 | Video2X C++/Vulkan | User-friendly and efficient wrapper | Linux and Windows | Low to moderate | External fallback application |
+
+The local TICKET-078 restoration benchmark also measured Video2X 6.4.0 on
+the RTX 5070 Ti. The documented `realesr-animevideov3` model reached 79.41
+reported FPS (74.46 FPS by stage wall time) through a declared 480x270 input
+adapter, while the heavier `realesrgan-plus` baseline reached 4.74 FPS. This
+is an upscale/restoration result, not evidence for Video2X frame-interpolation
+throughput or quality; the faster model is not a quality-equivalent replacement.
 
 The `vs-mlrt` documentation states that TensorRT is typically much faster
 than its ONNX Runtime CUDA backend. It also exposes TensorRT-RTX and

@@ -33,6 +33,23 @@ from .cli_types import (
     success_payload,
 )
 from .export import ExportProgress, execute_export
+from .export_estimates import (
+    SourceWorkload,
+    calibration_for_policy,
+    estimate_export,
+)
+from .export_naming import (
+    ExportDestinationError,
+    collision_safe_destination,
+    smart_export_name,
+)
+from .fps_policy import (
+    FrameRatePolicyError,
+    ResolvedFrameRatePolicy,
+    policy_source_metadata,
+    resolve_frame_rate_policy,
+)
+from .interpolation import resolve_frame_rate_policy_with_fallback
 from .media import MediaProbeError, probe_media
 from .model import Project, ProjectValidationError, Segment
 from .operations import (
@@ -57,6 +74,12 @@ from .persistence import (
     ProjectPersistenceError,
     load_project,
     save_project,
+)
+from .upscale_policy import (
+    ResolvedUpscalePolicy,
+    UpscalePolicy,
+    UpscalePolicyError,
+    resolve_upscale_policy,
 )
 
 __all__ = [
@@ -568,6 +591,131 @@ def _handle_save(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def _policy_metadata(project: Project) -> tuple[dict[str, Any], ...]:
+    return policy_source_metadata(project.sources or (project.source,))
+
+
+def _frame_rate_policy_override(
+    project: Project,
+    args: argparse.Namespace,
+) -> ResolvedFrameRatePolicy:
+    choice = getattr(args, "fps_choice", None)
+    custom_rate = getattr(args, "custom_fps", None)
+    enhancement = getattr(args, "enhance_fps", None)
+    backend = getattr(args, "fps_backend", None)
+    current = project.get_frame_rate_policy()
+    selected_choice = current.choice if choice is None else choice
+    selected_custom_rate = current.custom_rate if custom_rate is None else custom_rate
+    if selected_choice != "custom":
+        selected_custom_rate = None
+    selected_enhancement = current.enhancement_enabled if enhancement is None else enhancement
+    selected_backend = current.backend if backend is None else backend
+    try:
+        resolved, _validations, _notice = resolve_frame_rate_policy_with_fallback(
+            _policy_metadata(project),
+            choice=selected_choice,
+            custom_rate=selected_custom_rate,
+            enhancement_enabled=selected_enhancement,
+            backend=selected_backend,
+            ffmpeg_path=getattr(args, "ffmpeg", "ffmpeg"),
+        )
+        if resolved.has_unsupported_sources:
+            reasons = "; ".join(
+                decision.reason
+                for decision in resolved.decisions
+                if decision.action == "unsupported"
+            )
+            raise CliError(
+                "invalid_arguments",
+                "Frame-rate enhancement is not supported for the selected sources"
+                + (f": {reasons}" if reasons else ""),
+                exit_code=CLI_EXIT_INVALID,
+            )
+        invalid_backend = next(
+            (validation for validation in _validations if not validation.available),
+            None,
+        )
+        if invalid_backend is not None:
+            raise CliError(
+                "dependency",
+                invalid_backend.reason,
+                exit_code=CLI_EXIT_DEPENDENCY,
+            )
+        return resolved
+    except FrameRatePolicyError as error:
+        raise CliError(
+            "invalid_arguments",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+
+
+def _upscale_policy_override(
+    project: Project,
+    args: argparse.Namespace,
+) -> ResolvedUpscalePolicy:
+    current = project.get_upscale_policy()
+    enabled = getattr(args, "enhance_upscale", None)
+    model = getattr(args, "upscale_model", None)
+    backend = getattr(args, "upscale_backend", None)
+    try:
+        return resolve_upscale_policy(
+            _policy_metadata(project),
+            policy=UpscalePolicy(
+                enhancement_enabled=current.enhancement_enabled if enabled is None else enabled,
+                model=current.model if model is None else model,
+                backend=current.backend if backend is None else backend,
+                target_short_side=current.target_short_side,
+                landscape_max_short_side=current.landscape_max_short_side,
+                portrait_max_short_side=current.portrait_max_short_side,
+            ),
+        )
+    except UpscalePolicyError as error:
+        raise CliError(
+            "invalid_arguments",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+
+
+def _source_workloads(project: Project) -> tuple[SourceWorkload, ...]:
+    timeline = project.timeline
+    active_segments = tuple(segment for segment in timeline.segment_items if not segment.deleted)
+    workloads: list[SourceWorkload] = []
+    sources = {source.source_id: source for source in project.sources or (project.source,)}
+    for source_id, source in sources.items():
+        duration = sum(
+            segment.duration_seconds
+            for segment in active_segments
+            if segment.source_id in {None, source_id}
+        )
+        if duration <= 0:
+            continue
+        rate = source.metadata.get("frame_rate")
+        if rate is None:
+            continue
+        workloads.append(
+            SourceWorkload(
+                source_id=source_id,
+                duration_seconds=duration,
+                source_rate=rate,
+            )
+        )
+    return tuple(workloads)
+
+
+def _estimate_for_plan(
+    project: Project,
+    policy: ResolvedFrameRatePolicy,
+) -> dict[str, Any]:
+    calibration = calibration_for_policy(policy)
+    return estimate_export(
+        _source_workloads(project),
+        policy,
+        calibration=calibration,
+    ).to_dict()
+
+
 def _progress_payload(progress: ExportProgress) -> dict[str, Any]:
     return progress_payload(progress)
 
@@ -576,6 +724,9 @@ def _handle_export(
     args: argparse.Namespace,
     output: TextIO,
 ) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    args.frame_rate_policy = _frame_rate_policy_override(project, args)
+    args.upscale_policy = _upscale_policy_override(project, args)
     return handle_export(
         args,
         output,
@@ -583,6 +734,116 @@ def _handle_export(
         probe_media_fn=probe_media,
         plan_project_export_fn=plan_project_export,
         execute_export_fn=execute_export,
+    )
+
+
+def _handle_export_plan(
+    args: argparse.Namespace,
+    output: TextIO,
+) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    policy = _frame_rate_policy_override(project, args)
+    upscale_policy = _upscale_policy_override(project, args)
+    if args.output is None:
+        source_names = [source.path for source in project.sources or (project.source,)]
+        filename = smart_export_name(
+            source_names,
+            policy=policy.policy,
+            project_path=args.project,
+        )
+        try:
+            destination = collision_safe_destination(args.project.parent, filename)
+        except ExportDestinationError as error:
+            raise CliError(
+                "invalid_arguments",
+                str(error),
+                exit_code=CLI_EXIT_INVALID,
+            ) from error
+        args.output = destination
+    args.plan_only = True
+    args.frame_rate_policy = policy
+    args.upscale_policy = upscale_policy
+    return handle_export(
+        args,
+        output,
+        load_project_fn=_load_project_for_cli,
+        probe_media_fn=probe_media,
+        plan_project_export_fn=plan_project_export,
+        execute_export_fn=execute_export,
+    )
+
+
+def _handle_set_fps_policy(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    current = project.get_frame_rate_policy()
+    selected_backend = current.backend if args.fps_backend is None else args.fps_backend
+    selected_enhancement = (
+        current.enhancement_enabled if args.enhance_fps is None else args.enhance_fps
+    )
+    try:
+        resolved = resolve_frame_rate_policy(
+            _policy_metadata(project),
+            choice=args.fps_choice,
+            custom_rate=args.custom_fps,
+            enhancement_enabled=selected_enhancement,
+            backend=selected_backend,
+        )
+        project.set_frame_rate_policy(resolved.policy)
+    except FrameRatePolicyError as error:
+        raise CliError(
+            "invalid_arguments",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+    except ProjectValidationError as error:
+        raise CliError(
+            "invalid_operation",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "set-fps-policy",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "frame_rate_policy": resolved.to_dict(),
+        },
+    )
+
+
+def _handle_set_upscale_policy(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    current = project.get_upscale_policy()
+    try:
+        resolved = resolve_upscale_policy(
+            _policy_metadata(project),
+            policy=UpscalePolicy(
+                enhancement_enabled=args.enhance_upscale,
+                model=current.model if args.upscale_model is None else args.upscale_model,
+                backend=current.backend if args.upscale_backend is None else args.upscale_backend,
+                target_short_side=current.target_short_side,
+                landscape_max_short_side=current.landscape_max_short_side,
+                portrait_max_short_side=current.portrait_max_short_side,
+            ),
+        )
+        project.set_upscale_policy(resolved.policy)
+    except (ProjectValidationError, UpscalePolicyError) as error:
+        raise CliError(
+            "invalid_arguments",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+        ) from error
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "set-upscale-policy",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "upscale_policy": resolved.to_dict(),
+        },
     )
 
 
@@ -626,6 +887,10 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         "toggle-delete": _handle_deletion,
         "duration": _handle_duration,
         "save": _handle_save,
+        "set-fps-policy": _handle_set_fps_policy,
+        "set-fps": _handle_set_fps_policy,
+        "set-upscale-policy": _handle_set_upscale_policy,
+        "set-upscale": _handle_set_upscale_policy,
     }
     if args.command == "export":
         raise CliError(
@@ -660,6 +925,8 @@ def cli_main(
         args = parser.parse_args(argv)
         if args.command == "export":
             payload = _handle_export(args, output)
+        elif args.command == "export-plan":
+            payload = _handle_export_plan(args, output)
         else:
             payload = _dispatch(args)
         _write_json(output, payload)

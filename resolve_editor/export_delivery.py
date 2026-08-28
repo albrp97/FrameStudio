@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import os
-import subprocess
+import threading
 import time
+from fractions import Fraction
 from pathlib import Path
 
 from .export_ffmpeg import (
@@ -11,11 +11,15 @@ from .export_ffmpeg import (
     execute_stream_copy,
     expected_mixed_export_frames,
 )
+from .export_interpolation import execute_enhanced_export, probe_frame_count
 from .export_process import (
     emit_export_progress,
     expected_export_frames,
     partial_path,
+    prepare_export_sources,
+    publish_verified_export,
     remove_partial,
+    validate_decoded_output,
 )
 from .export_types import (
     _DURATION_TOLERANCE,
@@ -23,6 +27,7 @@ from .export_types import (
     ExportPlan,
     ExportProgressCallback,
 )
+from .interpolation_artifacts import run_artifact_gate
 from .media import MediaProbe, MediaProbeError, probe_media
 
 
@@ -40,7 +45,7 @@ def verify_mixed_export_output(
         raise ExportExecutionError("FFmpeg did not create a non-empty output")
     try:
         output_probe = probe_media(candidate, ffprobe_path)
-        _, frame_rate = expected_mixed_export_frames(plan)
+        expected_frames, frame_rate = expected_mixed_export_frames(plan)
     except (MediaProbeError, ExportExecutionError) as error:
         raise ExportExecutionError(
             f"Mixed export output could not be inspected: {error}"
@@ -50,6 +55,23 @@ def verify_mixed_export_output(
         raise ExportExecutionError("Mixed export duration does not match the edited duration")
     if (output_probe.width, output_probe.height) != (policy.width, policy.height):
         raise ExportExecutionError("Mixed export dimensions do not match the output policy")
+    try:
+        actual_rate = Fraction(output_probe.frame_rate)
+        expected_rate = Fraction(policy.frame_rate)
+    except (ValueError, ZeroDivisionError) as error:
+        raise ExportExecutionError("Mixed export frame rate metadata is invalid") from error
+    if actual_rate != expected_rate:
+        raise ExportExecutionError("Mixed export frame rate does not match the output policy")
+    actual_frames = probe_frame_count(candidate, ffprobe_path)
+    if actual_frames != expected_frames:
+        raise ExportExecutionError("Mixed export frame count does not match the selected target")
+    if plan.route == "enhanced":
+        run_artifact_gate(
+            candidate,
+            expected_frames,
+            ffmpeg_path=ffmpeg_path,
+            label="enhanced mixed output",
+        )
     if output_probe.has_audio_stream != policy.audio_stream_present:
         raise ExportExecutionError("Mixed export audio presence does not match the output policy")
     if policy.audio_stream_present:
@@ -59,34 +81,7 @@ def verify_mixed_export_output(
             raise ExportExecutionError(
                 "Mixed export channel count does not match the output policy"
             )
-    try:
-        result = subprocess.run(
-            [
-                ffmpeg_path,
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-xerror",
-                "-nostdin",
-                "-i",
-                str(candidate),
-                "-map",
-                "0",
-                "-f",
-                "null",
-                "-",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError as error:
-        raise ExportExecutionError(
-            f"Could not start FFmpeg for mixed output validation: {ffmpeg_path}"
-        ) from error
-    if result.returncode != 0:
-        detail = result.stderr.strip() or "Mixed export decode validation failed"
-        raise ExportExecutionError(detail)
+    validate_decoded_output(candidate, ffmpeg_path, label="mixed output")
     return output_probe
 
 
@@ -96,6 +91,8 @@ def execute_mixed_export(
     ffmpeg_path: str,
     ffprobe_path: str,
     progress_callback: ExportProgressCallback | None,
+    cancel_event: threading.Event | None = None,
+    cancellation_lock: threading.Lock | None = None,
 ) -> Path:
     if plan.route != "fallback":
         raise ExportExecutionError("Mixed-source exports must use the fallback route")
@@ -107,10 +104,13 @@ def execute_mixed_export(
         raise ExportExecutionError("Export destination must differ from every source")
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        source_stats = tuple(path.stat() for path in source_paths)
-        probes = tuple(probe_media(path, ffprobe_path) for path in source_paths)
-    except (OSError, MediaProbeError) as error:
+    except OSError as error:
         raise ExportExecutionError(f"Could not prepare mixed export: {error}") from error
+    source_stats, probes = prepare_export_sources(
+        source_paths,
+        ffprobe_path,
+        label="mixed export",
+    )
     started = time.monotonic()
     total_frames, _frame_rate = expected_mixed_export_frames(plan)
     emit_export_progress(
@@ -132,6 +132,7 @@ def execute_mixed_export(
             ffmpeg_path,
             progress_callback=progress_callback,
             started=started,
+            cancel_event=cancel_event,
         )
         emit_export_progress(
             progress_callback,
@@ -144,32 +145,25 @@ def execute_mixed_export(
             started=started,
             percent_override=99.0,
         )
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportExecutionError("Export cancelled")
         verify_mixed_export_output(
             plan,
             partial,
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
         )
-        for path, original_stat in zip(source_paths, source_stats, strict=True):
-            current_stat = path.stat()
-            if (
-                current_stat.st_size != original_stat.st_size
-                or current_stat.st_mtime_ns != original_stat.st_mtime_ns
-            ):
-                raise ExportExecutionError(
-                    f"Source changed during export; output was not published: {path.name}"
-                )
-        os.replace(partial, destination)
-        emit_export_progress(
-            progress_callback,
-            stage="complete",
-            current_seconds=plan.expected_duration_seconds,
-            total_duration_seconds=plan.expected_duration_seconds,
-            frame=total_frames,
+        publish_verified_export(
+            partial,
+            destination,
+            source_paths,
+            source_stats,
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            expected_duration_seconds=plan.expected_duration_seconds,
             total_frames=total_frames,
-            fps=None,
             started=started,
-            percent_override=100.0,
+            cancellation_lock=cancellation_lock,
         )
     except (ExportExecutionError, MediaProbeError, OSError) as error:
         cleanup_error = remove_partial(partial)
@@ -222,34 +216,39 @@ def verify_export_output(
         )
     ):
         raise ExportExecutionError("Export audio format does not match the output policy")
-    try:
-        result = subprocess.run(
-            [
-                ffmpeg_path,
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-xerror",
-                "-nostdin",
-                "-i",
-                str(candidate),
-                "-map",
-                "0",
-                "-f",
-                "null",
-                "-",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError as error:
-        raise ExportExecutionError(
-            f"Could not start FFmpeg for output validation: {ffmpeg_path}"
-        ) from error
-    if result.returncode != 0:
-        detail = result.stderr.strip() or "Output decode validation failed"
-        raise ExportExecutionError(detail)
+    if plan.frame_rate_policy is not None and plan.output_policy is not None:
+        try:
+            actual_rate = Fraction(output_probe.frame_rate)
+            expected_rate = Fraction(plan.output_policy.frame_rate)
+        except (ValueError, ZeroDivisionError) as error:
+            raise ExportExecutionError("Export frame rate metadata is invalid") from error
+        if actual_rate != expected_rate:
+            raise ExportExecutionError("Export frame rate does not match the selected target")
+        if plan.route == "enhanced":
+            actual_frames = probe_frame_count(candidate, ffprobe_path)
+            expected_frames = max(
+                1,
+                (
+                    Fraction(str(plan.expected_duration_seconds)) * expected_rate + Fraction(1, 2)
+                ).numerator
+                // (
+                    (
+                        Fraction(str(plan.expected_duration_seconds)) * expected_rate
+                        + Fraction(1, 2)
+                    ).denominator
+                ),
+            )
+            if actual_frames != expected_frames:
+                raise ExportExecutionError(
+                    "Enhanced export frame count does not match the selected target"
+                )
+            run_artifact_gate(
+                candidate,
+                expected_frames,
+                ffmpeg_path=ffmpeg_path,
+                label="enhanced output",
+            )
+    validate_decoded_output(candidate, ffmpeg_path, label="output")
     return output_probe
 
 
@@ -259,13 +258,30 @@ def execute_export(
     ffmpeg_path: str = "ffmpeg",
     ffprobe_path: str = "ffprobe",
     progress_callback: ExportProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
+    cancellation_lock: threading.Lock | None = None,
 ) -> Path:
+    if cancel_event is not None and cancel_event.is_set():
+        raise ExportExecutionError("Export cancelled")
+    if plan.route == "enhanced":
+        return execute_enhanced_export(
+            plan,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            progress_callback=progress_callback,
+            verify_single_output=verify_export_output,
+            verify_mixed_output=verify_mixed_export_output,
+            cancel_event=cancel_event,
+            cancellation_lock=cancellation_lock,
+        )
     if plan.source_paths:
         return execute_mixed_export(
             plan,
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
             progress_callback=progress_callback,
+            cancel_event=cancel_event,
+            cancellation_lock=cancellation_lock,
         )
     if plan.route not in {"stream-copy", "fallback"}:
         raise ExportExecutionError(f"Unsupported export route: {plan.route}")
@@ -304,6 +320,7 @@ def execute_export(
                 ffmpeg_path,
                 progress_callback=progress_callback,
                 started=started,
+                cancel_event=cancel_event,
             )
         else:
             execute_fallback(
@@ -313,6 +330,7 @@ def execute_export(
                 ffmpeg_path,
                 progress_callback=progress_callback,
                 started=started,
+                cancel_event=cancel_event,
             )
         emit_export_progress(
             progress_callback,
@@ -325,6 +343,8 @@ def execute_export(
             started=started,
             percent_override=99.0,
         )
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportExecutionError("Export cancelled")
         verify_export_output(
             plan,
             source_probe,
@@ -332,23 +352,17 @@ def execute_export(
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
         )
-        current_source_stat = source.stat()
-        if (
-            current_source_stat.st_size != source_stat.st_size
-            or current_source_stat.st_mtime_ns != source_stat.st_mtime_ns
-        ):
-            raise ExportExecutionError("Source changed during export; output was not published")
-        os.replace(partial, destination)
-        emit_export_progress(
-            progress_callback,
-            stage="complete",
-            current_seconds=plan.expected_duration_seconds,
-            total_duration_seconds=plan.expected_duration_seconds,
-            frame=total_frames,
+        publish_verified_export(
+            partial,
+            destination,
+            (source,),
+            (source_stat,),
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            expected_duration_seconds=plan.expected_duration_seconds,
             total_frames=total_frames,
-            fps=None,
             started=started,
-            percent_override=100.0,
+            cancellation_lock=cancellation_lock,
         )
     except (ExportExecutionError, MediaProbeError, OSError) as error:
         cleanup_error = remove_partial(partial)

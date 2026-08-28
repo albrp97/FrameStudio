@@ -15,6 +15,7 @@ from .composition import (
     TriplicateGroup,
     TriplicateInstance,
     VisualTransform,
+    focus_offset_bounds,
 )
 from .model_project import Project
 from .model_timeline import SegmentTimeline
@@ -29,6 +30,12 @@ from .model_types import (
     SourceStatus,
     seconds_to_ticks,
     ticks_to_seconds,
+)
+from .upscale_policy import (
+    ResolvedUpscalePolicy,
+    UpscaleDecision,
+    UpscalePolicy,
+    UpscalePolicyError,
 )
 
 ProjectTimeline = SegmentTimeline
@@ -52,13 +59,18 @@ __all__ = [
     "Project",
     "ProjectTimeline",
     "ProjectValidationError",
+    "ResolvedUpscalePolicy",
     "Segment",
     "SegmentTimeline",
     "SourceReference",
     "SourceStatus",
     "TriplicateGroup",
     "TriplicateInstance",
+    "UpscaleDecision",
+    "UpscalePolicy",
+    "UpscalePolicyError",
     "VisualTransform",
+    "focus_offset_bounds",
     "seconds_to_ticks",
     "ticks_to_seconds",
 ]

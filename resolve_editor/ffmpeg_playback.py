@@ -6,6 +6,7 @@ import signal
 import subprocess
 import threading
 import time
+from collections.abc import Hashable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -13,6 +14,7 @@ from typing import Any, Callable, Mapping, Sequence
 from .audio import AUDIO_CHANNELS, AUDIO_SAMPLE_RATE, audio_filter
 from .composition_render import segment_video_filters
 from .playback import PlaybackBackendError
+from .preview_strategy import PreviewFrameCache
 
 
 @dataclass(frozen=True)
@@ -21,11 +23,30 @@ class VideoFrame:
     width: int
     height: int
     position_seconds: float
+    decoded_position_seconds: float | None = None
+
+    def at_position(self, position_seconds: float) -> VideoFrame:
+        decoded_position = (
+            self.position_seconds
+            if self.decoded_position_seconds is None
+            else self.decoded_position_seconds
+        )
+        return VideoFrame(
+            self.data,
+            self.width,
+            self.height,
+            position_seconds,
+            decoded_position,
+        )
 
 
 FrameCallback = Callable[[VideoFrame], None]
 MessageCallback = Callable[[str], None]
 VoidCallback = Callable[[], None]
+
+
+class _PreviewRequestCancelled(Exception):
+    """Internal signal used when a preview request is obsolete before decode."""
 
 
 class FfmpegPlaybackBackend:
@@ -45,6 +66,7 @@ class FfmpegPlaybackBackend:
         audio_decision: Mapping[str, Any] | None = None,
         ffplay_path: str = "ffplay",
         on_warning: MessageCallback | None = None,
+        preview_cache_size: int = 8,
     ) -> None:
         if width <= 0 or height <= 0:
             raise ValueError("Playback dimensions must be positive")
@@ -71,12 +93,22 @@ class FfmpegPlaybackBackend:
         self._audio_monitor_thread: threading.Thread | None = None
         self._position_seconds = 0.0
         self._paused = False
+        self._playback_generation = 0
         self._preview_condition = threading.Condition(self._lock)
-        self._preview_request: tuple[int, float] | None = None
+        self._preview_request: tuple[int, float, Hashable | None] | None = None
         self._preview_generation = 0
         self._preview_process: subprocess.Popen[bytes] | None = None
         self._preview_thread: threading.Thread | None = None
         self._preview_shutdown = False
+        self._preview_cache: PreviewFrameCache[VideoFrame] = PreviewFrameCache(
+            preview_cache_size,
+            frame_rate,
+        )
+        self._preview_stale_frames = 0
+        self._preview_requests = 0
+        self._preview_cancelled_requests = 0
+        self._preview_coalesced_requests = 0
+        self._preview_failures = 0
 
     @property
     def frame_size(self) -> int:
@@ -287,8 +319,10 @@ class FfmpegPlaybackBackend:
                 f"(ffplay status {sink_return_code}, ffmpeg status {audio_return_code})"
             )
 
-    def _terminate_audio_preview(self) -> None:
+    def _terminate_audio_preview(self, *, expected_generation: int | None = None) -> None:
         with self._lock:
+            if expected_generation is not None and expected_generation != self._playback_generation:
+                return
             audio_process = self._audio_process
             audio_sink = self._audio_sink
             copy_thread = self._audio_copy_thread
@@ -334,6 +368,8 @@ class FfmpegPlaybackBackend:
             ) from error
         except OSError as error:
             raise PlaybackBackendError(f"Could not start FFmpeg playback: {error}") from error
+        self._playback_generation += 1
+        generation = self._playback_generation
         self._process = process
         self._stop_event = event
         self._paused = False
@@ -350,7 +386,7 @@ class FfmpegPlaybackBackend:
         stderr_thread.start()
         reader = threading.Thread(
             target=self._read_frames,
-            args=(process, event, start_position, stderr_output, stderr_thread),
+            args=(process, event, start_position, stderr_output, stderr_thread, generation),
             daemon=True,
         )
         reader.start()
@@ -401,6 +437,25 @@ class FfmpegPlaybackBackend:
                 return False
         return False
 
+    def _deliver_playback_frame(
+        self,
+        process: subprocess.Popen[bytes],
+        event: threading.Event,
+        generation: int,
+        frame: VideoFrame,
+        position: float,
+    ) -> bool:
+        with self._lock:
+            if (
+                self._process is not process
+                or event.is_set()
+                or generation != self._playback_generation
+            ):
+                return False
+            self._position_seconds = position
+            self.on_frame(frame)
+        return True
+
     def _read_frames(
         self,
         process: subprocess.Popen[bytes],
@@ -408,6 +463,7 @@ class FfmpegPlaybackBackend:
         start_position: float,
         stderr_output: list[bytes],
         stderr_thread: threading.Thread,
+        generation: int,
     ) -> None:
         frame_index = 0
         incomplete = False
@@ -435,11 +491,14 @@ class FfmpegPlaybackBackend:
                     self.duration_seconds,
                     start_position + frame_index / self.frame_rate,
                 )
-                with self._lock:
-                    if self._process is not process or event.is_set():
-                        break
-                    self._position_seconds = position
-                self.on_frame(VideoFrame(data, self.width, self.height, position))
+                if not self._deliver_playback_frame(
+                    process,
+                    event,
+                    generation,
+                    VideoFrame(data, self.width, self.height, position),
+                    position,
+                ):
+                    break
                 frame_index += 1
                 next_frame_at = time.monotonic() + frame_interval
         except (OSError, ValueError) as error:
@@ -455,22 +514,29 @@ class FfmpegPlaybackBackend:
                     return_code = process.poll()
                 stderr_thread.join(timeout=1)
                 with self._lock:
-                    is_current = self._process is process
+                    is_current = (
+                        self._process is process and generation == self._playback_generation
+                    )
                     if is_current:
                         self._process = None
                         self._stop_event = None
                         self._paused = False
                 if is_current:
-                    self._terminate_audio_preview()
-                    if incomplete:
-                        self._notify_error("FFmpeg playback ended with an incomplete frame")
-                    elif return_code not in (0, None):
-                        detail = stderr_output[0].decode(errors="replace").strip()
-                        self._notify_error(
-                            detail or f"FFmpeg playback exited with status {return_code}"
+                    self._terminate_audio_preview(expected_generation=generation)
+                    with self._lock:
+                        is_current = (
+                            generation == self._playback_generation and self._process is None
                         )
-                    else:
-                        self.on_end()
+                        if is_current:
+                            if incomplete:
+                                self._notify_error("FFmpeg playback ended with an incomplete frame")
+                            elif return_code not in (0, None):
+                                detail = stderr_output[0].decode(errors="replace").strip()
+                                self._notify_error(
+                                    detail or f"FFmpeg playback exited with status {return_code}"
+                                )
+                            else:
+                                self.on_end()
 
     def _notify_error(self, message: str) -> None:
         self.on_error(message or "FFmpeg playback failed")
@@ -546,6 +612,7 @@ class FfmpegPlaybackBackend:
         with self._lock:
             process = self._process
             event = self._stop_event
+            self._playback_generation += 1
             self._process = None
             self._stop_event = None
             self._paused = False
@@ -588,12 +655,19 @@ class FfmpegPlaybackBackend:
 
     def _cancel_preview_requests(self) -> None:
         with self._preview_condition:
+            if self._preview_request is not None:
+                self._preview_coalesced_requests += 1
+            if self._preview_request is not None or self._preview_process is not None:
+                self._preview_cancelled_requests += 1
             self._preview_generation += 1
             self._preview_request = None
             process = self._preview_process
             self._preview_condition.notify_all()
         if process is not None:
             self._terminate_preview_process(process)
+
+    def _preview_cache_namespace(self, _position_seconds: float) -> Hashable | None:
+        return None
 
     def _decode_one_frame(self, position_seconds: float) -> None:
         try:
@@ -638,31 +712,38 @@ class FfmpegPlaybackBackend:
         else:
             self._decode_one_frame(target)
 
-    def _decode_preview_frame(self, position_seconds: float) -> VideoFrame:
+    def _decode_preview_frame(
+        self,
+        position_seconds: float,
+        generation: int | None = None,
+    ) -> VideoFrame:
         try:
-            process = subprocess.Popen(
-                self._command(position_seconds, realtime=False, frame_count=1),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                start_new_session=True,
-            )
+            with self._preview_condition:
+                if generation is not None and (
+                    generation != self._preview_generation or self._preview_shutdown
+                ):
+                    raise _PreviewRequestCancelled
+                process = subprocess.Popen(
+                    self._command(position_seconds, realtime=False, frame_count=1),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    start_new_session=True,
+                )
+                self._preview_process = process
         except FileNotFoundError as error:
             raise PlaybackBackendError(
                 f"ffmpeg is not installed or not on PATH: {self.ffmpeg_path}"
             ) from error
         except OSError as error:
             raise PlaybackBackendError(f"Could not start preview seek: {error}") from error
-
-        with self._preview_condition:
-            self._preview_process = process
         try:
             try:
                 output, error_output = process.communicate(timeout=15)
             except subprocess.TimeoutExpired as error:
-                self._terminate_preview_process(process)
-                process.wait(timeout=2)
+                self._abort_preview_process(process)
                 raise PlaybackBackendError("Timed out while rendering the preview frame") from error
             except (OSError, ValueError) as error:
+                self._abort_preview_process(process)
                 raise PlaybackBackendError(
                     f"Could not render the preview frame: {error}"
                 ) from error
@@ -683,6 +764,36 @@ class FfmpegPlaybackBackend:
             position_seconds,
         )
 
+    def _abort_preview_process(self, process: subprocess.Popen[bytes]) -> None:
+        self._terminate_preview_process(process)
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            self._terminate_preview_process(process)
+            process.wait(timeout=2)
+        for stream in (process.stdout, process.stderr):
+            if stream is not None:
+                try:
+                    stream.close()
+                except (OSError, ValueError):
+                    pass
+
+    def _deliver_preview_frame(
+        self,
+        generation: int,
+        position_seconds: float,
+        cache_namespace: Hashable | None,
+        frame: VideoFrame,
+    ) -> bool:
+        with self._preview_condition:
+            if generation != self._preview_generation or self._preview_shutdown:
+                self._preview_stale_frames += 1
+                return False
+            self._position_seconds = position_seconds
+            self._preview_cache.put(frame, namespace=cache_namespace)
+            self.on_frame(frame)
+        return True
+
     def _run_preview_worker(self) -> None:
         while True:
             with self._preview_condition:
@@ -695,53 +806,79 @@ class FfmpegPlaybackBackend:
                 self._preview_request = None
                 if request is None:
                     continue
-                generation, position_seconds = request
+                generation, position_seconds, cache_namespace = request
 
             try:
-                frame = self._decode_preview_frame(position_seconds)
+                frame = self._decode_preview_frame(position_seconds, generation)
+            except _PreviewRequestCancelled:
+                continue
             except PlaybackBackendError as error:
                 with self._preview_condition:
                     is_current = (
                         generation == self._preview_generation and not self._preview_shutdown
                     )
                 if is_current:
+                    self._preview_failures += 1
                     self._notify_error(str(error))
                 continue
 
-            with self._preview_condition:
-                is_current = generation == self._preview_generation and not self._preview_shutdown
-                if is_current:
-                    self._position_seconds = position_seconds
-            if is_current:
-                self.on_frame(frame)
+            self._deliver_preview_frame(
+                generation,
+                position_seconds,
+                cache_namespace,
+                frame,
+            )
 
     def request_preview(self, position_seconds: float) -> None:
         target = max(0.0, min(self.duration_seconds, float(position_seconds)))
         self._terminate_process()
         self._cancel_preview_requests()
+        cached_frame: VideoFrame | None
+        cache_namespace = self._preview_cache_namespace(target)
         with self._preview_condition:
             if self._preview_shutdown:
                 raise PlaybackBackendError("Playback backend is closed")
-            self._preview_generation += 1
-            self._preview_request = (
-                self._preview_generation,
-                target,
-            )
-            self._position_seconds = target
-            worker = self._preview_thread
-            if worker is None or not worker.is_alive():
-                worker = threading.Thread(
-                    target=self._run_preview_worker,
-                    name="resolve-editor-preview",
-                    daemon=True,
+            self._preview_requests += 1
+            cached_frame = self._preview_cache.get(target, namespace=cache_namespace)
+            if cached_frame is not None:
+                self._position_seconds = target
+            else:
+                self._preview_generation += 1
+                self._preview_request = (
+                    self._preview_generation,
+                    target,
+                    cache_namespace,
                 )
-                self._preview_thread = worker
-                worker.start()
-            self._preview_condition.notify_all()
+                self._position_seconds = target
+                worker = self._preview_thread
+                if worker is None or not worker.is_alive():
+                    worker = threading.Thread(
+                        target=self._run_preview_worker,
+                        name="resolve-editor-preview",
+                        daemon=True,
+                    )
+                    self._preview_thread = worker
+                    worker.start()
+                self._preview_condition.notify_all()
+        if cached_frame is not None:
+            self.on_frame(cached_frame.at_position(target))
 
     def current_position(self) -> float:
         with self._lock:
             return self._position_seconds
+
+    def preview_stats(self) -> dict[str, int]:
+        with self._lock:
+            return {
+                "requests": self._preview_requests,
+                "cache_hits": self._preview_cache.hits,
+                "cache_misses": self._preview_cache.misses,
+                "cache_evictions": self._preview_cache.evictions,
+                "stale_frames": self._preview_stale_frames,
+                "cancelled_requests": self._preview_cancelled_requests,
+                "coalesced_requests": self._preview_coalesced_requests,
+                "failures": self._preview_failures,
+            }
 
     def close(self) -> None:
         self.stop()
@@ -776,6 +913,7 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
         audio_decisions: Mapping[str, Mapping[str, Any]] | None = None,
         ffplay_path: str = "ffplay",
         on_warning: MessageCallback | None = None,
+        preview_cache_size: int = 8,
     ) -> None:
         source_items = tuple(sources)
         if not source_items:
@@ -800,12 +938,20 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             ffmpeg_path,
             ffplay_path=ffplay_path,
             on_warning=on_warning,
+            preview_cache_size=preview_cache_size,
         )
 
     def _has_audio_preview(self) -> bool:
         return any(
             settings.get("status") != "not-applicable" for settings in self.audio_decisions.values()
         )
+
+    def _preview_cache_namespace(self, position_seconds: float) -> Hashable | None:
+        plan, _optimized, _input_offsets = self._render_plan(position_seconds)
+        segment_id = getattr(plan[0][0], "segment_id", None)
+        if not isinstance(segment_id, str):
+            raise PlaybackBackendError("Preview block does not have a valid segment identity")
+        return segment_id
 
     def _render_plan(
         self,
@@ -891,11 +1037,11 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
                 command.extend(["-ss", f"{offset:.6f}"])
             command.extend(["-noautorotate", "-i", str(path)])
 
-    def _audio_command(
+    def _base_command(
         self,
-        position_seconds: float,
         *,
         realtime: bool,
+        input_offsets: Mapping[int, float],
     ) -> list[str]:
         command = [
             self.ffmpeg_path,
@@ -904,9 +1050,21 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             "error",
             "-nostdin",
         ]
-        plan, optimized, input_offsets = self._render_plan(position_seconds)
         self._append_inputs(
             command,
+            realtime=realtime,
+            input_offsets=input_offsets,
+        )
+        return command
+
+    def _audio_command(
+        self,
+        position_seconds: float,
+        *,
+        realtime: bool,
+    ) -> list[str]:
+        plan, optimized, input_offsets = self._render_plan(position_seconds)
+        command = self._base_command(
             realtime=realtime,
             input_offsets=input_offsets,
         )
@@ -962,16 +1120,8 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
         realtime: bool,
         frame_count: int | None = None,
     ) -> list[str]:
-        command = [
-            self.ffmpeg_path,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-nostdin",
-        ]
         plan, optimized, input_offsets = self._render_plan(position_seconds)
-        self._append_inputs(
-            command,
+        command = self._base_command(
             realtime=realtime,
             input_offsets=input_offsets,
         )

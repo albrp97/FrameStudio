@@ -3,14 +3,21 @@ import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from resolve_editor.export import (
+    ExportExecutionError,
+    ExportPlan,
     ExportPlanningError,
+    OutputPolicy,
     parse_ffmpeg_progress_values,
     plan_export,
 )
+from resolve_editor.export_delivery import verify_mixed_export_output
+from resolve_editor.fps_policy import FrameRatePolicy
 from resolve_editor.media import MediaProbe, probe_media
 from resolve_editor.model import SegmentTimeline
+from resolve_editor.upscale_policy import UpscalePolicy
 
 
 def media_probe(
@@ -32,6 +39,128 @@ def media_probe(
 
 
 class EditorExportPlannerTests(unittest.TestCase):
+    def test_mixed_enhanced_output_rejects_an_incorrect_frame_count(self):
+        with TemporaryDirectory() as temporary_directory:
+            candidate = Path(temporary_directory) / "enhanced.mp4"
+            candidate.write_bytes(b"candidate")
+            plan = ExportPlan(
+                route="enhanced",
+                source=Path("first.mp4"),
+                destination=candidate,
+                segments=(),
+                expected_duration_seconds=1.0,
+                reason="enhancement",
+                source_paths=(Path("first.mp4"), Path("second.mp4")),
+                source_ids=("first", "second"),
+                output_policy=OutputPolicy(
+                    width=1920,
+                    height=1080,
+                    scaling_mode="contain-letterbox",
+                    frame_rate="20/1",
+                    timebase="1/1000000",
+                    container="mp4",
+                    video_codec="libx264",
+                    audio_codec=None,
+                    pixel_format="yuv420p",
+                    audio_stream_present=False,
+                    requires_normalization=True,
+                    reason="test",
+                ),
+            )
+            output_probe = MediaProbe(
+                path=candidate,
+                duration_seconds=1.0,
+                width=1920,
+                height=1080,
+                frame_rate="20/1",
+                video_codec="h264",
+                audio_codec=None,
+                format_name="mp4",
+            )
+
+            with (
+                patch("resolve_editor.export_delivery.probe_media", return_value=output_probe),
+                patch("resolve_editor.export_delivery.probe_frame_count", return_value=19),
+                patch("resolve_editor.export_delivery.validate_decoded_output"),
+            ):
+                with self.assertRaisesRegex(
+                    ExportExecutionError,
+                    "frame count",
+                ):
+                    verify_mixed_export_output(
+                        plan,
+                        candidate,
+                        ffmpeg_path="ffmpeg",
+                        ffprobe_path="ffprobe",
+                    )
+
+    def test_selected_target_rate_is_persisted_on_the_plan_and_forces_conversion(self):
+        probe = media_probe(Path("/tmp"))
+        timeline = SegmentTimeline(10.0)
+        policy = FrameRatePolicy(
+            choice="60",
+            target_rate="60/1",
+            enhancement_enabled=False,
+        )
+
+        plan = plan_export(
+            probe,
+            timeline,
+            Path("/tmp/edited.mp4"),
+            frame_rate_policy=policy,
+        )
+
+        self.assertEqual(plan.route, "fallback")
+        self.assertEqual(plan.output_policy.frame_rate, "60")
+        self.assertEqual(plan.frame_rate_policy.to_dict(), policy.to_dict())
+        self.assertEqual(plan.rate_decisions[0].action, "convert")
+
+    def test_enabled_supported_rate_selects_explicit_enhanced_route(self):
+        probe = media_probe(Path("/tmp"))
+        timeline = SegmentTimeline(10.0)
+        policy = FrameRatePolicy(
+            choice="60",
+            target_rate="60/1",
+            enhancement_enabled=True,
+        )
+
+        plan = plan_export(
+            probe,
+            timeline,
+            Path("/tmp/edited.mp4"),
+            frame_rate_policy=policy,
+        )
+
+        self.assertEqual(plan.route, "enhanced")
+        self.assertEqual(plan.rate_decisions[0].action, "interpolate")
+
+    def test_fractional_rve_enhancement_selects_gpu_route(self):
+        probe = MediaProbe(
+            path=Path("/tmp/source.mp4"),
+            duration_seconds=10.0,
+            width=1920,
+            height=1080,
+            frame_rate="24/1",
+            video_codec="h264",
+            audio_codec=None,
+            format_name="mp4",
+        )
+        policy = FrameRatePolicy(
+            choice="60",
+            target_rate="60/1",
+            enhancement_enabled=True,
+        )
+
+        plan = plan_export(
+            probe,
+            SegmentTimeline(10.0),
+            Path("/tmp/edited.mp4"),
+            frame_rate_policy=policy,
+        )
+
+        self.assertEqual(plan.route, "enhanced")
+        self.assertEqual(plan.rate_decisions[0].action, "interpolate")
+
     def test_ffmpeg_progress_values_include_frame_time_fps_and_completion(self):
         progress = parse_ffmpeg_progress_values(
             {
@@ -107,6 +236,7 @@ class EditorExportPlannerTests(unittest.TestCase):
             timeline,
             Path("/tmp/edited.mp4"),
             keyframe_timestamps=(),
+            upscale_policy=UpscalePolicy(enhancement_enabled=False),
         )
 
         self.assertEqual(plan.route, "fallback")

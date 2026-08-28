@@ -1,10 +1,12 @@
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from resolve_editor.app import (
     KEYCODE_SPACE,
     _metadata_float,
     create_play_pause_key_controller,
+    focus_control_has_keyboard_focus,
     format_export_progress_label,
     format_key_bindings,
     format_output_duration_label,
@@ -21,6 +23,10 @@ from resolve_editor.app import (
     timeline_scroll_position,
     toggle_segment_deleted_state,
     validate_source_selection,
+)
+from resolve_editor.app_timeline_actions import (
+    FOCUS_SCROLL_FIELDS,
+    focus_scroll_value,
 )
 from resolve_editor.export import ExportProgress
 from resolve_editor.model import SegmentTimeline
@@ -157,6 +163,22 @@ class EditorUiHelperTests(unittest.TestCase):
         self.assertTrue(is_fit_zoom_key(ord("0"), 4, 4))
         self.assertFalse(is_fit_zoom_key(ord("0"), 0, 4))
         self.assertFalse(is_fit_zoom_key(ord("1"), 4, 4))
+
+    def test_focus_scroll_uses_field_specific_direction_and_increment(self):
+        self.assertEqual(focus_scroll_value("zoom", 1.0, -1.0), 1.1)
+        self.assertEqual(focus_scroll_value("zoom", 1.0, 1.0), 1.0)
+        self.assertEqual(focus_scroll_value("offset_x", 0.0, -1.0), 10.0)
+        self.assertEqual(focus_scroll_value("offset_y", 0.0, 1.0), -10.0)
+        self.assertEqual(set(FOCUS_SCROLL_FIELDS), {"zoom", "offset_x", "offset_y"})
+
+    def test_focus_control_keyboard_focus_is_not_captured_by_global_shortcuts(self):
+        window = SimpleNamespace(
+            focus_zoom_spin=SimpleNamespace(has_focus=lambda: True),
+            focus_offset_x_spin=SimpleNamespace(has_focus=lambda: False),
+            focus_offset_y_spin=SimpleNamespace(has_focus=lambda: False),
+        )
+
+        self.assertTrue(focus_control_has_keyboard_focus(window))
 
     def test_export_progress_label_includes_all_requested_metrics(self):
         progress = ExportProgress(

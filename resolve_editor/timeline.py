@@ -6,6 +6,7 @@ from typing import Any, Callable
 from .model import SegmentTimeline
 from .timeline_geometry import (
     SELECTED_CLIP_BORDER_COLOR,
+    TIMELINE_DEFAULT_ZOOM,
     TIMELINE_HEIGHT,
     TIMELINE_HORIZONTAL_PADDING,
     TIMELINE_MAX_ZOOM,
@@ -39,6 +40,7 @@ __all__ = [
     "SELECTED_CLIP_BORDER_COLOR",
     "TIMELINE_HEIGHT",
     "TIMELINE_HORIZONTAL_PADDING",
+    "TIMELINE_DEFAULT_ZOOM",
     "TIMELINE_MAX_ZOOM",
     "TIMELINE_MIN_PIXELS_PER_SECOND",
     "TIMELINE_MIN_ZOOM",
@@ -75,7 +77,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._selected_segment_id: str | None = None
             self._selected_segment_ids: tuple[str, ...] = ()
             self._playhead_seconds = 0.0
-            self._zoom = TIMELINE_MIN_ZOOM
+            self._zoom = TIMELINE_DEFAULT_ZOOM
             self._viewport_width = 800.0
             self._on_seek = on_seek
             self._on_segment_selected = on_segment_selected
@@ -186,7 +188,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self.set_zoom(next_timeline_zoom(self._zoom, -1))
 
         def fit_to_view(self) -> None:
-            self.set_zoom(TIMELINE_MIN_ZOOM)
+            self.set_zoom(TIMELINE_DEFAULT_ZOOM)
 
         def get_zoom(self) -> float:
             return self._zoom

@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from .audio import AudioDecision
+from .fps_policy import FrameRatePolicy, SourceRateDecision, canonical_rate
 from .model import Segment
+from .upscale_policy import UpscaleDecision, UpscalePolicy
 
 _BOUNDARY_TOLERANCE = 1e-3
 _DURATION_TOLERANCE = 0.05
@@ -118,6 +120,8 @@ def _metadata_rate(value: Any, label: str) -> tuple[str, Fraction]:
 
 def resolve_output_policy(
     metadata: Sequence[Mapping[str, Any]],
+    *,
+    target_rate: Fraction | int | float | str | None = None,
 ) -> OutputPolicy:
     """Resolve a predictable canvas and timing profile for source metadata."""
     if not metadata:
@@ -149,9 +153,15 @@ def resolve_output_policy(
                 "audio_present": audio_present,
             }
         )
-    output_rate = max(item["rate_value"] for item in normalized)
-    output_rate_text = next(
-        item["frame_rate"] for item in normalized if item["rate_value"] == output_rate
+    output_rate = (
+        max(item["rate_value"] for item in normalized)
+        if target_rate is None
+        else canonical_rate(target_rate)
+    )
+    output_rate_text = (
+        next(item["frame_rate"] for item in normalized if item["rate_value"] == output_rate)
+        if target_rate is None
+        else str(output_rate)
     )
     dimensions_differ = any(
         (item["width"], item["height"]) != (_DEFAULT_OUTPUT_WIDTH, _DEFAULT_OUTPUT_HEIGHT)
@@ -170,6 +180,8 @@ def resolve_output_policy(
         reasons.append("sources are contain-scaled to the project canvas")
     if rates_differ:
         reasons.append("source frame rates differ; current timing selection is provisional")
+    if target_rate is not None:
+        reasons.append("export target frame rate is selected by the project FPS policy")
     return OutputPolicy(
         width=_DEFAULT_OUTPUT_WIDTH,
         height=_DEFAULT_OUTPUT_HEIGHT,
@@ -258,6 +270,11 @@ class ExportPlan:
     source_ids: tuple[str, ...] = ()
     output_policy: OutputPolicy | None = None
     audio_decisions: tuple[tuple[str, AudioDecision | dict[str, Any]], ...] = ()
+    frame_rate_policy: FrameRatePolicy | dict[str, Any] | None = None
+    rate_decisions: tuple[SourceRateDecision | dict[str, Any], ...] = ()
+    upscale_policy: UpscalePolicy | dict[str, Any] | None = None
+    upscale_decisions: tuple[UpscaleDecision | dict[str, Any], ...] = ()
+    estimate: dict[str, Any] | None = None
 
     @property
     def is_fast_path(self) -> bool:
@@ -284,4 +301,31 @@ class ExportPlan:
                 )
                 for source_id, decision in self.audio_decisions
             },
+            "frame_rate_policy": (
+                None
+                if self.frame_rate_policy is None
+                else (
+                    self.frame_rate_policy.to_dict()
+                    if isinstance(self.frame_rate_policy, FrameRatePolicy)
+                    else dict(self.frame_rate_policy)
+                )
+            ),
+            "rate_decisions": [
+                decision.to_dict() if isinstance(decision, SourceRateDecision) else dict(decision)
+                for decision in self.rate_decisions
+            ],
+            "upscale_policy": (
+                None
+                if self.upscale_policy is None
+                else (
+                    self.upscale_policy.to_dict()
+                    if isinstance(self.upscale_policy, UpscalePolicy)
+                    else dict(self.upscale_policy)
+                )
+            ),
+            "upscale_decisions": [
+                decision.to_dict() if isinstance(decision, UpscaleDecision) else dict(decision)
+                for decision in self.upscale_decisions
+            ],
+            "estimate": None if self.estimate is None else dict(self.estimate),
         }

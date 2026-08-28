@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from resolve_editor.export import ExportPlan
+from resolve_editor.fps_policy import FrameRatePolicy
 from resolve_editor.media import MediaProbe
 from resolve_editor.model import Project, ProjectValidationError
 from resolve_editor.operations import (
@@ -169,6 +170,82 @@ class EditorOperationsTests(unittest.TestCase):
 
             self.assertEqual(actual, expected)
             plan.assert_called_once()
+
+    def test_mixed_project_planning_leaves_target_rate_resolution_to_mixed_planner(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first_path = root / "first.mp4"
+            second_path = root / "second.mp4"
+            first_path.write_bytes(b"first")
+            second_path.write_bytes(b"second")
+            project = Project.create_multi(
+                (
+                    (
+                        first_path,
+                        {
+                            "duration_seconds": 2.0,
+                            "width": 320,
+                            "height": 180,
+                            "frame_rate": "10/1",
+                            "video_codec": "h264",
+                            "audio_codec": None,
+                            "format_name": "mp4",
+                        },
+                    ),
+                    (
+                        second_path,
+                        {
+                            "duration_seconds": 2.0,
+                            "width": 320,
+                            "height": 180,
+                            "frame_rate": "20/1",
+                            "video_codec": "h264",
+                            "audio_codec": None,
+                            "format_name": "mp4",
+                        },
+                    ),
+                )
+            )
+            project.set_frame_rate_policy(
+                FrameRatePolicy(
+                    choice="custom",
+                    custom_rate="30/1",
+                    target_rate="30/1",
+                )
+            )
+            expected = ExportPlan(
+                route="fallback",
+                source=first_path,
+                destination=root / "edited.mp4",
+                segments=tuple(project.timeline.segment_items),
+                expected_duration_seconds=4.0,
+                reason="shared mixed plan",
+            )
+
+            with (
+                patch(
+                    "resolve_editor.operations.probe_media",
+                    side_effect=(
+                        make_probe(root),
+                        make_probe(root),
+                    ),
+                ),
+                patch(
+                    "resolve_editor.operations.ensure_project_audio_analysis",
+                    return_value={},
+                ),
+                patch(
+                    "resolve_editor.operations.plan_mixed_export",
+                    return_value=expected,
+                ) as plan,
+            ):
+                actual = plan_project_export(
+                    project,
+                    root / "edited.mp4",
+                )
+
+            self.assertEqual(actual, expected)
+            self.assertNotIn("policy", plan.call_args.kwargs)
 
 
 if __name__ == "__main__":

@@ -28,7 +28,21 @@ resolve-editor relink PROJECT --source SOURCE_ID --path SOURCE
 resolve-editor duration PROJECT
 resolve-editor save PROJECT [--output PROJECT]
 resolve-editor reopen PROJECT
-resolve-editor export PROJECT --output VIDEO
+resolve-editor set-fps-policy PROJECT --choice {lowest,highest,custom,60} \
+  [--custom-fps FPS] [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND]
+resolve-editor set-upscale-policy PROJECT \
+  (--enable-upscale|--disable-upscale) [--upscale-model MODEL] \
+  [--upscale-backend BACKEND]
+resolve-editor export-plan PROJECT [--output VIDEO] \
+  [--fps-choice {lowest,highest,custom,60}] [--custom-fps FPS] \
+  [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND] \
+  [--upscale-enhancement|--no-upscale-enhancement] \
+  [--upscale-model MODEL] [--upscale-backend BACKEND]
+resolve-editor export PROJECT --output VIDEO \
+  [--fps-choice {lowest,highest,custom,60}] [--custom-fps FPS] \
+  [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND] \
+  [--upscale-enhancement|--no-upscale-enhancement] \
+  [--upscale-model MODEL] [--upscale-backend BACKEND]
 ```
 
 The same commands can be run from the repository with
@@ -54,6 +68,8 @@ Inspection and mutation commands include a `project` object containing:
   placement, block state, deletion state, display color, visual transform, and
   triplicate group state;
 - source duration, playhead, edited duration, and active/deleted counts;
+- persisted frame-rate and orientation-aware upscale policies, including
+  per-source eligibility decisions;
 - conservative exportability state.
 
 Repeated inspection of unchanged inputs is byte-equivalent. Explicit delete
@@ -98,7 +114,19 @@ Local paths are reduced to basenames by default. `--full-paths` explicitly
 opts into absolute project, source, and output paths. Stable IDs and media
 metadata are still emitted when paths are redacted. Export rejects a
 destination that resolves to the project file so the saved edit state cannot
-be replaced by media output.
+be replaced by media output. `export-plan` resolves a collision-safe
+destination when no output is supplied and never starts media processing.
+Both export commands accept the persisted frame-rate policy choices: lowest
+input FPS, highest input FPS, a positive rational custom FPS, or 60 FPS.
+Frame-rate enhancement remains disabled by default, while upscale enhancement
+is enabled by default for eligible sources. Upscale enhancement can be
+disabled per export or persisted with `set-upscale-policy`; eligible
+landscape sources have a short side of at most 1000 pixels and
+eligible portrait sources have a short side of at most 720 pixels. The default
+SuperUltraCompact restoration runs before spatial preparation and never
+downscales an eligible source. Export results include the normalized policies,
+per-source eligibility decisions, stage estimates, and verified output
+metadata.
 
 Export writes structured JSON Lines progress events with
 `command: "export.progress"` and `event: "progress"` before the final
@@ -112,19 +140,26 @@ Every project export uses the fixed 1920x1080 project canvas. Inputs that do
 not match it are contain-scaled and letterboxed through the established
 fallback render profile; a one-source input may use stream copy only when it
 already matches the project canvas. Source codec/container differences do not
-select a different delivery profile, and 60 FPS enhancement is outside
-contract version 1.
+select a different delivery profile.
 
 Focused composition edits use a versioned segment-owned transform on the fixed
-1920x1080 canvas. Zoom is bounded to `1.0..8.0`; X and Y offsets are bounded to
-`-960..960` and `-540..540` canvas pixels. Interactive CLI/UI values are
-clamped to those bounds. Mismatched sources are contain-scaled without
-stretching. Triplicate mode stores one linked group with exactly `center`,
-`left`, and `right` instances, renders them in that order over a black
-background, and applies one shared transform to all three. Focused or
-triplicate segments always use the verified fallback render route; they are
-never silently stream-copied.
+1920x1080 canvas. Zoom is bounded to `1.0..8.0`; X and Y offsets use the
+zoom-dependent bounds `±(1920 * (zoom - 1) / 2)` and
+`±(1080 * (zoom - 1) / 2)` canvas pixels. For example, 2x allows
+`±960`/`±540`, while 4x allows `±2880`/`±1620`. Interactive CLI/UI values are
+clamped to those bounds. The triplicate renderer also allows `±640` horizontal
+X selection at the default `1.0x` zoom because each instance crops a
+640-pixel-wide column; Y remains `0` at that zoom. Mismatched sources are
+contain-scaled without stretching. Triplicate mode stores one linked group
+with exactly `center`, `left`, and `right` instances, renders them in that
+order over a black background, and applies one shared transform to all three
+while preserving the contain/letterbox source geometry. Focused or triplicate
+segments always use the verified fallback render route; they are never
+silently stream-copied.
 
 The contract is versioned by `contract_version`. Additive fields preserve the
 current version; incompatible changes require a new version and an explicit
-migration or compatibility decision.
+migration or compatibility decision. The frame-rate and upscale policies are
+persisted in the versioned project JSON by `set-fps-policy` and
+`set-upscale-policy`, then reused by GUI, CLI, and export planning; these
+additive commands and fields remain within contract version 1.

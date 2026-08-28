@@ -1,0 +1,1444 @@
+{
+  "schema_version": 2,
+  "ticket": "TICKET-078",
+  "benchmark": "cross-model-restoration",
+  "status": "passedWithConcerns",
+  "readiness": "pending_user_validation",
+  "run": {
+    "completed": "2026-08-27",
+    "artifact_root": "~/Documents/edit/restoration-cross-model-20260827-480p-4x15s",
+    "source_label": "user-provided 480p video",
+    "source_path": "<source path redacted>",
+    "source_sha256": "acf6420455324e66d9c68d644888c3cb2977282d609d514d80c169c9918a7d2f",
+    "fixture_sha256": "14766a26edbeda1846e2deb070f5597764f4bd521049338b169cfaa77d5cb690",
+    "adapter_fixture_sha256": "ae082d5a977350d0a07a154d1105ea38ec843d8d9bdc552b9cec5f6a5096b96e",
+    "video2x_padded_fixture_sha256": "7442463a3d1a5e0e3e04b1315f723ab8901071a062166bb9b6ade54f92bf5723"
+  },
+  "fixture": {
+    "source": {
+      "duration_seconds": 853.64375,
+      "dimensions": "924x520",
+      "fps": "24000/1001",
+      "frame_count": 20466,
+      "video_codec": "hevc",
+      "pixel_format": "yuv420p",
+      "audio": {
+        "codec": "aac",
+        "sample_rate": 48000,
+        "channels": 2
+      }
+    },
+    "selected": {
+      "path": "fixture/fixture-60s.mp4",
+      "duration_seconds": 59.893167,
+      "dimensions": "924x520",
+      "fps": "24000/1001",
+      "frame_count": 1436,
+      "video_codec": "h264",
+      "pixel_format": "yuv420p",
+      "audio": {
+        "codec": "aac",
+        "sample_rate": 48000,
+        "channels": 2
+      },
+      "sha256": "14766a26edbeda1846e2deb070f5597764f4bd521049338b169cfaa77d5cb690"
+    },
+    "selection": {
+      "seed": 770,
+      "window_seconds": 15.0,
+      "window_count": 4,
+      "windows": [
+        {
+          "index": 1,
+          "start_seconds": 221.253,
+          "end_seconds": 236.253
+        },
+        {
+          "index": 2,
+          "start_seconds": 485.997,
+          "end_seconds": 500.997
+        },
+        {
+          "index": 3,
+          "start_seconds": 591.568,
+          "end_seconds": 606.568
+        },
+        {
+          "index": 4,
+          "start_seconds": 806.857,
+          "end_seconds": 821.857
+        }
+      ]
+    },
+    "neural_adapter": {
+      "path": "neural/fixture-480x270.mp4",
+      "dimensions": "480x270",
+      "fps": "24000/1001",
+      "frame_count": 1436,
+      "duration_seconds": 59.893167,
+      "sha256": "ae082d5a977350d0a07a154d1105ea38ec843d8d9bdc552b9cec5f6a5096b96e"
+    },
+    "video2x_padded": {
+      "path": "neural/fixture-480x270-video-padded.mp4",
+      "dimensions": "480x270",
+      "fps": "24000/1001",
+      "frame_count": 1438,
+      "duration_seconds": 59.976583,
+      "purpose": "duplicate one endpoint frame before and after Video2X processing because the wrapper drops two boundary frames",
+      "sha256": "7442463a3d1a5e0e3e04b1315f723ab8901071a062166bb9b6ade54f92bf5723"
+    }
+  },
+  "protocol": {
+    "source_frame_rate_policy": "native; no interpolation",
+    "target_dimensions": "1920x1080",
+    "scale_policy": "contain with centered letterbox",
+    "video_codec": "h264",
+    "video_pixel_format": "yuv420p",
+    "audio_policy": "preserve source audio; AAC 48 kHz stereo",
+    "container": "mp4",
+    "quality_metrics": {
+      "status": "unavailable",
+      "reason": "no clean aligned reference exists for this real-world fixture"
+    },
+    "visual_review_timestamps_seconds": [
+      7.0,
+      22.0,
+      37.0,
+      52.0
+    ],
+    "output_contract": {
+      "duration_tolerance_seconds": 0.25,
+      "required_frame_count": 1436,
+      "required_fps": "24000/1001",
+      "required_audio": "aac/48000 Hz/2 channels"
+    }
+  },
+  "environment": {
+    "platform": "Linux-7.2.0-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7",
+    "ffmpeg": "n9.0.1",
+    "ffprobe": "n9.0.1",
+    "gpu": "NVIDIA GeForce RTX 5070 Ti",
+    "rve": "PyTorch 2.10.0+cu128; CUDA; float16",
+    "basicvsr": "MMagic 1.2.0 isolated adapter",
+    "video2x": "6.4.0; ncnn/Vulkan; Vulkan device 0"
+  },
+  "summary": {
+    "candidate_rows": 24,
+    "passed": 17,
+    "failed": 0,
+    "unavailable": 4,
+    "excluded_license": 1,
+    "not_comparable": 2,
+    "completed_output_artifacts": 18,
+    "verified_outputs": 18,
+    "contact_sheets": 18,
+    "native_rve_runs": 9,
+    "adapter_runs": 3,
+    "objective_quality_scores": 0
+  },
+  "candidates": [
+    {
+      "id": "ffmpeg-lanczos-control",
+      "name": "Lanczos control",
+      "category": "control",
+      "status": "passed",
+      "run_ids": [
+        "ffmpeg-lanczos-control"
+      ],
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "id": "ffmpeg-hqdn3d-mild",
+      "name": "FFmpeg hqdn3d mild",
+      "category": "classical",
+      "status": "passed",
+      "run_ids": [
+        "ffmpeg-hqdn3d-mild"
+      ],
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "id": "ffmpeg-hqdn3d-strong",
+      "name": "FFmpeg hqdn3d strong",
+      "category": "classical",
+      "status": "passed",
+      "run_ids": [
+        "ffmpeg-hqdn3d-strong"
+      ],
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "id": "ffmpeg-atadenoise",
+      "name": "FFmpeg atadenoise",
+      "category": "classical",
+      "status": "passed",
+      "run_ids": [
+        "ffmpeg-atadenoise"
+      ],
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "id": "ffmpeg-deblock-strong",
+      "name": "FFmpeg deblock strong",
+      "category": "classical",
+      "status": "passed",
+      "run_ids": [
+        "ffmpeg-deblock-strong"
+      ],
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "id": "ffmpeg-cleanup-unsharp",
+      "name": "FFmpeg cleanup plus mild unsharp",
+      "category": "classical",
+      "status": "passed",
+      "run_ids": [
+        "ffmpeg-cleanup-unsharp"
+      ],
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "id": "rve-deh264-superultracompact",
+      "name": "RVE DeH264 SuperUltraCompact",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-deh264-superultracompact"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-deh264-rtmosr",
+      "name": "RVE DeH264 RTMoSR",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-deh264-rtmosr"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-deh264-span",
+      "name": "RVE DeH264 SPAN",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-deh264-span"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-deh264-plksr",
+      "name": "RVE DeH264 PLKSR",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-deh264-plksr"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-dncnn",
+      "name": "RVE DnCNN",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-dncnn"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-drunet",
+      "name": "RVE DRUNET",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-drunet"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-scunet",
+      "name": "RVE SCUNet",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-scunet"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-nafnet-deblur",
+      "name": "RVE NAFNet deblur",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-nafnet-deblur"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "rve-realisticvideo-upscale",
+      "name": "RVE RealisticVideo upscale",
+      "category": "native-rve",
+      "status": "passed",
+      "run_ids": [
+        "rve-realisticvideo-upscale"
+      ],
+      "license": "upstream RVE and model terms"
+    },
+    {
+      "id": "topaz-gaia",
+      "name": "Topaz Video AI Gaia",
+      "category": "commercial",
+      "status": "unavailable",
+      "reason": "no licensed local Topaz Video AI installation or Gaia executable was discovered",
+      "license": "proprietary commercial"
+    },
+    {
+      "id": "nomos2",
+      "name": "Nomos2",
+      "category": "single-frame-model",
+      "status": "unavailable",
+      "reason": "required executable, Python module, or model weight was not found in the configured local search scope",
+      "license": "unverified until the exact checkpoint is identified"
+    },
+    {
+      "id": "nomos2-4x-otf-esrgan",
+      "name": "4xNomos2_otf_esrgan",
+      "category": "single-frame-model",
+      "status": "unavailable",
+      "reason": "required executable, Python module, or model weight was not found in the configured local search scope",
+      "license": "unverified until the exact checkpoint is identified"
+    },
+    {
+      "id": "edvr",
+      "name": "EDVR",
+      "category": "temporal-model",
+      "status": "excluded-license",
+      "reason": "exact checkpoint and upstream license terms are unresolved; execution is not permitted by the benchmark contract",
+      "license": "unverified"
+    },
+    {
+      "id": "basicvsr",
+      "name": "BasicVSR",
+      "category": "temporal-model",
+      "status": "passed",
+      "run_ids": [
+        "basicvsr-reds4"
+      ],
+      "license": "Apache-2.0 code; checkpoint terms require verification",
+      "comparison_note": "480x270 input adapter; not a native-resolution ranking"
+    },
+    {
+      "id": "basicvsr-plus-plus",
+      "name": "BasicVSR++",
+      "category": "temporal-model",
+      "status": "not-comparable",
+      "reason": "MMagic was present, but no pinned BasicVSR++ checkpoint and adapter were configured",
+      "license": "Apache-2.0 code; checkpoint terms require verification"
+    },
+    {
+      "id": "tecogan",
+      "name": "TecoGAN",
+      "category": "temporal-model",
+      "status": "unavailable",
+      "reason": "required executable, Python module, or model weight was not found in the configured local search scope",
+      "license": "unverified"
+    },
+    {
+      "id": "realesrgan-x4plus",
+      "name": "RealESRGAN x4plus",
+      "category": "single-frame-model",
+      "status": "not-comparable",
+      "reason": "Video2X supplied a local RealESRGAN runtime, but no separate direct video-frame adapter was configured",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "id": "video2x-realesrgan",
+      "name": "Video2X wrapper (RealESRGAN)",
+      "category": "wrapper-runtime",
+      "status": "passed",
+      "run_ids": [
+        "video2x-realesr-animevideov3",
+        "video2x-realesrgan-plus"
+      ],
+      "selected_run_id": "video2x-realesr-animevideov3",
+      "license": "AGPL-3.0-or-later for Video2X; RealESRGAN model terms separate",
+      "comparison_note": "one wrapper row with a fast documented model and a heavier baseline; filtering/upscale only"
+    }
+  ],
+  "runs": [
+    {
+      "id": "ffmpeg-lanczos-control",
+      "candidate_id": "ffmpeg-lanczos-control",
+      "configuration": {
+        "filter": "scale=flags=lanczos",
+        "input_dimensions": "924x520",
+        "target_dimensions": "1920x1080",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "preset": "p5",
+          "cq": 18
+        }
+      },
+      "timing": {
+        "cold_seconds": 5.2067,
+        "warm_runs_seconds": [
+          5.0795,
+          5.2457
+        ],
+        "warm_median_seconds": 5.1626,
+        "warm_spread_seconds": 0.1662,
+        "processed_source_fps": 275.798,
+        "real_time_factor": 11.503
+      },
+      "resources": {
+        "cpu_user_seconds": 6.7699,
+        "cpu_system_seconds": 0.8164,
+        "peak_rss_kb": 1147564,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 21,
+          "average_utilization_percent": 7.38,
+          "peak_utilization_percent": 9.0,
+          "peak_memory_mb": 1114.0,
+          "average_power_watts": 58.71,
+          "peak_power_watts": 66.31
+        },
+        "raw_artifacts": "logs/ffmpeg-lanczos-control-cold.log; logs/ffmpeg-lanczos-control-warm-01.log; logs/ffmpeg-lanczos-control-warm-02.log"
+      },
+      "output": {
+        "path": "outputs/ffmpeg-lanczos-control.mp4",
+        "sha256": "4abfcfe2fbd225fb9c40306efd3b89aaf18c4608b6e1ba23ecfc1e60f5092bc5",
+        "size_bytes": 79108721,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 10566643,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/ffmpeg-lanczos-control.jpg"
+      }
+    },
+    {
+      "id": "ffmpeg-hqdn3d-mild",
+      "candidate_id": "ffmpeg-hqdn3d-mild",
+      "configuration": {
+        "filter": "hqdn3d=1.5:1.5:6:6",
+        "input_dimensions": "924x520",
+        "target_dimensions": "1920x1080",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "preset": "p5",
+          "cq": 18
+        }
+      },
+      "timing": {
+        "cold_seconds": 5.4798,
+        "warm_runs_seconds": [
+          5.3548,
+          5.4837
+        ],
+        "warm_median_seconds": 5.41925,
+        "warm_spread_seconds": 0.1289,
+        "processed_source_fps": 262.053,
+        "real_time_factor": 10.93
+      },
+      "resources": {
+        "cpu_user_seconds": 8.8621,
+        "cpu_system_seconds": 0.8249,
+        "peak_rss_kb": 1148476,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 21,
+          "average_utilization_percent": 7.36,
+          "peak_utilization_percent": 9.0,
+          "peak_memory_mb": 1114.0,
+          "average_power_watts": 59.49,
+          "peak_power_watts": 66.88
+        },
+        "raw_artifacts": "logs/ffmpeg-hqdn3d-mild-cold.log; logs/ffmpeg-hqdn3d-mild-warm-01.log; logs/ffmpeg-hqdn3d-mild-warm-02.log"
+      },
+      "output": {
+        "path": "outputs/ffmpeg-hqdn3d-mild.mp4",
+        "sha256": "fd90ed441e8c7ecbdafcb50f82ea044ed895f1589d2386e774962cd036cdfe76",
+        "size_bytes": 77881748,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 10402755,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/ffmpeg-hqdn3d-mild.jpg"
+      }
+    },
+    {
+      "id": "ffmpeg-hqdn3d-strong",
+      "candidate_id": "ffmpeg-hqdn3d-strong",
+      "configuration": {
+        "filter": "hqdn3d=3:2:12:8",
+        "input_dimensions": "924x520",
+        "target_dimensions": "1920x1080",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "preset": "p5",
+          "cq": 18
+        }
+      },
+      "timing": {
+        "cold_seconds": 5.4842,
+        "warm_runs_seconds": [
+          5.3502,
+          5.4962
+        ],
+        "warm_median_seconds": 5.4232,
+        "warm_spread_seconds": 0.146,
+        "processed_source_fps": 261.843,
+        "real_time_factor": 10.921
+      },
+      "resources": {
+        "cpu_user_seconds": 8.9287,
+        "cpu_system_seconds": 0.7993,
+        "peak_rss_kb": 1149176,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 21,
+          "average_utilization_percent": 7.68,
+          "peak_utilization_percent": 9.0,
+          "peak_memory_mb": 1036.0,
+          "average_power_watts": 60.23,
+          "peak_power_watts": 67.22
+        },
+        "raw_artifacts": "logs/ffmpeg-hqdn3d-strong-cold.log; logs/ffmpeg-hqdn3d-strong-warm-01.log; logs/ffmpeg-hqdn3d-strong-warm-02.log"
+      },
+      "output": {
+        "path": "outputs/ffmpeg-hqdn3d-strong.mp4",
+        "sha256": "2cb8753701b602fa89ff3ee9a05f82a0c35690d663ca87b35325b3874918e9c3",
+        "size_bytes": 76121080,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 10167581,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/ffmpeg-hqdn3d-strong.jpg"
+      }
+    },
+    {
+      "id": "ffmpeg-atadenoise",
+      "candidate_id": "ffmpeg-atadenoise",
+      "configuration": {
+        "filter": "atadenoise=0a=0.02:0b=0.04:1a=0.02:1b=0.04",
+        "input_dimensions": "924x520",
+        "target_dimensions": "1920x1080",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "preset": "p5",
+          "cq": 18
+        }
+      },
+      "timing": {
+        "cold_seconds": 5.3084,
+        "warm_runs_seconds": [
+          5.187,
+          5.3277
+        ],
+        "warm_median_seconds": 5.25735,
+        "warm_spread_seconds": 0.1407,
+        "processed_source_fps": 270.515,
+        "real_time_factor": 11.283
+      },
+      "resources": {
+        "cpu_user_seconds": 9.1133,
+        "cpu_system_seconds": 0.9264,
+        "peak_rss_kb": 1149308,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 21,
+          "average_utilization_percent": 8.19,
+          "peak_utilization_percent": 11.0,
+          "peak_memory_mb": 1036.0,
+          "average_power_watts": 59.55,
+          "peak_power_watts": 67.9
+        },
+        "raw_artifacts": "logs/ffmpeg-atadenoise-cold.log; logs/ffmpeg-atadenoise-warm-01.log; logs/ffmpeg-atadenoise-warm-02.log"
+      },
+      "output": {
+        "path": "outputs/ffmpeg-atadenoise.mp4",
+        "sha256": "a159a3340a8205ec26148c2d816726d02df85d72b20acf1465253ae083c7baa2",
+        "size_bytes": 81888087,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 10937887,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/ffmpeg-atadenoise.jpg"
+      }
+    },
+    {
+      "id": "ffmpeg-deblock-strong",
+      "candidate_id": "ffmpeg-deblock-strong",
+      "configuration": {
+        "filter": "deblock=filter=strong:block=8",
+        "input_dimensions": "924x520",
+        "target_dimensions": "1920x1080",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "preset": "p5",
+          "cq": 18
+        }
+      },
+      "timing": {
+        "cold_seconds": 5.3993,
+        "warm_runs_seconds": [
+          5.3001,
+          5.404
+        ],
+        "warm_median_seconds": 5.35205,
+        "warm_spread_seconds": 0.1039,
+        "processed_source_fps": 265.96,
+        "real_time_factor": 11.093
+      },
+      "resources": {
+        "cpu_user_seconds": 7.4491,
+        "cpu_system_seconds": 0.7614,
+        "peak_rss_kb": 1150040,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 21,
+          "average_utilization_percent": 7.68,
+          "peak_utilization_percent": 9.0,
+          "peak_memory_mb": 1036.0,
+          "average_power_watts": 61.74,
+          "peak_power_watts": 68.73
+        },
+        "raw_artifacts": "logs/ffmpeg-deblock-strong-cold.log; logs/ffmpeg-deblock-strong-warm-01.log; logs/ffmpeg-deblock-strong-warm-02.log"
+      },
+      "output": {
+        "path": "outputs/ffmpeg-deblock-strong.mp4",
+        "sha256": "18d933bbbf310915ca473cd8dee4373cd1a6a8faab6477a6a301efcbb6d84a83",
+        "size_bytes": 83694756,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 11179205,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/ffmpeg-deblock-strong.jpg"
+      }
+    },
+    {
+      "id": "ffmpeg-cleanup-unsharp",
+      "candidate_id": "ffmpeg-cleanup-unsharp",
+      "configuration": {
+        "filter": "hqdn3d=1.5:1.5:6:6,deblock=filter=weak:block=8,unsharp=5:5:0.35:5:5:0",
+        "input_dimensions": "924x520",
+        "target_dimensions": "1920x1080",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "preset": "p5",
+          "cq": 18
+        }
+      },
+      "timing": {
+        "cold_seconds": 5.8066,
+        "warm_runs_seconds": [
+          5.6924,
+          5.8578
+        ],
+        "warm_median_seconds": 5.7751,
+        "warm_spread_seconds": 0.1654,
+        "processed_source_fps": 247.305,
+        "real_time_factor": 10.315
+      },
+      "resources": {
+        "cpu_user_seconds": 15.239,
+        "cpu_system_seconds": 0.8498,
+        "peak_rss_kb": 1150284,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 21,
+          "average_utilization_percent": 7.48,
+          "peak_utilization_percent": 11.0,
+          "peak_memory_mb": 1036.0,
+          "average_power_watts": 58.95,
+          "peak_power_watts": 66.11
+        },
+        "raw_artifacts": "logs/ffmpeg-cleanup-unsharp-cold.log; logs/ffmpeg-cleanup-unsharp-warm-01.log; logs/ffmpeg-cleanup-unsharp-warm-02.log"
+      },
+      "output": {
+        "path": "outputs/ffmpeg-cleanup-unsharp.mp4",
+        "sha256": "03f106d6e67b2a28d7172c202abaca5bb08cef4f576533e6c90fbd14a74995e3",
+        "size_bytes": 90650696,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 12108318,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/ffmpeg-cleanup-unsharp.jpg"
+      }
+    },
+    {
+      "id": "rve-deh264-superultracompact",
+      "candidate_id": "rve-deh264-superultracompact",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "deH264_SuperUltraCompact.safetensors",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 7.7172,
+        "normalization_seconds": 5.1638,
+        "end_to_end_seconds": 12.881,
+        "processed_source_fps": 186.078,
+        "real_time_factor": 4.65,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 49.2317,
+        "cpu_system_seconds": 5.6636,
+        "peak_rss_kb": 1756348,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 28,
+          "average_utilization_percent": 52.71,
+          "peak_utilization_percent": 86.0,
+          "peak_memory_mb": 1289.0,
+          "average_power_watts": 181.63,
+          "peak_power_watts": 274.32
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-deh264-superultracompact-rve.log; neural/rve-native/logs/rve-deh264-superultracompact-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-deh264-superultracompact.mp4",
+        "sha256": "d369942fd43b2052719b03354ddabdbac87a149c7ea2762dd5d528c201877942",
+        "size_bytes": 73955255,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 9871415,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-deh264-superultracompact.jpg"
+      }
+    },
+    {
+      "id": "rve-deh264-rtmosr",
+      "candidate_id": "rve-deh264-rtmosr",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "1xDeH264_RTMoSR.pth",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 92.2245,
+        "normalization_seconds": 5.1748,
+        "end_to_end_seconds": 97.3993,
+        "processed_source_fps": 15.571,
+        "real_time_factor": 0.615,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 123.0424,
+        "cpu_system_seconds": 8.388,
+        "peak_rss_kb": 2385236,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 342,
+          "average_utilization_percent": 94.71,
+          "peak_utilization_percent": 100.0,
+          "peak_memory_mb": 2183.0,
+          "average_power_watts": 269.1,
+          "peak_power_watts": 282.23
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-deh264-rtmosr-rve.log; neural/rve-native/logs/rve-deh264-rtmosr-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-deh264-rtmosr.mp4",
+        "sha256": "cc3e8c3d2e272a442655774d0ede8ad3f8c53c534bb0d3d6db26e4122b3a9cbc",
+        "size_bytes": 74817237,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 9986471,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-deh264-rtmosr.jpg"
+      }
+    },
+    {
+      "id": "rve-deh264-span",
+      "candidate_id": "rve-deh264-span",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "1x_DeH264_SPAN.safetensors",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 47.5528,
+        "normalization_seconds": 5.1467,
+        "end_to_end_seconds": 52.6995,
+        "processed_source_fps": 30.198,
+        "real_time_factor": 1.137,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 78.6435,
+        "cpu_system_seconds": 6.4676,
+        "peak_rss_kb": 2385236,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 176,
+          "average_utilization_percent": 92.8,
+          "peak_utilization_percent": 99.0,
+          "peak_memory_mb": 2301.0,
+          "average_power_watts": 245.99,
+          "peak_power_watts": 260.03
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-deh264-span-rve.log; neural/rve-native/logs/rve-deh264-span-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-deh264-span.mp4",
+        "sha256": "c5a061ef35071b112f2b913d5a672a284ba8a63e6d3c0b31ed4b73a4f2fbecce",
+        "size_bytes": 73650950,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 9830797,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-deh264-span.jpg"
+      }
+    },
+    {
+      "id": "rve-deh264-plksr",
+      "candidate_id": "rve-deh264-plksr",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "1xDeH264_realplksr.pth",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 515.33,
+        "normalization_seconds": 5.1864,
+        "end_to_end_seconds": 520.5164,
+        "processed_source_fps": 2.787,
+        "real_time_factor": 0.115,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 550.4989,
+        "cpu_system_seconds": 25.1712,
+        "peak_rss_kb": 2385236,
+        "gpu": {
+          "samples": 1927,
+          "average_utilization_percent": 99.26,
+          "peak_utilization_percent": 100.0,
+          "peak_memory_mb": 1729.0,
+          "average_power_watts": 195.65,
+          "peak_power_watts": 197.59
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-deh264-plksr-rve.log; neural/rve-native/logs/rve-deh264-plksr-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-deh264-plksr.mp4",
+        "sha256": "da701165a0ca4ffcd4d27ee02452269bedd9a9b714bbbf7f47223d5d1ca8df33",
+        "size_bytes": 84352984,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 11259285,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-deh264-plksr.jpg"
+      }
+    },
+    {
+      "id": "rve-dncnn",
+      "candidate_id": "rve-dncnn",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "dncnn_color_blind.pth",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 35.9062,
+        "normalization_seconds": 5.1849,
+        "end_to_end_seconds": 41.0911,
+        "processed_source_fps": 39.993,
+        "real_time_factor": 1.458,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 66.9086,
+        "cpu_system_seconds": 5.7357,
+        "peak_rss_kb": 2385236,
+        "gpu": {
+          "samples": 133,
+          "average_utilization_percent": 90.56,
+          "peak_utilization_percent": 98.0,
+          "peak_memory_mb": 1355.0,
+          "average_power_watts": 253.58,
+          "peak_power_watts": 272.13
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-dncnn-rve.log; neural/rve-native/logs/rve-dncnn-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-dncnn.mp4",
+        "sha256": "5decf2854931bf6e859d34c6bfd0792265c0c07b2be242017ba74bff1620e727",
+        "size_bytes": 79752672,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 10645244,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-dncnn.jpg"
+      }
+    },
+    {
+      "id": "rve-drunet",
+      "candidate_id": "rve-drunet",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "drunet_color.pth",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 67.9246,
+        "normalization_seconds": 5.3016,
+        "end_to_end_seconds": 73.2262,
+        "processed_source_fps": 21.141,
+        "real_time_factor": 0.818,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 129.662,
+        "cpu_system_seconds": 7.5798,
+        "peak_rss_kb": 2385236,
+        "gpu": {
+          "samples": 252,
+          "average_utilization_percent": 93.17,
+          "peak_utilization_percent": 99.0,
+          "peak_memory_mb": 1707.0,
+          "average_power_watts": 280.42,
+          "peak_power_watts": 294.15
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-drunet-rve.log; neural/rve-native/logs/rve-drunet-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-drunet.mp4",
+        "sha256": "4c8e2cd13cf048b68062243022f23edb3b755bf42a701f2aaae0f96d32df3016",
+        "size_bytes": 67699004,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 9036342,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-drunet.jpg"
+      }
+    },
+    {
+      "id": "rve-scunet",
+      "candidate_id": "rve-scunet",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "scunet_color_real_psnr.pth",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 163.381,
+        "normalization_seconds": 5.143,
+        "end_to_end_seconds": 168.5239,
+        "processed_source_fps": 8.789,
+        "real_time_factor": 0.355,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 194.4245,
+        "cpu_system_seconds": 11.4037,
+        "peak_rss_kb": 2436688,
+        "gpu": {
+          "samples": 607,
+          "average_utilization_percent": 97.4,
+          "peak_utilization_percent": 99.0,
+          "peak_memory_mb": 2023.0,
+          "average_power_watts": 261.71,
+          "peak_power_watts": 266.92
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-scunet-rve.log; neural/rve-native/logs/rve-scunet-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-scunet.mp4",
+        "sha256": "26a9f8b457ed3fa79725d5e865b6bfd847d8055dd5b4391fc177d8130ddd7d71",
+        "size_bytes": 70489219,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 9408774,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-scunet.jpg"
+      }
+    },
+    {
+      "id": "rve-nafnet-deblur",
+      "candidate_id": "rve-nafnet-deblur",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "nafnet_gopro1x.pth",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none"
+      },
+      "timing": {
+        "cold_model_stage_seconds": 33.379,
+        "normalization_seconds": 5.1962,
+        "end_to_end_seconds": 38.5753,
+        "processed_source_fps": 43.021,
+        "real_time_factor": 1.553,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 73.5611,
+        "cpu_system_seconds": 5.8322,
+        "peak_rss_kb": 2436688,
+        "gpu": {
+          "samples": 124,
+          "average_utilization_percent": 85.74,
+          "peak_utilization_percent": 99.0,
+          "peak_memory_mb": 1533.0,
+          "average_power_watts": 241.17,
+          "peak_power_watts": 273.13
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-nafnet-deblur-rve.log; neural/rve-native/logs/rve-nafnet-deblur-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-nafnet-deblur.mp4",
+        "sha256": "94cefa07c80845f95095f9fb9f5880db8e31c1fbfbedb82e00b5b186a6fa3bb5",
+        "size_bytes": 102742009,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 13713819,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-nafnet-deblur.jpg"
+      }
+    },
+    {
+      "id": "rve-realisticvideo-upscale",
+      "candidate_id": "rve-realisticvideo-upscale",
+      "configuration": {
+        "runtime": "REAL-Video-Enhancer",
+        "model": "realesr-general-x4v3.pth",
+        "backend": "pytorch",
+        "device": "cuda:0",
+        "precision": "float16",
+        "input_dimensions": "924x520",
+        "model_stage_encoder": "libx264",
+        "final_encoder": "h264_nvenc",
+        "scene_detection": "none",
+        "scale": 2
+      },
+      "timing": {
+        "cold_model_stage_seconds": 69.0455,
+        "normalization_seconds": 5.3348,
+        "end_to_end_seconds": 74.3802,
+        "processed_source_fps": 20.798,
+        "real_time_factor": 0.805,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 190.5808,
+        "cpu_system_seconds": 10.6357,
+        "peak_rss_kb": 2436688,
+        "gpu": {
+          "samples": 255,
+          "average_utilization_percent": 88.84,
+          "peak_utilization_percent": 94.0,
+          "peak_memory_mb": 1567.0,
+          "average_power_watts": 261.07,
+          "peak_power_watts": 271.89
+        },
+        "raw_artifacts": "neural/rve-native/rve-native-results.json; neural/rve-native/logs/rve-realisticvideo-upscale-rve.log; neural/rve-native/logs/rve-realisticvideo-upscale-normalize.log"
+      },
+      "output": {
+        "path": "neural/rve-native/outputs/rve-realisticvideo-upscale.mp4",
+        "sha256": "e7589d233a4450dbd32b70dbb58ec511696ccd585592c46aeea948155b8dc",
+        "size_bytes": 83198729,
+        "duration_seconds": 59.934875,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 11105217,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/rve-realisticvideo-upscale.jpg"
+      }
+    },
+    {
+      "id": "basicvsr-reds4",
+      "candidate_id": "basicvsr",
+      "configuration": {
+        "runtime": "MMagic 1.2.0 isolated adapter",
+        "checkpoint": "basicvsr_20120409-0e599677.pth",
+        "device": "cuda",
+        "input_dimensions": "480x270",
+        "target_dimensions": "1920x1080",
+        "chunk_frames": 15,
+        "chunks": 96,
+        "temporal": true
+      },
+      "timing": {
+        "setup_seconds": 0.1939,
+        "inference_seconds": 92.4503,
+        "post_inference_pipeline_seconds": 22.0464,
+        "end_to_end_seconds": 114.690588,
+        "processed_source_fps": 15.533,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu": "not captured by the temporary runner",
+        "peak_rss": "not captured by the temporary runner",
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 514,
+          "average_utilization_percent": 72.94,
+          "peak_utilization_percent": 100.0,
+          "peak_memory_mb": 5496.0,
+          "average_power_watts": 221.13,
+          "peak_power_watts": 282.03
+        },
+        "raw_artifacts": "neural/basicvsr/basicvsr-reds4-60s-report.json; neural/basicvsr/basicvsr-reds4-60s.log; neural/basicvsr/gpu-telemetry.csv; neural/basicvsr/wall-time.txt"
+      },
+      "output": {
+        "path": "neural/basicvsr/basicvsr-reds4-60s.mp4",
+        "sha256": "2851e7db526a985f169652bc335bd65301f521b73298506dda6442a2f7877fea",
+        "size_bytes": 90899754,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 12141585,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/basicvsr.jpg"
+      }
+    },
+    {
+      "id": "video2x-realesr-animevideov3",
+      "candidate_id": "video2x-realesrgan",
+      "configuration": {
+        "runtime": "Video2X 6.4.0",
+        "backend": "ncnn/Vulkan",
+        "device": 0,
+        "model": "realesr-animevideov3",
+        "mode": "filtering/upscale only",
+        "scaling_factor": 4,
+        "input": "neural/fixture-480x270-video-padded.mp4 (1438 frames)",
+        "decode": "software (hwaccel=none)",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "cq": 18,
+          "preset": "p5",
+          "max_b_frames": 0
+        },
+        "audio_remux": "source AAC stream copied after processing; no -shortest"
+      },
+      "timing": {
+        "stage_wall_seconds": 18.840092,
+        "reported_processing_fps": 79.78,
+        "wall_processed_source_fps": 76.22,
+        "remux_seconds": 0.130248,
+        "end_to_end_seconds": 18.97034,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 5.589,
+        "cpu_system_seconds": 4.927,
+        "peak_rss": "not captured",
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 140,
+          "average_utilization_percent": 29.81,
+          "peak_utilization_percent": 59.0,
+          "peak_memory_mb": 1499.0,
+          "average_power_watts": 101.18,
+          "peak_power_watts": 174.02
+        },
+        "raw_artifacts": "neural/video2x/animevideov3/video2x.log; neural/video2x/animevideov3/gpu-telemetry.csv; neural/video2x/animevideov3/wall-time.txt; neural/video2x/animevideov3/remux-wall-time.txt"
+      },
+      "output": {
+        "stage_path": "neural/video2x/animevideov3/video2x-realesr-animevideov3-x4-stage.mp4",
+        "path": "neural/video2x/animevideov3/video2x-realesr-animevideov3-x4-comparable.mp4",
+        "sha256": "f3ab2ab10642df81bc9b067ef3b0b5b6e694e3a3a8d1d4a0d4693e9d18e7bfed",
+        "size_bytes": 106521482,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 14228198,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/video2x-realesr-animevideov3.jpg"
+      }
+    },
+    {
+      "id": "video2x-realesrgan-plus",
+      "candidate_id": "video2x-realesrgan",
+      "configuration": {
+        "runtime": "Video2X 6.4.0",
+        "backend": "ncnn/Vulkan",
+        "device": 0,
+        "model": "realesrgan-plus",
+        "mode": "filtering/upscale only",
+        "scaling_factor": 4,
+        "input": "neural/fixture-480x270-video-padded.mp4 (1438 frames)",
+        "decode": "software (hwaccel=none)",
+        "encoder": "h264_nvenc",
+        "encoder_options": {
+          "cq": 18,
+          "preset": "p5",
+          "max_b_frames": 0
+        },
+        "audio_remux": "source AAC stream copied after processing; no -shortest"
+      },
+      "timing": {
+        "stage_wall_seconds": 308.185434,
+        "reported_processing_fps": 4.68,
+        "wall_processed_source_fps": 4.66,
+        "remux_seconds": 0.127346,
+        "end_to_end_seconds": 308.31278,
+        "warm_runs": []
+      },
+      "resources": {
+        "cpu_user_seconds": 37.04,
+        "cpu_system_seconds": 4.669,
+        "peak_rss": "not captured",
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "samples": 1299,
+          "average_utilization_percent": 83.25,
+          "peak_utilization_percent": 97.0,
+          "peak_memory_mb": 2543.0,
+          "average_power_watts": 248.19,
+          "peak_power_watts": 266.02
+        },
+        "raw_artifacts": "neural/video2x/realesrgan-plus/video2x.log; neural/video2x/realesrgan-plus/gpu-telemetry.csv; neural/video2x/realesrgan-plus/wall-time.txt; neural/video2x/realesrgan-plus/remux-wall-time.txt"
+      },
+      "output": {
+        "stage_path": "neural/video2x/realesrgan-plus/video2x-realesrgan-plus-x4-stage.mp4",
+        "path": "neural/video2x/realesrgan-plus/video2x-realesrgan-plus-x4-comparable.mp4",
+        "sha256": "4211da53b47dd156d658eb29878b1023467424e435f91bee48a83d331226da9a",
+        "size_bytes": 119642542,
+        "duration_seconds": 59.893167,
+        "dimensions": "1920x1080",
+        "fps": "24000/1001",
+        "frame_count": 1436,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "audio": "aac/48000 Hz/2 channels",
+        "bitrate": 15980793,
+        "verification": "passed",
+        "playability": "passed",
+        "contact_sheet": "contact-sheets/video2x-realesrgan-plus.jpg"
+      }
+    }
+  ],
+  "integrity": {
+    "source_preservation": {
+      "status": "passed",
+      "source_hash_before": "acf6420455324e66d9c68d644888c3cb2977282d609d514d80c169c9918a7d2f",
+      "source_hash_after_runs": "acf6420455324e66d9c68d644888c3cb2977282d609d514d80c169c9918a7d2f",
+      "unchanged": true,
+      "artifact": "source-preservation.json"
+    },
+    "output_contract": {
+      "status": "passed",
+      "verified_count": 18,
+      "failed_count": 0,
+      "artifact": "neural/completed-output-verification.json"
+    },
+    "contact_sheets": {
+      "status": "passed",
+      "count": 18,
+      "timestamps_seconds": [
+        7.0,
+        22.0,
+        37.0,
+        52.0
+      ],
+      "directory": "contact-sheets/"
+    },
+    "temporary_artifacts": {
+      "status": "passed",
+      "partial_outputs_remaining": false,
+      "boundary_failure_fixed": "Video2X's initial -shortest remux dropped one final video frame; final artifacts were remuxed without -shortest and reverified"
+    }
+  },
+  "artifacts": {
+    "machine_report": "benchmarks/results/ticket-078-480p-4x15s.json",
+    "human_report": "benchmarks/results/ticket-078-480p-4x15s.md",
+    "external_root": "~/Documents/edit/restoration-cross-model-20260827-480p-4x15s",
+    "primary_matrix_report": "restoration-cross-model.json",
+    "availability_csv": "candidate-availability.csv",
+    "selection": "fixture/selection.json",
+    "source_preservation": "source-preservation.json",
+    "verification": "neural/completed-output-verification.json",
+    "contact_sheets": "contact-sheets/",
+    "raw_rve_results": "neural/rve-native/rve-native-results.json",
+    "raw_basicvsr_results": "neural/basicvsr/basicvsr-reds4-60s-report.json",
+    "raw_video2x_logs": "neural/video2x/"
+  },
+  "limitations": [
+    "This is one real-world fixture on one RTX 5070 Ti workstation; results are not universal hardware claims.",
+    "The RVE, BasicVSR, and Video2X configurations solve different restoration problems and are not a single quality-equivalent model family.",
+    "BasicVSR and both Video2X runs use a 480x270 adapter; they are not native 924x520 neural rankings.",
+    "The faster Video2X realesr-animevideov3 model is not a quality-equivalent acceleration of the heavier realesrgan-plus model.",
+    "No clean aligned reference exists, so PSNR/SSIM and an objective quality winner are unavailable.",
+    "CPU peak RSS was not captured by the temporary BasicVSR and Video2X runners; GPU telemetry and available CPU timing are retained."
+  ],
+  "recommendation": {
+    "status": "bounded_pending_user_visual_review",
+    "speed_candidates": [
+      {
+        "run_id": "video2x-realesr-animevideov3",
+        "reason": "fastest completed external wrapper configuration",
+        "reported_processing_fps": 79.78,
+        "wall_processed_source_fps": 76.22
+      },
+      {
+        "run_id": "rve-deh264-superultracompact",
+        "reason": "fastest native RVE model-stage run",
+        "processed_source_fps": 186.078
+      }
+    ],
+    "review_first": [
+      "rve-deh264-superultracompact",
+      "rve-nafnet-deblur",
+      "rve-deh264-span",
+      "basicvsr-reds4",
+      "video2x-realesr-animevideov3",
+      "video2x-realesrgan-plus",
+      "ffmpeg-lanczos-control"
+    ],
+    "quality_claim": "none until the supplied contact sheets and outputs are visually reviewed at the fixed timestamps"
+  }
+}

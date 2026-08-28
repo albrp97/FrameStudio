@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+import threading
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .app_helpers import _metadata_float, format_audio_decisions
-from .export import resolve_output_policy
+from .app_helpers import _metadata_float, editing_is_locked, format_audio_decisions
+from .export import OutputPolicy, resolve_output_policy
 from .ffmpeg_playback import FfmpegComposedPlaybackBackend, FfmpegPlaybackBackend
 from .media import MediaProbeError
-from .model import Project, ProjectValidationError
+from .model import Project, ProjectValidationError, Segment, SourceReference
 from .operations import (
     analyze_project_audio,
     create_project_from_source,
@@ -17,6 +18,134 @@ from .operations import (
 )
 from .persistence import ProjectPersistenceError, load_project, save_project
 from .playback import PlaybackController, PlaybackState
+
+
+def _schedule_on_main(glib: Any | None, callback: Callable[..., bool], *args: Any) -> None:
+    if glib is None:
+        callback(*args)
+        return
+    glib.idle_add(callback, *args)
+
+
+def _source_load_progress(
+    window: Any,
+    generation: int,
+    index: int,
+    total: int,
+    phase: str,
+) -> bool:
+    if generation != getattr(window, "_source_load_generation", generation):
+        return False
+    if phase == "probe":
+        percentage = round(index * 50 / total)
+    else:
+        percentage = 50 + round(index * 50 / total)
+    window._set_status(f"Loading clip {index}/{total} ({percentage}%)")
+    return False
+
+
+def _build_source_project(
+    selected_paths: tuple[Path, ...],
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> Project:
+    if len(selected_paths) == 1:
+        return create_project_from_source(
+            selected_paths[0],
+            progress_callback=progress_callback,
+        )
+    return create_project_from_sources(
+        selected_paths,
+        progress_callback=progress_callback,
+    )
+
+
+def _load_source_blocking(window: Any, selected_paths: tuple[Path, ...]) -> bool:
+    try:
+        project = _build_source_project(selected_paths)
+        analyze_project_audio(project)
+    except (MediaProbeError, ProjectValidationError) as error:
+        window._show_error(str(error))
+        return False
+    attach_project(window, project, None)
+    names = ", ".join(path.name for path in selected_paths)
+    window._set_status(f"Loaded source video(s): {names} (project not saved)")
+    return False
+
+
+def _load_source_worker(
+    window: Any,
+    selected_paths: tuple[Path, ...],
+    generation: int,
+    glib: Any,
+) -> None:
+    total = len(selected_paths)
+
+    def report_progress(index: int, _phase_total: int, phase: str) -> None:
+        _schedule_on_main(
+            glib,
+            _source_load_progress,
+            window,
+            generation,
+            index,
+            total,
+            phase,
+        )
+
+    try:
+        project = _build_source_project(
+            selected_paths,
+            progress_callback=report_progress,
+        )
+        analyze_project_audio(
+            project,
+            progress_callback=report_progress,
+        )
+    except (MediaProbeError, ProjectValidationError, ValueError) as error:
+        _schedule_on_main(
+            glib,
+            _finish_source_load,
+            window,
+            generation,
+            selected_paths,
+            None,
+            str(error),
+        )
+        return
+    _schedule_on_main(
+        glib,
+        _finish_source_load,
+        window,
+        generation,
+        selected_paths,
+        project,
+        None,
+    )
+
+
+def _finish_source_load(
+    window: Any,
+    generation: int,
+    selected_paths: tuple[Path, ...],
+    project: Project | None,
+    error_message: str | None,
+) -> bool:
+    if generation != getattr(window, "_source_load_generation", generation):
+        return False
+    try:
+        if project is None:
+            window._show_error(error_message or "Source loading failed")
+            return False
+        try:
+            attach_project(window, project, None)
+        except (MediaProbeError, ProjectValidationError, ValueError) as error:
+            window._show_error(str(error))
+            return False
+        names = ", ".join(path.name for path in selected_paths)
+        window._set_status(f"Loaded source video(s): {names} (project not saved)")
+        return False
+    finally:
+        window._source_load_in_progress = False
+        window._update_segment_controls()
 
 
 def _create_backend_callbacks(window: Any) -> tuple[Any, Any, Any, Any]:
@@ -28,7 +157,7 @@ def _create_backend_callbacks(window: Any) -> tuple[Any, Any, Any, Any]:
 
     def on_frame(frame) -> None:
         if is_current():
-            window._on_frame(frame)
+            window._on_frame(frame, generation)
 
     def on_error(message: str) -> None:
         if is_current():
@@ -45,7 +174,34 @@ def _create_backend_callbacks(window: Any) -> tuple[Any, Any, Any, Any]:
     return on_frame, on_error, on_end, on_warning
 
 
+def _create_composed_preview_backend(
+    sources: Sequence[SourceReference],
+    active_segments: Sequence[Segment],
+    policy: OutputPolicy,
+    frame_rate: float,
+    duration_seconds: float,
+    callbacks: tuple[Any, Any, Any, Any],
+    audio_decisions: Mapping[str, Any],
+) -> FfmpegComposedPlaybackBackend:
+    on_frame, on_error, on_end, on_warning = callbacks
+    return FfmpegComposedPlaybackBackend(
+        tuple((source.source_id, Path(source.path)) for source in sources),
+        active_segments,
+        policy.width,
+        policy.height,
+        frame_rate,
+        duration_seconds,
+        on_frame,
+        on_error,
+        on_end,
+        audio_decisions=audio_decisions,
+        on_warning=on_warning,
+    )
+
+
 def save_to(window: Any, path: Path) -> None:
+    if editing_is_locked(window):
+        return
     if window.project is None:
         return
     if window.controller is not None:
@@ -66,26 +222,47 @@ def save_to(window: Any, path: Path) -> None:
     window._set_status(f"Saved editor project: {destination.name}")
 
 
-def load_source(window: Any, paths: Path | Sequence[Path]) -> bool:
+def load_source(
+    window: Any,
+    paths: Path | Sequence[Path],
+    glib: Any | None = None,
+) -> bool:
+    if editing_is_locked(window):
+        return False
     selected_paths = (
         (Path(paths),) if isinstance(paths, Path) else tuple(Path(path) for path in paths)
     )
-    try:
-        if len(selected_paths) == 1:
-            project = create_project_from_source(selected_paths[0])
-        else:
-            project = create_project_from_sources(selected_paths)
-        analyze_project_audio(project)
-    except (MediaProbeError, ProjectValidationError) as error:
-        window._show_error(str(error))
+    if not selected_paths:
+        window._show_error("At least one source is required")
         return False
-    attach_project(window, project, None)
-    names = ", ".join(path.name for path in selected_paths)
-    window._set_status(f"Loaded source video(s): {names} (project not saved)")
+    if getattr(window, "_source_load_in_progress", False):
+        window._set_status("Source loading is already in progress")
+        return False
+    if glib is None:
+        return _load_source_blocking(window, selected_paths)
+    generation = int(getattr(window, "_source_load_generation", 0)) + 1
+    window._source_load_generation = generation
+    window._source_load_in_progress = True
+    window._set_status(f"Loading clip 1/{len(selected_paths)} (0%)")
+    window._update_segment_controls()
+    worker = threading.Thread(
+        target=_load_source_worker,
+        args=(window, selected_paths, generation, glib),
+        name="resolve-editor-source-loader",
+        daemon=True,
+    )
+    try:
+        worker.start()
+    except RuntimeError as error:
+        window._source_load_in_progress = False
+        window._update_segment_controls()
+        window._show_error(f"Could not start source loading: {error}")
     return False
 
 
 def load_project_path(window: Any, path: Path) -> bool:
+    if editing_is_locked(window):
+        return False
     try:
         project = load_project(path)
     except ProjectPersistenceError as error:
@@ -156,18 +333,14 @@ def attach_project(
     window.timeline_canvas.set_sensitive(True)
     window.audio_status_label.set_text(format_audio_decisions(project))
     if use_composed_preview:
-        window.backend = FfmpegComposedPlaybackBackend(
-            tuple((source.source_id, Path(source.path)) for source in sources),
+        window.backend = _create_composed_preview_backend(
+            sources,
             active_segments,
-            policy.width,
-            policy.height,
+            policy,
             window.source_frame_rate,
             window.segment_timeline.edited_duration_seconds,
-            on_frame,
-            on_error,
-            on_end,
-            audio_decisions=audio_decisions,
-            on_warning=on_warning,
+            (on_frame, on_error, on_end, on_warning),
+            audio_decisions,
         )
     else:
         window.backend = FfmpegPlaybackBackend(
@@ -227,33 +400,18 @@ def refresh_playback_backend(window: Any) -> None:
         window._show_error("Cannot preview an empty edit")
         window._update_playback_controls()
         return
-    if requires_composed_preview and window.segment_timeline.mixed_source:
-        window.backend = FfmpegComposedPlaybackBackend(
-            tuple((source.source_id, Path(source.path)) for source in sources),
-            active_segments,
-            policy.width,
-            policy.height,
-            window.source_frame_rate,
-            window.segment_timeline.edited_duration_seconds,
-            on_frame,
-            on_error,
-            on_end,
-            audio_decisions=audio_decisions,
-            on_warning=on_warning,
+    if requires_composed_preview:
+        composed_sources = (
+            sources if window.segment_timeline.mixed_source else (window.project.source,)
         )
-    elif requires_composed_preview:
-        window.backend = FfmpegComposedPlaybackBackend(
-            ((window.project.source.source_id, Path(window.project.source.path)),),
+        window.backend = _create_composed_preview_backend(
+            composed_sources,
             active_segments,
-            policy.width,
-            policy.height,
+            policy,
             window.source_frame_rate,
             window.segment_timeline.edited_duration_seconds,
-            on_frame,
-            on_error,
-            on_end,
-            audio_decisions=audio_decisions,
-            on_warning=on_warning,
+            (on_frame, on_error, on_end, on_warning),
+            audio_decisions,
         )
     else:
         window.backend = FfmpegPlaybackBackend(

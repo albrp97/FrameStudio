@@ -11,7 +11,8 @@ TIMELINE_HEIGHT = 124
 TIMELINE_RULER_HEIGHT = 34.0
 TIMELINE_TRACK_Y = 44.0
 TIMELINE_TRACK_HEIGHT = 54.0
-TIMELINE_MIN_ZOOM = 1.0
+TIMELINE_MIN_ZOOM = 0.5
+TIMELINE_DEFAULT_ZOOM = 1.0
 TIMELINE_MAX_ZOOM = 12.0
 SELECTED_CLIP_BORDER_COLOR = (
     246.0 / 255.0,
@@ -20,6 +21,8 @@ SELECTED_CLIP_BORDER_COLOR = (
     1.0,
 )
 TIMELINE_ZOOM_LEVELS = (
+    0.5,
+    0.75,
     1.0,
     1.25,
     1.5,
@@ -93,10 +96,7 @@ def timeline_pixels_per_second(
         1.0,
         viewport - TIMELINE_HORIZONTAL_PADDING * 2,
     )
-    return max(
-        usable_width / duration,
-        TIMELINE_MIN_PIXELS_PER_SECOND,
-    ) * clamp_timeline_zoom(zoom)
+    return (usable_width / duration) * clamp_timeline_zoom(zoom)
 
 
 def timeline_content_width(
@@ -111,9 +111,9 @@ def timeline_content_width(
         zoom,
     )
     return max(
-        viewport,
-        TIMELINE_HORIZONTAL_PADDING * 2
-        + _positive_float(duration_seconds, "Timeline duration") * pixels_per_second,
+        TIMELINE_HORIZONTAL_PADDING * 2,
+        _positive_float(duration_seconds, "Timeline duration") * pixels_per_second
+        + TIMELINE_HORIZONTAL_PADDING * 2,
     )
 
 

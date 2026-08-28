@@ -5,6 +5,7 @@ from resolve_editor.model import Segment, SegmentTimeline
 from resolve_editor.timeline import (
     SELECTED_CLIP_BORDER_COLOR,
     TimelineClipGeometry,
+    clamp_timeline_zoom,
     create_timeline_canvas,
     hit_test_timeline_segment,
     layout_timeline_segments,
@@ -160,7 +161,21 @@ class EditorTimelineTests(unittest.TestCase):
         self.assertEqual(fit_width, 600.0)
         self.assertGreater(zoomed_width, fit_width)
         self.assertEqual(next_timeline_zoom(1.0, 1), 1.25)
-        self.assertEqual(next_timeline_zoom(1.0, -1), 1.0)
+        self.assertEqual(next_timeline_zoom(1.0, -1), 0.75)
+        self.assertEqual(clamp_timeline_zoom(0.5), 0.5)
+        self.assertLess(
+            timeline_content_width(120.0, 600.0, 0.5),
+            timeline_content_width(120.0, 600.0, 1.0),
+        )
+
+    def test_default_zoom_fits_long_timelines_to_the_viewport(self):
+        self.assertEqual(timeline_content_width(120.0, 600.0, 1.0), 600.0)
+        self.assertEqual(timeline_content_width(3600.0, 600.0, 1.0), 600.0)
+        TimelineCanvas = create_timeline_canvas(FakeGtk)
+        canvas = TimelineCanvas()
+        canvas.set_viewport_width(600.0)
+        canvas.set_timeline(SegmentTimeline(120.0))
+        self.assertFalse(canvas.has_horizontal_overflow())
 
     def test_hit_testing_and_position_mapping_use_source_time(self):
         timeline = SegmentTimeline(60.0)

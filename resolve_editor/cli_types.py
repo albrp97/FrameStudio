@@ -35,6 +35,11 @@ CLI_COMMANDS = frozenset(
         "duration",
         "save",
         "export",
+        "export-plan",
+        "set-fps-policy",
+        "set-fps",
+        "set-upscale-policy",
+        "set-upscale",
     }
 )
 

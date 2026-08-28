@@ -50,7 +50,25 @@ def _normal_branch(
     transform: VisualTransform,
     width: int,
     height: int,
+    *,
+    preserve_resolution: bool = False,
+    content_width: int | None = None,
+    content_height: int | None = None,
 ) -> str:
+    if preserve_resolution:
+        if content_width is None or content_height is None:
+            raise ValueError("Preserve-resolution rendering requires content dimensions")
+        scaled_width = max(content_width, int(math.ceil(content_width * transform.zoom)))
+        scaled_height = max(content_height, int(math.ceil(content_height * transform.zoom)))
+        crop_width = min(scaled_width, width)
+        crop_height = min(scaled_height, height)
+        x, y = _crop_expression(transform)
+        return (
+            f"{input_label}scale={content_width}:{content_height},"
+            f"scale={scaled_width}:{scaled_height},"
+            f"crop={crop_width}:{crop_height}:x={x}:y={y},"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+        )
     scaled_width = max(width, int(math.ceil(width * transform.zoom)))
     scaled_height = max(height, int(math.ceil(height * transform.zoom)))
     x, y = _crop_expression(transform)
@@ -67,18 +85,43 @@ def _triplicate_branch(
     transform: VisualTransform,
     width: int,
     height: int,
+    *,
+    preserve_resolution: bool = False,
+    content_width: int | None = None,
+    content_height: int | None = None,
 ) -> str:
+    zoom = transform.zoom
     slot_width = width // 3
-    scaled_width = max(slot_width, int(math.ceil(slot_width * transform.zoom)))
-    scaled_height = max(height, int(math.ceil(height * transform.zoom)))
+    if preserve_resolution:
+        if content_width is None or content_height is None:
+            raise ValueError("Preserve-resolution rendering requires content dimensions")
+        scaled_width = max(content_width, int(math.ceil(content_width * zoom)))
+        scaled_height = max(content_height, int(math.ceil(content_height * zoom)))
+        crop_width = min(scaled_width, slot_width)
+        crop_height = min(scaled_height, height)
+        x, y = _crop_expression(transform)
+        return (
+            f"{input_label}scale={content_width}:{content_height},"
+            f"scale={scaled_width}:{scaled_height},"
+            f"crop={crop_width}:{crop_height}:x={x}:y={y},"
+            f"pad={slot_width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+        )
+    scaled_width = max(width, int(math.ceil(width * zoom)))
+    scaled_height = max(height, int(math.ceil(height * zoom)))
+    if math.isclose(zoom, 1.0):
+        triplicate_x_scale = 1.0
+    else:
+        triplicate_x_scale = (width * zoom - slot_width) / (width * (zoom - 1.0))
     x, y = _crop_expression(
         transform,
-        x_scale=slot_width / CANVAS_WIDTH,
+        x_scale=(width / CANVAS_WIDTH) * triplicate_x_scale,
         y_scale=height / CANVAS_HEIGHT,
     )
     return (
-        f"{input_label}scale={scaled_width}:{scaled_height}:"
-        "force_original_aspect_ratio=increase,"
+        f"{input_label}scale={width}:{height}:"
+        "force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        f"scale={scaled_width}:{scaled_height},"
         f"crop={slot_width}:{height}:x={x}:y={y},setsar=1"
     )
 
@@ -93,6 +136,9 @@ def segment_video_filters(
     frame_rate: float | str | None = None,
     source_start_seconds: float | None = None,
     source_duration_seconds: float | None = None,
+    preserve_resolution: bool = False,
+    content_width: int | None = None,
+    content_height: int | None = None,
 ) -> list[str]:
     """Build the shared video graph used by preview and export."""
     if width <= 0 or height <= 0:
@@ -113,6 +159,10 @@ def segment_video_filters(
         raise ValueError("Render source duration must be finite and greater than zero")
     if start_value + duration_value > segment.end_seconds + 1e-6:
         raise ValueError("Render source range must be within the segment")
+    if preserve_resolution and (
+        content_width is None or content_height is None or content_width <= 0 or content_height <= 0
+    ):
+        raise ValueError("Preserve-resolution rendering requires positive content dimensions")
     start = f"{start_value:.6f}"
     duration = f"{duration_value:.6f}"
     trim = f"{input_label}trim=start={start}:duration={duration},setpts=PTS-STARTPTS"
@@ -133,6 +183,9 @@ def segment_video_filters(
                     transform,
                     width,
                     height,
+                    preserve_resolution=preserve_resolution,
+                    content_width=content_width,
+                    content_height=content_height,
                 )
                 + role_label
             )
@@ -148,6 +201,9 @@ def segment_video_filters(
         segment.visual_transform,
         width,
         height,
+        preserve_resolution=preserve_resolution,
+        content_width=content_width,
+        content_height=content_height,
     )
     if rate is not None:
         normal += f",fps={rate}"

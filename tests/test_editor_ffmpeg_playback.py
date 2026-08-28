@@ -139,6 +139,119 @@ class FfmpegPlaybackTests(unittest.TestCase):
         finally:
             backend.close()
 
+    def test_playback_frame_delivery_is_atomic_with_process_invalidation(self):
+        callback_started = threading.Event()
+        release_callback = threading.Event()
+        invalidation_finished = threading.Event()
+        frames = []
+
+        def on_frame(frame):
+            frames.append(frame)
+            callback_started.set()
+            self.assertTrue(release_callback.wait(timeout=3))
+
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            on_frame,
+            lambda _message: None,
+            lambda: None,
+        )
+        process = object()
+        event = threading.Event()
+        backend._process = process
+        backend._playback_generation = 1
+        frame = VideoFrame(b"\0" * backend.frame_size, 16, 16, 0.1)
+
+        try:
+            delivery_thread = threading.Thread(
+                target=lambda: backend._deliver_playback_frame(
+                    process,
+                    event,
+                    1,
+                    frame,
+                    0.1,
+                ),
+            )
+            delivery_thread.start()
+            self.assertTrue(callback_started.wait(timeout=3))
+
+            def invalidate():
+                with backend._lock:
+                    backend._playback_generation += 1
+                    backend._process = None
+                    invalidation_finished.set()
+
+            invalidation_thread = threading.Thread(target=invalidate)
+            invalidation_thread.start()
+            self.assertFalse(invalidation_finished.wait(timeout=0.1))
+
+            release_callback.set()
+            delivery_thread.join(timeout=3)
+            invalidation_thread.join(timeout=3)
+
+            self.assertFalse(delivery_thread.is_alive())
+            self.assertFalse(invalidation_thread.is_alive())
+            self.assertEqual(len(frames), 1)
+        finally:
+            release_callback.set()
+            with backend._lock:
+                backend._process = None
+            backend.close()
+
+    def test_old_playback_cleanup_cannot_terminate_new_audio_generation(self):
+        class FakeProcess:
+            pid = 999999
+
+            def __init__(self):
+                self.terminated = False
+                self.waited = False
+
+            def poll(self):
+                return None if not self.terminated else 0
+
+            def terminate(self):
+                self.terminated = True
+
+            def kill(self):
+                self.terminated = True
+
+            def wait(self, timeout=None):
+                del timeout
+                self.waited = True
+                return 0
+
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+        )
+        new_audio = FakeProcess()
+        new_sink = FakeProcess()
+        backend._playback_generation = 2
+        backend._audio_process = new_audio
+        backend._audio_sink = new_sink
+
+        try:
+            backend._terminate_audio_preview(expected_generation=1)
+
+            self.assertFalse(new_audio.terminated)
+            self.assertFalse(new_sink.terminated)
+            self.assertIs(backend._audio_process, new_audio)
+            self.assertIs(backend._audio_sink, new_sink)
+        finally:
+            backend._audio_process = None
+            backend._audio_sink = None
+            backend.close()
+
     def test_seek_scales_and_letterboxes_into_requested_canvas(self):
         frames = []
         backend = FfmpegPlaybackBackend(
@@ -167,7 +280,8 @@ class FfmpegPlaybackTests(unittest.TestCase):
                 self.first_started = threading.Event()
                 self.release_first = threading.Event()
 
-            def _decode_preview_frame(self, position_seconds):
+            def _decode_preview_frame(self, position_seconds, generation=None):
+                del generation
                 if position_seconds == 0.1:
                     self.first_started.set()
                     self.release_first.wait(timeout=3)
@@ -203,6 +317,195 @@ class FfmpegPlaybackTests(unittest.TestCase):
                 deadline.wait(0.1)
 
             self.assertEqual([frame.position_seconds for frame in frames], [0.4])
+            self.assertEqual(backend.preview_stats()["stale_frames"], 1)
+        finally:
+            backend.close()
+
+    def test_preview_frame_delivery_is_atomic_with_generation_invalidation(self):
+        callback_started = threading.Event()
+        release_callback = threading.Event()
+        invalidation_finished = threading.Event()
+        frames = []
+
+        def on_frame(frame):
+            frames.append(frame)
+            callback_started.set()
+            self.assertTrue(release_callback.wait(timeout=3))
+
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            on_frame,
+            lambda _message: None,
+            lambda: None,
+        )
+        backend._preview_generation = 1
+        frame = VideoFrame(b"\0" * backend.frame_size, 16, 16, 0.1)
+
+        try:
+            delivery_thread = threading.Thread(
+                target=lambda: backend._deliver_preview_frame(
+                    1,
+                    0.1,
+                    None,
+                    frame,
+                ),
+            )
+            delivery_thread.start()
+            self.assertTrue(callback_started.wait(timeout=3))
+
+            def invalidate():
+                with backend._preview_condition:
+                    backend._preview_generation += 1
+                    invalidation_finished.set()
+
+            invalidation_thread = threading.Thread(target=invalidate)
+            invalidation_thread.start()
+            self.assertFalse(invalidation_finished.wait(timeout=0.1))
+
+            release_callback.set()
+            delivery_thread.join(timeout=3)
+            invalidation_thread.join(timeout=3)
+
+            self.assertFalse(delivery_thread.is_alive())
+            self.assertFalse(invalidation_thread.is_alive())
+            self.assertEqual(len(frames), 1)
+        finally:
+            release_callback.set()
+            backend.close()
+
+    def test_preview_cancellation_cannot_miss_process_registration(self):
+        process_started = threading.Event()
+        release_process = threading.Event()
+        cancellation_finished = threading.Event()
+
+        class FakeProcess:
+            pid = 1234
+            returncode = 0
+
+            def __init__(self):
+                self.killed = False
+
+            def communicate(self, timeout=None):
+                del timeout
+                return b"\0" * backend.frame_size, b""
+
+            def poll(self):
+                return None if not self.killed else -9
+
+            def kill(self):
+                self.killed = True
+
+            def wait(self, timeout=None):
+                del timeout
+                return self.returncode
+
+        process = FakeProcess()
+
+        def fake_popen(*_args, **_kwargs):
+            process_started.set()
+            self.assertTrue(release_process.wait(timeout=3))
+            return process
+
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            decode_result = []
+            with patch(
+                "resolve_editor.ffmpeg_playback.subprocess.Popen",
+                side_effect=fake_popen,
+            ):
+                decode_thread = threading.Thread(
+                    target=lambda: decode_result.append(
+                        backend._decode_preview_frame(0.1, generation=0)
+                    ),
+                )
+                decode_thread.start()
+                self.assertTrue(process_started.wait(timeout=3))
+
+                cancel_thread = threading.Thread(
+                    target=lambda: (
+                        backend._cancel_preview_requests(),
+                        cancellation_finished.set(),
+                    ),
+                )
+                cancel_thread.start()
+                self.assertFalse(cancellation_finished.wait(timeout=0.1))
+
+                release_process.set()
+                decode_thread.join(timeout=3)
+                cancel_thread.join(timeout=3)
+
+            self.assertFalse(decode_thread.is_alive())
+            self.assertFalse(cancel_thread.is_alive())
+            self.assertTrue(process.killed)
+            self.assertEqual(len(decode_result), 1)
+        finally:
+            backend.close()
+
+    def test_preview_communication_error_terminates_registered_process(self):
+        class FailingProcess:
+            pid = 1235
+            returncode = -1
+            stdout = None
+            stderr = None
+
+            def __init__(self):
+                self.killed = False
+                self.waited = False
+
+            def communicate(self, timeout=None):
+                del timeout
+                raise OSError("pipe closed")
+
+            def poll(self):
+                return -9 if self.killed else None
+
+            def kill(self):
+                self.killed = True
+
+            def wait(self, timeout=None):
+                del timeout
+                self.waited = True
+                return self.returncode
+
+        process = FailingProcess()
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            with (
+                patch(
+                    "resolve_editor.ffmpeg_playback.subprocess.Popen",
+                    return_value=process,
+                ),
+                self.assertRaisesRegex(PlaybackBackendError, "pipe closed"),
+            ):
+                backend._decode_preview_frame(0.1, generation=0)
+
+            self.assertTrue(process.killed)
+            self.assertTrue(process.waited)
+            self.assertIsNone(backend._preview_process)
         finally:
             backend.close()
 
@@ -231,6 +534,45 @@ class FfmpegPlaybackTests(unittest.TestCase):
             self.assertTrue(frame_ready.wait(timeout=3))
             self.assertEqual(len(frames[0].data), 16 * 16 * 4)
             self.assertAlmostEqual(frames[0].position_seconds, 0.2)
+        finally:
+            backend.close()
+
+    def test_repeated_preview_request_uses_bounded_frame_cache(self):
+        frames = []
+
+        class CountingBackend(FfmpegPlaybackBackend):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.decode_count = 0
+
+            def _decode_preview_frame(self, position_seconds, generation=None):
+                del generation
+                self.decode_count += 1
+                return super()._decode_preview_frame(position_seconds)
+
+        backend = CountingBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            frames.append,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            backend.request_preview(0.2)
+            deadline = time.monotonic() + 3
+            while len(frames) < 1 and time.monotonic() < deadline:
+                time.sleep(0.01)
+            backend.request_preview(0.201)
+
+            self.assertEqual(backend.decode_count, 1)
+            self.assertEqual(backend.preview_stats()["cache_hits"], 1)
+            self.assertEqual(len(frames), 2)
+            self.assertAlmostEqual(frames[-1].position_seconds, 0.201)
+            self.assertAlmostEqual(frames[-1].decoded_position_seconds, 0.2)
         finally:
             backend.close()
 
@@ -429,6 +771,62 @@ class FfmpegPlaybackTests(unittest.TestCase):
             self.assertGreater(len(frames), 1)
             self.assertEqual(errors, [])
             self.assertEqual(warnings, ["Audio output is unavailable"])
+        finally:
+            backend.close()
+
+    def test_composed_preview_cache_is_scoped_to_the_active_timeline_block(self):
+        class ComposedPreviewBackend(FfmpegComposedPlaybackBackend):
+            def _decode_preview_frame(self, position_seconds, generation=None):
+                del generation
+                plan, _optimized, _input_offsets = self._render_plan(position_seconds)
+                source_id = plan[0][0].source_id
+                value = 1 if source_id == "first" else 2
+                return VideoFrame(
+                    bytes([value]) * self.frame_size,
+                    self.width,
+                    self.height,
+                    position_seconds,
+                )
+
+        first = Segment.create(
+            0.0,
+            0.5,
+            source_id="first",
+            timeline_start_seconds=0.0,
+            timeline_end_seconds=0.5,
+        )
+        second = Segment.create(
+            0.0,
+            0.5,
+            source_id="second",
+            timeline_start_seconds=0.5,
+            timeline_end_seconds=1.0,
+        )
+        frames = []
+        backend = ComposedPreviewBackend(
+            (("first", self.source), ("second", self.source)),
+            (first, second),
+            16,
+            16,
+            10.0,
+            1.0,
+            frames.append,
+            lambda _message: None,
+            lambda: None,
+        )
+
+        try:
+            backend.request_preview(0.49)
+            deadline = time.monotonic() + 3
+            while len(frames) < 1 and time.monotonic() < deadline:
+                time.sleep(0.01)
+            backend.request_preview(0.51)
+            deadline = time.monotonic() + 3
+            while len(frames) < 2 and time.monotonic() < deadline:
+                time.sleep(0.01)
+
+            self.assertEqual(frames[-1].data, b"\x02" * backend.frame_size)
+            self.assertEqual(backend.preview_stats()["cache_hits"], 0)
         finally:
             backend.close()
 

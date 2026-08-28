@@ -273,6 +273,50 @@ def build_cli_parser() -> argparse.ArgumentParser:
     )
     export_parser.add_argument("project", type=Path)
     export_parser.add_argument("--output", type=Path, required=True)
+    export_parser.add_argument(
+        "--fps-choice",
+        choices=("lowest", "highest", "custom", "60"),
+        help="target frame-rate policy choice",
+    )
+    export_parser.add_argument("--custom-fps", help="positive rational custom target FPS")
+    enhancement_toggle = export_parser.add_mutually_exclusive_group()
+    enhancement_toggle.add_argument(
+        "--enhance-fps",
+        dest="enhance_fps",
+        action="store_true",
+        help="enable validated motion enhancement for eligible sources",
+    )
+    enhancement_toggle.add_argument(
+        "--no-enhance-fps",
+        dest="enhance_fps",
+        action="store_false",
+        help="disable motion enhancement",
+    )
+    export_parser.set_defaults(enhance_fps=None)
+    export_parser.add_argument("--fps-backend", help="FPS backend/profile identifier")
+    upscale_toggle = export_parser.add_mutually_exclusive_group()
+    upscale_toggle.add_argument(
+        "--upscale-enhancement",
+        dest="enhance_upscale",
+        action="store_true",
+        help="enable SuperUltraCompact restoration and orientation-aware upscaling",
+    )
+    upscale_toggle.add_argument(
+        "--no-upscale-enhancement",
+        dest="enhance_upscale",
+        action="store_false",
+        help="disable upscale enhancement",
+    )
+    export_parser.set_defaults(enhance_upscale=None)
+    export_parser.add_argument("--upscale-model", help="upscale model identifier")
+    export_parser.add_argument("--upscale-backend", help="upscale backend/profile identifier")
+    export_parser.add_argument(
+        "--plan-only",
+        "--dry-run",
+        dest="plan_only",
+        action="store_true",
+        help="show the validated export plan without starting media processing",
+    )
     export_parser.add_argument("--ffmpeg", default="ffmpeg")
     export_parser.add_argument("--ffprobe", default="ffprobe")
     export_parser.add_argument(
@@ -280,4 +324,105 @@ def build_cli_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="include absolute local paths in output",
     )
+    plan_parser = commands.add_parser(
+        "export-plan",
+        help="resolve an export plan without starting media processing",
+    )
+    plan_parser.add_argument("project", type=Path)
+    plan_parser.add_argument("--output", type=Path)
+    plan_parser.add_argument("--fps-choice", choices=("lowest", "highest", "custom", "60"))
+    plan_parser.add_argument("--custom-fps", help="positive rational custom target FPS")
+    plan_enhancement_toggle = plan_parser.add_mutually_exclusive_group()
+    plan_enhancement_toggle.add_argument(
+        "--enhance-fps",
+        dest="enhance_fps",
+        action="store_true",
+        help="enable validated motion enhancement for eligible sources",
+    )
+    plan_enhancement_toggle.add_argument(
+        "--no-enhance-fps",
+        dest="enhance_fps",
+        action="store_false",
+        help="disable motion enhancement",
+    )
+    plan_parser.set_defaults(enhance_fps=None)
+    plan_parser.add_argument("--fps-backend", help="FPS backend/profile identifier")
+    plan_upscale_toggle = plan_parser.add_mutually_exclusive_group()
+    plan_upscale_toggle.add_argument(
+        "--upscale-enhancement",
+        dest="enhance_upscale",
+        action="store_true",
+        help="enable SuperUltraCompact restoration and orientation-aware upscaling",
+    )
+    plan_upscale_toggle.add_argument(
+        "--no-upscale-enhancement",
+        dest="enhance_upscale",
+        action="store_false",
+        help="disable upscale enhancement",
+    )
+    plan_parser.set_defaults(enhance_upscale=None)
+    plan_parser.add_argument("--upscale-model", help="upscale model identifier")
+    plan_parser.add_argument("--upscale-backend", help="upscale backend/profile identifier")
+    plan_parser.add_argument("--ffmpeg", default="ffmpeg")
+    plan_parser.add_argument("--ffprobe", default="ffprobe")
+    plan_parser.add_argument("--full-paths", action="store_true")
+
+    fps_policy_parser = commands.add_parser(
+        "set-fps-policy",
+        aliases=("set-fps",),
+        help="persist the target frame-rate and enhancement policy",
+    )
+    fps_policy_parser.add_argument("project", type=Path)
+    fps_policy_parser.add_argument(
+        "--choice",
+        "--fps-choice",
+        dest="fps_choice",
+        choices=("lowest", "highest", "custom", "60"),
+        required=True,
+    )
+    fps_policy_parser.add_argument("--custom-fps", help="positive rational custom target FPS")
+    fps_policy_toggle = fps_policy_parser.add_mutually_exclusive_group()
+    fps_policy_toggle.add_argument(
+        "--enhance-fps",
+        dest="enhance_fps",
+        action="store_true",
+        help="enable validated motion enhancement for eligible sources",
+    )
+    fps_policy_toggle.add_argument(
+        "--no-enhance-fps",
+        dest="enhance_fps",
+        action="store_false",
+        help="disable motion enhancement",
+    )
+    fps_policy_parser.set_defaults(enhance_fps=None)
+    fps_policy_parser.add_argument("--fps-backend", default=None)
+    fps_policy_parser.add_argument("--output", type=Path)
+    fps_policy_parser.add_argument("--full-paths", action="store_true")
+    upscale_policy_parser = commands.add_parser(
+        "set-upscale-policy",
+        aliases=("set-upscale",),
+        help="persist the orientation-aware upscale enhancement policy",
+    )
+    upscale_policy_parser.add_argument("project", type=Path)
+    upscale_policy_toggle = upscale_policy_parser.add_mutually_exclusive_group(
+        required=True,
+    )
+    upscale_policy_toggle.add_argument(
+        "--enable",
+        "--enable-upscale",
+        dest="enhance_upscale",
+        action="store_true",
+        help="enable SuperUltraCompact restoration and upscaling",
+    )
+    upscale_policy_toggle.add_argument(
+        "--disable",
+        "--disable-upscale",
+        dest="enhance_upscale",
+        action="store_false",
+        help="disable upscale enhancement",
+    )
+    upscale_policy_parser.add_argument("--upscale-model", default=None)
+    upscale_policy_parser.add_argument("--upscale-backend", default=None)
+    upscale_policy_parser.add_argument("--output", type=Path)
+    upscale_policy_parser.add_argument("--full-paths", action="store_true")
     return parser

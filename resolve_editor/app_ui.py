@@ -14,10 +14,12 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     open_source = Gtk.Button(label="Select video(s)")
     open_source.connect("clicked", window._on_open_source_clicked)
     header.pack_start(open_source)
+    window.open_source_button = open_source
 
     open_project = Gtk.Button(label="Open project")
     open_project.connect("clicked", window._on_open_project_clicked)
     header.pack_start(open_project)
+    window.open_project_button = open_project
 
     export = Gtk.Button(label="Export video")
     export.connect("clicked", window._on_export_clicked)
@@ -28,10 +30,12 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     save = Gtk.Button(label="Save project")
     save.connect("clicked", window._on_save_clicked)
     header.pack_end(save)
+    window.save_button = save
 
     reopen = Gtk.Button(label="Reopen project")
     reopen.connect("clicked", window._on_reopen_clicked)
     header.pack_end(reopen)
+    window.reopen_button = reopen
 
     root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
     root.set_margin_top(12)
@@ -72,7 +76,9 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
         0.0,
     )
     window.focus_zoom_spin = Gtk.SpinButton.new(zoom_adjustment, 0.1, 2)
-    window.focus_zoom_spin.set_tooltip_text("Selected clip zoom (1.00x to 8.00x)")
+    window.focus_zoom_spin.set_tooltip_text(
+        "Selected clip zoom (1.00x to 8.00x); scroll up/down to adjust by 0.10x"
+    )
     window.focus_zoom_spin.connect("value-changed", window._on_focus_control_changed)
     composition_controls.append(Gtk.Label(label="Zoom"))
     composition_controls.append(window.focus_zoom_spin)
@@ -86,7 +92,9 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
         0.0,
     )
     window.focus_offset_x_spin = Gtk.SpinButton.new(offset_x_adjustment, 10.0, 0)
-    window.focus_offset_x_spin.set_tooltip_text("Selected clip horizontal focus offset")
+    window.focus_offset_x_spin.set_tooltip_text(
+        "Selected clip horizontal focus offset; scroll up/down by 10 pixels"
+    )
     window.focus_offset_x_spin.connect("value-changed", window._on_focus_control_changed)
     composition_controls.append(Gtk.Label(label="X"))
     composition_controls.append(window.focus_offset_x_spin)
@@ -100,7 +108,9 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
         0.0,
     )
     window.focus_offset_y_spin = Gtk.SpinButton.new(offset_y_adjustment, 10.0, 0)
-    window.focus_offset_y_spin.set_tooltip_text("Selected clip vertical focus offset")
+    window.focus_offset_y_spin.set_tooltip_text(
+        "Selected clip vertical focus offset; scroll up/down by 10 pixels"
+    )
     window.focus_offset_y_spin.connect("value-changed", window._on_focus_control_changed)
     composition_controls.append(Gtk.Label(label="Y"))
     composition_controls.append(window.focus_offset_y_spin)
@@ -126,6 +136,16 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     triplicate.connect("clicked", window._on_triplicate_clicked)
     composition_controls.append(triplicate)
     window.triplicate_button = triplicate
+
+    for field, control in (
+        ("zoom", window.focus_zoom_spin),
+        ("offset_x", window.focus_offset_x_spin),
+        ("offset_y", window.focus_offset_y_spin),
+    ):
+        scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
+        scroll.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        scroll.connect("scroll", window._on_focus_control_scroll, field)
+        control.add_controller(scroll)
 
     root.append(composition_controls)
 
@@ -226,11 +246,17 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     export_progress_label.set_xalign(0.0)
     export_progress_label.set_wrap(True)
     export_progress_panel.append(export_progress_label)
+    cancel_export = Gtk.Button(label="Cancel export")
+    cancel_export.set_halign(Gtk.Align.START)
+    cancel_export.set_visible(False)
+    cancel_export.connect("clicked", window._on_cancel_export_clicked)
+    export_progress_panel.append(cancel_export)
     export_progress_panel.set_visible(False)
     root.append(export_progress_panel)
     window.export_progress_panel = export_progress_panel
     window.export_progress_bar = export_progress_bar
     window.export_progress_label = export_progress_label
+    window.cancel_export_button = cancel_export
 
     window.status_label = Gtk.Label(label="Select source video(s) or open a project file")
     window.status_label.set_xalign(0.0)

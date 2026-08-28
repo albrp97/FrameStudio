@@ -99,7 +99,14 @@ resolve-editor clean-focus ~/Videos/source.resolve.json --segment SEGMENT_ID
 resolve-editor relink ~/Videos/mixed.resolve.json --source SOURCE_ID \
   --path ~/Videos/relocated.mp4
 resolve-editor duration ~/Videos/source.resolve.json
-resolve-editor export ~/Videos/source.resolve.json --output ~/Videos/edited.mp4
+resolve-editor set-fps-policy ~/Videos/source.resolve.json --choice 60 \
+  --enhance-fps --fps-backend ffmpeg-minterpolate
+resolve-editor set-upscale-policy ~/Videos/source.resolve.json \
+  --enable-upscale --upscale-model SuperUltraCompact \
+  --upscale-backend rve-restoration
+resolve-editor export-plan ~/Videos/source.resolve.json
+resolve-editor export ~/Videos/source.resolve.json --output ~/Videos/edited.mp4 \
+  --upscale-enhancement
 ```
 
 Use `--full-paths` only when automation needs local paths; output redacts them
@@ -107,6 +114,10 @@ by default. Export emits structured progress events followed by a verified
 final result. The complete contract is documented in
 [`docs/specs/cli-contract.md`](docs/specs/cli-contract.md). From the
 repository, use `make cli ARGS="inspect /absolute/path/to/project.resolve.json"`.
+
+Upscale enhancement is enabled by default for eligible sources. The export
+panel and CLI still expose an explicit opt-out with `--no-upscale-enhancement`;
+`set-upscale-policy --disable-upscale` persists that choice for the project.
 
 The simplest workflow is to start the editor first and choose media inside the
 interface:
@@ -173,9 +184,16 @@ after validation. Empty edits are rejected.
 
 For a non-1080p input, fixed-canvas scaling requires the fallback render path.
 The established render profile owns the output container, codecs, audio, and
-pixel format; source codec/container differences do not change it. Current
-frame-rate handling is deterministic and 60-FPS enhancement remains a later
-capability.
+pixel format; source codec/container differences do not change it. New export
+plans default to 60 FPS with enhancement enabled; explicit saved project
+settings remain authoritative. The export panel names the lowest and highest
+input-rate choices, shows the edited duration, estimated processing time, and
+estimated output size, and reports the selected interpolation backend. If the
+preferred RVE environment is unavailable, a validated FFmpeg interpolation
+fallback is selected when the media is eligible. A single compatible, uncut
+source can publish its verified interpolation result directly; cuts, mixed
+sources, visual changes, incompatible media, and audio normalization retain the
+safe fallback render path.
 
 ### Makefile shortcuts
 
@@ -190,10 +208,45 @@ make editor ARGS="--source /absolute/path/to/video.mp4"
 make editor ARGS="--project /absolute/path/to/project.resolve.json"
 make cli ARGS="inspect /absolute/path/to/project.resolve.json"
 make smoke
+make restoration-benchmark ARGS="--source /absolute/path/to/video.mp4"
 make test
 make check
 make quality
 ```
+
+The restoration benchmark is a research-only comparison of the versioned
+candidate matrix in `benchmarks/restoration_candidates.json`. It defaults to
+the existing TICKET-077 fixture when available, keeps unavailable or
+license-blocked candidates in the report, and writes uncommitted JSON,
+Markdown, CSV, command, log, and contact-sheet artifacts under
+`~/Documents/edit/restoration-cross-model-YYYYMMDD/`. Use
+`--fixture /path/to/fixture-45s.mp4` to reuse a specific fixture or
+`--source /path/to/video.mp4` to create the deterministic three-window
+fixture. Use `--segment-count 4` to create four deterministic 15-second
+windows, for example:
+
+```sh
+make restoration-benchmark ARGS="--source /path/to/video.mp4 --segment-count 4"
+```
+
+It does not download model weights, add production dependencies, or enable
+restoration in editor export. Runnable controls record one cold run and two
+warm runs by default; use `--warm-runs N` to change the repeat count.
+
+The Video2X benchmark configuration is pinned to release 6.4.0, ncnn/Vulkan,
+device 0, filtering/upscale-only mode, and the documented
+`realesr-animevideov3` model. The measured configuration uses `h264_nvenc`
+with `cq=18`, `preset=p5`, and `--max-b-frames 0`; the prior
+`realesrgan-plus` result remains in the report as a separate baseline. CUDA
+decode is not enabled because Video2X's frame conversion rejects CUDA input
+frames on this workstation.
+
+The completed four-window run against the requested real video is summarized
+in `benchmarks/results/ticket-078-480p-4x15s.json` and
+`benchmarks/results/ticket-078-480p-4x15s.md`. The output videos, raw logs,
+telemetry, and contact sheets remain in the external artifact directory
+`~/Documents/edit/restoration-cross-model-20260827-480p-4x15s/` so large
+generated media and private source data are not tracked in the repository.
 
 The `media`, `concat`, and `fps` targets keep the existing workflow scripts
 available, for example `make media ARGS="--dry-run --root ~/Videos"`.
@@ -390,7 +443,10 @@ Its RIFE 4.26 weights are the same as the validated local weights, and its
 unmodified TensorRT FP16 path reproduces the same grid artifact. The installed
 RVE checkout includes the PixelShuffle fallback, RGB/frame-pacing corrections,
 and exact output-FPS support validated on this RTX 5070 Ti. The older
-VapourSynth implementation remains available with `--engine vs-rife`.
+VapourSynth implementation remains available with `--engine vs-rife`. If the
+preferred RVE environment is unavailable, the unified and direct commands
+automatically use the validated FFmpeg `minterpolate` fallback; select it
+explicitly with `--engine ffmpeg-minterpolate`.
 
 Audio is analyzed per source before encoding. The default gain is chosen to
 balance mean RMS `-35 dBFS` and median absolute sample level `-50 dBFS`, with a
@@ -444,35 +500,48 @@ The single-tool production workflow is `resolve-concat`; the installed
 resolve-concat
 ```
 
-Select one video and it goes directly to RIFE: no concatenation and no audio
-transformation are performed; the original audio stream is copied into the
-final MP4. When multiple videos are selected, they are concatenated once with
-audio normalization disabled, then one global RIFE pass runs over the
-temporary master. Use `resolve-fps /path/to/video.mp4 --force` only when a
-separate FPS-only command is desired. Run `./install.sh` once to install both
+Select one video and it goes directly to the selected FPS backend: no
+concatenation and no audio transformation are performed; the original audio
+stream is copied into the final MP4. When multiple videos are selected, they
+are concatenated once with audio normalization disabled, then one global FPS
+enhancement pass runs over the temporary master. Use
+`resolve-fps /path/to/video.mp4 --force` only when a separate FPS-only command
+is desired. Run `./install.sh` once to install both
 commands into `~/bin`.
 
 During interpolation the console shows a live Pacman-style bar with percent,
 frame count, end-to-end pipeline FPS, elapsed time, and ETA. The displayed
 pipeline FPS includes decoding, RIFE, and delivery encoding; it is not the
 model-only inference FPS from the benchmark. The default backend is corrected
-REAL-Video-Enhancer RIFE 4.26; use `--engine vs-rife` for the VapourSynth
-fallback.
+REAL-Video-Enhancer RIFE 4.26; use `--engine vs-rife` for the VapourSynth path
+or `--engine ffmpeg-minterpolate` for the explicit FFmpeg fallback. When the
+default RVE prerequisites are missing, the command reports the reason and
+selects the FFmpeg fallback automatically.
 
 The RVE backend expects the validated local setup at these paths:
 
 ```text
-/tmp/REAL-Video-Enhancer
-/tmp/rve-models-pixel-fallback/rife4.26.pkl
-/tmp/rve-shims
+~/.cache/resolve-fps/trt/bin/python
+~/.cache/resolve-fps/REAL-Video-Enhancer
+~/.cache/resolve-fps/rve-models-pixel-fallback/rife4.26.pkl
+~/.cache/resolve-fps/rve-shims
 ```
 
 Override them with `--rve-root`, `--rve-model`, and `--rve-shims`, or set
-`RESOLVE_RVE_ROOT`, `RESOLVE_RVE_MODEL`, and `RESOLVE_RVE_SHIMS`. RVE's factor
-two output is padded or trimmed to the existing rational target-frame policy,
-so a 29.97-to-60 conversion preserves the timeline (for example, 900 input
-frames become 1,802 output frames). The adapter rejects unsupported
-non-near-integer factors instead of silently changing cadence.
+`RESOLVE_RVE_ROOT`, `RESOLVE_RVE_MODEL`, and `RESOLVE_RVE_SHIMS`. RVE output is
+padded or trimmed to the existing rational target-frame policy, so a
+29.97-to-60 conversion preserves the timeline (for example, 900 input frames
+become 1,802 output frames). Constant-frame-rate fractional conversions such
+as 23.976-to-60 use the next safe integer RVE oversampling pass and then
+normalize to the exact target rate with GPU NVENC. Variable-frame-rate input
+remains explicitly unsupported rather than silently changing cadence.
+
+On the RTX 5070 Ti, use a Blackwell-compatible runtime such as PyTorch
+2.10.0+cu128, Torch-TensorRT 2.10.0, and TensorRT 10.14.1.48.post1. Older
+CUDA/PyTorch builds can report that CUDA is available while failing to launch
+`sm_120` kernels; the RVE preflight executes a CUDA probe and falls back
+explicitly when that happens. The adapter also exposes the CUDA 13 and
+TensorRT shared-library directories bundled with the isolated runtime.
 
 Press `Ctrl+C` to cancel safely. The active FFmpeg/RIFE processes are stopped,
 the hidden `.partial` output is deleted, and any temporary multi-input master
@@ -487,8 +556,9 @@ the RVE temporary directories, and hidden `.partial` files if the machine is
 forcibly stopped.
 
 The validated strategy is a two-stage run. First create one compatible
-stream-copy master; then run one global RIFE 4.26 pass over that master. Do
-not run RIFE separately on each input clip, because resetting the 29.97-to-60
+stream-copy master; then run one global interpolation pass over that master
+using RVE when available or the explicit FFmpeg fallback otherwise. Do not run
+interpolation separately on each input clip, because resetting the 29.97-to-60
 cadence at every clip boundary is slower and can introduce timing drift.
 The integrated RVE path was 2.3x to 2.5x faster than the fallback on the
 one-clip/three-clip benchmark; exact measurements and caveats are recorded in
@@ -504,7 +574,8 @@ OUTPUT="$HOME/Documents/edit/copy-concatenated-rife4.26-60fps.mp4"
 resolve-concat "$INPUT_DIR" --concat-only --output "$MASTER" --mode auto \
   --audio-normalization off --performance-mode off --force
 
-# This is the normal integrated command; it concatenates once and uses RVE.
+# This is the normal integrated command; it concatenates once and uses RVE
+# when available, otherwise the validated FFmpeg fallback.
 resolve-concat "$INPUT_DIR" --engine rve --output "$OUTPUT" \
   --performance-mode auto --force
 ```

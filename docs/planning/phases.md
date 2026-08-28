@@ -8,7 +8,7 @@
 **Planning depth:** full
 **Approval:** user-approved on 2026-08-21 before feature generation
 **Owner:** repository planning; maintainer identity is not recorded
-**Last updated:** 2026-08-22
+**Last updated:** 2026-08-27
 **Repository revision:** working tree after approved lifecycle migration
 
 ## Purpose
@@ -36,6 +36,8 @@ implementation work.
    represent multiple sources, segments, selections, and output canvases.
 8. Add 60 FPS enhancement after timing, audio, output, and optional segment
    scope are explicit and testable.
+9. Optimize interactive preview and validate future media-processing choices
+   with measured target-workstation evidence before changing defaults.
 
 The first usable product is the combined outcome of PHASE-001 through
 PHASE-003. PHASE-004 onward is future expansion and must not be pulled into
@@ -52,7 +54,8 @@ the first horizon without approved scope change.
 | 4.5 | PHASE-004A | Stabilize editor architecture for future phases | CAP-012 | PHASE-004 | complete |
 | 5 | PHASE-005 | Balance sources and deliver consistent media | CAP-005, CAP-008, CAP-012 | PHASE-004A | complete |
 | 6 | PHASE-006 | Focus and compose important action | CAP-005, CAP-009, CAP-010, CAP-012 | PHASE-004A, PHASE-005 | complete |
-| 7 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | confirmed |
+| 7 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | complete |
+| 8 | PHASE-008 | Optimize responsive preview and select evidence-based media strategies | CAP-002, CAP-005, CAP-009, CAP-011, CAP-012 | PHASE-006, PHASE-007; target-workstation media and benchmark evidence | complete |
 
 ## Common Phase Rules
 
@@ -81,24 +84,25 @@ are closed; confirmed future phases remain open.
 | 4.5 | PHASE-004A | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-004A-stabilizing-editor-architecture.md` |
 | 6 | PHASE-005 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-005-balancing-sources-and-delivering-consistent-media.md` |
 | 7 | PHASE-006 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-006-focusing-and-composing-important-action.md` |
-| 8 | PHASE-007 | confirmed | OBJ-001, SCOPE-001 | `phases/open/PHASE-007-producing-validated-60-fps-edits.md` |
+| 8 | PHASE-007 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-007-producing-validated-60-fps-edits.md` |
+| 9 | PHASE-008 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md` |
 
 ## Capability Coverage
 
 | Capability | Covered phases | First-horizon coverage | Future coverage |
 |---|---|---|---|
 | CAP-001 | PHASE-001 | Import/source inspection | Extended mixed-source identity in PHASE-004 |
-| CAP-002 | PHASE-001, PHASE-004 | One-source playback and seek | Composed mixed-source preview |
+| CAP-002 | PHASE-001, PHASE-004, PHASE-008 | One-source playback and seek | Composed mixed-source preview and responsive cursor-driven preview |
 | CAP-003 | PHASE-002, PHASE-004 | Split/delete | Movement, multi-selection, copy/paste, expanded segment model |
 | CAP-004 | PHASE-001, PHASE-003 | Save/reopen | Future schema expansion |
-| CAP-005 | PHASE-002, PHASE-004, PHASE-005, PHASE-006, PHASE-007 | Fast verified cut export | Composition, audio, mixed-source, and FPS delivery |
+| CAP-005 | PHASE-002, PHASE-004, PHASE-005, PHASE-006, PHASE-007, PHASE-008 | Fast verified cut export | Composition, audio, mixed-source, FPS delivery, and measured rendering strategies |
 | CAP-006 | PHASE-003 | Basic agentable workflow | Future full editing command surface |
 | CAP-007 | PHASE-004 | Not included | Multiple mixed-media sources |
 | CAP-008 | PHASE-005 | Not included | Per-input audio handling |
-| CAP-009 | PHASE-006 | Not included | Reusable transforms |
+| CAP-009 | PHASE-006, PHASE-008 | Not included | Reusable transforms and direct focus interaction |
 | CAP-010 | PHASE-006 | Not included | Linked triplicate composition |
-| CAP-011 | PHASE-007 | Not included | Validated 60 FPS enhancement |
-| CAP-012 | PHASE-001 through PHASE-007, PHASE-004A | Source/project/output safety | Cross-cutting future safety and maintainable boundaries |
+| CAP-011 | PHASE-007, PHASE-008 | Not included | Validated 60 FPS enhancement and mixed-FPS strategy evidence |
+| CAP-012 | PHASE-001 through PHASE-008, PHASE-004A | Source/project/output safety | Cross-cutting future safety and maintainable boundaries |
 
 ## Phase Approval and Handoff
 
@@ -107,8 +111,14 @@ are individual lifecycle files, and each feature record is assigned to exactly
 one phase. PHASE-002 through PHASE-004 are complete and closed after user
 approval on 2026-08-22. PHASE-001, PHASE-005, PHASE-004A, and PHASE-006 are
 complete and closed after user validation, review, and local delivery
-evidence. PHASE-007 remains a confirmed future phase. Ticket execution
-remains governed by the backlog and the open/closed ticket directories.
+evidence. PHASE-007 is complete and closed after the user confirmed its
+approved ticket set was accepted and tested; unavailable remote and
+target-specific checks remain recorded as accepted warnings. PHASE-008 is
+complete and closed after FEAT-024 through FEAT-028 and TICKET-061 through
+TICKET-082 were manually validated and explicitly closed by the user on
+2026-08-28. Historical generic blocker, runtime, target-workstation, license,
+remote-check, and benchmark limitations remain recorded in the linked
+evidence.
 
 ## Source References
 
@@ -134,8 +144,20 @@ remains governed by the backlog and the open/closed ticket directories.
   satisfied.
 - PHASE-006 moved from `phases/open/` to `phases/closed/` after its
   FEAT-017 through FEAT-019 and TICKET-038 through TICKET-047 records passed
-  implementation, validation, review, and local delivery. PHASE-007 remains
-  in `phases/open/` as the confirmed next phase.
+  implementation, validation, review, and local delivery. PHASE-007 moved
+  from `phases/open/` to `phases/closed/` after FEAT-020 through FEAT-023 and
+  TICKET-048 through TICKET-060 were implemented, tested, reviewed, and
+  accepted on 2026-08-26; remote and target-specific limitations remain
+  explicitly recorded in the linked evidence.
+- PHASE-008 was added to `phases/open/` on 2026-08-26 under the confirmed
+  future direction. Its responsive-preview and focus-control records are
+  complete and closed; the mixed-FPS comparison is complete and its approved
+  Strategy B production follow-up is tracked by active TICKET-076.
+  Restoration survey TICKET-073 is also complete. FEAT-027 has TICKET-077
+  verifying under CHG-006 and TICKET-078 verifying under CHG-007, while
+  TICKET-074 through TICKET-075 retain their blocked generic path because
+  required runtimes and evidence remain incomplete. The phase remains open
+  without changing the first-horizon scope.
 - The original phase-index metadata, sequencing rationale, common rules,
   capability coverage, handoff gate, and source references remain in this
   synchronized index.

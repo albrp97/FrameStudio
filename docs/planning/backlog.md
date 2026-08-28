@@ -13,14 +13,15 @@ recorded as an accepted warning
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/planning/phases.md`,
 `docs/planning/features.md`, `.github/aidd-config.yml`
-**Last updated:** 2026-08-22
+**Last updated:** 2026-08-27
 
 ## Purpose
 
 The PHASE-001 section contains the complete bounded ticket set for opening one
 supported source, controlling playback and timeline navigation, and
 saving/reopening the source edit foundation. TICKET-029 is a corrective
-transport ticket for the reported Space playback failure. The PHASE-002 section below adds
+transport ticket for the reported Space playback failure. TICKET-059 is a
+corrective B-key split ticket for the one-source editing workflow. The PHASE-002 section below adds
 the approved planning ticket set for one-source cutting and verified export.
 The PHASE-003 section adds the completed deterministic CLI and GUI/CLI parity
 ticket set. The PHASE-004 section adds the approved mixed-source ticket set, including
@@ -33,12 +34,30 @@ ticket set, now complete and closed after user validation and delivery review.
 The PHASE-006 section adds the approved reusable focus and linked triplicate
 composition ticket set; implementation, validation, review, and local delivery
 are complete and its records are closed.
+The PHASE-007 section adds the completed target-FPS export ticket set,
+including the export planning panel, smart naming, calibrated estimates,
+validated interpolation, audio/timing preservation, and safe delivery
+verification. Its records were closed after implementation, testing, review,
+and user acceptance; TICKET-060 records the corrective implementation.
+The PHASE-008 section tracks responsive preview optimization, direct focus
+controls, mixed-FPS render-strategy comparison, and restoration research.
+TICKET-061 through TICKET-082 are complete and closed. FEAT-025 through
+FEAT-028 are complete and closed, including the approved Strategy B route,
+restoration benchmarks, optional SuperUltraCompact enhancement, editor
+responsiveness corrections, and default-zoom triplicate offsets. Historical
+benchmark, runtime, target-workstation, and remote-check limitations remain
+recorded in the linked evidence.
 
 ## Ticket Lifecycle Records
 
 This backlog index is synchronized with both ticket lifecycle directories.
 Completed tickets are closed; TICKET-001 through TICKET-047 are complete and
 closed after their approved validation, review, and local delivery evidence.
+TICKET-048 through TICKET-060 are complete and closed after the user
+confirmed they were approved, accepted, and tested. Unavailable remote and
+target-specific checks remain recorded as accepted warnings. TICKET-061
+through TICKET-082 are complete and closed with their linked evidence after
+the user's explicit manual-validation and closeout decision on 2026-08-28.
 
 | Sequence | ID | Status | Parent feature | Phase | Current path |
 |---:|---|---|---|---|---|
@@ -55,6 +74,7 @@ closed after their approved validation, review, and local delivery evidence.
 | 11 | TICKET-011 | complete | FEAT-005 | PHASE-002 | `tickets/closed/TICKET-011-verified-safe-export.md` |
 | 28 | TICKET-028 | complete | FEAT-004 | PHASE-002 | `tickets/closed/TICKET-028-restore-one-source-block-movement.md` |
 | 29 | TICKET-029 | complete | FEAT-002 | PHASE-001 | `tickets/closed/TICKET-029-restore-space-playback-toggle.md` |
+| 59 | TICKET-059 | complete | FEAT-004 | PHASE-002 | `tickets/closed/TICKET-059-restore-b-key-timeline-splitting.md` |
 | 12 | TICKET-012 | complete | FEAT-007 | PHASE-003 | `tickets/closed/TICKET-012-select-deterministic-cli-contract-and-inspection-schema.md` |
 | 13 | TICKET-013 | complete | FEAT-007 | PHASE-003 | `tickets/closed/TICKET-013-implement-deterministic-project-inspection.md` |
 | 14 | TICKET-014 | complete | FEAT-008 | PHASE-003 | `tickets/closed/TICKET-014-implement-one-source-edit-commands.md` |
@@ -89,6 +109,40 @@ closed after their approved validation, review, and local delivery evidence.
 | 45 | TICKET-045 | complete | FEAT-019 | PHASE-006 | `tickets/closed/TICKET-045-expose-focused-edits-through-cli-and-gui-parity.md` |
 | 46 | TICKET-046 | complete | FEAT-019 | PHASE-006 | `tickets/closed/TICKET-046-render-and-verify-focused-compositions-safely.md` |
 | 47 | TICKET-047 | complete | FEAT-019 | PHASE-006 | `tickets/closed/TICKET-047-verify-focused-composition-delivery.md` |
+| 48 | TICKET-048 | complete | FEAT-020 | PHASE-007 | `tickets/closed/TICKET-048-define-target-fps-selection-and-enhancement-scope.md` |
+| 49 | TICKET-049 | complete | FEAT-020 | PHASE-007 | `tickets/closed/TICKET-049-persist-and-expose-frame-rate-policy.md` |
+| 50 | TICKET-050 | complete | FEAT-021 | PHASE-007 | `tickets/closed/TICKET-050-choose-export-destination-and-smart-name.md` |
+| 51 | TICKET-051 | complete | FEAT-021 | PHASE-007 | `tickets/closed/TICKET-051-calibrate-export-processing-time-estimates.md` |
+| 52 | TICKET-052 | complete | FEAT-021 | PHASE-007 | `tickets/closed/TICKET-052-build-export-planning-panel.md` |
+| 53 | TICKET-053 | complete | FEAT-022 | PHASE-007 | `tickets/closed/TICKET-053-validate-interpolation-backend-and-artifact-gate.md` |
+| 54 | TICKET-054 | complete | FEAT-022 | PHASE-007 | `tickets/closed/TICKET-054-implement-exact-target-fps-interpolation.md` |
+| 55 | TICKET-055 | complete | FEAT-022 | PHASE-007 | `tickets/closed/TICKET-055-preserve-audio-and-delivery-profile-during-enhancement.md` |
+| 56 | TICKET-056 | complete | FEAT-023 | PHASE-007 | `tickets/closed/TICKET-056-connect-enhanced-export-routes-and-progress.md` |
+| 57 | TICKET-057 | complete | FEAT-023 | PHASE-007 | `tickets/closed/TICKET-057-verify-enhanced-output-integrity-and-regressions.md` |
+| 58 | TICKET-058 | complete | FEAT-023 | PHASE-007 | `tickets/closed/TICKET-058-run-target-workstation-phase-007-validation.md` |
+| 60 | TICKET-060 | complete | FEAT-021 | PHASE-007 | `tickets/closed/TICKET-060-refine-export-planning-and-enhanced-smart-render.md` |
+| 61 | TICKET-061 | complete | FEAT-024 | PHASE-008 | `tickets/closed/TICKET-061-research-lossless-cut-preview-architecture.md` |
+| 62 | TICKET-062 | complete | FEAT-024 | PHASE-008 | `tickets/closed/TICKET-062-benchmark-current-preview-latency.md` |
+| 63 | TICKET-063 | complete | FEAT-024 | PHASE-008 | `tickets/closed/TICKET-063-experiment-with-preview-rendering-strategies.md` |
+| 64 | TICKET-064 | complete | FEAT-024 | PHASE-008 | `tickets/closed/TICKET-064-adopt-and-document-responsive-preview-strategy.md` |
+| 65 | TICKET-065 | complete | FEAT-025 | PHASE-008 | `tickets/closed/TICKET-065-define-direct-focus-modification-interactions.md` |
+| 66 | TICKET-066 | complete | FEAT-025 | PHASE-008 | `tickets/closed/TICKET-066-implement-scroll-driven-focus-modifications.md` |
+| 67 | TICKET-067 | complete | FEAT-025 | PHASE-008 | `tickets/closed/TICKET-067-correct-zoomed-focus-coordinate-bounds.md` |
+| 68 | TICKET-068 | complete | FEAT-025 | PHASE-008 | `tickets/closed/TICKET-068-verify-focus-control-persistence-and-parity.md` |
+| 69 | TICKET-069 | complete | FEAT-026 | PHASE-008 | `tickets/closed/TICKET-069-define-comparable-mixed-fps-render-benchmarks.md` |
+| 70 | TICKET-070 | complete | FEAT-026 | PHASE-008 | `tickets/closed/TICKET-070-benchmark-concat-first-enhancement-strategy.md` |
+| 71 | TICKET-071 | complete | FEAT-026 | PHASE-008 | `tickets/closed/TICKET-071-benchmark-per-source-enhancement-strategy.md` |
+| 72 | TICKET-072 | complete | FEAT-026 | PHASE-008 | `tickets/closed/TICKET-072-select-and-document-mixed-fps-render-default.md` |
+| 73 | TICKET-073 | complete | FEAT-027 | PHASE-008 | `tickets/closed/TICKET-073-survey-video-upscaling-denoise-and-compression-recovery.md` |
+| 74 | TICKET-074 | complete | FEAT-027 | PHASE-008 | `tickets/closed/TICKET-074-benchmark-restoration-candidates.md` |
+| 75 | TICKET-075 | complete | FEAT-027 | PHASE-008 | `tickets/closed/TICKET-075-recommend-restoration-pipeline-and-gates.md` |
+| 76 | TICKET-076 | complete | FEAT-026 | PHASE-008 | `tickets/closed/TICKET-076-adopt-per-source-render-strategy.md` |
+| 77 | TICKET-077 | complete | FEAT-027 | PHASE-008 | `tickets/closed/TICKET-077-benchmark-real-video-enhancer-restoration.md` |
+| 78 | TICKET-078 | complete | FEAT-027 | PHASE-008 | `tickets/closed/TICKET-078-expand-cross-model-restoration-benchmark.md` |
+| 79 | TICKET-079 | complete | FEAT-028 | PHASE-008 | `tickets/closed/TICKET-079-implement-optional-upscale-enhancement.md` |
+| 80 | TICKET-080 | complete | FEAT-028 | PHASE-008 | `tickets/closed/TICKET-080-benchmark-upscale-render-strategies.md` |
+| 81 | TICKET-081 | complete | FEAT-028 | PHASE-008 | `tickets/closed/TICKET-081-restore-editor-loading-zoom-and-gpu-interpolation.md` |
+| 82 | TICKET-082 | complete | FEAT-025 | PHASE-008 | `tickets/closed/TICKET-082-allow-triplicate-horizontal-offset-at-default-zoom.md` |
 
 ## Ticket summary
 
@@ -190,6 +244,7 @@ copy/paste, or CLI parity.
 | 10 | TICKET-010 | Select fast or fallback export plans | FEAT-005 | TICKET-007 | complete | `tickets/closed/TICKET-010-export-plan-selection.md` |
 | 11 | TICKET-011 | Execute, verify, and publish export safely | FEAT-005 | TICKET-008, TICKET-010 | complete | `tickets/closed/TICKET-011-verified-safe-export.md` |
 | 28 | TICKET-028 | Restore one-source block movement | FEAT-004 | TICKET-008; existing shared movement operation | complete | `tickets/closed/TICKET-028-restore-one-source-block-movement.md` |
+| 59 | TICKET-059 | Restore B-key timeline splitting | FEAT-004 | TICKET-008; playback/timeline position mapping | complete | `tickets/closed/TICKET-059-restore-b-key-timeline-splitting.md` |
 
 ### Dependency order
 
@@ -333,9 +388,9 @@ without silently changing those behaviors.
 - `docs/specs/project-scope.md`
 - `docs/specs/capability-map.md`
 - `docs/planning/phases/open/PHASE-003-repeating-the-basic-edit-through-agents.md`
-- `docs/planning/features/open/FEAT-007-inspecting-projects-through-a-deterministic-cli.md`
-- `docs/planning/features/open/FEAT-008-applying-one-source-edits-through-cli.md`
-- `docs/planning/features/open/FEAT-009-sharing-domain-behavior-between-gui-and-cli.md`
+- `docs/planning/features/closed/FEAT-007-inspecting-projects-through-a-deterministic-cli.md`
+- `docs/planning/features/closed/FEAT-008-applying-one-source-edits-through-cli.md`
+- `docs/planning/features/closed/FEAT-009-sharing-domain-behavior-between-gui-and-cli.md`
 - `docs/planning/tickets/closed/TICKET-011-verified-safe-export.md`
 - `.github/aidd-config.yml`
 
@@ -431,9 +486,9 @@ prior evidence remain protected while the mixed-source model is introduced.
 - `docs/specs/project-scope.md`
 - `docs/specs/capability-map.md`
 - `docs/planning/phases/open/PHASE-004-combining-mixed-source-footage.md`
-- `docs/planning/features/open/FEAT-010-importing-and-retaining-mixed-source-project-identity.md`
-- `docs/planning/features/open/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md`
-- `docs/planning/features/open/FEAT-012-previewing-and-exporting-mixed-source-edits.md`
+- `docs/planning/features/closed/FEAT-010-importing-and-retaining-mixed-source-project-identity.md`
+- `docs/planning/features/closed/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md`
+- `docs/planning/features/closed/FEAT-012-previewing-and-exporting-mixed-source-edits.md`
 - `docs/planning/reviews/CHG-001-atomic-segment-block-editing.md`
 - `docs/planning/reviews/CHG-002-fixed-1080p-render-profile.md`
 - `.github/aidd-config.yml`
@@ -451,7 +506,7 @@ prior evidence remain protected while the mixed-source model is introduced.
 **Last updated:** 2026-08-22
 **Source paths:** `docs/planning/reviews/CHG-003-editor-architecture-stabilization.md`,
 `docs/planning/phases/open/PHASE-004A-stabilizing-editor-architecture.md`,
-`docs/planning/features/open/FEAT-013-modular-editor-architecture.md`,
+`docs/planning/features/closed/FEAT-013-modular-editor-architecture.md`,
 `.github/aidd-config.yml`
 
 This focused ticket set separates the oversized editor modules before
@@ -494,7 +549,7 @@ contracts remain protected.
 
 - `docs/planning/reviews/CHG-003-editor-architecture-stabilization.md`
 - `docs/planning/phases/open/PHASE-004A-stabilizing-editor-architecture.md`
-- `docs/planning/features/open/FEAT-013-modular-editor-architecture.md`
+- `docs/planning/features/closed/FEAT-013-modular-editor-architecture.md`
 - `.github/aidd-config.yml`
 
 ## PHASE-005 - Completed Ticket Set
@@ -510,9 +565,9 @@ feature and ticket set after validation
 **Owner:** repository planning and implementation in the active worktree
 **Last updated:** 2026-08-22
 **Source paths:** `docs/planning/phases/open/PHASE-005-balancing-sources-and-delivering-consistent-media.md`,
-`docs/planning/features/open/FEAT-014-balancing-each-source-consistently.md`,
-`docs/planning/features/open/FEAT-015-selecting-tested-delivery-routes.md`,
-`docs/planning/features/open/FEAT-016-synchronizing-media-decisions-and-verification.md`,
+`docs/planning/features/closed/FEAT-014-balancing-each-source-consistently.md`,
+`docs/planning/features/closed/FEAT-015-selecting-tested-delivery-routes.md`,
+`docs/planning/features/closed/FEAT-016-synchronizing-media-decisions-and-verification.md`,
 `.github/aidd-config.yml`
 
 This ticket set covers source-level audio policy, analysis and persistence,
@@ -587,9 +642,9 @@ contracts.
 - `docs/specs/capability-map.md`
 - `docs/specs/future-product-direction.md`
 - `docs/planning/phases/open/PHASE-005-balancing-sources-and-delivering-consistent-media.md`
-- `docs/planning/features/open/FEAT-014-balancing-each-source-consistently.md`
-- `docs/planning/features/open/FEAT-015-selecting-tested-delivery-routes.md`
-- `docs/planning/features/open/FEAT-016-synchronizing-media-decisions-and-verification.md`
+- `docs/planning/features/closed/FEAT-014-balancing-each-source-consistently.md`
+- `docs/planning/features/closed/FEAT-015-selecting-tested-delivery-routes.md`
+- `docs/planning/features/closed/FEAT-016-synchronizing-media-decisions-and-verification.md`
 - `.github/aidd-config.yml`
 
 ## PHASE-006 - Verification Ticket Set
@@ -685,9 +740,9 @@ protected throughout PHASE-006.
 - `docs/specs/capability-map.md`
 - `docs/specs/future-product-direction.md`
 - `docs/planning/phases/open/PHASE-006-focusing-and-composing-important-action.md`
-- `docs/planning/features/open/FEAT-017-editing-reusable-visual-focus-controls.md`
-- `docs/planning/features/open/FEAT-018-creating-linked-triplicate-compositions.md`
-- `docs/planning/features/open/FEAT-019-delivering-focused-compositions-safely.md`
+- `docs/planning/features/closed/FEAT-017-editing-reusable-visual-focus-controls.md`
+- `docs/planning/features/closed/FEAT-018-creating-linked-triplicate-compositions.md`
+- `docs/planning/features/closed/FEAT-019-delivering-focused-compositions-safely.md`
 - `.github/aidd-config.yml`
 
 ## Migration Notes
@@ -716,3 +771,273 @@ protected throughout PHASE-006.
 - BACKLOG-006 added the PHASE-006 planning set with FEAT-017 through FEAT-019
   and TICKET-038 through TICKET-047. After user validation, review, and local
   delivery, all records moved to the configured closed lifecycle directories.
+- BACKLOG-007 added the PHASE-007 planning set with FEAT-020 through FEAT-023
+  and TICKET-048 through TICKET-060. After implementation, testing, review,
+  and user acceptance on 2026-08-26, all records moved to the configured
+  closed lifecycle directories; unavailable remote and target-specific checks
+  remain recorded as accepted warnings.
+
+## PHASE-007 - Target-FPS Export Ticket Set
+
+**Backlog extension ID:** BACKLOG-007
+**Objective:** OBJ-001
+**Scope:** SCOPE-001
+**Phase:** PHASE-007
+**Features:** FEAT-020, FEAT-021, FEAT-022, FEAT-023
+**Status:** complete
+**Closure:** user-approved on 2026-08-26 after TICKET-048 through
+TICKET-060 were implemented, tested, reviewed, and accepted; unavailable
+remote and target-specific checks remain recorded as accepted warnings
+**Approval:** user-authorized on 2026-08-24 to create the PHASE-007 feature
+and ticket breakdown; completion was subsequently accepted by the user
+**Owner:** repository planning; maintainer identity is not recorded
+**Last updated:** 2026-08-26
+**Source paths:** `vision.md`, `docs/specs/project-scope.md`,
+`docs/specs/capability-map.md`,
+`docs/specs/future-product-direction.md`,
+`docs/planning/phases/closed/PHASE-007-producing-validated-60-fps-edits.md`,
+`docs/planning/features.md`, `FPS-ENHANCEMENT-RESEARCH.md`,
+`FLOWFRAMES-RESEARCH.md`, `docs/specs/cli-contract.md`,
+`.github/aidd-config.yml`
+
+This ticket set covers the requested export destination page, smart
+collision-safe naming, lowest/highest/custom/60 FPS choices, enhancement
+toggle, realistic processing estimate, validated RIFE/RVE interpolation,
+exact timing, audio preservation, safe progress, and final verification. It
+does not replace legacy scripts, claim universal performance, or implement
+work in this planning step.
+
+### Ticket summary
+
+| Sequence | ID | Title | Parent feature | Dependencies | Status | Current path |
+|---:|---|---|---|---|---|---|
+| 48 | TICKET-048 | Define target FPS selection and enhancement scope | FEAT-020 | PHASE-005; PHASE-006 timing; source metadata | complete | `tickets/closed/TICKET-048-define-target-fps-selection-and-enhancement-scope.md` |
+| 49 | TICKET-049 | Persist and expose frame-rate policy | FEAT-020 | TICKET-048; versioned project schema | complete | `tickets/closed/TICKET-049-persist-and-expose-frame-rate-policy.md` |
+| 50 | TICKET-050 | Choose export destination and smart name | FEAT-021 | TICKET-048; destination safety guard | complete | `tickets/closed/TICKET-050-choose-export-destination-and-smart-name.md` |
+| 51 | TICKET-051 | Calibrate export processing-time estimates | FEAT-021 | TICKET-048; local throughput evidence | complete | `tickets/closed/TICKET-051-calibrate-export-processing-time-estimates.md` |
+| 52 | TICKET-052 | Build export planning panel | FEAT-021 | TICKET-049, TICKET-050, TICKET-051 | complete | `tickets/closed/TICKET-052-build-export-planning-panel.md` |
+| 53 | TICKET-053 | Validate interpolation backend and artifact gate | FEAT-022 | TICKET-048; representative fixtures; target runtime | complete | `tickets/closed/TICKET-053-validate-interpolation-backend-and-artifact-gate.md` |
+| 54 | TICKET-054 | Implement exact target FPS interpolation | FEAT-022 | TICKET-048, TICKET-053; mixed-source timing | complete | `tickets/closed/TICKET-054-implement-exact-target-fps-interpolation.md` |
+| 55 | TICKET-055 | Preserve audio and delivery profile during enhancement | FEAT-022 | TICKET-054; PHASE-005 delivery policy | complete | `tickets/closed/TICKET-055-preserve-audio-and-delivery-profile-during-enhancement.md` |
+| 56 | TICKET-056 | Connect enhanced export routes and progress | FEAT-023 | TICKET-049, TICKET-052, TICKET-055 | complete | `tickets/closed/TICKET-056-connect-enhanced-export-routes-and-progress.md` |
+| 57 | TICKET-057 | Verify enhanced output integrity and regressions | FEAT-023 | TICKET-056; timing/audio behavior | complete | `tickets/closed/TICKET-057-verify-enhanced-output-integrity-and-regressions.md` |
+| 58 | TICKET-058 | Run target workstation Phase 007 validation | FEAT-023 | TICKET-057; target workstation and fixtures | complete | `tickets/closed/TICKET-058-run-target-workstation-phase-007-validation.md` |
+| 60 | TICKET-060 | Refine export planning and enhanced smart render | FEAT-021 | TICKET-048 through TICKET-058 implementation surfaces; protected export baseline | complete | `tickets/closed/TICKET-060-refine-export-planning-and-enhanced-smart-render.md` |
+
+### Dependency order
+
+`TICKET-048 -> TICKET-049`
+
+`TICKET-048 -> {TICKET-050, TICKET-051}`
+
+`TICKET-049 + TICKET-050 + TICKET-051 -> TICKET-052`
+
+`TICKET-048 -> TICKET-053 -> TICKET-054 -> TICKET-055`
+
+`TICKET-049 + TICKET-052 + TICKET-055 -> TICKET-056 -> TICKET-057 -> TICKET-058`
+
+`TICKET-060` was a corrective implementation record under FEAT-021. It
+preserved the original ticket ancestry and is now complete and closed with
+the Phase 007 delivery set.
+
+TICKET-048 settles the target-rate, already-target-rate, lower-rate, and
+enhancement-scope rules before implementation. TICKET-049 makes that policy
+round-trip through project and CLI state. TICKET-050 and TICKET-051 can be
+planned independently after the policy, then TICKET-052 integrates the
+preflight export surface. TICKET-053 validates the backend before
+TICKET-054/055 connect interpolation, timing, audio, and delivery. TICKET-056
+through TICKET-058 complete the GUI/CLI route, verification, regression, and
+target-workstation evidence.
+
+### Feature coverage
+
+| Feature outcome | Ticket coverage | Coverage status |
+|---|---|---|
+| Choose target frame-rate delivery and enhancement scope | TICKET-048, TICKET-049 | covered |
+| Plan export destination, naming, and processing estimates | TICKET-050 through TICKET-052, TICKET-060 | covered |
+| Run validated motion interpolation | TICKET-053 through TICKET-055 | covered |
+| Verify and safely deliver enhanced or ordinary exports | TICKET-056 through TICKET-058 | covered |
+| CAP-005 - Rendering fast, valid, and safe outputs | TICKET-048 through TICKET-058 | covered |
+| CAP-006 - Automating the project through a deterministic CLI | TICKET-056 through TICKET-058 | covered |
+| CAP-011 - Enhancing frame rate to 60 FPS | TICKET-048, TICKET-049, TICKET-051 through TICKET-058 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | TICKET-048 through TICKET-058 | covered |
+
+### Readiness and gates
+
+- PHASE-007 and FEAT-020 through FEAT-023 are complete and closed with their
+  required child records.
+- TICKET-048 through TICKET-060 have stable ancestry, bounded scope,
+  implementation and regression evidence, and user acceptance.
+- Baseline, local quality, contract, smoke, real-media, static-analysis,
+  review, and available user-validation gates are recorded in the linked
+  evidence. Unavailable remote and target-specific checks remain explicit
+  accepted warnings rather than false passes.
+
+### Protected behavior
+
+Existing one-source and mixed-source editing, source-level audio decisions,
+fixed 1920x1080 output, project compatibility, safe partial-output handling,
+structured CLI errors, legacy scripts, and source preservation remain
+protected throughout PHASE-007.
+
+### Source references
+
+- `vision.md`
+- `docs/specs/project-scope.md`
+- `docs/specs/capability-map.md`
+- `docs/specs/future-product-direction.md`
+- `docs/planning/phases/closed/PHASE-007-producing-validated-60-fps-edits.md`
+- `docs/planning/features/closed/FEAT-020-choosing-target-frame-rate-delivery.md`
+- `docs/planning/features/closed/FEAT-021-planning-export-destination-and-estimates.md`
+- `docs/planning/features/closed/FEAT-022-running-validated-motion-interpolation.md`
+- `docs/planning/features/closed/FEAT-023-verifying-safe-enhanced-delivery.md`
+- `FPS-ENHANCEMENT-RESEARCH.md`
+- `FLOWFRAMES-RESEARCH.md`
+- `resolve_concat.py`
+- `resolve_fps.py`
+- `.github/aidd-config.yml`
+
+## PHASE-008 - Responsive Preview and Media Strategy Ticket Set
+
+**Backlog extension ID:** BACKLOG-008
+**Objective:** OBJ-001
+**Scope:** SCOPE-001
+**Phase:** PHASE-008
+**Features:** FEAT-024, FEAT-025, FEAT-026, FEAT-027, FEAT-028
+**Status:** complete
+**Approval:** user-authorized on 2026-08-26 to create the PHASE-008 feature
+and ticket breakdown; user-authorized manual validation and closeout on
+2026-08-28
+**Owner:** repository planning; maintainer identity is not recorded
+**Last updated:** 2026-08-28
+**Source paths:** `vision.md`, `docs/specs/project-scope.md`,
+`docs/specs/capability-map.md`, `docs/specs/future-product-direction.md`,
+`docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
+`docs/planning/features/closed/FEAT-024-optimizing-cursor-driven-preview.md`,
+`docs/planning/features/closed/FEAT-025-streamlining-segment-focus-modifications.md`,
+`docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
+`docs/planning/features/closed/FEAT-027-researching-video-restoration-and-upscaling.md`,
+`docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`,
+`.github/aidd-config.yml`
+
+This ticket set covers measured preview optimization informed by Lossless Cut
+research, direct scroll-based focus controls, 2x/4x focus-bound verification,
+matched mixed-FPS render-strategy comparison, the approved Strategy B
+production-default follow-up, research-only restoration recommendations, and
+the separately approved opt-in SuperUltraCompact production-upscale follow-up.
+It does not vendor external code, add unapproved model families, or change
+the first-horizon scope.
+
+### Ticket summary
+
+| Sequence | ID | Title | Parent feature | Dependencies | Status | Current path |
+|---:|---|---|---|---|---|---|
+| 61 | TICKET-061 | Research Lossless Cut preview architecture | FEAT-024 | current playback boundary; public source or limitation record | complete | `tickets/closed/TICKET-061-research-lossless-cut-preview-architecture.md` |
+| 62 | TICKET-062 | Benchmark current preview latency | FEAT-024 | TICKET-061; representative media and trace | complete | `tickets/closed/TICKET-062-benchmark-current-preview-latency.md` |
+| 63 | TICKET-063 | Experiment with preview rendering strategies | FEAT-024 | TICKET-061, TICKET-062 | complete | `tickets/closed/TICKET-063-experiment-with-preview-rendering-strategies.md` |
+| 64 | TICKET-064 | Adopt and document responsive preview strategy | FEAT-024 | TICKET-063; regression and target-workstation evidence | complete | `tickets/closed/TICKET-064-adopt-and-document-responsive-preview-strategy.md` |
+| 65 | TICKET-065 | Define direct focus modification interactions | FEAT-025 | PHASE-006 focus/triplicate semantics; GTK event behavior | complete | `tickets/closed/TICKET-065-define-direct-focus-modification-interactions.md` |
+| 66 | TICKET-066 | Implement scroll-driven focus modifications | FEAT-025 | TICKET-065; existing focus model | complete | `tickets/closed/TICKET-066-implement-scroll-driven-focus-modifications.md` |
+| 67 | TICKET-067 | Correct zoomed focus coordinate bounds | FEAT-025 | TICKET-065; fixed canvas and layout semantics | complete | `tickets/closed/TICKET-067-correct-zoomed-focus-coordinate-bounds.md` |
+| 68 | TICKET-068 | Verify focus-control persistence and parity | FEAT-025 | TICKET-066, TICKET-067; project/CLI contracts | complete | `tickets/closed/TICKET-068-verify-focus-control-persistence-and-parity.md` |
+| 69 | TICKET-069 | Define comparable mixed-FPS render benchmarks | FEAT-026 | PHASE-005/007 behavior; representative media | complete | `tickets/closed/TICKET-069-define-comparable-mixed-fps-render-benchmarks.md` |
+| 70 | TICKET-070 | Benchmark concat-first enhancement strategy | FEAT-026 | TICKET-069; current safe route | complete | `tickets/closed/TICKET-070-benchmark-concat-first-enhancement-strategy.md` |
+| 71 | TICKET-071 | Benchmark per-source enhancement strategy | FEAT-026 | TICKET-069; interpolation and concatenation path | complete | `tickets/closed/TICKET-071-benchmark-per-source-enhancement-strategy.md` |
+| 72 | TICKET-072 | Select and document mixed-FPS render default | FEAT-026 | TICKET-070, TICKET-071; review and approval | complete | `tickets/closed/TICKET-072-select-and-document-mixed-fps-render-default.md` |
+| 73 | TICKET-073 | Survey video upscaling, denoise, and compression recovery | FEAT-027 | public research; license/runtime constraints | complete | `tickets/closed/TICKET-073-survey-video-upscaling-denoise-and-compression-recovery.md` |
+| 74 | TICKET-074 | Benchmark restoration candidates | FEAT-027 | TICKET-073; bounded samples and runtimes | complete | `tickets/closed/TICKET-074-benchmark-restoration-candidates.md` |
+| 75 | TICKET-075 | Recommend restoration pipeline and gates | FEAT-027 | TICKET-073, TICKET-074 | complete | `tickets/closed/TICKET-075-recommend-restoration-pipeline-and-gates.md` |
+| 76 | TICKET-076 | Adopt per-source render strategy as the enhanced default | FEAT-026 | TICKET-072; output and interpolation gates | complete | `tickets/closed/TICKET-076-adopt-per-source-render-strategy.md` |
+| 77 | TICKET-077 | Benchmark REAL Video Enhancer restoration on degraded media | FEAT-027 | TICKET-073; supplied media; available runtimes | complete | `tickets/closed/TICKET-077-benchmark-real-video-enhancer-restoration.md` |
+| 78 | TICKET-078 | Expand cross-model restoration benchmark | FEAT-027 | TICKET-073, TICKET-077; pinned candidate runtimes and licenses | complete | `tickets/closed/TICKET-078-expand-cross-model-restoration-benchmark.md` |
+| 79 | TICKET-079 | Implement optional upscale enhancement | FEAT-028 | TICKET-076; local RVE runtime and SuperUltraCompact weights | complete | `tickets/closed/TICKET-079-implement-optional-upscale-enhancement.md` |
+| 80 | TICKET-080 | Benchmark upscale render strategies | FEAT-028 | TICKET-079; requested fixtures and target workstation | complete | `tickets/closed/TICKET-080-benchmark-upscale-render-strategies.md` |
+| 81 | TICKET-081 | Restore editor loading, timeline zoom, and GPU interpolation | FEAT-028 | existing editor lifecycle; validated RVE runtime; representative local media | complete | `tickets/closed/TICKET-081-restore-editor-loading-zoom-and-gpu-interpolation.md` |
+| 82 | TICKET-082 | Allow triplicate horizontal offset at default zoom | FEAT-025 | existing focus bounds; triplicate composition; persistence and CLI contracts | complete | `tickets/closed/TICKET-082-allow-triplicate-horizontal-offset-at-default-zoom.md` |
+
+### Dependency order
+
+`TICKET-061 -> TICKET-062 -> TICKET-063 -> TICKET-064`
+
+`TICKET-065 -> TICKET-066 -> TICKET-067 -> TICKET-068 -> TICKET-082`
+
+`TICKET-069 -> {TICKET-070, TICKET-071} -> TICKET-072 -> TICKET-076`
+
+`TICKET-073 -> TICKET-074 -> TICKET-075`
+
+`TICKET-073 -> TICKET-077 -> TICKET-078 -> restoration evidence assimilation`
+
+`TICKET-076 -> TICKET-079 -> TICKET-080`
+
+`TICKET-079 -> TICKET-081`
+
+The preview work establishes an external research boundary and current
+baseline before experiments and default adoption. The focus work defines
+interaction ownership before implementation, then verifies zoom bounds and
+GUI/CLI/persistence parity. The render comparison fixes a common protocol
+before running either strategy and selecting a route. The restoration work
+separates survey, measurement, and recommendation so no production model is
+silently introduced.
+
+### Feature coverage
+
+| Feature outcome | Ticket coverage | Coverage status |
+|---|---|---|
+| Optimize cursor-driven preview | TICKET-061 through TICKET-064 | covered |
+| Streamline segment focus modifications | TICKET-065 through TICKET-068, TICKET-082 | covered |
+| Compare and adopt mixed-FPS render strategy | TICKET-069 through TICKET-072, TICKET-076 | covered |
+| Research video restoration and upscaling | TICKET-073 through TICKET-075, TICKET-077 through TICKET-078 | covered |
+| Add optional SuperUltraCompact upscale enhancement | TICKET-079 through TICKET-081 | covered |
+| CAP-002 - Playing and navigating an edit timeline | TICKET-061 through TICKET-064 | covered |
+| CAP-003 - Editing segments non-destructively | TICKET-065 through TICKET-068, TICKET-082 | covered |
+| CAP-005 - Rendering fast, valid, and safe outputs | TICKET-061, TICKET-064, TICKET-069 through TICKET-081 | covered |
+| CAP-009 - Applying reusable visual modifications | TICKET-065 through TICKET-068, TICKET-082 | covered |
+| CAP-010 - Linking triplicate composition instances | TICKET-065 through TICKET-068, TICKET-082 | covered |
+| CAP-011 - Enhancing frame rate to 60 FPS | TICKET-069 through TICKET-081 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | TICKET-061 through TICKET-082 | covered |
+
+### Readiness and gates
+
+- PHASE-008 is complete with FEAT-024 through FEAT-028 and TICKET-061 through
+  TICKET-082 closed after the user's explicit manual-validation and closeout
+  decision on 2026-08-28.
+- Each execution ticket requires the configured baseline, preimplementation
+  checklist, user approval, evidence, local quality, applicable real-system,
+  static-analysis, and review gates.
+- Network access, target-workstation media, model/runtime availability,
+  licensing, and remote checks must be recorded explicitly when unavailable.
+- TICKET-074 and TICKET-075 retain their original generic blocker history;
+  concrete RVE and cross-model evidence is recorded by TICKET-077 and
+  TICKET-078. Neither research ticket alters production routing. TICKET-076
+  records the separately approved render-routing implementation, while
+  TICKET-079 through TICKET-081 record the approved production-upscale
+  follow-up and responsiveness corrections.
+
+### Protected behavior
+
+Existing one-source and mixed-source editing, fixed 1920x1080 output,
+source-level audio decisions, project compatibility, interpolation, atomic
+export, structured CLI errors, legacy scripts, and source preservation remain
+protected throughout PHASE-008. The historical concat-first route remains
+available as evidence and safe fallback behavior where required.
+
+### Source references
+
+- `vision.md`
+- `docs/specs/project-scope.md`
+- `docs/specs/capability-map.md`
+- `docs/specs/future-product-direction.md`
+- `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`
+- `docs/planning/features/closed/FEAT-024-optimizing-cursor-driven-preview.md`
+- `docs/planning/features/closed/FEAT-025-streamlining-segment-focus-modifications.md`
+- `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`
+- `docs/planning/features/closed/FEAT-027-researching-video-restoration-and-upscaling.md`
+- `docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`
+- `resolve_editor/app_playback.py`
+- `resolve_editor/ffmpeg_playback.py`
+- `resolve_editor/export_smart_render.py`
+- `resolve_editor/export_interpolation.py`
+- `FAST-CONCAT-RESEARCH.md`
+- `FPS-ENHANCEMENT-RESEARCH.md`
+- `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`
+- `.github/aidd-config.yml`

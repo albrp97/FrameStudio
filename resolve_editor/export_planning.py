@@ -19,8 +19,22 @@ from .export_types import (
     OutputPolicy,
     resolve_output_policy,
 )
+from .fps_policy import (
+    FrameRatePolicy,
+    FrameRatePolicyError,
+    ResolvedFrameRatePolicy,
+    resolved_from_policy,
+)
 from .media import MediaProbe
 from .model import Segment, SegmentTimeline
+from .upscale_policy import (
+    ResolvedUpscalePolicy,
+    UpscalePolicy,
+    UpscalePolicyError,
+)
+from .upscale_policy import (
+    resolved_from_policy as resolved_upscale_from_policy,
+)
 
 
 def format_name_tokens(format_name: str) -> set[str]:
@@ -139,6 +153,51 @@ def _persisted_audio_decision(
     return decision if isinstance(decision, AudioDecision) else dict(decision)
 
 
+def _resolved_frame_rate_policy(
+    metadata: Sequence[Mapping[str, Any]],
+    policy: (FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, Any] | None),
+) -> ResolvedFrameRatePolicy | None:
+    if policy is None:
+        return None
+    try:
+        if isinstance(policy, ResolvedFrameRatePolicy):
+            resolved = policy
+        else:
+            normalized = (
+                policy if isinstance(policy, FrameRatePolicy) else FrameRatePolicy.from_dict(policy)
+            )
+            resolved = resolved_from_policy(metadata, normalized)
+    except FrameRatePolicyError as error:
+        raise ExportPlanningError(f"Invalid frame-rate policy: {error}") from error
+    if resolved.has_unsupported_sources:
+        unsupported = "; ".join(
+            f"{item.source_id}: {item.reason}"
+            for item in resolved.decisions
+            if item.action == "unsupported"
+        )
+        raise ExportPlanningError(
+            "Frame-rate enhancement is not supported for the selected sources: " + unsupported
+        )
+    return resolved
+
+
+def _resolved_upscale_policy(
+    metadata: Sequence[Mapping[str, Any]],
+    policy: UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, Any] | None,
+) -> ResolvedUpscalePolicy:
+    try:
+        if policy is None:
+            return resolved_upscale_from_policy(metadata, UpscalePolicy())
+        if isinstance(policy, ResolvedUpscalePolicy):
+            return policy
+        normalized = (
+            policy if isinstance(policy, UpscalePolicy) else UpscalePolicy.from_dict(policy)
+        )
+        return resolved_upscale_from_policy(metadata, normalized)
+    except UpscalePolicyError as error:
+        raise ExportPlanningError(f"Invalid upscale policy: {error}") from error
+
+
 def plan_export(
     media: MediaProbe,
     timeline: SegmentTimeline,
@@ -148,6 +207,10 @@ def plan_export(
     ffprobe_path: str = "ffprobe",
     audio_decision: AudioDecision | Mapping[str, Any] | None = None,
     audio_source_id: str = "source",
+    frame_rate_policy: (
+        FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, Any] | None
+    ) = None,
+    upscale_policy: UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, Any] | None = None,
 ) -> ExportPlan:
     timeline.validate()
     if not math.isclose(
@@ -168,7 +231,22 @@ def plan_export(
         None if audio_decision is None else _persisted_audio_decision(audio_decision)
     )
 
-    output_policy = resolve_output_policy([media.metadata()])
+    source_metadata = {
+        **media.metadata(),
+        "source_id": audio_source_id,
+    }
+    resolved_fps_policy = _resolved_frame_rate_policy(
+        (source_metadata,),
+        frame_rate_policy,
+    )
+    resolved_upscale_policy = _resolved_upscale_policy(
+        (source_metadata,),
+        upscale_policy,
+    )
+    output_policy = resolve_output_policy(
+        [source_metadata],
+        target_rate=(None if resolved_fps_policy is None else resolved_fps_policy.target_rate),
+    )
     fallback_reasons: list[str] = []
     if any(segment.has_visual_modifications for segment in active_segments):
         fallback_reasons.append("visual focus or triplicate composition requires decoded rendering")
@@ -213,6 +291,16 @@ def plan_export(
             fallback_reasons.append(
                 f"source-level audio decision is {decision_status or 'pending'}"
             )
+    if resolved_fps_policy is not None:
+        decision = resolved_fps_policy.decisions[0]
+        if decision.action == "interpolate":
+            fallback_reasons.append("validated frame-rate enhancement is required for this source")
+        elif decision.action in {"convert", "convert-down"}:
+            fallback_reasons.append("selected target frame rate differs from the source rate")
+    if resolved_upscale_policy.has_eligible_sources:
+        fallback_reasons.append(
+            "validated SuperUltraCompact spatial enhancement is required for eligible sources"
+        )
 
     boundaries = internal_boundaries(
         active_segments,
@@ -229,6 +317,11 @@ def plan_export(
         ):
             fallback_reasons.append("one or more cut boundaries are not keyframe-aligned")
 
+    plan_audio_decisions = (
+        () if persisted_audio_decision is None else ((audio_source_id, persisted_audio_decision),)
+    )
+    plan_frame_rate_policy = None if resolved_fps_policy is None else resolved_fps_policy.policy
+    plan_rate_decisions = () if resolved_fps_policy is None else resolved_fps_policy.decisions
     if not fallback_reasons:
         if boundaries:
             reason = "All retained cut boundaries are keyframe-aligned for stream copy"
@@ -242,15 +335,26 @@ def plan_export(
             expected_duration_seconds=timeline.edited_duration_seconds,
             reason=reason,
             output_policy=output_policy,
-            audio_decisions=(
-                ()
-                if persisted_audio_decision is None
-                else ((audio_source_id, persisted_audio_decision),)
-            ),
+            audio_decisions=plan_audio_decisions,
+            frame_rate_policy=plan_frame_rate_policy,
+            rate_decisions=plan_rate_decisions,
+            upscale_policy=resolved_upscale_policy.policy,
+            upscale_decisions=resolved_upscale_policy.decisions,
         )
 
+    route = (
+        "enhanced"
+        if (
+            resolved_upscale_policy.has_eligible_sources
+            or (
+                resolved_fps_policy is not None
+                and any(item.action == "interpolate" for item in resolved_fps_policy.decisions)
+            )
+        )
+        else "fallback"
+    )
     return ExportPlan(
-        route="fallback",
+        route=route,
         source=source,
         destination=output,
         segments=active_segments,
@@ -261,11 +365,11 @@ def plan_export(
         fallback_container="mp4",
         fallback_pixel_format="yuv420p",
         output_policy=output_policy,
-        audio_decisions=(
-            ()
-            if persisted_audio_decision is None
-            else ((audio_source_id, persisted_audio_decision),)
-        ),
+        audio_decisions=plan_audio_decisions,
+        frame_rate_policy=plan_frame_rate_policy,
+        rate_decisions=plan_rate_decisions,
+        upscale_policy=resolved_upscale_policy.policy,
+        upscale_decisions=resolved_upscale_policy.decisions,
     )
 
 
@@ -281,6 +385,10 @@ def plan_mixed_export(
         AudioDecision | Mapping[str, Any],
     ]
     | None = None,
+    frame_rate_policy: (
+        FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, Any] | None
+    ) = None,
+    upscale_policy: UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, Any] | None = None,
 ) -> ExportPlan:
     """Plan a composed export for a timeline that references several sources."""
     timeline.validate()
@@ -289,33 +397,60 @@ def plan_mixed_export(
     probes = tuple(sources)
     if not probes:
         raise ExportPlanningError("At least one source is required for mixed export")
-    resolved_policy = (
-        resolve_output_policy([probe.metadata() for probe in probes]) if policy is None else policy
-    )
+    active_segments = tuple(segment for segment in timeline.segment_items if not segment.deleted)
+    if not active_segments or timeline.edited_duration_seconds <= 0:
+        raise ExportPlanningError("Cannot export an empty edit")
     if source_ids is None:
         source_ids = tuple(
-            segment.source_id for segment in timeline.segment_items if segment.source_id is not None
+            segment.source_id for segment in active_segments if segment.source_id is not None
         )
         source_ids = tuple(dict.fromkeys(source_ids))
     ids = tuple(source_ids)
     if len(ids) != len(probes):
         raise ExportPlanningError("Mixed export source identities do not match probes")
     source_by_id = dict(zip(ids, probes, strict=True))
-    active_segments = tuple(segment for segment in timeline.segment_items if not segment.deleted)
-    if not active_segments or timeline.edited_duration_seconds <= 0:
-        raise ExportPlanningError("Cannot export an empty edit")
     for segment in active_segments:
-        if segment.source_id not in source_by_id:
+        source_id = segment.source_id
+        if source_id is None or source_id not in source_by_id:
             raise ExportPlanningError(
-                f"Timeline block references an unavailable source: {segment.source_id}"
+                f"Timeline block references an unavailable source: {source_id}"
             )
-        probe = source_by_id[segment.source_id]
+        probe = source_by_id[source_id]
         if segment.end_seconds > probe.duration_seconds + _DURATION_TOLERANCE:
             raise ExportPlanningError(
                 f"Timeline block exceeds source duration: {segment.segment_id}"
             )
+    active_source_ids = tuple(
+        dict.fromkeys(
+            segment.source_id for segment in active_segments if segment.source_id is not None
+        )
+    )
+    active_probes = tuple(source_by_id[source_id] for source_id in active_source_ids)
+    source_metadata = tuple(
+        {
+            **probe.metadata(),
+            "source_id": source_id,
+        }
+        for source_id, probe in zip(active_source_ids, active_probes, strict=True)
+    )
+    resolved_fps_policy = _resolved_frame_rate_policy(
+        source_metadata,
+        frame_rate_policy,
+    )
+    resolved_upscale_policy = _resolved_upscale_policy(
+        source_metadata,
+        upscale_policy,
+    )
+    resolved_policy = (
+        resolve_output_policy(
+            source_metadata,
+            target_rate=(None if resolved_fps_policy is None else resolved_fps_policy.target_rate),
+        )
+        if policy is None
+        else policy
+    )
     output = Path(destination).expanduser()
-    source_paths = tuple(probe.path.expanduser().resolve() for probe in probes)
+    source_paths = tuple(probe.path.expanduser().resolve() for probe in active_probes)
     if output.resolve() in source_paths:
         raise ExportPlanningError("Export destination must differ from every source")
     decision_items = tuple(
@@ -323,7 +458,7 @@ def plan_mixed_export(
             source_id,
             _persisted_audio_decision(audio_decisions[source_id]),
         )
-        for source_id in ids
+        for source_id in active_source_ids
         if audio_decisions is not None and source_id in audio_decisions
     )
     composition_reason = (
@@ -331,8 +466,26 @@ def plan_mixed_export(
         if any(segment.has_visual_modifications for segment in active_segments)
         else ""
     )
+    rate_reason = ""
+    if resolved_fps_policy is not None:
+        if any(item.action == "interpolate" for item in resolved_fps_policy.decisions):
+            rate_reason = "; validated frame-rate enhancement is required for eligible sources"
+        elif any(
+            item.action in {"convert", "convert-down"} for item in resolved_fps_policy.decisions
+        ):
+            rate_reason = "; selected target frame rate requires conversion"
+    upscale_reason = ""
+    if resolved_upscale_policy.has_eligible_sources:
+        upscale_reason = (
+            "; validated SuperUltraCompact spatial enhancement is required for eligible sources"
+        )
     return ExportPlan(
-        route="fallback",
+        route=(
+            "enhanced"
+            if resolved_upscale_policy.has_eligible_sources
+            or (rate_reason and "enhancement" in rate_reason)
+            else "fallback"
+        ),
         source=source_paths[0],
         destination=output,
         segments=active_segments,
@@ -340,13 +493,19 @@ def plan_mixed_export(
         reason=(
             f"Mixed-source composition requires normalization: {resolved_policy.reason}"
             f"{composition_reason}"
+            f"{rate_reason}"
+            f"{upscale_reason}"
         ),
         fallback_video_codec=resolved_policy.video_codec,
         fallback_audio_codec=resolved_policy.audio_codec,
         fallback_container=resolved_policy.container,
         fallback_pixel_format=resolved_policy.pixel_format,
         source_paths=source_paths,
-        source_ids=ids,
+        source_ids=active_source_ids,
         output_policy=resolved_policy,
         audio_decisions=decision_items,
+        frame_rate_policy=(None if resolved_fps_policy is None else resolved_fps_policy.policy),
+        rate_decisions=(() if resolved_fps_policy is None else resolved_fps_policy.decisions),
+        upscale_policy=resolved_upscale_policy.policy,
+        upscale_decisions=resolved_upscale_policy.decisions,
     )

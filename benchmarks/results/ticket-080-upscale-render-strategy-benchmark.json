@@ -1,0 +1,1352 @@
+{
+  "schema_version": 1,
+  "benchmark": "ticket-080-upscale-render-strategy-benchmark",
+  "status": "passed",
+  "protocol": {
+    "source_ids": [
+      "landscape_1080p24",
+      "landscape_480p30",
+      "portrait_720x1280_30"
+    ],
+    "sources": [
+      {
+        "source_id": "landscape_1080p24",
+        "orientation": "landscape",
+        "fps": 24,
+        "duration_seconds": 40.0,
+        "width": 1920,
+        "height": 1080,
+        "audio": true
+      },
+      {
+        "source_id": "landscape_480p30",
+        "orientation": "landscape",
+        "fps": 30,
+        "duration_seconds": 40.0,
+        "width": 854,
+        "height": 480,
+        "audio": true
+      },
+      {
+        "source_id": "portrait_720x1280_30",
+        "orientation": "portrait",
+        "fps": 30,
+        "duration_seconds": 40.0,
+        "width": 720,
+        "height": 1280,
+        "audio": true
+      }
+    ],
+    "retained_ranges_seconds": {
+      "landscape_1080p24": {
+        "start": 10.0,
+        "duration": 10.0
+      },
+      "landscape_480p30": {
+        "start": 10.0,
+        "duration": 10.0
+      },
+      "portrait_720x1280_30": {
+        "start": 10.0,
+        "duration": 10.0
+      }
+    },
+    "portrait_triplicate": {
+      "source_id": "portrait_720x1280_30",
+      "layout": "three equal side-by-side slots"
+    },
+    "target_fps": "60/1",
+    "backend": "ffmpeg-minterpolate",
+    "native_rve_24_to_60": "supported for constant-frame-rate input via 3x integer RVE oversampling and exact 60 FPS GPU normalization; VFR remains unsupported",
+    "output_profile": {
+      "dimensions": "1920x1080",
+      "video_codec": "h264",
+      "pixel_format": "yuv420p",
+      "audio_codec": "aac",
+      "audio": "AAC 48kHz stereo",
+      "container": "mp4"
+    },
+    "verification_gates": [
+      "ffprobe metadata and frame count",
+      "FFmpeg decode/playability",
+      "source hash unchanged",
+      "partial/intermediate cleanup"
+    ],
+    "repetitions": 1
+  },
+  "environment": {
+    "platform": "Linux-7.2.0-1-cachyos-x86_64-with-glibc2.44",
+    "python": "3.14.7",
+    "ffmpeg": "available",
+    "ffprobe": "available",
+    "artifact_root": "~/Documents/edit/ticket-080-upscale-render-strategy-20260827",
+    "limits": "Single workstation; one cold repetition; generated fixtures; reports redact private paths.",
+    "rve": {
+      "available": true,
+      "executed": true,
+      "model": "SuperUltraCompact",
+      "native_24_to_60": "supported for constant-frame-rate input via 3x integer RVE oversampling and exact 60 FPS GPU normalization; VFR remains unsupported"
+    },
+    "fixture_generation": "passed",
+    "fixture_stages": [
+      {
+        "name": "generate landscape_1080p24 fixture",
+        "status": "passed",
+        "wall_seconds": 1.2254,
+        "output_bytes": 74336800,
+        "resource": {
+          "child_user_seconds": 8.0649,
+          "child_system_seconds": 0.3209,
+          "child_max_rss_kb_cumulative": 1086508
+        },
+        "error": null,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "utilization_percent": 5.0,
+          "memory_used_mb": 1125.0,
+          "power_watts": 34.0
+        }
+      },
+      {
+        "name": "generate landscape_480p30 fixture",
+        "status": "passed",
+        "wall_seconds": 0.5968,
+        "output_bytes": 18856736,
+        "resource": {
+          "child_user_seconds": 2.0655,
+          "child_system_seconds": 0.1401,
+          "child_max_rss_kb_cumulative": 1086508
+        },
+        "error": null,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "utilization_percent": 4.0,
+          "memory_used_mb": 1125.0,
+          "power_watts": 35.08
+        }
+      },
+      {
+        "name": "generate portrait_720x1280_30 fixture",
+        "status": "passed",
+        "wall_seconds": 0.843,
+        "output_bytes": 39977534,
+        "resource": {
+          "child_user_seconds": 4.4347,
+          "child_system_seconds": 0.24,
+          "child_max_rss_kb_cumulative": 1086508
+        },
+        "error": null,
+        "gpu": {
+          "name": "NVIDIA GeForce RTX 5070 Ti",
+          "utilization_percent": 5.0,
+          "memory_used_mb": 1125.0,
+          "power_watts": 34.8
+        }
+      }
+    ],
+    "source_preservation": {
+      "passed": true,
+      "hashes_compared": true,
+      "before": {
+        "landscape_1080p24.mp4": "fa7f20b4a6cc140b2a1ef35b9647a8f4a89cf062b7f7e74e9021b1f1bb436793",
+        "landscape_480p30.mp4": "bda863694432ecf6aa9b4635d6ea7f0691432c37a5ab698e6bfaf8c596e483ae",
+        "portrait_720x1280_30.mp4": "667e591d719df838b14b48854661c443ff74939955e5251d7b3533ac1f248075"
+      },
+      "after": {
+        "landscape_1080p24.mp4": "fa7f20b4a6cc140b2a1ef35b9647a8f4a89cf062b7f7e74e9021b1f1bb436793",
+        "landscape_480p30.mp4": "bda863694432ecf6aa9b4635d6ea7f0691432c37a5ab698e6bfaf8c596e483ae",
+        "portrait_720x1280_30.mp4": "667e591d719df838b14b48854661c443ff74939955e5251d7b3533ac1f248075"
+      }
+    },
+    "cleanup": {
+      "requested": true,
+      "passed": true,
+      "workdir_removed": true,
+      "error": null
+    },
+    "benchmark_gates": {
+      "status": "passed",
+      "strategies_passed": true,
+      "source_preservation_passed": true,
+      "cleanup_passed": true
+    }
+  },
+  "strategies": {
+    "production_per_source_rve": {
+      "status": "passed",
+      "ordering": "cut -> audio-preserving RVE restoration -> spatial crop/pad -> per-source 60 FPS minterpolate -> concatenate -> final encode",
+      "stages": [
+        {
+          "name": "cut retained 10s landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.369,
+          "output_bytes": 17802968,
+          "resource": {
+            "child_user_seconds": 2.539,
+            "child_system_seconds": 0.1256,
+            "child_max_rss_kb_cumulative": 1086508
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 34.41
+          }
+        },
+        {
+          "name": "cut retained 10s landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.2075,
+          "output_bytes": 4402993,
+          "resource": {
+            "child_user_seconds": 0.7347,
+            "child_system_seconds": 0.0694,
+            "child_max_rss_kb_cumulative": 1086508
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 34.38
+          }
+        },
+        {
+          "name": "cut retained 10s portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.2465,
+          "output_bytes": 9455414,
+          "resource": {
+            "child_user_seconds": 1.4967,
+            "child_system_seconds": 0.0856,
+            "child_max_rss_kb_cumulative": 1086508
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 34.59
+          }
+        },
+        {
+          "name": "RVE SuperUltraCompact restoration landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 6.1413,
+          "output_bytes": 7051711,
+          "resource": {
+            "child_user_seconds": 26.5213,
+            "child_system_seconds": 2.822,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 34.0
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.4359,
+          "output_bytes": 13807311,
+          "resource": {
+            "child_user_seconds": 3.2622,
+            "child_system_seconds": 0.1723,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 3.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 63.73
+          }
+        },
+        {
+          "name": "RVE SuperUltraCompact restoration landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 4.1017,
+          "output_bytes": 1884945,
+          "resource": {
+            "child_user_seconds": 9.4874,
+            "child_system_seconds": 1.2572,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 3.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 52.65
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.347,
+          "output_bytes": 8015772,
+          "resource": {
+            "child_user_seconds": 2.5615,
+            "child_system_seconds": 0.0976,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 3.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 78.33
+          }
+        },
+        {
+          "name": "RVE SuperUltraCompact restoration portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 4.8641,
+          "output_bytes": 4332119,
+          "resource": {
+            "child_user_seconds": 16.9827,
+            "child_system_seconds": 1.7497,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 3.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 64.11
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.3487,
+          "output_bytes": 9612038,
+          "resource": {
+            "child_user_seconds": 2.5644,
+            "child_system_seconds": 0.122,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 3.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 63.96
+          }
+        },
+        {
+          "name": "FPS minterpolate landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 190.5017,
+          "output_bytes": 20453161,
+          "resource": {
+            "child_user_seconds": 193.4542,
+            "child_system_seconds": 0.1826,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 63.71
+          }
+        },
+        {
+          "name": "FPS minterpolate landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 191.7425,
+          "output_bytes": 13234616,
+          "resource": {
+            "child_user_seconds": 194.5932,
+            "child_system_seconds": 0.1858,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1125.0,
+            "power_watts": 30.09
+          }
+        },
+        {
+          "name": "FPS minterpolate portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 145.0376,
+          "output_bytes": 14136501,
+          "resource": {
+            "child_user_seconds": 147.3632,
+            "child_system_seconds": 0.1719,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1047.0,
+            "power_watts": 31.78
+          }
+        },
+        {
+          "name": "concatenate processed sources",
+          "status": "passed",
+          "wall_seconds": 0.083,
+          "output_bytes": 47821942,
+          "resource": {
+            "child_user_seconds": 0.0564,
+            "child_system_seconds": 0.0391,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1047.0,
+            "power_watts": 32.68
+          }
+        },
+        {
+          "name": "final encode fixed canvas",
+          "status": "passed",
+          "wall_seconds": 2.2547,
+          "output_bytes": 46705617,
+          "resource": {
+            "child_user_seconds": 19.2133,
+            "child_system_seconds": 0.4697,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1047.0,
+            "power_watts": 32.82
+          }
+        }
+      ],
+      "total_wall_seconds": 546.6812,
+      "intermediate_bytes": 218717108,
+      "temporary_storage_bytes": 218717108,
+      "final_bytes": 46705617,
+      "output_artifact": "production_per_source_rve.mp4",
+      "subjective_quality_notes": "Manual review required for faces/text, edges, ringing, color, crop/pad, temporal stability, and triplicate behavior.",
+      "output": {
+        "duration_seconds": 30.0,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 1800,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 46705617
+      },
+      "verification": {
+        "expected_duration_seconds": 30.0,
+        "duration_tolerance_seconds": 0.05,
+        "expected_dimensions": "1920x1080",
+        "expected_fps": "60",
+        "expected_frames": 1800,
+        "expected_audio": true,
+        "duration_seconds_matches": true,
+        "width_matches": true,
+        "height_matches": true,
+        "video_codec_matches": true,
+        "pixel_format_matches": true,
+        "fps_matches": true,
+        "frames_matches": true,
+        "audio_matches": true,
+        "audio_codec_matches": true,
+        "audio_sample_rate_matches": true,
+        "audio_channels_matches": true,
+        "container_matches": true,
+        "passed": true
+      },
+      "playability": {
+        "passed": true,
+        "error": null
+      },
+      "output_sha256": "808fddd310f768b3618ea7c70be571d1a861d1c1816760942d47485c76d44975",
+      "visual_review": {
+        "contact_sheet": "production_per_source_rve.jpg",
+        "fixed_frames": [
+          "production_per_source_rve-0s.png",
+          "production_per_source_rve-10s.png",
+          "production_per_source_rve-20s.png",
+          "production_per_source_rve-29.5s.png"
+        ],
+        "fixed_timestamps_seconds": [
+          0,
+          10,
+          20,
+          29.5
+        ]
+      }
+    },
+    "concat_first_control": {
+      "status": "passed",
+      "ordering": "cut -> spatial crop/pad -> normalize all sources to 30 FPS -> concatenate -> 60 FPS control conversion -> final encode",
+      "stages": [
+        {
+          "name": "cut retained 10s landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.3961,
+          "output_bytes": 17802968,
+          "resource": {
+            "child_user_seconds": 2.5566,
+            "child_system_seconds": 0.1388,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.98
+          }
+        },
+        {
+          "name": "cut retained 10s landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.1748,
+          "output_bytes": 4402993,
+          "resource": {
+            "child_user_seconds": 0.7207,
+            "child_system_seconds": 0.0782,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.75
+          }
+        },
+        {
+          "name": "cut retained 10s portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.2719,
+          "output_bytes": 9455414,
+          "resource": {
+            "child_user_seconds": 1.4943,
+            "child_system_seconds": 0.0827,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.7
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.3844,
+          "output_bytes": 17108845,
+          "resource": {
+            "child_user_seconds": 2.9323,
+            "child_system_seconds": 0.133,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.94
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.4312,
+          "output_bytes": 11588387,
+          "resource": {
+            "child_user_seconds": 3.013,
+            "child_system_seconds": 0.1334,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.56
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.3686,
+          "output_bytes": 13061957,
+          "resource": {
+            "child_user_seconds": 2.6934,
+            "child_system_seconds": 0.1329,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.22
+          }
+        },
+        {
+          "name": "normalize landscape_1080p24 to concat FPS",
+          "status": "passed",
+          "wall_seconds": 0.4677,
+          "output_bytes": 16912011,
+          "resource": {
+            "child_user_seconds": 2.6673,
+            "child_system_seconds": 0.2463,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.4
+          }
+        },
+        {
+          "name": "normalize landscape_480p30 to concat FPS",
+          "status": "passed",
+          "wall_seconds": 0.511,
+          "output_bytes": 11066491,
+          "resource": {
+            "child_user_seconds": 2.8036,
+            "child_system_seconds": 0.2891,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.95
+          }
+        },
+        {
+          "name": "normalize portrait_720x1280_30 to concat FPS",
+          "status": "passed",
+          "wall_seconds": 0.4274,
+          "output_bytes": 11744997,
+          "resource": {
+            "child_user_seconds": 2.1534,
+            "child_system_seconds": 0.2354,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.33
+          }
+        },
+        {
+          "name": "concatenate normalized sources before FPS",
+          "status": "passed",
+          "wall_seconds": 0.0844,
+          "output_bytes": 39721027,
+          "resource": {
+            "child_user_seconds": 0.0531,
+            "child_system_seconds": 0.0355,
+            "child_max_rss_kb_cumulative": 2050612
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.53
+          }
+        },
+        {
+          "name": "FPS control after concatenation",
+          "status": "passed",
+          "wall_seconds": 2.2178,
+          "output_bytes": 44614461,
+          "resource": {
+            "child_user_seconds": 14.9962,
+            "child_system_seconds": 0.9538,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.52
+          }
+        },
+        {
+          "name": "final encode fixed canvas",
+          "status": "passed",
+          "wall_seconds": 1.9614,
+          "output_bytes": 43561775,
+          "resource": {
+            "child_user_seconds": 16.9162,
+            "child_system_seconds": 0.4452,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.04
+          }
+        }
+      ],
+      "total_wall_seconds": 7.6967,
+      "intermediate_bytes": 241041326,
+      "temporary_storage_bytes": 241041326,
+      "final_bytes": 43561775,
+      "output_artifact": "concat_first_control.mp4",
+      "subjective_quality_notes": "Manual review required for faces/text, edges, ringing, color, crop/pad, temporal stability, and triplicate behavior.",
+      "output": {
+        "duration_seconds": 30.0,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 1800,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 43561775
+      },
+      "verification": {
+        "expected_duration_seconds": 30.0,
+        "duration_tolerance_seconds": 0.05,
+        "expected_dimensions": "1920x1080",
+        "expected_fps": "60",
+        "expected_frames": 1800,
+        "expected_audio": true,
+        "duration_seconds_matches": true,
+        "width_matches": true,
+        "height_matches": true,
+        "video_codec_matches": true,
+        "pixel_format_matches": true,
+        "fps_matches": true,
+        "frames_matches": true,
+        "audio_matches": true,
+        "audio_codec_matches": true,
+        "audio_sample_rate_matches": true,
+        "audio_channels_matches": true,
+        "container_matches": true,
+        "passed": true
+      },
+      "playability": {
+        "passed": true,
+        "error": null
+      },
+      "output_sha256": "d5001539c57fc939ccffd01945336e548b3617f205b76c79f81f586fc0e9acc0",
+      "visual_review": {
+        "contact_sheet": "concat_first_control.jpg",
+        "fixed_frames": [
+          "concat_first_control-0s.png",
+          "concat_first_control-10s.png",
+          "concat_first_control-20s.png",
+          "concat_first_control-29.5s.png"
+        ],
+        "fixed_timestamps_seconds": [
+          0,
+          10,
+          20,
+          29.5
+        ]
+      }
+    },
+    "cut_first_control": {
+      "status": "passed",
+      "ordering": "cut -> spatial crop/pad -> per-source 60 FPS control conversion -> concatenate -> final encode",
+      "stages": [
+        {
+          "name": "cut retained 10s landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.391,
+          "output_bytes": 17802968,
+          "resource": {
+            "child_user_seconds": 2.5525,
+            "child_system_seconds": 0.1158,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.2
+          }
+        },
+        {
+          "name": "cut retained 10s landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.179,
+          "output_bytes": 4402993,
+          "resource": {
+            "child_user_seconds": 0.7475,
+            "child_system_seconds": 0.0533,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.98
+          }
+        },
+        {
+          "name": "cut retained 10s portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.2789,
+          "output_bytes": 9455414,
+          "resource": {
+            "child_user_seconds": 1.486,
+            "child_system_seconds": 0.1028,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.04
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.3796,
+          "output_bytes": 17108845,
+          "resource": {
+            "child_user_seconds": 2.8928,
+            "child_system_seconds": 0.1789,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.98
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.4157,
+          "output_bytes": 11588387,
+          "resource": {
+            "child_user_seconds": 3.0421,
+            "child_system_seconds": 0.1241,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.23
+          }
+        },
+        {
+          "name": "spatial scale/crop/pad portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.3753,
+          "output_bytes": 13061957,
+          "resource": {
+            "child_user_seconds": 2.6996,
+            "child_system_seconds": 0.134,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.51
+          }
+        },
+        {
+          "name": "FPS control landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.7038,
+          "output_bytes": 18850132,
+          "resource": {
+            "child_user_seconds": 4.3836,
+            "child_system_seconds": 0.2778,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.54
+          }
+        },
+        {
+          "name": "FPS control landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.7418,
+          "output_bytes": 11545612,
+          "resource": {
+            "child_user_seconds": 4.4376,
+            "child_system_seconds": 0.3046,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.61
+          }
+        },
+        {
+          "name": "FPS control portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.5806,
+          "output_bytes": 13865058,
+          "resource": {
+            "child_user_seconds": 3.4252,
+            "child_system_seconds": 0.272,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.55
+          }
+        },
+        {
+          "name": "concatenate processed sources",
+          "status": "passed",
+          "wall_seconds": 0.0821,
+          "output_bytes": 44258514,
+          "resource": {
+            "child_user_seconds": 0.058,
+            "child_system_seconds": 0.0378,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.67
+          }
+        },
+        {
+          "name": "final encode fixed canvas",
+          "status": "passed",
+          "wall_seconds": 2.1489,
+          "output_bytes": 46787816,
+          "resource": {
+            "child_user_seconds": 18.235,
+            "child_system_seconds": 0.5204,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.63
+          }
+        }
+      ],
+      "total_wall_seconds": 6.2767,
+      "intermediate_bytes": 208727696,
+      "temporary_storage_bytes": 208727696,
+      "final_bytes": 46787816,
+      "output_artifact": "cut_first_control.mp4",
+      "subjective_quality_notes": "Manual review required for faces/text, edges, ringing, color, crop/pad, temporal stability, and triplicate behavior.",
+      "output": {
+        "duration_seconds": 30.0,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 1800,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 46787816
+      },
+      "verification": {
+        "expected_duration_seconds": 30.0,
+        "duration_tolerance_seconds": 0.05,
+        "expected_dimensions": "1920x1080",
+        "expected_fps": "60",
+        "expected_frames": 1800,
+        "expected_audio": true,
+        "duration_seconds_matches": true,
+        "width_matches": true,
+        "height_matches": true,
+        "video_codec_matches": true,
+        "pixel_format_matches": true,
+        "fps_matches": true,
+        "frames_matches": true,
+        "audio_matches": true,
+        "audio_codec_matches": true,
+        "audio_sample_rate_matches": true,
+        "audio_channels_matches": true,
+        "container_matches": true,
+        "passed": true
+      },
+      "playability": {
+        "passed": true,
+        "error": null
+      },
+      "output_sha256": "f3144a678a5529fbcf29eb85899252ba9aad5afe4168f4c7d685180f4ff89467",
+      "visual_review": {
+        "contact_sheet": "cut_first_control.jpg",
+        "fixed_frames": [
+          "cut_first_control-0s.png",
+          "cut_first_control-10s.png",
+          "cut_first_control-20s.png",
+          "cut_first_control-29.5s.png"
+        ],
+        "fixed_timestamps_seconds": [
+          0,
+          10,
+          20,
+          29.5
+        ]
+      }
+    },
+    "full_source_before_cut_control": {
+      "status": "passed",
+      "ordering": "full-source control variant retained as an explicit comparison row; source ranges are cut before final assembly",
+      "stages": [
+        {
+          "name": "spatially prepare full source landscape_1080p24 before cut",
+          "status": "passed",
+          "wall_seconds": 1.4983,
+          "output_bytes": 70201966,
+          "resource": {
+            "child_user_seconds": 11.1135,
+            "child_system_seconds": 0.5169,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.8
+          }
+        },
+        {
+          "name": "cut retained 10s after spatial preparation landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.4582,
+          "output_bytes": 17017600,
+          "resource": {
+            "child_user_seconds": 3.213,
+            "child_system_seconds": 0.1489,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.2
+          }
+        },
+        {
+          "name": "spatially prepare full source landscape_480p30 before cut",
+          "status": "passed",
+          "wall_seconds": 1.6522,
+          "output_bytes": 45614406,
+          "resource": {
+            "child_user_seconds": 11.7856,
+            "child_system_seconds": 0.4922,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.96
+          }
+        },
+        {
+          "name": "cut retained 10s after spatial preparation landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.4672,
+          "output_bytes": 11150923,
+          "resource": {
+            "child_user_seconds": 3.2261,
+            "child_system_seconds": 0.1484,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.8
+          }
+        },
+        {
+          "name": "spatially prepare full source portrait_720x1280_30 before cut",
+          "status": "passed",
+          "wall_seconds": 1.5534,
+          "output_bytes": 53580395,
+          "resource": {
+            "child_user_seconds": 10.6744,
+            "child_system_seconds": 0.4798,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.92
+          }
+        },
+        {
+          "name": "cut retained 10s after spatial preparation portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.3851,
+          "output_bytes": 12118420,
+          "resource": {
+            "child_user_seconds": 2.5572,
+            "child_system_seconds": 0.116,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 4.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.79
+          }
+        },
+        {
+          "name": "FPS control landscape_1080p24",
+          "status": "passed",
+          "wall_seconds": 0.6898,
+          "output_bytes": 18867983,
+          "resource": {
+            "child_user_seconds": 4.4103,
+            "child_system_seconds": 0.2832,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.61
+          }
+        },
+        {
+          "name": "FPS control landscape_480p30",
+          "status": "passed",
+          "wall_seconds": 0.7113,
+          "output_bytes": 11218508,
+          "resource": {
+            "child_user_seconds": 4.3763,
+            "child_system_seconds": 0.2883,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 34.17
+          }
+        },
+        {
+          "name": "FPS control portrait_720x1280_30",
+          "status": "passed",
+          "wall_seconds": 0.5856,
+          "output_bytes": 12774573,
+          "resource": {
+            "child_user_seconds": 3.474,
+            "child_system_seconds": 0.2667,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.99
+          }
+        },
+        {
+          "name": "concatenate processed sources",
+          "status": "passed",
+          "wall_seconds": 0.0813,
+          "output_bytes": 42858728,
+          "resource": {
+            "child_user_seconds": 0.0552,
+            "child_system_seconds": 0.0389,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.94
+          }
+        },
+        {
+          "name": "final encode fixed canvas",
+          "status": "passed",
+          "wall_seconds": 2.1365,
+          "output_bytes": 45140474,
+          "resource": {
+            "child_user_seconds": 18.2398,
+            "child_system_seconds": 0.5276,
+            "child_max_rss_kb_cumulative": 3178664
+          },
+          "error": null,
+          "gpu": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 5.0,
+            "memory_used_mb": 1048.0,
+            "power_watts": 33.86
+          }
+        }
+      ],
+      "total_wall_seconds": 10.2189,
+      "intermediate_bytes": 340543976,
+      "temporary_storage_bytes": 340543976,
+      "final_bytes": 45140474,
+      "output_artifact": "full_source_before_cut_control.mp4",
+      "subjective_quality_notes": "Manual review required for faces/text, edges, ringing, color, crop/pad, temporal stability, and triplicate behavior.",
+      "output": {
+        "duration_seconds": 30.0,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 1800,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 45140474
+      },
+      "verification": {
+        "expected_duration_seconds": 30.0,
+        "duration_tolerance_seconds": 0.05,
+        "expected_dimensions": "1920x1080",
+        "expected_fps": "60",
+        "expected_frames": 1800,
+        "expected_audio": true,
+        "duration_seconds_matches": true,
+        "width_matches": true,
+        "height_matches": true,
+        "video_codec_matches": true,
+        "pixel_format_matches": true,
+        "fps_matches": true,
+        "frames_matches": true,
+        "audio_matches": true,
+        "audio_codec_matches": true,
+        "audio_sample_rate_matches": true,
+        "audio_channels_matches": true,
+        "container_matches": true,
+        "passed": true
+      },
+      "playability": {
+        "passed": true,
+        "error": null
+      },
+      "output_sha256": "b1e6a4f5adf0117ca5f618c0c39cb31d09232d4673d045a7bec77a4814959183",
+      "visual_review": {
+        "contact_sheet": "full_source_before_cut_control.jpg",
+        "fixed_frames": [
+          "full_source_before_cut_control-0s.png",
+          "full_source_before_cut_control-10s.png",
+          "full_source_before_cut_control-20s.png",
+          "full_source_before_cut_control-29.5s.png"
+        ],
+        "fixed_timestamps_seconds": [
+          0,
+          10,
+          20,
+          29.5
+        ]
+      }
+    }
+  },
+  "comparison": {
+    "facts": "Measured stage and end-to-end values are in strategy results.",
+    "subjective_quality_notes": "Contact sheets and fixed frames are retained for manual inspection; no numeric visual score is inferred.",
+    "recommendation": {
+      "selected_strategy": "production_per_source_rve",
+      "selected_strategy_role": "quality-oriented production candidate",
+      "rationale": "SuperUltraCompact restoration ran per source before spatial preparation; the 24 FPS source used the pre-fix FFmpeg minterpolate fallback. The current fractional RVE route is validated separately in TICKET-081.",
+      "selected_strategy_measurements": {
+        "status": "passed",
+        "total_wall_seconds": 546.6812,
+        "final_bytes": 46705617
+      },
+      "controls": {
+        "concat_first_control": {
+          "status": "passed",
+          "total_wall_seconds": 7.6967,
+          "final_bytes": 43561775
+        },
+        "cut_first_control": {
+          "status": "passed",
+          "total_wall_seconds": 6.2767,
+          "final_bytes": 46787816
+        },
+        "full_source_before_cut_control": {
+          "status": "passed",
+          "total_wall_seconds": 10.2189,
+          "final_bytes": 45140474
+        }
+      },
+      "control_quality_limitation": "Controls are no-enhancement timing/integrity controls using non-RVE FPS conversion; they are not quality-equivalent to the RVE production row and must not be used for a visual-quality ranking.",
+      "visual_quality_claim": "No numeric visual-quality claim is made.",
+      "scope_limits": [
+        "one cold run",
+        "synthetic testsrc2/sine fixtures",
+        "single workstation",
+        "production routing is unchanged"
+      ],
+      "review_artifacts": "Contact sheets and fixed frames require human inspection."
+    }
+  }
+}

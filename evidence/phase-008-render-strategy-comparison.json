@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "benchmark": "phase-008-render-strategy-comparison",
+  "status": "passed",
+  "protocol": {
+    "source_ids": [
+      "source_a",
+      "source_b"
+    ],
+    "sources": [
+      {
+        "source_id": "source_a",
+        "orientation": "landscape",
+        "fps": 10,
+        "duration_seconds": 1.2,
+        "width": 1920,
+        "height": 1080,
+        "audio": true
+      },
+      {
+        "source_id": "source_b",
+        "orientation": "landscape",
+        "fps": 15,
+        "duration_seconds": 1.2,
+        "width": 1920,
+        "height": 1080,
+        "audio": true
+      }
+    ],
+    "target_fps": "60/1",
+    "backend": "ffmpeg-minterpolate",
+    "output_profile": {
+      "dimensions": "1920x1080",
+      "video_codec": "h264",
+      "pixel_format": "yuv420p",
+      "audio_codec": "aac",
+      "audio": "AAC 48kHz stereo",
+      "container": "mp4"
+    },
+    "concat_mode": "FFmpeg concat demuxer with stream copy; preserves the prepared or interpolated video and audio streams",
+    "warm_cold_conditions": "one cold run per strategy; no cache warm-up",
+    "verification_gates": [
+      "ffprobe metadata and frame count",
+      "FFmpeg decode/playability",
+      "source hash unchanged",
+      "partial/intermediate cleanup"
+    ],
+    "repetitions": 1,
+    "stage_definitions": {
+      "A": [
+        "prepare each source at minimum input FPS",
+        "concatenate prepared sources at minimum FPS using stream copy",
+        "one enhancement pass on the unified master"
+      ],
+      "B": [
+        "prepare each source at its native FPS",
+        "enhance each prepared source independently",
+        "concatenate enhanced sources at target FPS using stream copy"
+      ]
+    }
+  },
+  "environment": {
+    "platform": "Linux",
+    "python": "3.14.7",
+    "ffmpeg": "available",
+    "ffprobe": "available",
+    "limits": "Single workstation, generated short fixtures, FFmpeg fallback backend.",
+    "rve": {
+      "available": "not assessed",
+      "artifact_status": "not exercised",
+      "executed": false,
+      "reason": "The matched run selected the available FFmpeg backend only."
+    },
+    "fixture_generation": "passed",
+    "source_preservation": {
+      "passed": true,
+      "hashes_compared": true
+    },
+    "cleanup": {
+      "requested": true,
+      "passed": true,
+      "workdir_removed": true,
+      "error": null
+    },
+    "benchmark_gates": {
+      "status": "passed",
+      "strategies_passed": true,
+      "source_preservation_passed": true,
+      "cleanup_passed": true
+    },
+    "fixture_stages": [
+      {
+        "name": "generate source_a fixture",
+        "status": "passed",
+        "wall_seconds": 0.0724,
+        "output_bytes": 1088216,
+        "resource": {
+          "child_user_seconds": 0.1301,
+          "child_system_seconds": 0.0383,
+          "child_max_rss_kb_cumulative": 271640
+        },
+        "error": null
+      },
+      {
+        "name": "generate source_b fixture",
+        "status": "passed",
+        "wall_seconds": 0.0827,
+        "output_bytes": 1370891,
+        "resource": {
+          "child_user_seconds": 0.1879,
+          "child_system_seconds": 0.043,
+          "child_max_rss_kb_cumulative": 337292
+        },
+        "error": null
+      }
+    ]
+  },
+  "strategies": {
+    "A": {
+      "status": "passed",
+      "stages": [
+        {
+          "name": "prepare source_a at minimum FPS",
+          "status": "passed",
+          "wall_seconds": 0.0937,
+          "output_bytes": 1086572,
+          "resource": {
+            "child_user_seconds": 0.1652,
+            "child_system_seconds": 0.0396,
+            "child_max_rss_kb_cumulative": 337292
+          },
+          "error": null
+        },
+        {
+          "name": "prepare source_b at minimum FPS",
+          "status": "passed",
+          "wall_seconds": 0.0862,
+          "output_bytes": 1054486,
+          "resource": {
+            "child_user_seconds": 0.1558,
+            "child_system_seconds": 0.0453,
+            "child_max_rss_kb_cumulative": 337292
+          },
+          "error": null
+        },
+        {
+          "name": "concatenate prepared sources",
+          "status": "passed",
+          "wall_seconds": 0.0399,
+          "output_bytes": 2139841,
+          "resource": {
+            "child_user_seconds": 0.0312,
+            "child_system_seconds": 0.0091,
+            "child_max_rss_kb_cumulative": 337292
+          },
+          "error": null
+        },
+        {
+          "name": "enhance unified master",
+          "status": "passed",
+          "wall_seconds": 51.084,
+          "output_bytes": 2233222,
+          "resource": {
+            "child_user_seconds": 54.1684,
+            "child_system_seconds": 0.4944,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "verify output integrity",
+          "status": "passed",
+          "wall_seconds": 0.4093,
+          "output_bytes": 0,
+          "resource": {
+            "child_user_seconds": 0.3923,
+            "child_system_seconds": 0.012,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "verify FFmpeg playability",
+          "status": "passed",
+          "wall_seconds": 0.1288,
+          "output_bytes": 0,
+          "resource": {
+            "child_user_seconds": 0.6,
+            "child_system_seconds": 0.0395,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        }
+      ],
+      "total_wall_seconds": 51.8419,
+      "intermediate_bytes": 4280899,
+      "final_bytes": 2233222,
+      "subjective_quality_notes": "Manual review required: inspect motion continuity, boundaries, and audio sync; not scored by this harness.",
+      "output": {
+        "duration_seconds": 2.4,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 144,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 2233222
+      },
+      "verification": {
+        "expected_duration_seconds": 2.4,
+        "duration_tolerance_seconds": 0.05,
+        "expected_dimensions": "1920x1080",
+        "expected_fps": "60",
+        "expected_frames": 144,
+        "expected_audio": true,
+        "expected_video_codec": "h264",
+        "expected_pixel_format": "yuv420p",
+        "expected_audio_codec": "aac",
+        "expected_container": "mp4",
+        "duration_seconds_matches": true,
+        "width_matches": true,
+        "height_matches": true,
+        "video_codec_matches": true,
+        "pixel_format_matches": true,
+        "fps_matches": true,
+        "frames_matches": true,
+        "audio_matches": true,
+        "audio_codec_matches": true,
+        "audio_sample_rate_matches": true,
+        "audio_channels_matches": true,
+        "container_matches": true,
+        "passed": true
+      },
+      "playability": {
+        "passed": true,
+        "error": null
+      }
+    },
+    "B": {
+      "status": "passed",
+      "stages": [
+        {
+          "name": "prepare source_a at native FPS",
+          "status": "passed",
+          "wall_seconds": 0.086,
+          "output_bytes": 1086572,
+          "resource": {
+            "child_user_seconds": 0.141,
+            "child_system_seconds": 0.0413,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "prepare source_b at native FPS",
+          "status": "passed",
+          "wall_seconds": 0.087,
+          "output_bytes": 1358884,
+          "resource": {
+            "child_user_seconds": 0.1917,
+            "child_system_seconds": 0.0507,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "enhance source_a to target FPS",
+          "status": "passed",
+          "wall_seconds": 19.6781,
+          "output_bytes": 1064644,
+          "resource": {
+            "child_user_seconds": 21.1075,
+            "child_system_seconds": 0.1642,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "enhance source_b to target FPS",
+          "status": "passed",
+          "wall_seconds": 19.1826,
+          "output_bytes": 1224521,
+          "resource": {
+            "child_user_seconds": 20.8346,
+            "child_system_seconds": 0.1351,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "concatenate enhanced sources",
+          "status": "passed",
+          "wall_seconds": 0.0501,
+          "output_bytes": 2287886,
+          "resource": {
+            "child_user_seconds": 0.0394,
+            "child_system_seconds": 0.011,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "verify output integrity",
+          "status": "passed",
+          "wall_seconds": 0.4066,
+          "output_bytes": 0,
+          "resource": {
+            "child_user_seconds": 0.3912,
+            "child_system_seconds": 0.0139,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        },
+        {
+          "name": "verify FFmpeg playability",
+          "status": "passed",
+          "wall_seconds": 0.1259,
+          "output_bytes": 0,
+          "resource": {
+            "child_user_seconds": 0.5933,
+            "child_system_seconds": 0.0472,
+            "child_max_rss_kb_cumulative": 1727192
+          },
+          "error": null
+        }
+      ],
+      "total_wall_seconds": 39.6163,
+      "intermediate_bytes": 4734621,
+      "final_bytes": 2287886,
+      "subjective_quality_notes": "Manual review required: inspect motion continuity, boundaries, and audio sync; not scored by this harness.",
+      "output": {
+        "duration_seconds": 2.421354,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 144,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 2287886
+      },
+      "verification": {
+        "expected_duration_seconds": 2.4,
+        "duration_tolerance_seconds": 0.05,
+        "expected_dimensions": "1920x1080",
+        "expected_fps": "60",
+        "expected_frames": 144,
+        "expected_audio": true,
+        "expected_video_codec": "h264",
+        "expected_pixel_format": "yuv420p",
+        "expected_audio_codec": "aac",
+        "expected_container": "mp4",
+        "duration_seconds_matches": true,
+        "width_matches": true,
+        "height_matches": true,
+        "video_codec_matches": true,
+        "pixel_format_matches": true,
+        "fps_matches": true,
+        "frames_matches": true,
+        "audio_matches": true,
+        "audio_codec_matches": true,
+        "audio_sample_rate_matches": true,
+        "audio_channels_matches": true,
+        "container_matches": true,
+        "passed": true
+      },
+      "playability": {
+        "passed": true,
+        "error": null
+      }
+    }
+  },
+  "comparison": {
+    "facts": "Measured stage and end-to-end values are in strategy results.",
+    "subjective_quality_notes": "Manual visual review is separate from measured correctness; no numeric quality score is inferred."
+  }
+}

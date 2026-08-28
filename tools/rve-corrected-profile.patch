@@ -1,0 +1,117 @@
+diff --git a/backend/src/FFmpegBuffers.py b/backend/src/FFmpegBuffers.py
+index e7b22f1..a5553ed 100644
+--- a/backend/src/FFmpegBuffers.py
++++ b/backend/src/FFmpegBuffers.py
+@@ -59,7 +59,11 @@ class FFmpegRead(Buffer):
+         self.color_primaries = color_primaries
+         self.color_transfer = color_transfer
+         self.input_pixel_format = input_pixel_format
+-        self.yuv420pMOD = self.input_pixel_format == "yuv420p" and not self.hdr_mode
++        self.yuv420pMOD = (
++            self.input_pixel_format == "yuv420p"
++            and not self.hdr_mode
++            and os.environ.get("RVE_RGB_INPUT") != "1"
++        )
+         self.ffmpeg_path = ffmpeg_path
+         #self.yuv420pMOD = False
+         if self.hdr_mode:
+@@ -88,10 +92,14 @@ class FFmpegRead(Buffer):
+         ]
+ 
+         filter_string = f"crop={self.width}:{self.height}:{self.borderX}:{self.borderY},scale=w=iw*sar:h=ih" #+ ":in_range=limited:out_range=full,format=yuv420p" if self.yuv420pMOD == "yuv420p" else "" # fix dar != sar
++        if os.environ.get("RVE_RGB_INPUT") == "1" and not self.hdr_mode:
++            filter_string += ",format=rgb24"
+         #if not self.hdr_mode:
+         #    if self.input_pixel_format == "yuv420p":
+         #        filter_string += ":in_range=tv:out_range=full" # color shifts a smidgen but helps with artifacts when converting yuv to raw
+         command += [
++            "-fps_mode",
++            "passthrough",
+             "-vf",
+             filter_string,
+             "-f",
+@@ -215,11 +223,18 @@ class FFmpegWrite(Buffer):
+         self.color_transfer = color_transfer
+         self.ffmpeg_path = ffmpeg_path
+         self.ffmpeg_log_file = ffmpeg_log_file
+-        self.outputFPS = (
+-            (self.fps * self.interpolateFactor)
+-            if not self.slowmo_mode
+-            else self.fps
+-        )
++        configured_output_fps = os.environ.get("RVE_OUTPUT_FPS")
++        if configured_output_fps:
++            try:
++                self.outputFPS = float(configured_output_fps)
++            except ValueError as error:
++                raise ValueError("RVE_OUTPUT_FPS must be a number") from error
++        else:
++            self.outputFPS = (
++                (self.fps * self.interpolateFactor)
++                if not self.slowmo_mode
++                else self.fps
++            )
+         self.ffmpeg_log = open(self.ffmpeg_log_file, "w", encoding='utf-8')
+         try:
+             command = self.command()
+diff --git a/backend/src/RenderVideo.py b/backend/src/RenderVideo.py
+index 85b2e77..24245e9 100644
+--- a/backend/src/RenderVideo.py
++++ b/backend/src/RenderVideo.py
+@@ -322,6 +322,7 @@ class Render:
+     def render(self):
+         frames_rendered = 0
++        last_output_frame = None
+         """
+         from viztracer import VizTracer
+         tracer = VizTracer()
+@@ -384,13 +385,25 @@ class Render:
+                                                target_height=self.height*self.override_upscale_scale,)
+ 
+                 
++                output_frame = (
++                    frame.get_frame_bytes() if type(frame) != bytes else frame
++                )
+                 self.informationHandler.setFramesRendered(frames_rendered)
+-                self.informationHandler.setPreviewFrame(frame.get_frame_bytes() if type(frame) != bytes else frame)
+-                
+-                self.writeBuffer.writeQueue.put(frame.get_frame_bytes() if type(frame) != bytes else frame)
++                self.informationHandler.setPreviewFrame(output_frame)
++                self.writeBuffer.writeQueue.put(output_frame)
++                last_output_frame = output_frame
+                 frames_rendered += int(self.ceilInterpolateFactor)
+             else:
+                 sleep(1)
++
++        if (
++            self.interpolateModel
++            and os.environ.get("RVE_EXACT_FRAME_COUNT") == "1"
++            and last_output_frame is not None
++        ):
++            for _ in range(self.ceilInterpolateFactor - 1):
++                self.writeBuffer.writeQueue.put(last_output_frame)
++
+         self.writeBuffer.writeQueue.put(None)
+         """
+         tracer.stop()
+diff --git a/backend/src/pytorch/TensorRTHandler.py b/backend/src/pytorch/TensorRTHandler.py
+index 27f97cf..d71810b 100644
+--- a/backend/src/pytorch/TensorRTHandler.py
++++ b/backend/src/pytorch/TensorRTHandler.py
+@@ -176,6 +176,11 @@ class TorchTensorRTHandler:
+                 min_block_size=1,
+                 max_aux_streams=self.max_aux_streams,
+                 optimization_level=self.optimization_level,
++                torch_executed_ops=(
++                    {torch.ops.aten.pixel_shuffle.default}
++                    if os.environ.get("RVE_TRT_TORCH_PIXEL") == "1"
++                    else None
++                ),
+                 #tiling_optimization_level="full",
+             )
+         
+@@ -206,4 +211,3 @@ class TorchTensorRTHandler:
+         trt_engine_path = os.path.join(self.model_parent_path, trt_engine_name)
+         print(f"Loading TensorRT engine from {trt_engine_path}.", file=sys.stderr)
+         return torch.jit.load(trt_engine_path).eval()
+-
