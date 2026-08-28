@@ -25,22 +25,24 @@ the first horizon without an approved scope change.
 ## Existing repository surfaces
 
 - `framestudio_media.py`: FrameStudio/Resolve-compatible media preparation and
-  curses TUI.
+  curses TUI, exposed globally as `framestudio media`.
 - `framestudio_concat.py`: video selection, concatenation, audio analysis, and
-  integrated FPS workflow.
-- `framestudio_fps.py`: direct and integrated RIFE/FPS processing.
+  integrated FPS workflow, exposed globally as `framestudio concat`.
+- `framestudio_fps.py`: direct and integrated RIFE/FPS processing, exposed
+  globally as `framestudio fps`.
 - `tests/`: Python `unittest` coverage for the existing scripts.
 - `benchmarks/`: FPS pipeline harnesses.
 - `FAST-CONCAT-RESEARCH.md`, `FLOWFRAMES-RESEARCH.md`, and
   `FPS-ENHANCEMENT-RESEARCH.md`: research evidence, not automatic product
   requirements.
-- `install.sh`: installs canonical FrameStudio commands and legacy aliases into
-  `~/bin`.
+- `install.sh`: installs the single canonical `framestudio` command into
+  `~/bin` and removes obsolete workflow aliases.
 
-FrameStudio is the canonical product identity. The `resolve_*` scripts,
-`resolve-*` commands, legacy `resolve_editor` imports, and `.resolve.json`
-projects are compatibility surfaces and must continue to work unless an
-approved migration removes them.
+FrameStudio is the canonical product identity. The `resolve_*` scripts, legacy
+`resolve_editor` imports, and `.resolve.json` projects are compatibility
+surfaces and must continue to work unless an approved migration removes them.
+The old `resolve-*` and separate `framestudio-*` global command aliases are no
+longer installed.
 
 The editor UI, project model, playback layer, and editor CLI now live under
 `framestudio/` and `framestudio.py`. The approved foundation uses GTK 4,
@@ -85,7 +87,7 @@ Existing operational commands documented in `README.md` include:
 ./install.sh
 ./framestudio_media.py --help
 ./framestudio_media.py --dry-run --root <directory>
-framestudio-concat --dry-run <directory>
+framestudio concat --dry-run <directory>
 ```
 
 Do not add a formatter, linter, type checker, build system, or dependency

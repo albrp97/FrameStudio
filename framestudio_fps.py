@@ -1642,8 +1642,13 @@ def run_pipeline(
         return 0
 
 
-def parse_arguments(argv: list[str] | None = None) -> Namespace:
+def parse_arguments(
+    argv: list[str] | None = None,
+    *,
+    prog: str | None = None,
+) -> Namespace:
     parser = argparse.ArgumentParser(
+        prog=prog,
         description=("Enhance video to a target FPS; no input opens the video selector TUI.")
     )
     parser.add_argument(
@@ -1722,8 +1727,8 @@ def run_combined_pipeline(
     return run_pipeline(paths, current_dir, arguments)
 
 
-def main(argv: list[str] | None = None) -> int:
-    arguments = parse_arguments(argv)
+def main(argv: list[str] | None = None, *, prog: str | None = None) -> int:
+    arguments = parse_arguments(argv, prog=prog)
     requested_output = arguments.output.expanduser().resolve() if arguments.output else None
     arguments.output = requested_output
     if arguments.input_path is None:

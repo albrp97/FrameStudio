@@ -29,9 +29,9 @@ help:
 		'make editor     Launch the GTK editor (pass ARGS="...")' \
 		'make cli        Run deterministic editor CLI commands (pass ARGS="...")' \
 		'make smoke      Run generated-media editor smoke flows' \
-		'make media      Run framestudio_media.py (pass ARGS="...")' \
-		'make concat     Run framestudio_concat.py (pass ARGS="...")' \
-		'make fps        Run framestudio_fps.py (pass ARGS="...")' \
+		'make media      Run framestudio media (pass ARGS="...")' \
+		'make concat     Run framestudio concat (pass ARGS="...")' \
+		'make fps        Run framestudio fps (pass ARGS="...")' \
 		'make restoration-benchmark  Run the research benchmark (pass ARGS="...")' \
 		'make install    Install command wrappers into ~/bin'
 
@@ -149,13 +149,13 @@ smoke:
 	$(PYTHON) framestudio.py --project "$$project" --smoke-test
 
 media:
-	$(PYTHON) framestudio_media.py $(ARGS)
+	$(PYTHON) framestudio.py media $(ARGS)
 
 concat:
-	$(PYTHON) framestudio_concat.py $(ARGS)
+	$(PYTHON) framestudio.py concat $(ARGS)
 
 fps:
-	$(PYTHON) framestudio_fps.py $(ARGS)
+	$(PYTHON) framestudio.py fps $(ARGS)
 
 restoration-benchmark:
 	$(PYTHON) benchmarks/restoration_benchmark.py $(ARGS)

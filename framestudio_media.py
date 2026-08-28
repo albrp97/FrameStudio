@@ -90,6 +90,8 @@ class MediaInfo:
     @property
     def duration(self) -> float:
         value = self.format.get("duration")
+        if value is None:
+            return 0.0
         try:
             return max(0.0, float(value))
         except (TypeError, ValueError):
@@ -722,7 +724,16 @@ class FrameStudioTUI:
             classification = classify(info)
             if existing_generated_output(info, self.profile):
                 classification = Classification(True, False, False, "PREPARED", "valid generated output exists")
-            self.entries.append(Entry(path, False, path in self.selection, classification.label, classification.reason, info.duration))
+            self.entries.append(
+                Entry(
+                    path,
+                    False,
+                    path in self.selection,
+                    classification.label,
+                    classification.reason,
+                    duration=info.duration,
+                )
+            )
         self.cursor = min(self.cursor, max(0, len(self.entries) - 1))
 
     def selected_paths(self) -> list[Path]:
@@ -1043,8 +1054,11 @@ def dry_run(root: Path, profile: str = DEFAULT_PROFILE) -> int:
     return 0
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Prepare media for FrameStudio (fast DNxHR/PCM by default).")
+def build_parser(*, prog: str | None = None) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="Prepare media for FrameStudio (fast DNxHR/PCM by default).",
+    )
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help=f"root folder (default: {DEFAULT_ROOT})")
     parser.add_argument("--dry-run", action="store_true", help="scan and report; never convert or delete")
     deletion = parser.add_mutually_exclusive_group()
@@ -1070,14 +1084,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="temporarily use the system performance profile and restore it afterward (default: auto)",
     )
     parser.set_defaults(delete_originals=True)
-    parser.add_argument("--version", action="version", version=f"framestudio-media {VERSION}")
+    version_name = prog or "framestudio-media"
+    parser.add_argument("--version", action="version", version=f"{version_name} {VERSION}")
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+def main(argv: list[str] | None = None, *, prog: str | None = None) -> int:
+    parser = build_parser(prog=prog)
+    args = parser.parse_args(argv)
     if args.jobs < 0:
-        build_parser().error("--jobs must be zero or greater")
+        parser.error("--jobs must be zero or greater")
     root = args.root.expanduser()
     profile = normalize_profile(args.profile)
     if args.dry_run:

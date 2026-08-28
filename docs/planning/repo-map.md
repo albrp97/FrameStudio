@@ -94,7 +94,7 @@ Baseline command:
 - `./framestudio.py --help`
 - `./framestudio_media.py --help`
 - `./framestudio_media.py --dry-run --root <directory>`
-- `framestudio-concat --dry-run <directory>`
+- `framestudio concat --dry-run <directory>`
 
 The media-dependent script commands require suitable media/tooling; no claim
 is made that they pass for every environment.

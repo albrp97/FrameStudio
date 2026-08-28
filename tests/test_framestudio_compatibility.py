@@ -1,9 +1,11 @@
 import importlib
+import os
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from framestudio.export_naming import LEGACY_PROJECT_SUFFIX, PROJECT_SUFFIX
 from framestudio.model import Project
@@ -85,3 +87,94 @@ class FrameStudioCompatibilityTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("framestudio", result.stdout.casefold())
+
+    def test_global_workflow_subcommands_forward_to_canonical_modules(self):
+        from framestudio.entrypoint import main
+
+        for command, module_name in (
+            ("media", "framestudio_media"),
+            ("concat", "framestudio_concat"),
+            ("fps", "framestudio_fps"),
+        ):
+            with self.subTest(command=command):
+                module = importlib.import_module(module_name)
+                with patch.object(module, "main", return_value=23) as workflow_main:
+                    self.assertEqual(main([command, "--dry-run"]), 23)
+                    workflow_main.assert_called_once_with(
+                        ["--dry-run"],
+                        prog=f"framestudio {command}",
+                    )
+
+    def test_global_workflow_help_uses_framestudio_command_name(self):
+        environment = os.environ.copy()
+        environment.pop("FORCE_COLOR", None)
+        for command in ("media", "concat", "fps"):
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [sys.executable, "framestudio.py", command, "--help"],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"usage: framestudio {command}", result.stdout)
+
+    def test_global_editor_help_uses_framestudio_command_name(self):
+        environment = os.environ.copy()
+        environment.pop("FORCE_COLOR", None)
+        result = subprocess.run(
+            [sys.executable, "framestudio.py", "--help"],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("usage: framestudio ", result.stdout)
+
+    def test_install_creates_only_the_unified_global_command(self):
+        obsolete_names = (
+            "framestudio-media",
+            "framestudio-concat",
+            "framestudio-fps",
+            "framestudio-editor",
+            "resolve-editor",
+            "resolve-media",
+            "resolve-concat",
+            "resolve-fps",
+        )
+        repository = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as temporary_directory:
+            home = Path(temporary_directory)
+            bin_directory = home / "bin"
+            bin_directory.mkdir()
+            for name in obsolete_names:
+                (bin_directory / name).write_text("obsolete\n")
+
+            environment = os.environ.copy()
+            environment["HOME"] = str(home)
+            result = subprocess.run(
+                [str(repository / "install.sh")],
+                cwd=repository,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                {path.name for path in bin_directory.iterdir()},
+                {"framestudio"},
+            )
+            version = subprocess.run(
+                [str(bin_directory / "framestudio"), "--version"],
+                cwd=Path("/"),
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(version.returncode, 0, version.stderr)
+            self.assertIn("framestudio", version.stdout.casefold())

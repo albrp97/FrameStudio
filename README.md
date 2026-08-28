@@ -2,15 +2,17 @@
 
 FrameStudio is a local Linux video editor with a deterministic CLI, GTK
 playback UI, timeline editing, and safe FFmpeg export. Its supporting
-`framestudio-media` command is a dependency-free Python/curses browser and
+`framestudio media` workflow is a dependency-free Python/curses browser and
 preparation tool for Resolve-compatible media workflows. It starts in
 `~/Documents/edit`, or accepts a different root with `--root`. The default
 profile is optimized for speed and editing compatibility rather than
 mathematical losslessness.
 
-The canonical editor command is `framestudio`. `framestudio-editor` remains an
-explicit alias, and the legacy `resolve-*` commands and Python entrypoints
-continue to forward to the same implementation for existing workflows.
+The only globally installed command is `framestudio`. The editor opens with no
+subcommand, while media preparation, concatenation, and FPS enhancement use
+the `media`, `concat`, and `fps` subcommands. The repository's Python
+entrypoints and legacy imports remain available for compatibility, but
+separate workflow command aliases are not installed.
 
 ## Safety and codec policy
 
@@ -52,23 +54,23 @@ required. It writes FFV1 video and PCM audio to Matroska (`.mkv`). The legacy
 ## Usage
 
 ```sh
-framestudio-media
-framestudio-media --root ~/Videos/to-edit
-framestudio-media --dry-run --root ~/Documents/edit
-framestudio-media --profile fast --root ~/Videos/to-edit
-framestudio-media --profile lossless --root ~/Videos/to-edit --gpu on
-framestudio-media --jobs 1                 # force sequential processing
-framestudio-media --performance-mode off   # leave the current system profile alone
-framestudio-media --keep-originals    # opt out of the default Trash move
-framestudio-media --gpu off            # disable NVIDIA acceleration for lossless mode
-framestudio-media --gpu auto           # quiet GPU detection with CPU fallback
-framestudio-media --version
+framestudio media
+framestudio media --root ~/Videos/to-edit
+framestudio media --dry-run --root ~/Documents/edit
+framestudio media --profile fast --root ~/Videos/to-edit
+framestudio media --profile lossless --root ~/Videos/to-edit --gpu on
+framestudio media --jobs 1                 # force sequential processing
+framestudio media --performance-mode off   # leave the current system profile alone
+framestudio media --keep-originals    # opt out of the default Trash move
+framestudio media --gpu off            # disable NVIDIA acceleration for lossless mode
+framestudio media --gpu auto           # quiet GPU detection with CPU fallback
+framestudio media --version
 ```
 
 To open the combined concat-and-FPS selector anywhere in a terminal:
 
 ```sh
-framestudio-concat
+framestudio concat
 ```
 
 To open the focused one-source editor:
@@ -409,12 +411,12 @@ press `Enter` to run the complete workflow. One selected video goes directly
 to FPS enhancement with audio stream-copy; multiple selected videos are
 concatenated once and then enhanced globally. `a` selects every video in the
 current folder, `n` clears the selection, and `Left/h/Backspace` goes up. Use
-`framestudio-concat --root ~/Videos` to start in a different folder.
+`framestudio concat --root ~/Videos` to start in a different folder.
 
 For a non-interactive run, pass the folder directly:
 
 ```sh
-framestudio-concat ~/Documents/edit/copy
+framestudio concat ~/Documents/edit/copy
 ```
 
 For a multiple-video run it chooses the most common resolution and the lowest
@@ -500,11 +502,11 @@ Use `--concat-only` to reproduce the older one-process concat behavior.
 
 ### FPS enhancement: concatenate first, then interpolate once
 
-The single-tool production workflow is `framestudio-concat`; the installed
-`framestudio-fps` command remains available for direct FPS-only use:
+The single-tool production workflow is `framestudio concat`; direct FPS-only
+processing is available as the `framestudio fps` subcommand:
 
 ```sh
-framestudio-concat
+framestudio concat
 ```
 
 Select one video and it goes directly to the selected FPS backend: no
@@ -512,9 +514,9 @@ concatenation and no audio transformation are performed; the original audio
 stream is copied into the final MP4. When multiple videos are selected, they
 are concatenated once with audio normalization disabled, then one global FPS
 enhancement pass runs over the temporary master. Use
-`framestudio-fps /path/to/video.mp4 --force` only when a separate FPS-only command
-is desired. Run `./install.sh` once to install both
-commands into `~/bin`.
+`framestudio fps /path/to/video.mp4 --force` only when a separate FPS-only
+workflow is desired. Run `./install.sh` once to install the single
+`framestudio` command into `~/bin`.
 
 During interpolation the console shows a live Pacman-style bar with percent,
 frame count, end-to-end pipeline FPS, elapsed time, and ETA. The displayed
@@ -578,12 +580,12 @@ INPUT_DIR="$HOME/Documents/edit/copy"
 MASTER="$HOME/Documents/edit/copy-concatenated-29.97fps.mp4"
 OUTPUT="$HOME/Documents/edit/copy-concatenated-rife4.26-60fps.mp4"
 
-framestudio-concat "$INPUT_DIR" --concat-only --output "$MASTER" --mode auto \
+framestudio concat "$INPUT_DIR" --concat-only --output "$MASTER" --mode auto \
   --audio-normalization off --performance-mode off --force
 
 # This is the normal integrated command; it concatenates once and uses RVE
 # when available, otherwise the validated FFmpeg fallback.
-framestudio-concat "$INPUT_DIR" --engine rve --output "$OUTPUT" \
+framestudio concat "$INPUT_DIR" --engine rve --output "$OUTPUT" \
   --performance-mode auto --force
 ```
 
@@ -653,7 +655,7 @@ nvidia-smi
 ffmpeg -hide_banner -decoders | grep cuvid
 ffmpeg -hide_banner -encoders | grep -E 'dnxhd|ffv1_vulkan'
 powerprofilesctl get
-framestudio-media --dry-run --root ~/Documents/edit
+framestudio media --dry-run --root ~/Documents/edit
 ```
 
 The implementation keeps the source safe by using atomic partial outputs,
@@ -661,7 +663,7 @@ ffprobe verification, automatic GPU-to-CPU fallback for lossless mode, and
 `gio trash` only after successful verification. Performance mode restoration is
 also guarded so a profile changed externally is not overwritten. If the TUI or
 conversion path misbehaves, rerun with
-`framestudio-media --profile fast --gpu off --keep-originals`; this gives a
+`framestudio media --profile fast --gpu off --keep-originals`; this gives a
 non-destructive recovery path. Use `--profile lossless --gpu off` to force the
 CPU lossless encoder.
 
@@ -673,12 +675,10 @@ From this directory:
 ./install.sh
 ```
 
-This creates `~/bin/framestudio`, `~/bin/framestudio-media`,
-`~/bin/framestudio-concat`, and `~/bin/framestudio-fps`; the requested
-environment already has `~/bin` on `PATH`. `framestudio-editor` is an explicit
-editor alias, and the four legacy `resolve-*` command names are installed as
-compatibility aliases. FFmpeg (`ffmpeg` and `ffprobe`) and the GTK 4/PyGObject
-runtime must be installed for the editor.
+This creates only `~/bin/framestudio`; the requested environment already has
+`~/bin` on `PATH`. Re-running the installer removes obsolete
+`framestudio-*` and `resolve-*` workflow aliases. FFmpeg (`ffmpeg` and
+`ffprobe`) and the GTK 4/PyGObject runtime must be installed for the editor.
 
 ## Checks
 
@@ -687,5 +687,5 @@ python3 -m py_compile framestudio_media.py tests/test_classification.py
 python3 -m unittest discover -s tests
 ./framestudio_media.py --help
 ./framestudio_media.py --dry-run --root ~/Documents/edit
-framestudio-concat --dry-run ~/Documents/edit/copy
+framestudio concat --dry-run ~/Documents/edit/copy
 ```

@@ -62,7 +62,7 @@ original media was not modified. The normalized target was 1920x1080 at
 
 | Method | Sample | Elapsed | Result |
 | --- | ---: | ---: | --- |
-| Compatible stream copy through `framestudio-concat` | 3 compatible parts, about 40 s | 0.26 s | Valid and lossless |
+| Compatible stream copy through `framestudio concat` | 3 compatible parts, about 40 s | 0.26 s | Valid and lossless |
 | Direct mixed-input `ffmpeg -c copy` | 2 incompatible parts, about 24 s | completed quickly | Invalid timing: reported duration about 4.3 hours |
 | Current single-process GPU concat filter | 2 mixed parts, about 24 s | 4.09 s | Valid target output |
 | Current single-process CPU `libx264` path | 2 mixed parts, about 24 s | 11.86 s | Valid target output |
@@ -243,7 +243,7 @@ normalizer.
 The implemented automated path is:
 
 ```sh
-framestudio-concat ~/Documents/edit/copy \
+framestudio concat ~/Documents/edit/copy \
   --output ~/Documents/edit/copy-concatenated-29.97fps-parallel.mp4 \
   --force --jobs 3
 ```
@@ -251,7 +251,7 @@ framestudio-concat ~/Documents/edit/copy \
 For a controlled single-process comparison:
 
 ```sh
-framestudio-concat ~/Documents/edit/copy \
+framestudio concat ~/Documents/edit/copy \
   --output ~/Documents/edit/copy-concatenated-29.97fps-single-current.mp4 \
   --force --strategy single
 ```

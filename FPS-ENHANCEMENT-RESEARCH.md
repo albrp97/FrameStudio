@@ -12,7 +12,7 @@ evaluation, concat/interpolation integration benchmark, and end-to-end
 30-second pipeline comparison are now included below.
 Performance numbers are labeled as local measurements, upstream measurements,
 or estimates. The corrected RVE adapter is now the default backend for the
-unified `framestudio-concat` workflow; the earlier isolated renders remain useful
+unified `framestudio concat` workflow; the earlier isolated renders remain useful
 as reproducible comparison points.
 
 ## Executive decision
@@ -516,10 +516,10 @@ enough evidence to replace the production path; the integrated benchmark
 below applies the exact timeline, audio, cleanup, and artifact safeguards
 before selecting a default.
 
-### Integrated `framestudio-concat` RVE benchmark
+### Integrated `framestudio concat` RVE benchmark
 
 The corrected adapter was then wired into the repository's unified
-`framestudio-concat` workflow and benchmarked against the existing `vs-rife`
+`framestudio concat` workflow and benchmarked against the existing `vs-rife`
 implementation. Both engines used RIFE 4.26, selective TensorRT FP16 with
 the PyTorch `aten.pixel_shuffle` fallback, scene detection, NVENC preset
 `p1`, constant QP 18, copied AAC, and temporary performance mode. The
@@ -552,10 +552,10 @@ The integrated benchmark artifacts are retained here:
 /home/ghiki/.cache/framestudio-fps/rve-integration-benchmark/vs-three.mp4
 ```
 
-The default command is now:
+The default workflow is now:
 
 ```sh
-framestudio-concat [folder-or-video]
+framestudio concat [folder-or-video]
 ```
 
 Use `--engine vs-rife` for the fallback. The RVE adapter requires the corrected
@@ -1372,9 +1372,9 @@ joining files. A future command should make the operation explicit, for
 example:
 
 ```text
-framestudio-fps --input source.mp4 --target-fps 60 --profile fast
-framestudio-fps --input source.mp4 --target-fps 60 --profile quality
-framestudio-fps --input source.mp4 --target-fps 60 --profile anime
+framestudio fps --input source.mp4 --target-fps 60 --profile fast
+framestudio fps --input source.mp4 --target-fps 60 --profile quality
+framestudio fps --input source.mp4 --target-fps 60 --profile anime
 ```
 
 The command should preserve the original by default, use a unique partial
@@ -1431,7 +1431,7 @@ file with invented objects.
 
 The integrated production design is now complete:
 
-1. `framestudio-concat` is the single user-facing workflow. One input skips
+1. `framestudio concat` is the single user-facing workflow. One input skips
    concatenation; multiple inputs are stream-copy concatenated once and then
    interpolated globally.
 2. The default backend is corrected RVE RIFE 4.26 with selective TensorRT FP16

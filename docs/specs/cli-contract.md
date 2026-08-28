@@ -46,10 +46,11 @@ framestudio export PROJECT --output VIDEO \
 ```
 
 The same commands can be run from the repository with
-`python3 framestudio.py ...` or `make cli ARGS="..."`.
-The installed `framestudio-editor` command is an equivalent explicit alias;
-legacy `resolve-editor` and `resolve_editor.py` invocations remain supported
-through compatibility forwarding.
+`python3 framestudio.py ...` or `make cli ARGS="..."`. The only globally
+installed entrypoint is `framestudio`; its media workflows are available as
+`framestudio media`, `framestudio concat`, and `framestudio fps`. The legacy
+Python entrypoints remain supported through compatibility forwarding, but
+separate workflow aliases are not installed.
 
 ## Success output
 

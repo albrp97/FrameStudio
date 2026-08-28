@@ -1025,8 +1025,13 @@ def interactive_selection(
     )
 
 
-def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
+def parse_arguments(
+    argv: list[str] | None = None,
+    *,
+    prog: str | None = None,
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
+        prog=prog,
         description=("Run concat-first FPS enhancement; no input opens the selector TUI.")
     )
     parser.add_argument(
@@ -1282,8 +1287,8 @@ def concatenate(
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    arguments = parse_arguments(argv)
+def main(argv: list[str] | None = None, *, prog: str | None = None) -> int:
+    arguments = parse_arguments(argv, prog=prog)
     requested_output = arguments.output.expanduser().resolve() if arguments.output else None
     if arguments.input_dir is None:
         selection = interactive_selection(arguments.root.expanduser().resolve())
