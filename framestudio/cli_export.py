@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Callable
+from contextlib import redirect_stdout
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, TextIO
@@ -21,9 +23,15 @@ from .export import (
     ExportPlanningError,
     ExportProgress,
 )
+from .export_console import ConsoleProgressReporter
 from .export_estimates import (
     calibration_for_policy,
     estimate_project_export,
+)
+from .export_session import (
+    ExportSessionError,
+    discard_export_session,
+    discover_export_session,
 )
 from .fps_policy import FrameRatePolicy, ResolvedFrameRatePolicy
 from .media import MediaProbe, MediaProbeError
@@ -75,6 +83,7 @@ def handle_export(
     args: Any,
     output: TextIO,
     *,
+    progress_output: TextIO | None = None,
     load_project_fn: Callable[..., Project],
     probe_media_fn: Callable[..., MediaProbe],
     plan_project_export_fn: Callable[..., ExportPlan],
@@ -153,15 +162,76 @@ def handle_export(
                 },
             )
 
+        session_mode = getattr(args, "resume_mode", "fresh")
+        session_info = discover_export_session(plan.destination)
+        if session_mode == "resume" and not session_info.resumable:
+            reason = session_info.reason or "No compatible resumable export session exists"
+            raise CliError(
+                "export_session",
+                reason,
+                exit_code=CLI_EXIT_OPERATION,
+            )
+        if session_mode == "discard":
+            try:
+                discarded = discard_export_session(plan.destination)
+            except ExportSessionError as error:
+                raise CliError(
+                    "export_session",
+                    str(error),
+                    exit_code=CLI_EXIT_OPERATION,
+                ) from error
+            return success_payload(
+                "export",
+                {
+                    "project": project_payload(
+                        project,
+                        args.project,
+                        include_paths=args.full_paths,
+                    ),
+                    "export": {
+                        "planned": True,
+                        "verified": False,
+                        "session": {
+                            "mode": "discard",
+                            "discarded": not discarded.exists,
+                            "status": discarded.to_dict(),
+                        },
+                    },
+                },
+            )
+        if session_mode != "fresh":
+            _write_json(
+                output,
+                {
+                    "contract_version": CLI_CONTRACT_VERSION,
+                    "command": "export.session",
+                    "event": "session",
+                    "session": {
+                        "mode": session_mode,
+                        "status": session_info.to_dict(),
+                    },
+                },
+            )
+
+        console_progress = ConsoleProgressReporter(
+            stream=sys.stderr if progress_output is None else progress_output,
+            force=bool(getattr(args, "human_progress", False)),
+        )
+
         def report_progress(progress: ExportProgress) -> None:
+            console_progress(progress)
             _write_json(output, progress_payload(progress))
 
-        destination = execute_export_fn(
-            plan,
-            ffmpeg_path=args.ffmpeg,
-            ffprobe_path=args.ffprobe,
-            progress_callback=report_progress,
-        )
+        diagnostic_output = sys.stderr if progress_output is None else progress_output
+        with redirect_stdout(diagnostic_output):
+            execute_kwargs: dict[str, Any] = {
+                "ffmpeg_path": args.ffmpeg,
+                "ffprobe_path": args.ffprobe,
+                "progress_callback": report_progress,
+            }
+            if session_mode != "fresh":
+                execute_kwargs["resume_mode"] = session_mode
+            destination = execute_export_fn(plan, **execute_kwargs)
         output_media = probe_media_fn(destination, args.ffprobe)
     except MediaProbeError as error:
         raise CliError(
@@ -202,6 +272,11 @@ def handle_export(
                     destination,
                     args.full_paths,
                 ),
+                "session": {
+                    "mode": session_mode,
+                    "resumed": session_mode == "resume",
+                    "previous_completed_stage_count": session_info.completed_stage_count,
+                },
                 "output": {
                     "duration_seconds": output_media.duration_seconds,
                     "width": output_media.width,

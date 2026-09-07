@@ -12,6 +12,27 @@ class ProjectPersistenceError(RuntimeError):
     """Raised when a project cannot be safely saved or loaded."""
 
 
+AUTOSAVE_FILENAME = "autosave.framestudio.json"
+
+
+def autosave_path() -> Path:
+    state_home = os.environ.get("XDG_STATE_HOME")
+    base = Path(state_home).expanduser() if state_home else Path.home() / ".local" / "state"
+    return base / "framestudio" / AUTOSAVE_FILENAME
+
+
+def autosave_exists() -> bool:
+    return autosave_path().is_file()
+
+
+def save_autosave(project: Project) -> Path:
+    return save_project(project, autosave_path())
+
+
+def load_autosave() -> Project:
+    return load_project(autosave_path())
+
+
 def _cleanup_partial(path: Path | None) -> OSError | None:
     if path is None:
         return None

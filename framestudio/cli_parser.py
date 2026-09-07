@@ -324,6 +324,34 @@ def build_cli_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="include absolute local paths in output",
     )
+    export_parser.add_argument(
+        "--human-progress",
+        action="store_true",
+        help="also print numbered export stages to the terminal",
+    )
+    resume_options = export_parser.add_mutually_exclusive_group()
+    resume_options.add_argument(
+        "--resume",
+        dest="resume_mode",
+        action="store_const",
+        const="resume",
+        help="resume the compatible destination export session",
+    )
+    resume_options.add_argument(
+        "--restart",
+        dest="resume_mode",
+        action="store_const",
+        const="restart",
+        help="discard the compatible destination export session and start over",
+    )
+    resume_options.add_argument(
+        "--discard",
+        dest="resume_mode",
+        action="store_const",
+        const="discard",
+        help="discard the destination export session without exporting",
+    )
+    export_parser.set_defaults(resume_mode="fresh")
     plan_parser = commands.add_parser(
         "export-plan",
         help="resolve an export plan without starting media processing",

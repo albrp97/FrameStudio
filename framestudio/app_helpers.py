@@ -192,18 +192,27 @@ def format_output_duration_label(duration_seconds: float) -> str:
     return f"Final output: {format_duration(duration_seconds)}"
 
 
-def format_audio_decisions(project) -> str:
+def format_audio_decisions(
+    project,
+    analyzing_source_ids: Sequence[str] = (),
+) -> str:
     sources = project.sources or (project.source,)
+    analyzing = set(analyzing_source_ids)
     labels: list[str] = []
     for source in sources:
         settings = project.source_audio_settings(source.source_id)
         status = settings.get("status", "pending")
-        if audio_decision_is_stale(source, settings):
+        if source.source_id in analyzing and status == "pending":
+            status = "analyzing"
+        elif audio_decision_is_stale(source, settings):
             status = "stale"
         label = f"{Path(source.path).name}: {status}"
         gain = settings.get("gain_db")
         if status == "ready" and isinstance(gain, (int, float)) and not isinstance(gain, bool):
             label += f" ({float(gain):+.2f} dB)"
+        diagnostic = settings.get("diagnostic")
+        if status in {"failed", "unsupported"} and isinstance(diagnostic, str) and diagnostic:
+            label += f" [{diagnostic}]"
         labels.append(label)
     return "Audio decisions: " + "; ".join(labels)
 

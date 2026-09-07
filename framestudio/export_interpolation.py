@@ -5,16 +5,22 @@ import math
 import os
 import shutil
 import subprocess
-import tempfile
 import threading
 import time
-from collections.abc import Sequence
+import warnings
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from fractions import Fraction
 from functools import partial as bind_partial
 from pathlib import Path
 from typing import Callable
 
+from .export_cache import (
+    CachedArtifactInvalid,
+    ExportCache,
+    ExportCacheError,
+    build_export_cache_request,
+)
 from .export_ffmpeg import execute_fallback, execute_mixed_fallback
 from .export_process import (
     emit_export_progress,
@@ -25,7 +31,15 @@ from .export_process import (
     run_ffmpeg,
     segment_is_full_source,
 )
+from .export_session import (
+    ExportSession,
+    ExportSessionError,
+    build_export_session_request,
+)
 from .export_smart_render import (
+    PreparedSource,
+    _upscale_decisions,
+    _upscale_policy,
     _write_concat_list,
     build_concat_copy_command,
     build_video_only_copy_command,
@@ -49,7 +63,7 @@ from .fps_policy import (
 from .interpolation import run_source_interpolation
 from .interpolation_artifacts import run_artifact_gate
 from .media import MediaProbe, MediaProbeError, probe_media
-from .upscale_policy import UpscaleDecision
+from .upscale_policy import DEFAULT_UPSCALE_MODEL, UpscaleDecision
 
 VerifySingle = Callable[..., MediaProbe]
 VerifyMixed = Callable[..., MediaProbe]
@@ -117,6 +131,155 @@ def _policy(plan: ExportPlan) -> FrameRatePolicy:
                 f"Enhanced export output frame rate is invalid: {error}",
             ) from error
     raise ExportExecutionError("Enhanced export is missing its frame-rate policy")
+
+
+def _runtime_path(
+    options: Mapping[str, object],
+    name: str,
+    default: Path,
+) -> Path:
+    value = options.get(name, default)
+    if isinstance(value, Path):
+        return value
+    if isinstance(value, str):
+        return Path(value)
+    raise ExportExecutionError(f"Enhanced export runtime path {name} is invalid")
+
+
+def _enhanced_runtime_paths(
+    plan: ExportPlan,
+    options: Mapping[str, object],
+) -> dict[str, Path]:
+    runtime_paths: dict[str, Path] = {}
+    interpolation_backend = _policy(plan).backend.casefold().strip()
+    if interpolation_backend.startswith("rve"):
+        from framestudio_fps import (
+            DEFAULT_FPS_PYTHON,
+            DEFAULT_FPS_SITE,
+            DEFAULT_RVE_MODEL,
+            DEFAULT_RVE_ROOT,
+            DEFAULT_RVE_SHIMS,
+        )
+
+        runtime_paths.update(
+            {
+                "interpolation.fps_python": _runtime_path(
+                    options,
+                    "fps_python",
+                    DEFAULT_FPS_PYTHON,
+                ),
+                "interpolation.site_packages": _runtime_path(
+                    options,
+                    "site_packages",
+                    DEFAULT_FPS_SITE,
+                ),
+                "interpolation.rve_model": _runtime_path(
+                    options,
+                    "rve_model",
+                    DEFAULT_RVE_MODEL,
+                ),
+                "interpolation.rve_root": _runtime_path(
+                    options,
+                    "rve_root",
+                    DEFAULT_RVE_ROOT,
+                ),
+                "interpolation.rve_shims": _runtime_path(
+                    options,
+                    "rve_shims",
+                    DEFAULT_RVE_SHIMS,
+                ),
+            }
+        )
+    elif interpolation_backend in {"vs-rife", "rife", "vapoursynth-rife"}:
+        from framestudio_fps import (
+            DEFAULT_BESTSOURCE,
+            DEFAULT_FPS_PYTHON,
+            DEFAULT_FPS_SITE,
+            DEFAULT_GRAPH,
+            DEFAULT_TRT_CACHE,
+        )
+
+        runtime_paths.update(
+            {
+                "interpolation.fps_python": _runtime_path(
+                    options,
+                    "fps_python",
+                    DEFAULT_FPS_PYTHON,
+                ),
+                "interpolation.site_packages": _runtime_path(
+                    options,
+                    "site_packages",
+                    DEFAULT_FPS_SITE,
+                ),
+                "interpolation.graph": _runtime_path(options, "graph", DEFAULT_GRAPH),
+                "interpolation.trt_cache": _runtime_path(
+                    options,
+                    "trt_cache",
+                    DEFAULT_TRT_CACHE,
+                ),
+                "interpolation.bestsource": _runtime_path(
+                    options,
+                    "bestsource",
+                    DEFAULT_BESTSOURCE,
+                ),
+            }
+        )
+
+    upscale_policy = _upscale_policy(plan)
+    if (
+        upscale_policy is None
+        or not upscale_policy.enhancement_enabled
+        or not upscale_policy.backend.casefold().strip().startswith("rve")
+    ):
+        return runtime_paths
+    upscale_decisions = _upscale_decisions(plan)
+    eligible_decisions = tuple(
+        decision for decision in upscale_decisions.values() if decision.eligible
+    )
+    if not eligible_decisions:
+        return runtime_paths
+
+    from framestudio_fps import (
+        DEFAULT_FPS_PYTHON,
+        DEFAULT_FPS_SITE,
+        DEFAULT_RVE_RESTORATION_MODEL,
+        DEFAULT_RVE_ROOT,
+        DEFAULT_RVE_SHIMS,
+    )
+
+    runtime_paths.update(
+        {
+            "restoration.fps_python": _runtime_path(
+                options,
+                "fps_python",
+                DEFAULT_FPS_PYTHON,
+            ),
+            "restoration.site_packages": _runtime_path(
+                options,
+                "site_packages",
+                DEFAULT_FPS_SITE,
+            ),
+            "restoration.rve_root": _runtime_path(
+                options,
+                "rve_root",
+                DEFAULT_RVE_ROOT,
+            ),
+            "restoration.rve_shims": _runtime_path(
+                options,
+                "rve_shims",
+                DEFAULT_RVE_SHIMS,
+            ),
+        }
+    )
+    for decision in eligible_decisions:
+        model = decision.model or upscale_policy.model
+        model_path = (
+            DEFAULT_RVE_RESTORATION_MODEL
+            if model.casefold() == DEFAULT_UPSCALE_MODEL.casefold()
+            else Path(model)
+        )
+        runtime_paths[f"restoration.model.{decision.source_id}"] = model_path
+    return runtime_paths
 
 
 def _decision_by_id(plan: ExportPlan) -> dict[str, SourceRateDecision]:
@@ -319,6 +482,46 @@ def _segment_target_frame_counts(
     return tuple(counts)
 
 
+def _cached_interpolation_validator(
+    *,
+    segment_index: int,
+    expected_frames: int,
+    decision: SourceRateDecision,
+    prepared: PreparedSource,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+) -> Callable[[Path], MediaProbe]:
+    def validate(path: Path) -> MediaProbe:
+        try:
+            candidate = probe_media(path, ffprobe_path)
+        except MediaProbeError as error:
+            raise CachedArtifactInvalid(str(error)) from error
+        try:
+            candidate_frames = probe_frame_count(path, ffprobe_path)
+            run_artifact_gate(
+                path,
+                expected_frames,
+                ffmpeg_path=ffmpeg_path,
+                label=f"cached interpolated segment {segment_index + 1}",
+            )
+        except ExportExecutionError as error:
+            raise CachedArtifactInvalid(str(error)) from error
+        if (
+            canonical_rate(candidate.frame_rate) != decision.target_rate
+            or candidate_frames != expected_frames
+            or abs(candidate.duration_seconds - prepared.probe.duration_seconds)
+            > max(_DURATION_TOLERANCE, 0.1)
+            or (candidate.width, candidate.height) != (prepared.probe.width, prepared.probe.height)
+            or candidate.has_audio_stream != prepared.probe.has_audio_stream
+        ):
+            raise CachedArtifactInvalid(
+                f"Cached interpolated segment {segment_index + 1} does not match its profile"
+            )
+        return candidate
+
+    return validate
+
+
 def _format_tokens(value: str) -> set[str]:
     return {token.strip().casefold() for token in value.split(",") if token.strip()}
 
@@ -457,8 +660,8 @@ def _execute_clip_concat_fallback(
         )
     command.extend(
         [
-            "-t",
-            f"{expected_duration_seconds:.6f}",
+            "-frames:v",
+            str(total_frames),
             "-movflags",
             "+faststart",
             "-shortest",
@@ -602,13 +805,10 @@ def _execute_enhanced_clip_assembly(
         cancel_event=cancel_event,
     )
     if len(assembly_paths) == 1:
-        if assembly_paths[0].parent == temporary:
-            os.replace(assembly_paths[0], partial)
-        else:
-            try:
-                shutil.copyfile(assembly_paths[0], partial)
-            except OSError as error:
-                raise ExportExecutionError("Could not copy the enhanced output") from error
+        try:
+            shutil.copyfile(assembly_paths[0], partial)
+        except OSError as error:
+            raise ExportExecutionError("Could not copy the enhanced output") from error
         return
     if all(_stream_copy_compatible(probe, policy) for probe in assembly_probes):
         list_path = temporary / "enhanced-segments-list.txt"
@@ -684,6 +884,7 @@ def _execute_per_source_enhanced_render(
     started: float,
     total_frames: int,
     cancel_event: threading.Event | None,
+    cache: ExportCache | None = None,
 ) -> None:
     prepared_sources = prepare_enhanced_sources(
         plan,
@@ -696,6 +897,7 @@ def _execute_per_source_enhanced_render(
         started=started,
         cancel_event=cancel_event,
         backend_kwargs=options,
+        cache=cache,
     )
     active_segments = tuple(segment for segment in plan.segments if not segment.deleted)
     if len(prepared_sources) != len(active_segments):
@@ -731,31 +933,61 @@ def _execute_per_source_enhanced_render(
                 started=started,
                 percent_override=stage_start,
             )
-            interpolated = _interpolate_probe(
-                prepared.probe,
-                source_id=prepared.source_id,
+            interpolation_path = temporary / f"enhanced-segment-{index}.mp4"
+            validate_cached_interpolation = _cached_interpolation_validator(
+                segment_index=index,
+                expected_frames=target_frames[index],
                 decision=decision,
-                destination=temporary / f"enhanced-segment-{index}.mp4",
-                ffprobe_path=ffprobe_path,
+                prepared=prepared,
                 ffmpeg_path=ffmpeg_path,
-                backend_kwargs=dict(options),
-                target_frames=target_frames[index],
-                ranges=None,
-                cancel_event=cancel_event,
-                progress_callback=(
-                    bind_partial(
-                        _forward_interpolation_progress,
-                        progress_callback,
-                        stage=stage,
-                        start_percent=stage_start,
-                        end_percent=stage_end,
-                    )
-                    if progress_callback is not None
-                    else None
-                ),
-                progress_stage=stage,
-                progress_started=started,
+                ffprobe_path=ffprobe_path,
             )
+
+            interpolated = (
+                None
+                if cache is None
+                else cache.reuse(
+                    f"enhanced-segment-{index}",
+                    validate_cached_interpolation,
+                )
+            )
+            if interpolated is None:
+                interpolated = _interpolate_probe(
+                    prepared.probe,
+                    source_id=prepared.source_id,
+                    decision=decision,
+                    destination=interpolation_path,
+                    ffprobe_path=ffprobe_path,
+                    ffmpeg_path=ffmpeg_path,
+                    backend_kwargs=dict(options),
+                    target_frames=target_frames[index],
+                    ranges=None,
+                    cancel_event=cancel_event,
+                    progress_callback=(
+                        bind_partial(
+                            _forward_interpolation_progress,
+                            progress_callback,
+                            stage=stage,
+                            start_percent=stage_start,
+                            end_percent=stage_end,
+                        )
+                        if progress_callback is not None
+                        else None
+                    ),
+                    progress_stage=stage,
+                    progress_started=started,
+                )
+                if cache is not None:
+                    cache.record(
+                        f"enhanced-segment-{index}",
+                        interpolated.path,
+                        metadata={
+                            "frame_count": target_frames[index],
+                            "source_id": prepared.source_id,
+                            "source_rate": str(decision.source_rate),
+                            "target_rate": str(decision.target_rate),
+                        },
+                    )
             enhanced_paths.append(interpolated.path)
             enhanced_probes.append(interpolated)
             emit_export_progress(
@@ -825,6 +1057,7 @@ def _execute_concat_first_enhanced_render(
     started: float,
     total_frames: int,
     cancel_event: threading.Event | None,
+    cache: ExportCache | None = None,
 ) -> None:
     master = prepare_enhanced_master(
         plan,
@@ -885,7 +1118,10 @@ def _execute_concat_first_enhanced_render(
         progress_stage=stage,
         progress_started=started,
     )
-    os.replace(interpolated.path, partial)
+    try:
+        shutil.copyfile(interpolated.path, partial)
+    except OSError as error:
+        raise ExportExecutionError("Could not copy the interpolated output") from error
     emit_export_progress(
         progress_callback,
         stage="publishing interpolated output",
@@ -1008,7 +1244,10 @@ def _execute_legacy_enhanced_render(
         and len(original_probes) == 1
         and can_publish_interpolated_source(plan, original_probes[0])
     ):
-        os.replace(prepared_probes[0].path, partial)
+        try:
+            shutil.copyfile(prepared_probes[0].path, partial)
+        except OSError as error:
+            raise ExportExecutionError("Could not copy the interpolated output") from error
         emit_export_progress(
             progress_callback,
             stage="publishing interpolated output",
@@ -1128,6 +1367,7 @@ def execute_enhanced_export(
     backend_kwargs: dict[str, object] | None = None,
     cancel_event: threading.Event | None = None,
     cancellation_lock: threading.Lock | None = None,
+    resume_mode: str = "fresh",
 ) -> Path:
     if plan.route != "enhanced":
         raise ExportExecutionError("Enhanced export requires the enhanced route")
@@ -1170,12 +1410,84 @@ def execute_enhanced_export(
     partial = partial_path(destination)
     options = dict(backend_kwargs or {})
     options.setdefault("backend", policy.backend)
+    runtime_paths = _enhanced_runtime_paths(plan, options)
     try:
-        with tempfile.TemporaryDirectory(
-            prefix=f".{destination.name}.interpolation-",
-            dir=str(destination.parent),
-        ) as temporary_directory:
-            temporary = Path(temporary_directory)
+        cache_request = build_export_cache_request(
+            plan=plan,
+            source_paths=source_paths,
+            source_stats=tuple(source_stats),
+            options=options,
+            runtime_paths=runtime_paths,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+        )
+    except ExportCacheError as error:
+        remove_partial(partial)
+        raise ExportExecutionError(str(error)) from error
+    try:
+        session_request = build_export_session_request(
+            plan=plan,
+            source_paths=source_paths,
+            source_stats=source_stats,
+            options=options,
+            runtime_paths=runtime_paths,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+        )
+        session = ExportSession.open(
+            destination,
+            session_request,
+            ("preparation", "interpolation", "upscale", "assembly", "verification"),
+            mode=resume_mode,
+        )
+    except ExportSessionError as error:
+        remove_partial(partial)
+        raise ExportExecutionError(str(error)) from error
+    try:
+        cache = ExportCache.open(destination, cache_request)
+        if resume_mode == "restart":
+            cache.discard_after_success()
+            cache = ExportCache.open(destination, cache_request)
+    except ExportCacheError as error:
+        session.close()
+        remove_partial(partial)
+        raise ExportExecutionError(str(error)) from error
+    try:
+        temporary = cache.root
+        cached_assembly = session.reuse(
+            "assembly",
+            lambda candidate: (
+                verify_mixed_output(
+                    plan,
+                    candidate,
+                    ffmpeg_path=ffmpeg_path,
+                    ffprobe_path=ffprobe_path,
+                )
+                if plan.source_paths
+                else verify_single_output(
+                    plan,
+                    original_probes[0],
+                    candidate,
+                    ffmpeg_path=ffmpeg_path,
+                    ffprobe_path=ffprobe_path,
+                )
+            ),
+        )
+        if cached_assembly is not None:
+            shutil.copyfile(cached_assembly, partial)
+            emit_export_progress(
+                progress_callback,
+                stage="resuming assembly",
+                current_seconds=plan.expected_duration_seconds,
+                total_duration_seconds=plan.expected_duration_seconds,
+                frame=total_frames,
+                total_frames=total_frames,
+                fps=None,
+                started=started,
+                percent_override=95.0,
+            )
+        else:
+            session.mark_running("preparation")
             if _should_use_concat_first(plan, original_probes[0]):
                 _execute_concat_first_enhanced_render(
                     plan,
@@ -1206,7 +1518,20 @@ def execute_enhanced_export(
                     started=started,
                     total_frames=total_frames,
                     cancel_event=cancel_event,
+                    cache=cache,
                 )
+            session.mark_complete(
+                "preparation",
+                metadata={"cached_artifact_count": cache.reused_artifact_count},
+            )
+            session.mark_complete(
+                "interpolation",
+                metadata={"cached_artifact_count": cache.reused_artifact_count},
+            )
+            session.mark_complete(
+                "upscale",
+                metadata={"cached_artifact_count": cache.reused_artifact_count},
+            )
         emit_export_progress(
             progress_callback,
             stage="verifying",
@@ -1220,6 +1545,7 @@ def execute_enhanced_export(
         )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportExecutionError("Export cancelled")
+        session.mark_running("verification")
         if plan.source_paths:
             verify_mixed_output(
                 plan,
@@ -1235,6 +1561,8 @@ def execute_enhanced_export(
                 ffmpeg_path=ffmpeg_path,
                 ffprobe_path=ffprobe_path,
             )
+        if cached_assembly is None:
+            session.record("assembly", partial)
         publish_verified_export(
             partial,
             destination,
@@ -1247,12 +1575,33 @@ def execute_enhanced_export(
             started=started,
             cancellation_lock=cancellation_lock,
         )
-    except (ExportExecutionError, MediaProbeError, OSError) as error:
+        session.mark_complete("verification")
+        try:
+            session.cleanup_after_success()
+        except ExportSessionError as error:
+            warnings.warn(str(error), RuntimeWarning, stacklevel=2)
+        try:
+            cache.discard_after_success()
+        except ExportCacheError as error:
+            warnings.warn(str(error), RuntimeWarning, stacklevel=2)
+    except (
+        ExportExecutionError,
+        ExportCacheError,
+        ExportSessionError,
+        MediaProbeError,
+        OSError,
+    ) as error:
+        session.mark_failure(
+            str(error),
+            cancelled=cancel_event is not None and cancel_event.is_set(),
+        )
         cleanup_error = remove_partial(partial)
         message = f"Could not export {destination.name}: {error}"
         if cleanup_error is not None:
             message += f"; could not remove partial output: {cleanup_error}"
         raise ExportExecutionError(message) from error
+    finally:
+        session.close()
     return destination
 
 

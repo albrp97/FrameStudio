@@ -12,6 +12,7 @@ from framestudio.timeline import (
     next_timeline_zoom,
     timeline_content_width,
     timeline_position_from_x,
+    timeline_zoom_for_window,
 )
 
 
@@ -167,6 +168,8 @@ class EditorTimelineTests(unittest.TestCase):
             timeline_content_width(120.0, 600.0, 0.5),
             timeline_content_width(120.0, 600.0, 1.0),
         )
+        self.assertEqual(next_timeline_zoom(12.0, 1), 18.0)
+        self.assertEqual(clamp_timeline_zoom(100.0), 100.0)
 
     def test_default_zoom_fits_long_timelines_to_the_viewport(self):
         self.assertEqual(timeline_content_width(120.0, 600.0, 1.0), 600.0)
@@ -175,6 +178,20 @@ class EditorTimelineTests(unittest.TestCase):
         canvas = TimelineCanvas()
         canvas.set_viewport_width(600.0)
         canvas.set_timeline(SegmentTimeline(120.0))
+        self.assertFalse(canvas.has_horizontal_overflow())
+
+    def test_thirty_minute_fit_uses_exact_scale_for_short_and_long_projects(self):
+        self.assertAlmostEqual(timeline_zoom_for_window(60.0, 1800.0), 1.0 / 30.0)
+        self.assertEqual(timeline_zoom_for_window(3600.0, 1800.0), 2.0)
+
+        TimelineCanvas = create_timeline_canvas(FakeGtk)
+        canvas = TimelineCanvas()
+        canvas.set_viewport_width(600.0)
+        canvas.set_timeline(SegmentTimeline(60.0))
+        canvas.fit_to_duration(1800.0)
+
+        self.assertAlmostEqual(canvas.get_zoom(), 1.0 / 30.0)
+        self.assertEqual(canvas.get_content_width(), 600.0)
         self.assertFalse(canvas.has_horizontal_overflow())
 
     def test_hit_testing_and_position_mapping_use_source_time(self):

@@ -42,6 +42,59 @@ def make_probe(
 
 
 class EditorSmartRenderCommandTests(unittest.TestCase):
+    def test_enhanced_concat_fallback_limits_video_to_target_frame_count(self):
+        from framestudio.export_interpolation import _execute_clip_concat_fallback
+
+        policy = OutputPolicy(
+            width=64,
+            height=64,
+            scaling_mode="source-native",
+            frame_rate="60/1",
+            timebase="1/1000000",
+            container="mp4",
+            video_codec="libx264",
+            audio_codec=None,
+            pixel_format="yuv420p",
+            audio_stream_present=False,
+            requires_normalization=False,
+            reason="exact frame-count fallback",
+        )
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            paths = (root / "first.mp4", root / "second.mp4")
+            for path in paths:
+                path.write_bytes(b"source")
+            probes = tuple(make_probe(path, frame_rate="60/1", duration=0.5) for path in paths)
+            output = root / "output.partial.mp4"
+            commands = []
+
+            def fake_run_ffmpeg(command, **_kwargs):
+                commands.append(command)
+                output.write_bytes(b"output")
+
+            with patch(
+                "framestudio.export_interpolation.run_ffmpeg",
+                side_effect=fake_run_ffmpeg,
+            ):
+                _execute_clip_concat_fallback(
+                    paths,
+                    probes,
+                    policy,
+                    output,
+                    ffmpeg_path="ffmpeg",
+                    progress_callback=None,
+                    started=0.0,
+                    expected_duration_seconds=1.0,
+                    total_frames=60,
+                    cancel_event=None,
+                )
+
+            self.assertEqual(len(commands), 1)
+            command = commands[0]
+            self.assertEqual(command[command.index("-frames:v") + 1], "60")
+            self.assertNotIn("-t", command)
+            self.assertIn("-shortest", command)
+
     def test_lossless_cut_command_uses_stream_copy_without_video_filters(self):
         command = build_lossless_cut_command(
             Path("source.mp4"),

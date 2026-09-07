@@ -4,7 +4,7 @@ import math
 import os
 import shutil
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from fractions import Fraction
 from pathlib import Path
@@ -12,6 +12,7 @@ from typing import Any
 
 from .audio import AudioDecision, audio_filter
 from .composition_render import segment_video_filters
+from .export_cache import CachedArtifactInvalid, ExportCache
 from .export_process import (
     output_format,
     partial_path,
@@ -20,6 +21,7 @@ from .export_process import (
 )
 from .export_types import (
     _BOUNDARY_TOLERANCE,
+    _DURATION_TOLERANCE,
     ExportExecutionError,
     ExportPlan,
     ExportPlanningError,
@@ -51,6 +53,89 @@ class PreparedSource:
     path: Path
     probe: MediaProbe
     source_rate: Fraction
+
+
+def _cut_probe_validator(
+    segment: Segment,
+    source_probe: MediaProbe,
+    include_audio: bool,
+) -> Callable[[MediaProbe], bool]:
+    def validate(candidate: MediaProbe) -> bool:
+        return (
+            abs(candidate.duration_seconds - segment.duration_seconds)
+            <= max(_DURATION_TOLERANCE, 0.1)
+            and (candidate.width, candidate.height) == (source_probe.width, source_probe.height)
+            and candidate.has_audio_stream == (include_audio and source_probe.has_audio_stream)
+        )
+
+    return validate
+
+
+def _restored_probe_validator(
+    source_probe: MediaProbe,
+) -> Callable[[MediaProbe], bool]:
+    def validate(candidate: MediaProbe) -> bool:
+        return (
+            abs(candidate.duration_seconds - source_probe.duration_seconds)
+            <= max(_DURATION_TOLERANCE, 0.1)
+            and (candidate.width, candidate.height) == (source_probe.width, source_probe.height)
+            and canonical_rate(candidate.frame_rate) == canonical_rate(source_probe.frame_rate)
+            and candidate.has_audio_stream == source_probe.has_audio_stream
+        )
+
+    return validate
+
+
+def _prepared_probe_validator(
+    segment: Segment,
+    policy: OutputPolicy,
+    preparation_rate: Fraction,
+) -> Callable[[MediaProbe], bool]:
+    def validate(candidate: MediaProbe) -> bool:
+        return (
+            abs(candidate.duration_seconds - segment.duration_seconds)
+            <= max(_DURATION_TOLERANCE, 0.1)
+            and (candidate.width, candidate.height) == (policy.width, policy.height)
+            and canonical_rate(candidate.frame_rate) == canonical_rate(preparation_rate)
+            and candidate.has_audio_stream == policy.audio_stream_present
+        )
+
+    return validate
+
+
+def _reuse_cached_probe(
+    cache: ExportCache | None,
+    artifact_id: str,
+    *,
+    ffprobe_path: str,
+    expected: Callable[[MediaProbe], bool],
+) -> MediaProbe | None:
+    if cache is None:
+        return None
+
+    def validate(path: Path) -> MediaProbe:
+        try:
+            probe = probe_media(path, ffprobe_path)
+        except MediaProbeError as error:
+            raise CachedArtifactInvalid(str(error)) from error
+        if not expected(probe):
+            raise CachedArtifactInvalid(f"Cached artifact {artifact_id} does not match its profile")
+        return probe
+
+    return cache.reuse(artifact_id, validate)
+
+
+def _record_cached_probe(
+    cache: ExportCache | None,
+    artifact_id: str,
+    probe: MediaProbe,
+) -> None:
+    if cache is not None:
+        cache.record(
+            artifact_id,
+            probe.path,
+            metadata={"probe": probe.metadata()},
+        )
 
 
 def _scaled_progress_callback(
@@ -700,6 +785,7 @@ def prepare_enhanced_sources(
     started: float,
     cancel_event: threading.Event | None,
     backend_kwargs: Mapping[str, object] | None = None,
+    cache: ExportCache | None = None,
 ) -> tuple[PreparedSource, ...]:
     """Prepare each retained timeline segment without changing its source rate."""
     policy = plan.output_policy
@@ -768,25 +854,39 @@ def prepare_enhanced_sources(
             )
         ):
             cut_path = temporary / f"segment-{segment_index}-cut.mp4"
-            cut_probe = _execute_lossless_selection(
-                probe,
-                (segment,),
-                cut_path,
-                temporary,
-                include_audio=policy.audio_stream_present,
-                ffmpeg_path=ffmpeg_path,
+            cached_cut_probe = _reuse_cached_probe(
+                cache,
+                f"segment-{segment_index}-cut",
                 ffprobe_path=ffprobe_path,
-                progress_callback=_segment_preparation_progress(
-                    progress_callback,
-                    start_percent=30.0 * segment_index / total_segments,
-                    end_percent=30.0 * (segment_index + 1) / total_segments,
-                    stage=f"preparing segment {segment_index + 1}/{total_segments}",
+                expected=_cut_probe_validator(
+                    segment,
+                    probe,
+                    policy.audio_stream_present,
                 ),
-                started=started,
-                progress_offset_seconds=progress_offset,
-                progress_total_duration_seconds=progress_total,
-                cancel_event=cancel_event,
             )
+            if cached_cut_probe is None:
+                cut_probe = _execute_lossless_selection(
+                    probe,
+                    (segment,),
+                    cut_path,
+                    temporary,
+                    include_audio=policy.audio_stream_present,
+                    ffmpeg_path=ffmpeg_path,
+                    ffprobe_path=ffprobe_path,
+                    progress_callback=_segment_preparation_progress(
+                        progress_callback,
+                        start_percent=30.0 * segment_index / total_segments,
+                        end_percent=30.0 * (segment_index + 1) / total_segments,
+                        stage=f"preparing segment {segment_index + 1}/{total_segments}",
+                    ),
+                    started=started,
+                    progress_offset_seconds=progress_offset,
+                    progress_total_duration_seconds=progress_total,
+                    cancel_event=cancel_event,
+                )
+                _record_cached_probe(cache, f"segment-{segment_index}-cut", cut_probe)
+            else:
+                cut_probe = cached_cut_probe
             selected_segment = Segment.create(0.0, segment.duration_seconds)
 
         restoration_decision = upscale_decisions.get(source_id)
@@ -805,15 +905,27 @@ def prepare_enhanced_sources(
             restoration_source = cut_path
             restoration_probe = cut_probe
             restoration_path = temporary / f"segment-{segment_index}-restored.mp4"
-            restored_probe = _run_source_restoration(
-                restoration_probe,
-                restoration_path,
-                policy=upscale_policy,
-                model=restoration_decision.model or upscale_policy.model,
-                backend_kwargs=restoration_options,
+            restored_probe = _reuse_cached_probe(
+                cache,
+                f"segment-{segment_index}-restored",
                 ffprobe_path=ffprobe_path,
-                cancel_event=cancel_event,
+                expected=_restored_probe_validator(restoration_probe),
             )
+            if restored_probe is None:
+                restored_probe = _run_source_restoration(
+                    restoration_probe,
+                    restoration_path,
+                    policy=upscale_policy,
+                    model=restoration_decision.model or upscale_policy.model,
+                    backend_kwargs=restoration_options,
+                    ffprobe_path=ffprobe_path,
+                    cancel_event=cancel_event,
+                )
+                _record_cached_probe(
+                    cache,
+                    f"segment-{segment_index}-restored",
+                    restored_probe,
+                )
             cut_path = restoration_path
             cut_probe = restored_probe
             if restoration_source == probe.path:
@@ -848,30 +960,46 @@ def prepare_enhanced_sources(
             if cut_path == probe.path:
                 normalization_source = probe.path
                 normalization_segments = (segment,)
-            normalized_probe = _execute_source_normalization(
-                normalization_source,
-                normalized_path,
-                normalization_segments,
-                target_rate=preparation_rate,
-                policy=policy,
-                audio_decision=audio_decision,
-                has_audio=cut_probe.has_audio_stream,
-                ffmpeg_path=ffmpeg_path,
+            normalized_probe = _reuse_cached_probe(
+                cache,
+                f"segment-{segment_index}-prepared",
                 ffprobe_path=ffprobe_path,
-                preserve_resolution=use_preserve_resolution,
-                content_width=content_width,
-                content_height=content_height,
-                progress_callback=_segment_preparation_progress(
-                    progress_callback,
-                    start_percent=30.0 * segment_index / total_segments,
-                    end_percent=30.0 * (segment_index + 1) / total_segments,
-                    stage=f"preparing segment {segment_index + 1}/{total_segments}",
+                expected=_prepared_probe_validator(
+                    segment,
+                    policy,
+                    preparation_rate,
                 ),
-                started=started,
-                progress_offset_seconds=progress_offset,
-                progress_total_duration_seconds=progress_total,
-                cancel_event=cancel_event,
             )
+            if normalized_probe is None:
+                normalized_probe = _execute_source_normalization(
+                    normalization_source,
+                    normalized_path,
+                    normalization_segments,
+                    target_rate=preparation_rate,
+                    policy=policy,
+                    audio_decision=audio_decision,
+                    has_audio=cut_probe.has_audio_stream,
+                    ffmpeg_path=ffmpeg_path,
+                    ffprobe_path=ffprobe_path,
+                    preserve_resolution=use_preserve_resolution,
+                    content_width=content_width,
+                    content_height=content_height,
+                    progress_callback=_segment_preparation_progress(
+                        progress_callback,
+                        start_percent=30.0 * segment_index / total_segments,
+                        end_percent=30.0 * (segment_index + 1) / total_segments,
+                        stage=f"preparing segment {segment_index + 1}/{total_segments}",
+                    ),
+                    started=started,
+                    progress_offset_seconds=progress_offset,
+                    progress_total_duration_seconds=progress_total,
+                    cancel_event=cancel_event,
+                )
+                _record_cached_probe(
+                    cache,
+                    f"segment-{segment_index}-prepared",
+                    normalized_probe,
+                )
             prepared_path = normalized_path
             prepared_probe = normalized_probe
         else:

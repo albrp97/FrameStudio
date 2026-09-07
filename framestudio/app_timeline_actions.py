@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -22,12 +23,36 @@ from .operations import (
     paste_segments_after_selection,
     split_segment,
 )
-from .timeline import timeline_zoom_label
+from .persistence import autosave_exists
+from .timeline import TIMELINE_FIT_WINDOW_SECONDS, timeline_zoom_label
 from .ui import format_duration
 
 
 def _editing_locked(window: Any) -> bool:
     return editing_is_locked(window)
+
+
+def _live_timeline_position(window: Any) -> float:
+    position = None
+    controller = getattr(window, "controller", None)
+    if controller is not None:
+        position = controller.snapshot().position_seconds
+        backend = getattr(window, "backend", None)
+        current_position = getattr(backend, "current_position", None)
+        if callable(current_position):
+            try:
+                backend_position = float(current_position())
+            except (TypeError, ValueError):
+                backend_position = None
+            if backend_position is not None and math.isfinite(backend_position):
+                position = backend_position
+    if position is None:
+        project = getattr(window, "project", None)
+        position = 0.0 if project is None else project.playhead_seconds
+    timeline = getattr(window, "segment_timeline", None)
+    if timeline is None:
+        return float(position)
+    return float(timeline.edited_to_timeline_position(position))
 
 
 def on_timeline_segment_selected(window: Any, segment_id: str) -> None:
@@ -114,6 +139,14 @@ def fit_timeline_zoom(window: Any) -> None:
     window._center_timeline_on_playhead()
 
 
+def fit_timeline_to_thirty_minutes(window: Any) -> None:
+    window.timeline_canvas.fit_to_duration(TIMELINE_FIT_WINDOW_SECONDS)
+    window.timeline_zoom_label.set_text(
+        timeline_zoom_label(window.timeline_canvas.get_zoom()),
+    )
+    window._center_timeline_on_playhead()
+
+
 def center_timeline_on_playhead(window: Any) -> None:
     if window.controller is None:
         return
@@ -139,7 +172,12 @@ def center_timeline_on_playhead(window: Any) -> None:
 
 def update_segment_controls(window: Any) -> None:
     enabled = not (window._export_in_progress or getattr(window, "_source_load_in_progress", False))
-    window.export_button.set_sensitive(window.project is not None and enabled)
+    has_active_timeline = (
+        window.project is not None
+        and window.segment_timeline is not None
+        and bool(window.segment_timeline.active_blocks())
+    )
+    window.export_button.set_sensitive(has_active_timeline and enabled)
     for control in (
         window.open_source_button,
         window.open_project_button,
@@ -147,6 +185,16 @@ def update_segment_controls(window: Any) -> None:
         window.reopen_button,
     ):
         control.set_sensitive(enabled)
+    fit_thirty_minutes_button = getattr(window, "fit_thirty_minutes_button", None)
+    if fit_thirty_minutes_button is not None:
+        fit_thirty_minutes_button.set_sensitive(
+            enabled and window.project is not None,
+        )
+    recover_button = getattr(window, "recover_autosave_button", None)
+    if recover_button is not None:
+        recover_button.set_sensitive(
+            enabled and autosave_exists(),
+        )
     window.timeline_canvas.set_sensitive(enabled)
     has_selection = (
         window.project is not None
@@ -352,6 +400,7 @@ def on_triplicate_clicked(window: Any, _button: Any) -> None:
     if window.project is None or not window.selected_segment_ids:
         window._show_error("Select a clip before changing triplicate mode")
         return
+    preserved_position = _live_timeline_position(window)
     try:
         selected = tuple(
             window.segment_timeline.find(segment_id) for segment_id in window.selected_segment_ids
@@ -366,7 +415,11 @@ def on_triplicate_clicked(window: Any, _button: Any) -> None:
     except ProjectValidationError as error:
         window._show_error(str(error))
         return
+    window.project.set_playhead(preserved_position)
     window._refresh_timeline(window.selected_segment_id)
+    timeline_canvas = getattr(window, "timeline_canvas", None)
+    if timeline_canvas is not None:
+        timeline_canvas.set_playhead(preserved_position)
     window._set_status(
         f"{'Disabled' if should_disable else 'Enabled'} triplicate for "
         f"{len(window.selected_segment_ids)} selected clip(s)",

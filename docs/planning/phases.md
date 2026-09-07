@@ -55,7 +55,7 @@ the first horizon without approved scope change.
 | 5 | PHASE-005 | Balance sources and deliver consistent media | CAP-005, CAP-008, CAP-012 | PHASE-004A | complete |
 | 6 | PHASE-006 | Focus and compose important action | CAP-005, CAP-009, CAP-010, CAP-012 | PHASE-004A, PHASE-005 | complete |
 | 7 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | complete |
-| 8 | PHASE-008 | Optimize responsive preview and select evidence-based media strategies | CAP-002, CAP-005, CAP-009, CAP-011, CAP-012 | PHASE-006, PHASE-007; target-workstation media and benchmark evidence | complete |
+| 8 | PHASE-008 | Optimize responsive preview and select evidence-based media strategies | CAP-002, CAP-003, CAP-004, CAP-005, CAP-009, CAP-011, CAP-012 | PHASE-006, PHASE-007; target-workstation media and benchmark evidence | complete |
 
 ## Common Phase Rules
 
@@ -92,9 +92,9 @@ are closed; confirmed future phases remain open.
 | Capability | Covered phases | First-horizon coverage | Future coverage |
 |---|---|---|---|
 | CAP-001 | PHASE-001 | Import/source inspection | Extended mixed-source identity in PHASE-004 |
-| CAP-002 | PHASE-001, PHASE-004, PHASE-008 | One-source playback and seek | Composed mixed-source preview and responsive cursor-driven preview |
-| CAP-003 | PHASE-002, PHASE-004 | Split/delete | Movement, multi-selection, copy/paste, expanded segment model |
-| CAP-004 | PHASE-001, PHASE-003 | Save/reopen | Future schema expansion |
+| CAP-002 | PHASE-001, PHASE-004, PHASE-008 | One-source playback and seek | Composed mixed-source preview, responsive cursor-driven preview, and scalable timeline navigation |
+| CAP-003 | PHASE-002, PHASE-004, PHASE-008 | Split/delete | Movement, multi-selection, copy/paste, expanded segment model, and resilient timeline controls |
+| CAP-004 | PHASE-001, PHASE-003, PHASE-008 | Save/reopen | Future schema expansion and current-project recovery |
 | CAP-005 | PHASE-002, PHASE-004, PHASE-005, PHASE-006, PHASE-007, PHASE-008 | Fast verified cut export | Composition, audio, mixed-source, FPS delivery, and measured rendering strategies |
 | CAP-006 | PHASE-003 | Basic agentable workflow | Future full editing command surface |
 | CAP-007 | PHASE-004 | Not included | Multiple mixed-media sources |
@@ -114,11 +114,11 @@ complete and closed after user validation, review, and local delivery
 evidence. PHASE-007 is complete and closed after the user confirmed its
 approved ticket set was accepted and tested; unavailable remote and
 target-specific checks remain recorded as accepted warnings. PHASE-008 is
-complete and closed after FEAT-024 through FEAT-028 and TICKET-061 through
-TICKET-082 were manually validated and explicitly closed by the user on
-2026-08-28. Historical generic blocker, runtime, target-workstation, license,
-remote-check, and benchmark limitations remain recorded in the linked
-evidence.
+complete and closed after FEAT-024 through FEAT-029 and TICKET-061 through
+TICKET-101 were implemented, reviewed, manually validated, and explicitly
+closed by the user on 2026-09-07. Historical generic blocker, runtime,
+target-workstation, license, remote-check, and benchmark limitations remain
+recorded in the linked evidence.
 
 ## Source References
 
@@ -156,8 +156,17 @@ evidence.
   Restoration survey TICKET-073 is also complete. FEAT-027 has TICKET-077
   verifying under CHG-006 and TICKET-078 verifying under CHG-007, while
   TICKET-074 through TICKET-075 retain their blocked generic path because
-  required runtimes and evidence remain incomplete. The phase remains open
-  without changing the first-horizon scope.
+  required runtimes and evidence remain incomplete. The phase later moved to
+  `phases/closed/` on 2026-09-07 after the remaining editor-recovery and
+  resumable-export records reached terminal evidence without changing the
+  first-horizon scope.
+- PHASE-008 and FEAT-024 were reopened under CHG-009 on 2026-08-28 after
+  measuring that source import still waited for full-file audio analysis
+  before attaching a usable project. The follow-up is limited to metadata-first
+  attachment, truthful background audio status, generation-safe completion,
+  export gating, and   before/after import-latency evidence. TICKET-083 through TICKET-101 then
+  completed with user-validation, review, and delivery evidence, and the
+  same-ID phase and feature records moved to their `closed/` directories.
 - The original phase-index metadata, sequencing rationale, common rules,
   capability coverage, handoff gate, and source references remain in this
   synchronized index.

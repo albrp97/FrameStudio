@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 
 from .audio import (
     AUDIO_POLICY_VERSION,
+    AudioAnalysisCancelled,
     AudioDecision,
     analyze_source_audio,
     audio_decision_is_stale,
@@ -14,6 +16,7 @@ from .audio import (
 from .composition import VisualTransform
 from .export import (
     ExportPlan,
+    ExportPlanningError,
     plan_export,
     plan_mixed_export,
 )
@@ -299,9 +302,12 @@ def ensure_project_audio_analysis(
     project: Project,
     *,
     ffmpeg_path: str = "ffmpeg",
+    cancel_event: threading.Event | None = None,
 ) -> dict[str, dict[str, object]]:
     decisions: dict[str, dict[str, object]] = {}
     for source in project.sources or (project.source,):
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportPlanningError("Export cancelled")
         settings = project.source_audio_settings(source.source_id)
         status = settings.get("status")
         if (
@@ -309,7 +315,14 @@ def ensure_project_audio_analysis(
             or settings.get("policy_version") != AUDIO_POLICY_VERSION
             or audio_decision_is_stale(source, settings)
         ):
-            decision = analyze_source_audio(source, ffmpeg_path=ffmpeg_path)
+            try:
+                decision = analyze_source_audio(
+                    source,
+                    ffmpeg_path=ffmpeg_path,
+                    cancel_event=cancel_event,
+                )
+            except AudioAnalysisCancelled as error:
+                raise ExportPlanningError("Export cancelled") from error
             settings = decision.to_dict()
             project.set_source_audio_settings(source.source_id, settings)
         decisions[source.source_id] = settings
@@ -420,12 +433,14 @@ def plan_project_export(
     | Mapping[str, object]
     | None = None,
     upscale_policy: UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, object] | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> ExportPlan:
     if project.segment_timeline is None:
         raise ValueError("Project segment timeline is required")
     audio_decisions = ensure_project_audio_analysis(
         project,
         ffmpeg_path=ffmpeg_path,
+        cancel_event=cancel_event,
     )
     selected_frame_rate_policy = (
         project.output_settings.get("frame_rate_policy")

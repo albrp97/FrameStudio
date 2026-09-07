@@ -4,6 +4,7 @@ from typing import Any
 
 from .app_helpers import KEY_BINDINGS
 from .composition import MAX_OFFSET_X, MAX_OFFSET_Y, MAX_ZOOM, MIN_ZOOM
+from .persistence import autosave_exists
 from .timeline import create_timeline_canvas
 
 
@@ -20,6 +21,15 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     open_project.connect("clicked", window._on_open_project_clicked)
     header.pack_start(open_project)
     window.open_project_button = open_project
+
+    recover_autosave = Gtk.Button(label="Recover autosave")
+    recover_autosave.set_tooltip_text(
+        "Open the latest crash-recovery project without changing the normal project path"
+    )
+    recover_autosave.connect("clicked", window._on_recover_autosave_clicked)
+    recover_autosave.set_sensitive(autosave_exists())
+    header.pack_start(recover_autosave)
+    window.recover_autosave_button = recover_autosave
 
     export = Gtk.Button(label="Export video")
     export.connect("clicked", window._on_export_clicked)
@@ -168,6 +178,12 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     window.timeline_output_label = Gtk.Label(label="Final output: 00:00")
     window.timeline_output_label.set_tooltip_text("Duration of included clips in the final export")
     timeline_toolbar.append(window.timeline_output_label)
+
+    fit_thirty_minutes = Gtk.Button(label="30 min")
+    fit_thirty_minutes.set_tooltip_text("Fit the timeline scale so 30 minutes spans the viewport")
+    fit_thirty_minutes.connect("clicked", window._fit_timeline_to_thirty_minutes)
+    timeline_toolbar.append(fit_thirty_minutes)
+    window.fit_thirty_minutes_button = fit_thirty_minutes
 
     timeline_toolbar_spacer = Gtk.Box()
     timeline_toolbar_spacer.set_hexpand(True)

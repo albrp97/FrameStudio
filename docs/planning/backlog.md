@@ -44,9 +44,19 @@ controls, mixed-FPS render-strategy comparison, and restoration research.
 TICKET-061 through TICKET-082 are complete and closed. FEAT-025 through
 FEAT-028 are complete and closed, including the approved Strategy B route,
 restoration benchmarks, optional SuperUltraCompact enhancement, editor
-responsiveness corrections, and default-zoom triplicate offsets. Historical
-benchmark, runtime, target-workstation, and remote-check limitations remain
-recorded in the linked evidence.
+responsiveness corrections, and default-zoom triplicate offsets. FEAT-024 and
+FEAT-029 are complete and closed after implementation, review, user
+validation, and local delivery evidence. TICKET-083 through TICKET-101 are
+complete and closed under their linked evidence. Historical benchmark,
+runtime, target-workstation, and remote-check
+limitations remain recorded in the linked evidence. The completed FEAT-029 work covers
+the editor recovery, timeline, composition, resumable-export,
+console-observability, continuous-seek, responsive-export-planning,
+upscale-count, Wayland-renderer, enhanced-export frame-count, video-only
+playback, deletion responsiveness, FPS-count, and post-export action tickets.
+CHG-010 added the general resumable-export session/checkpoint,
+recovery-control, and CLI-parity tickets without changing the first-horizon
+scope; all four are now delivered.
 
 ## Ticket Lifecycle Records
 
@@ -55,9 +65,11 @@ Completed tickets are closed; TICKET-001 through TICKET-047 are complete and
 closed after their approved validation, review, and local delivery evidence.
 TICKET-048 through TICKET-060 are complete and closed after the user
 confirmed they were approved, accepted, and tested. Unavailable remote and
-target-specific checks remain recorded as accepted warnings. TICKET-061
-through TICKET-082 are complete and closed with their linked evidence after
-the user's explicit manual-validation and closeout decision on 2026-08-28.
+target-specific checks remain recorded as accepted warnings. TICKET-061 through TICKET-082 are complete and closed with their linked
+evidence after the user's explicit manual-validation and closeout decision on
+2026-08-28. TICKET-083 through TICKET-101 are complete and closed after the
+user's 2026-09-07 validation, focused functionality evidence, repository
+gates, and review evidence.
 
 | Sequence | ID | Status | Parent feature | Phase | Current path |
 |---:|---|---|---|---|---|
@@ -143,6 +155,25 @@ the user's explicit manual-validation and closeout decision on 2026-08-28.
 | 80 | TICKET-080 | complete | FEAT-028 | PHASE-008 | `tickets/closed/TICKET-080-benchmark-upscale-render-strategies.md` |
 | 81 | TICKET-081 | complete | FEAT-028 | PHASE-008 | `tickets/closed/TICKET-081-restore-editor-loading-zoom-and-gpu-interpolation.md` |
 | 82 | TICKET-082 | complete | FEAT-025 | PHASE-008 | `tickets/closed/TICKET-082-allow-triplicate-horizontal-offset-at-default-zoom.md` |
+| 83 | TICKET-083 | complete | FEAT-024 | PHASE-008 | `tickets/closed/TICKET-083-defer-audio-analysis-during-import.md` |
+| 84 | TICKET-084 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-084-implement-single-project-autosave-and-recovery.md` |
+| 85 | TICKET-085 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-085-add-unlimited-timeline-zoom-and-thirty-minute-fit.md` |
+| 86 | TICKET-086 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-086-preserve-triplicate-playhead-and-play-state.md` |
+| 87 | TICKET-087 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-087-resume-enhanced-export-intermediates-after-failure.md` |
+| 88 | TICKET-088 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-088-add-numbered-staged-console-export-progress.md` |
+| 89 | TICKET-089 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-089-keep-playback-running-when-seeking-timeline.md` |
+| 90 | TICKET-090 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-090-keep-export-planning-responsive.md` |
+| 91 | TICKET-091 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-091-report-upscale-count-and-preserve-render-route.md` |
+| 92 | TICKET-092 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-092-avoid-wayland-vulkan-swapchain-warning.md` |
+| 93 | TICKET-093 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-093-fix-enhanced-export-frame-count-and-cache-reuse.md` |
+| 94 | TICKET-094 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-094-improve-video-only-playback-and-audio-analysis-coalescing.md` |
+| 95 | TICKET-095 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-095-keep-last-clip-deletion-responsive.md` |
+| 96 | TICKET-096 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-096-report-fps-enhancement-count.md` |
+| 97 | TICKET-097 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-097-add-safe-post-export-actions-and-failure-logs.md` |
+| 98 | TICKET-098 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-098-persist-resumable-export-session-checkpoints.md` |
+| 99 | TICKET-099 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md` |
+| 100 | TICKET-100 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md` |
+| 101 | TICKET-101 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
 
 ## Ticket summary
 
@@ -903,13 +934,17 @@ protected throughout PHASE-007.
 **Objective:** OBJ-001
 **Scope:** SCOPE-001
 **Phase:** PHASE-008
-**Features:** FEAT-024, FEAT-025, FEAT-026, FEAT-027, FEAT-028
+**Features:** FEAT-024, FEAT-025, FEAT-026, FEAT-027, FEAT-028, FEAT-029
 **Status:** complete
 **Approval:** user-authorized on 2026-08-26 to create the PHASE-008 feature
-and ticket breakdown; user-authorized manual validation and closeout on
-2026-08-28
+and ticket breakdown; the PHASE-008/FEAT-024 follow-up was authorized by the
+2026-08-28 request to create, implement, review, and measure the import
+responsiveness ticket. FEAT-029 and TICKET-084 through TICKET-092 were
+authorized by follow-up requests to create, implement, test, and review the
+focused improvements without waiting for separate ticket approval. CHG-010 and TICKET-098 through TICKET-101 were authorized on 2026-09-06;
+their implementation, validation, review, and delivery evidence is complete.
 **Owner:** repository planning; maintainer identity is not recorded
-**Last updated:** 2026-08-28
+**Last updated:** 2026-09-07
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/specs/future-product-direction.md`,
 `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
@@ -918,6 +953,16 @@ and ticket breakdown; user-authorized manual validation and closeout on
 `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
 `docs/planning/features/closed/FEAT-027-researching-video-restoration-and-upscaling.md`,
 `docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`,
+`docs/planning/features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md`,
+`docs/planning/tickets/closed/TICKET-091-report-upscale-count-and-preserve-render-route.md`,
+`evidence/ticket-091-report-upscale-count-and-preserve-render-route.md`,
+`docs/planning/tickets/closed/TICKET-092-avoid-wayland-vulkan-swapchain-warning.md`,
+`evidence/ticket-092-avoid-wayland-vulkan-swapchain-warning.md`,
+`docs/planning/reviews/CHG-010-generalize-export-resume-across-cancellation-and-restarts.md`,
+`docs/planning/tickets/closed/TICKET-098-persist-resumable-export-session-checkpoints.md`,
+`docs/planning/tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md`,
+`docs/planning/tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md`,
+`docs/planning/tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md`,
 `.github/aidd-config.yml`
 
 This ticket set covers measured preview optimization informed by Lossless Cut
@@ -926,7 +971,10 @@ matched mixed-FPS render-strategy comparison, the approved Strategy B
 production-default follow-up, research-only restoration recommendations, and
 the separately approved opt-in SuperUltraCompact production-upscale follow-up.
 It does not vendor external code, add unapproved model families, or change
-the first-horizon scope.
+the first-horizon scope. The FEAT-029 extension also covers persistent,
+fingerprinted checkpoints for ordinary and enhanced exports, explicit
+resume/restart/discard lifecycle controls, and bounded continuation after
+cancellation or failure.
 
 ### Ticket summary
 
@@ -954,6 +1002,25 @@ the first-horizon scope.
 | 80 | TICKET-080 | Benchmark upscale render strategies | FEAT-028 | TICKET-079; requested fixtures and target workstation | complete | `tickets/closed/TICKET-080-benchmark-upscale-render-strategies.md` |
 | 81 | TICKET-081 | Restore editor loading, timeline zoom, and GPU interpolation | FEAT-028 | existing editor lifecycle; validated RVE runtime; representative local media | complete | `tickets/closed/TICKET-081-restore-editor-loading-zoom-and-gpu-interpolation.md` |
 | 82 | TICKET-082 | Allow triplicate horizontal offset at default zoom | FEAT-025 | existing focus bounds; triplicate composition; persistence and CLI contracts | complete | `tickets/closed/TICKET-082-allow-triplicate-horizontal-offset-at-default-zoom.md` |
+| 83 | TICKET-083 | Defer audio analysis during source import | FEAT-024 | TICKET-081; metadata probing; existing audio policy and export gate | complete | `tickets/closed/TICKET-083-defer-audio-analysis-during-import.md` |
+| 84 | TICKET-084 | Implement single-project autosave and recovery | FEAT-029 | TICKET-083; versioned persistence and lifecycle | complete | `tickets/closed/TICKET-084-implement-single-project-autosave-and-recovery.md` |
+| 85 | TICKET-085 | Add unlimited timeline zoom and 30-minute fit | FEAT-029 | timeline geometry; TICKET-081 baseline | complete | `tickets/closed/TICKET-085-add-unlimited-timeline-zoom-and-thirty-minute-fit.md` |
+| 86 | TICKET-086 | Preserve triplicate playhead and play state | FEAT-029 | live backend/controller position; TICKET-082 composition | complete | `tickets/closed/TICKET-086-preserve-triplicate-playhead-and-play-state.md` |
+| 87 | TICKET-087 | Resume enhanced export intermediates after failure | FEAT-029 | TICKET-076, TICKET-079; safe atomic export | complete | `tickets/closed/TICKET-087-resume-enhanced-export-intermediates-after-failure.md` |
+| 88 | TICKET-088 | Add numbered staged console export progress | FEAT-029 | ExportProgress; CLI JSON Lines; TICKET-087 stages | complete | `tickets/closed/TICKET-088-add-numbered-staged-console-export-progress.md` |
+| 89 | TICKET-089 | Keep playback running when seeking on the timeline | FEAT-029 | playback controller; timeline preview request | complete | `tickets/closed/TICKET-089-keep-playback-running-when-seeking-timeline.md` |
+| 90 | TICKET-090 | Keep export planning responsive for reopened projects | FEAT-029 | export panel; GTK main-loop contract; backend validation | complete | `tickets/closed/TICKET-090-keep-export-planning-responsive.md` |
+| 91 | TICKET-091 | Report eligible videos and preserve the upscale render route | FEAT-029 | TICKET-079, TICKET-087, TICKET-090; source-level upscale policy; GTK export panel | complete | `tickets/closed/TICKET-091-report-upscale-count-and-preserve-render-route.md` |
+| 92 | TICKET-092 | Avoid Wayland Vulkan swapchain warnings during editor rendering | FEAT-029 | GTK initialization; Wayland renderer selection; editor smoke | complete | `tickets/closed/TICKET-092-avoid-wayland-vulkan-swapchain-warning.md` |
+| 93 | TICKET-093 | Preserve exact enhanced mixed-export frame counts and retry valid intermediates | FEAT-029 | TICKET-087, TICKET-091; enhanced assembly and output verification | complete | `tickets/closed/TICKET-093-fix-enhanced-export-frame-count-and-cache-reuse.md` |
+| 94 | TICKET-094 | Improve video-only playback and audio-analysis coalescing | FEAT-029 | TICKET-083; playback and source-analysis lifecycle | complete | `tickets/closed/TICKET-094-improve-video-only-playback-and-audio-analysis-coalescing.md` |
+| 95 | TICKET-095 | Keep last-clip deletion responsive | FEAT-029 | empty-edit lifecycle; timeline controller | complete | `tickets/closed/TICKET-095-keep-last-clip-deletion-responsive.md` |
+| 96 | TICKET-096 | Report FPS-enhancement counts | FEAT-029 | TICKET-079, TICKET-091; export planning panel | complete | `tickets/closed/TICKET-096-report-fps-enhancement-count.md` |
+| 97 | TICKET-097 | Add safe post-export actions and failure logs | FEAT-029 | export completion; system-action safety | complete | `tickets/closed/TICKET-097-add-safe-post-export-actions-and-failure-logs.md` |
+| 98 | TICKET-098 | Persist resumable export session checkpoints | FEAT-029 | TICKET-087, TICKET-093; export cache and atomic persistence | complete | `tickets/closed/TICKET-098-persist-resumable-export-session-checkpoints.md` |
+| 99 | TICKET-099 | Checkpoint and resume all export stages | FEAT-029 | TICKET-098, TICKET-087, TICKET-093; staged export execution | complete | `tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md` |
+| 100 | TICKET-100 | Offer export resume, restart, and discard controls | FEAT-029 | TICKET-098, TICKET-099, TICKET-090; GTK project lifecycle | complete | `tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md` |
+| 101 | TICKET-101 | Preserve the CLI export resume contract | FEAT-029 | TICKET-098, TICKET-099, TICKET-088; CLI JSON Lines | complete | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
 
 ### Dependency order
 
@@ -971,8 +1038,38 @@ the first-horizon scope.
 
 `TICKET-079 -> TICKET-081`
 
+`TICKET-081 -> TICKET-083`
+
+`TICKET-083 -> {TICKET-084, TICKET-085, TICKET-086, TICKET-087, TICKET-088, TICKET-090}`
+
+`TICKET-079 + TICKET-087 + TICKET-090 -> TICKET-091`
+
+`TICKET-087 + TICKET-093 -> TICKET-098 -> TICKET-099`
+
+`TICKET-098 + TICKET-099 + TICKET-090 -> TICKET-100`
+
+`TICKET-098 + TICKET-099 + TICKET-088 -> TICKET-101`
+
+`TICKET-089` is independently grounded in the existing playback controller
+and timeline preview request path.
+
+`TICKET-092` is independently grounded in GTK initialization and the target
+Wayland renderer behavior.
+
+`TICKET-093` is grounded in the retained enhanced-export artifacts and the
+strict final frame-count verification path. It depends on the validated
+resumable-render and enhanced-routing contracts but does not weaken them.
+
+`TICKET-098` generalizes the persistent identity and checkpoint contract
+around the existing enhanced cache without replacing TICKET-087. TICKET-099
+extends that contract to ordinary and enhanced routes. TICKET-100 and
+TICKET-101 expose explicit lifecycle choices in the GTK and CLI surfaces
+without permitting silent resume.
+
 The preview work establishes an external research boundary and current
-baseline before experiments and default adoption. The focus work defines
+baseline before experiments and default adoption. TICKET-083 is a controlled
+follow-up that keeps the preview implementation intact while moving source
+attachment ahead of full-file audio analysis. The focus work defines
 interaction ownership before implementation, then verifies zoom bounds and
 GUI/CLI/persistence parity. The render comparison fixes a common protocol
 before running either strategy and selecting a route. The restoration work
@@ -983,24 +1080,29 @@ silently introduced.
 
 | Feature outcome | Ticket coverage | Coverage status |
 |---|---|---|
-| Optimize cursor-driven preview | TICKET-061 through TICKET-064 | covered |
+| Optimize cursor-driven preview and source attachment | TICKET-061 through TICKET-064, TICKET-083 | covered |
 | Streamline segment focus modifications | TICKET-065 through TICKET-068, TICKET-082 | covered |
 | Compare and adopt mixed-FPS render strategy | TICKET-069 through TICKET-072, TICKET-076 | covered |
 | Research video restoration and upscaling | TICKET-073 through TICKET-075, TICKET-077 through TICKET-078 | covered |
 | Add optional SuperUltraCompact upscale enhancement | TICKET-079 through TICKET-081 | covered |
-| CAP-002 - Playing and navigating an edit timeline | TICKET-061 through TICKET-064 | covered |
-| CAP-003 - Editing segments non-destructively | TICKET-065 through TICKET-068, TICKET-082 | covered |
-| CAP-005 - Rendering fast, valid, and safe outputs | TICKET-061, TICKET-064, TICKET-069 through TICKET-081 | covered |
+| Strengthen editor recovery and export observability | TICKET-084 through TICKET-101 | covered |
+| CAP-002 - Playing and navigating an edit timeline | TICKET-061 through TICKET-064, TICKET-085, TICKET-086, TICKET-089 | covered |
+| CAP-003 - Editing segments non-destructively | TICKET-065 through TICKET-068, TICKET-082, TICKET-085, TICKET-086 | covered |
+| CAP-004 - Persisting and reopening edit state | TICKET-005, TICKET-006, TICKET-084, TICKET-098, TICKET-100 | covered |
+| CAP-005 - Rendering fast, valid, and safe outputs | TICKET-061, TICKET-064, TICKET-069 through TICKET-081, TICKET-087 through TICKET-101 | covered |
+| CAP-006 - Automating the project through a deterministic CLI | TICKET-088, TICKET-101 | covered |
 | CAP-009 - Applying reusable visual modifications | TICKET-065 through TICKET-068, TICKET-082 | covered |
 | CAP-010 - Linking triplicate composition instances | TICKET-065 through TICKET-068, TICKET-082 | covered |
 | CAP-011 - Enhancing frame rate to 60 FPS | TICKET-069 through TICKET-081 | covered |
-| CAP-012 - Protecting media, state, and failure recovery | TICKET-061 through TICKET-082 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | TICKET-061 through TICKET-101 | covered |
 
 ### Readiness and gates
 
-- PHASE-008 is complete with FEAT-024 through FEAT-028 and TICKET-061 through
-  TICKET-082 closed after the user's explicit manual-validation and closeout
-  decision on 2026-08-28.
+- PHASE-008, FEAT-024, FEAT-029, and TICKET-083 through TICKET-101 are
+  complete and closed after implementation, regression, functionality,
+  user-validation, static-analysis, review, and delivery evidence recorded on
+  2026-09-07. TICKET-061 through TICKET-082 remain closed after the user's
+  earlier manual-validation and closeout decision on 2026-08-28.
 - Each execution ticket requires the configured baseline, preimplementation
   checklist, user approval, evidence, local quality, applicable real-system,
   static-analysis, and review gates.
@@ -1033,6 +1135,13 @@ available as evidence and safe fallback behavior where required.
 - `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`
 - `docs/planning/features/closed/FEAT-027-researching-video-restoration-and-upscaling.md`
 - `docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`
+- `docs/planning/features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md`
+- `docs/planning/tickets/closed/TICKET-093-fix-enhanced-export-frame-count-and-cache-reuse.md`
+- `docs/planning/reviews/CHG-010-generalize-export-resume-across-cancellation-and-restarts.md`
+- `docs/planning/tickets/closed/TICKET-098-persist-resumable-export-session-checkpoints.md`
+- `docs/planning/tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md`
+- `docs/planning/tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md`
+- `docs/planning/tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md`
 - `framestudio/app_playback.py`
 - `framestudio/ffmpeg_playback.py`
 - `framestudio/export_smart_render.py`

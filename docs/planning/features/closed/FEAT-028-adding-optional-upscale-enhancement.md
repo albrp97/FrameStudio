@@ -13,7 +13,7 @@ and benchmark its render strategies; execution remains subject to evidence,
 user-validation, review, and delivery gates.
 **Last updated:** 2026-08-28
 **Source paths:** `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`,
-`docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
+`docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
 `docs/specs/future-product-direction.md`, `FPS-ENHANCEMENT-RESEARCH.md`,
 `framestudio/export_planning.py`, `framestudio/export_delivery.py`,
 `framestudio/composition_render.py`, `.github/aidd-config.yml`

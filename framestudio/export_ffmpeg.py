@@ -17,6 +17,7 @@ from .export_process import (
     run_ffmpeg,
     segment_is_full_source,
 )
+from .export_session import ExportSession
 from .export_types import (
     ExportExecutionError,
     ExportPlan,
@@ -53,6 +54,7 @@ def execute_stream_copy(
     progress_callback: ExportProgressCallback | None = None,
     started: float | None = None,
     cancel_event: threading.Event | None = None,
+    session: ExportSession | None = None,
 ) -> None:
     has_audio = source_probe.has_audio_stream
     output_format_name = output_format(plan.destination)
@@ -106,18 +108,46 @@ def execute_stream_copy(
         )
         return
 
-    with tempfile.TemporaryDirectory(
-        prefix=f".{plan.destination.name}.parts-",
-        dir=str(plan.destination.parent),
-    ) as temporary_directory:
-        parts_directory = Path(temporary_directory)
+    temporary_context = (
+        tempfile.TemporaryDirectory(
+            prefix=f".{plan.destination.name}.parts-",
+            dir=str(plan.destination.parent),
+        )
+        if session is None
+        else None
+    )
+    try:
+        if temporary_context is not None:
+            parts_directory = Path(temporary_context.name)
+        else:
+            if session is None:
+                raise ExportExecutionError("Stream-copy export session is unavailable")
+            parts_directory = session.artifacts_root
         part_paths: list[Path] = []
         part_suffix = plan.source.suffix or ".mp4"
         frame_rate = source_probe.frame_rate_value
         progress_offset = 0.0
         frame_offset = 0
         for index, segment in enumerate(segments):
-            part = parts_directory / f"part-{index}{part_suffix}"
+            stage_id = f"cut-{index}"
+            cached = None if session is None else session.reuse(stage_id)
+            if cached is not None:
+                part_paths.append(cached)
+                command_frames = max(
+                    1,
+                    round(segment.duration_seconds * frame_rate),
+                )
+                progress_offset += segment.duration_seconds
+                frame_offset += command_frames
+                continue
+            part = (
+                parts_directory / f"part-{index}{part_suffix}"
+                if session is None
+                else session.artifact_path(stage_id, suffix=part_suffix)
+            )
+            part.unlink(missing_ok=True)
+            if session is not None:
+                session.mark_running(stage_id)
             command = [
                 ffmpeg_path,
                 "-hide_banner",
@@ -155,11 +185,14 @@ def execute_stream_copy(
                 cancel_event=cancel_event,
             )
             part_paths.append(part)
+            if session is not None:
+                session.record(stage_id, part)
             progress_offset += segment.duration_seconds
             frame_offset += command_frames
         list_path = parts_directory / "concat-list.txt"
         list_path.write_text(
-            "\n".join("'" + str(path).replace("'", "'\\''") + "'" for path in part_paths) + "\n",
+            "\n".join("file '" + str(path).replace("'", "'\\''") + "'" for path in part_paths)
+            + "\n",
             encoding="utf-8",
         )
         command = [
@@ -195,6 +228,9 @@ def execute_stream_copy(
             percent_override=99.0,
         )
         run_ffmpeg(command, cancel_event=cancel_event)
+    finally:
+        if temporary_context is not None:
+            temporary_context.cleanup()
 
 
 def fallback_filter(

@@ -64,6 +64,7 @@ class FfmpegPlaybackBackend:
         on_end: VoidCallback,
         ffmpeg_path: str = "ffmpeg",
         audio_decision: Mapping[str, Any] | None = None,
+        audio_preview_enabled: bool = False,
         ffplay_path: str = "ffplay",
         on_warning: MessageCallback | None = None,
         preview_cache_size: int = 8,
@@ -82,6 +83,7 @@ class FfmpegPlaybackBackend:
         self.on_end = on_end
         self.ffmpeg_path = ffmpeg_path
         self.audio_decision = None if audio_decision is None else dict(audio_decision)
+        self.audio_preview_enabled = audio_preview_enabled
         self.ffplay_path = ffplay_path
         self.on_warning = on_warning or (lambda _message: None)
         self._lock = threading.RLock()
@@ -163,9 +165,27 @@ class FfmpegPlaybackBackend:
         return command
 
     def _has_audio_preview(self) -> bool:
-        if self.audio_decision is None:
+        if not self.audio_preview_enabled or self.audio_decision is None:
             return False
         return self.audio_decision.get("status") != "not-applicable"
+
+    def _audio_sink_command(self) -> list[str]:
+        return [
+            self.ffplay_path,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nodisp",
+            "-autoexit",
+            "-f",
+            "s16le",
+            "-ar",
+            str(AUDIO_SAMPLE_RATE),
+            "-ch_layout",
+            "stereo",
+            "-i",
+            "pipe:0",
+        ]
 
     def _audio_command(
         self,
@@ -220,22 +240,7 @@ class FfmpegPlaybackBackend:
                 start_new_session=True,
             )
             audio_sink = subprocess.Popen(
-                [
-                    self.ffplay_path,
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-nodisp",
-                    "-autoexit",
-                    "-f",
-                    "s16le",
-                    "-ar",
-                    str(AUDIO_SAMPLE_RATE),
-                    "-ac",
-                    str(AUDIO_CHANNELS),
-                    "-i",
-                    "pipe:0",
-                ],
+                self._audio_sink_command(),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -911,6 +916,7 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
         on_end: VoidCallback,
         ffmpeg_path: str = "ffmpeg",
         audio_decisions: Mapping[str, Mapping[str, Any]] | None = None,
+        audio_preview_enabled: bool = False,
         ffplay_path: str = "ffplay",
         on_warning: MessageCallback | None = None,
         preview_cache_size: int = 8,
@@ -926,6 +932,7 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             source_id: index for index, (source_id, _path) in enumerate(source_items)
         }
         self.audio_decisions = {} if audio_decisions is None else dict(audio_decisions)
+        self.audio_preview_enabled = audio_preview_enabled
         super().__init__(
             source_items[0][1],
             width,
@@ -936,13 +943,14 @@ class FfmpegComposedPlaybackBackend(FfmpegPlaybackBackend):
             on_error,
             on_end,
             ffmpeg_path,
+            audio_preview_enabled=audio_preview_enabled,
             ffplay_path=ffplay_path,
             on_warning=on_warning,
             preview_cache_size=preview_cache_size,
         )
 
     def _has_audio_preview(self) -> bool:
-        return any(
+        return self.audio_preview_enabled and any(
             settings.get("status") != "not-applicable" for settings in self.audio_decisions.values()
         )
 

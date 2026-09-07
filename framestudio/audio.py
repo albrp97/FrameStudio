@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import subprocess
+import threading
 from array import array
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,10 @@ _AUDIO_GAIN_THRESHOLD_DB = 0.01
 
 class AudioAnalysisError(RuntimeError):
     """Raised when FFmpeg cannot produce source audio measurements."""
+
+
+class AudioAnalysisCancelled(RuntimeError):
+    """Raised when an in-progress audio analysis is superseded."""
 
 
 @dataclass(frozen=True)
@@ -140,13 +145,30 @@ def _audio_present(source: SourceReference) -> bool:
     return bool(value)
 
 
+def _terminate_audio_analysis_process(process: subprocess.Popen[bytes]) -> None:
+    try:
+        process.terminate()
+        process.wait(timeout=2)
+    except ProcessLookupError:
+        return
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            return
+        process.wait()
+
+
 def analyze_audio(
     path: Path,
     *,
     ffmpeg_path: str = "ffmpeg",
     policy: AudioPolicy = LEGACY_AUDIO_POLICY,
+    cancel_event: threading.Event | None = None,
 ) -> AudioStats:
     """Measure PCM samples using the legacy mean/median histogram algorithm."""
+    if cancel_event is not None and cancel_event.is_set():
+        raise AudioAnalysisCancelled("Audio analysis was cancelled")
     try:
         process = subprocess.Popen(
             [
@@ -182,10 +204,32 @@ def analyze_audio(
     sum_squares = 0.0
     peak = 0.0
     stderr_output = ""
+    cancellation_stop = threading.Event()
+    cancellation_watcher: threading.Thread | None = None
+
+    if cancel_event is not None:
+
+        def watch_cancellation() -> None:
+            while not cancellation_stop.wait(0.05):
+                if not cancel_event.is_set():
+                    continue
+                _terminate_audio_analysis_process(process)
+                return
+
+        cancellation_watcher = threading.Thread(
+            target=watch_cancellation,
+            name="framestudio-editor-audio-cancel",
+            daemon=True,
+        )
+        cancellation_watcher.start()
+
     try:
         if process.stdout is None:
             raise AudioAnalysisError("FFmpeg audio analysis did not provide a sample pipe")
         while True:
+            if cancel_event is not None and cancel_event.is_set():
+                _terminate_audio_analysis_process(process)
+                raise AudioAnalysisCancelled("Audio analysis was cancelled")
             chunk = process.stdout.read(1024 * 1024)
             if not chunk:
                 break
@@ -211,14 +255,21 @@ def analyze_audio(
                     )
                 histogram[bucket] += 1
     except (OSError, ValueError) as error:
+        if cancel_event is not None and cancel_event.is_set():
+            raise AudioAnalysisCancelled("Audio analysis was cancelled") from error
         raise AudioAnalysisError(f"Could not read FFmpeg audio samples: {error}") from error
     finally:
+        cancellation_stop.set()
+        if cancellation_watcher is not None:
+            cancellation_watcher.join(timeout=3)
         if process.stdout is not None:
             process.stdout.close()
         if process.stderr is not None:
             stderr_output = process.stderr.read().decode(errors="replace").strip()
             process.stderr.close()
         return_code = process.wait()
+    if cancel_event is not None and cancel_event.is_set():
+        raise AudioAnalysisCancelled("Audio analysis was cancelled")
     if return_code != 0:
         raise AudioAnalysisError(
             f"Audio analysis failed for {Path(path).name}: {stderr_output or 'ffmpeg failed'}"
@@ -295,6 +346,7 @@ def analyze_source_audio(
     *,
     ffmpeg_path: str = "ffmpeg",
     policy: AudioPolicy = LEGACY_AUDIO_POLICY,
+    cancel_event: threading.Event | None = None,
 ) -> AudioDecision:
     if not _audio_present(source):
         return _decision(
@@ -313,6 +365,7 @@ def analyze_source_audio(
             Path(source.path),
             ffmpeg_path=ffmpeg_path,
             policy=policy,
+            cancel_event=cancel_event,
         )
     except AudioAnalysisError as error:
         return _decision(

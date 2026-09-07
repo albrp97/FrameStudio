@@ -3,7 +3,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from framestudio.export_panel import prepare_export_panel
+from framestudio.export_panel import (
+    fps_panel_rows,
+    prepare_export_panel,
+    upscale_panel_rows,
+)
 from framestudio.fps_policy import rate_choice_labels
 from framestudio.interpolation import BackendValidation
 from framestudio.model import Project
@@ -24,6 +28,58 @@ def make_project(root: Path) -> Project:
             "format_name": "mp4",
         },
     )
+
+
+def make_multi_project(root: Path) -> Project:
+    entries = []
+    for name, width, height in (
+        ("eligible-landscape.mp4", 640, 360),
+        ("eligible-portrait.mp4", 720, 1280),
+        ("ineligible-landscape.mp4", 1920, 1080),
+    ):
+        source = root / name
+        source.write_bytes(b"fixture")
+        entries.append(
+            (
+                source,
+                {
+                    "duration_seconds": 10.0,
+                    "width": width,
+                    "height": height,
+                    "frame_rate": "30/1",
+                    "video_codec": "h264",
+                    "audio_codec": None,
+                    "format_name": "mp4",
+                },
+            )
+        )
+    return Project.create_multi(entries)
+
+
+def make_mixed_rate_project(root: Path) -> Project:
+    entries = []
+    for name, frame_rate in (
+        ("source-30.mp4", "30/1"),
+        ("source-60.mp4", "60/1"),
+        ("source-120.mp4", "120/1"),
+    ):
+        source = root / name
+        source.write_bytes(b"fixture")
+        entries.append(
+            (
+                source,
+                {
+                    "duration_seconds": 10.0,
+                    "width": 640,
+                    "height": 360,
+                    "frame_rate": frame_rate,
+                    "video_codec": "h264",
+                    "audio_codec": None,
+                    "format_name": "mp4",
+                },
+            )
+        )
+    return Project.create_multi(entries)
 
 
 def unavailable_rve_validation(
@@ -66,6 +122,119 @@ class EditorExportPanelTests(unittest.TestCase):
         self.assertTrue(state.policy.policy.enhancement_enabled)
         self.assertIsNotNone(state.upscale_policy)
         self.assertTrue(state.upscale_policy.policy.enhancement_enabled)
+
+    def test_panel_reports_source_level_videos_to_upscale_count(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            state = prepare_export_panel(
+                make_multi_project(root),
+                root,
+                choice="lowest",
+                enhancement_enabled=False,
+                upscale_enabled=True,
+                backend="ffmpeg-minterpolate",
+                project_path=root / "edit.framestudio.json",
+            )
+
+        rows = dict(state.display_rows)
+        self.assertEqual(rows["Videos to upscale"], "2")
+        self.assertEqual(state.summary["upscale"]["eligible_source_count"], 2)
+        self.assertEqual(state.summary["upscale"]["source_count"], 3)
+
+    def test_panel_reports_source_level_videos_to_fps_enhance_count(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            state = prepare_export_panel(
+                make_mixed_rate_project(root),
+                root,
+                choice="60",
+                enhancement_enabled=True,
+                upscale_enabled=False,
+                backend="ffmpeg-minterpolate",
+                project_path=root / "edit.framestudio.json",
+            )
+
+        rows = dict(state.display_rows)
+        self.assertEqual(rows["Videos to FPS enhance"], "1")
+        self.assertEqual(state.summary["fps"]["eligible_source_count"], 1)
+        self.assertEqual(state.summary["fps"]["source_count"], 3)
+
+    def test_pending_fps_rows_report_source_count_before_export_plan_finishes(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            rows = dict(
+                fps_panel_rows(
+                    make_mixed_rate_project(root),
+                    choice="60",
+                    enhancement_enabled=True,
+                    backend="ffmpeg-minterpolate",
+                )
+            )
+
+        self.assertEqual(rows["FPS enhancement"], "On")
+        self.assertEqual(rows["Videos to FPS enhance"], "1")
+
+    def test_pending_fps_rows_report_zero_when_disabled(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            rows = dict(
+                fps_panel_rows(
+                    make_mixed_rate_project(root),
+                    choice="60",
+                    enhancement_enabled=False,
+                    backend="ffmpeg-minterpolate",
+                )
+            )
+
+        self.assertEqual(rows["FPS enhancement"], "Off")
+        self.assertEqual(rows["Videos to FPS enhance"], "0")
+
+    def test_pending_upscale_rows_report_count_before_export_plan_finishes(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            rows = dict(upscale_panel_rows(make_multi_project(root), enabled=True))
+
+        self.assertEqual(rows["Upscale enhancement"], "On")
+        self.assertEqual(rows["Upscale model"], "SuperUltraCompact")
+        self.assertEqual(rows["Videos to upscale"], "2")
+
+    def test_pending_upscale_rows_report_zero_when_disabled(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            rows = dict(upscale_panel_rows(make_project(root), enabled=False))
+
+        self.assertEqual(rows["Upscale enhancement"], "Off")
+        self.assertEqual(rows["Videos to upscale"], "0")
+        self.assertNotIn("Upscale model", rows)
+
+    def test_panel_reports_zero_videos_to_upscale_when_none_are_eligible(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"fixture")
+            project = Project.create(
+                source,
+                {
+                    "duration_seconds": 10.0,
+                    "width": 1920,
+                    "height": 1080,
+                    "frame_rate": "10/1",
+                    "video_codec": "h264",
+                    "audio_codec": None,
+                    "format_name": "mp4",
+                },
+            )
+            state = prepare_export_panel(
+                project,
+                root,
+                choice="lowest",
+                enhancement_enabled=False,
+                upscale_enabled=True,
+                backend="ffmpeg-minterpolate",
+                project_path=root / "edit.framestudio.json",
+            )
+
+        self.assertEqual(dict(state.display_rows)["Videos to upscale"], "0")
 
     def test_rate_choice_labels_include_resolved_input_rates(self):
         labels = rate_choice_labels(

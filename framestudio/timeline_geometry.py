@@ -33,6 +33,7 @@ TIMELINE_ZOOM_LEVELS = (
     8.0,
     12.0,
 )
+TIMELINE_FIT_WINDOW_SECONDS = 30.0 * 60.0
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,7 @@ def _positive_float(value: float, label: str) -> float:
 
 def clamp_timeline_zoom(zoom: float) -> float:
     parsed = _positive_float(zoom, "Timeline zoom")
-    return max(TIMELINE_MIN_ZOOM, min(TIMELINE_MAX_ZOOM, parsed))
+    return max(TIMELINE_MIN_ZOOM, parsed)
 
 
 def next_timeline_zoom(zoom: float, direction: int) -> float:
@@ -74,7 +75,7 @@ def next_timeline_zoom(zoom: float, direction: int) -> float:
         for level in TIMELINE_ZOOM_LEVELS:
             if level > current + 1e-9:
                 return level
-        return TIMELINE_MAX_ZOOM
+        return current * 1.5
     for level in reversed(TIMELINE_ZOOM_LEVELS):
         if level < current - 1e-9:
             return level
@@ -82,7 +83,16 @@ def next_timeline_zoom(zoom: float, direction: int) -> float:
 
 
 def timeline_zoom_label(zoom: float) -> str:
-    return f"{clamp_timeline_zoom(zoom) * 100:.0f}%"
+    return f"{_positive_float(zoom, 'Timeline zoom') * 100:.0f}%"
+
+
+def timeline_zoom_for_window(
+    duration_seconds: float,
+    window_seconds: float,
+) -> float:
+    duration = _positive_float(duration_seconds, "Timeline duration")
+    window = _positive_float(window_seconds, "Timeline fit window")
+    return duration / window
 
 
 def timeline_pixels_per_second(
@@ -96,7 +106,7 @@ def timeline_pixels_per_second(
         1.0,
         viewport - TIMELINE_HORIZONTAL_PADDING * 2,
     )
-    return (usable_width / duration) * clamp_timeline_zoom(zoom)
+    return (usable_width / duration) * _positive_float(zoom, "Timeline zoom")
 
 
 def timeline_content_width(

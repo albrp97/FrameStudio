@@ -13,7 +13,7 @@ superseded that limitation.
 **Approval:** user-authorized on 2026-08-26 to break down PHASE-008; ticket
 execution remains separately gated by the configured approval policy
 **Last updated:** 2026-08-28
-**Source paths:** `docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
+**Source paths:** `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
 `docs/specs/future-product-direction.md`, `framestudio/export_delivery.py`,
 `framestudio/export_smart_render.py`, `framestudio_concat.py`, `framestudio_fps.py`,
 `FAST-CONCAT-RESEARCH.md`, `FPS-ENHANCEMENT-RESEARCH.md`,

@@ -14,7 +14,7 @@ after the default-zoom triplicate offset correction request.
 **Approval:** user-authorized on 2026-08-26 to break down PHASE-008; ticket
 execution remains separately gated by the configured approval policy
 **Last updated:** 2026-08-28
-**Source paths:** `docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
+**Source paths:** `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
 `docs/specs/future-product-direction.md`, `framestudio/app_ui.py`,
 `framestudio/app_timeline_actions.py`, `framestudio/composition.py`,
 `framestudio/model_types.py`, `framestudio/operations.py`,

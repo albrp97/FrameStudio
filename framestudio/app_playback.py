@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .app_export import request_close_after_export
 from .app_helpers import (
     TIMELINE_SCROLL_PIXELS,
     frame_step_direction,
@@ -15,6 +16,7 @@ from .app_helpers import (
     timeline_scroll_mode,
     timeline_scroll_position,
 )
+from .app_project import _invalidate_audio_analysis
 from .ffmpeg_playback import PlaybackBackendError, VideoFrame
 from .playback import PlaybackState
 from .ui import format_duration
@@ -119,7 +121,8 @@ def seek_timeline(window: Any, position_seconds: float) -> bool:
 def request_timeline_preview(window: Any, position_seconds: float) -> None:
     if window.controller is None or window.backend is None:
         return
-    if window.controller.snapshot().state == PlaybackState.PLAYING:
+    was_playing = window.controller.snapshot().state == PlaybackState.PLAYING
+    if was_playing:
         if not window.controller.pause():
             window._show_error(
                 window.controller.snapshot().error or "Could not pause source for preview",
@@ -145,6 +148,11 @@ def request_timeline_preview(window: Any, position_seconds: float) -> None:
     except PlaybackBackendError as error:
         window.controller.report_error(str(error))
         window._show_error(str(error))
+        return
+    if was_playing and not window.controller.play():
+        window._show_error(
+            window.controller.snapshot().error or "Could not resume source after preview seek",
+        )
 
 
 def on_timeline_scroll(
@@ -337,8 +345,10 @@ def handle_backend_end(window: Any, generation: int | None = None) -> bool:
 
 
 def on_close_request(window: Any, _window: Any) -> bool:
+    defer_close = request_close_after_export(window)
+    _invalidate_audio_analysis(window)
     window._stop_backend()
-    return False
+    return defer_close
 
 
 def start_smoke_test(window: Any, GLib: Any) -> bool:

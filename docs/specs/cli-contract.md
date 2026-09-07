@@ -42,7 +42,8 @@ framestudio export PROJECT --output VIDEO \
   [--fps-choice {lowest,highest,custom,60}] [--custom-fps FPS] \
   [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND] \
   [--upscale-enhancement|--no-upscale-enhancement] \
-  [--upscale-model MODEL] [--upscale-backend BACKEND]
+  [--upscale-model MODEL] [--upscale-backend BACKEND] \
+  [--resume|--restart|--discard]
 ```
 
 The same commands can be run from the repository with
@@ -139,6 +140,20 @@ failed export cannot be mistaken for a completed command. The final result
 reports the selected stream-copy or fallback route, the reason, verified
 output metadata, and publication path. Unverified partial files are never
 reported as successful output.
+
+Exports also keep a destination-scoped checkpoint session until verified
+publication succeeds. Use `--resume` to explicitly continue a compatible
+cancelled or failed session, `--restart` to discard its checkpoints and start
+again, or `--discard` to remove the session without running media work. Resume
+and restart emit an `export.session` JSON Lines event before progress. A
+changed source, project, destination, policy, runtime, or tool identity is
+rejected for `--resume`; an ordinary export invocation remains a fresh export.
+
+When stderr is connected to a terminal, export also prints human-readable
+numbered stages: preparation, rendering/enhancement, concatenation/composition,
+verification, and publication. `--human-progress` forces these messages when
+stderr is redirected. They are emitted only on stderr, so the JSON Lines
+contract on stdout remains machine-readable.
 
 Every project export uses the fixed 1920x1080 project canvas. Inputs that do
 not match it are contain-scaled and letterboxed through the established

@@ -23,6 +23,7 @@ from .fps_policy import (
     FrameRatePolicy,
     FrameRatePolicyError,
     ResolvedFrameRatePolicy,
+    resolve_frame_rate_policy,
     resolved_from_policy,
 )
 from .media import MediaProbe
@@ -161,7 +162,15 @@ def _resolved_frame_rate_policy(
         return None
     try:
         if isinstance(policy, ResolvedFrameRatePolicy):
-            resolved = policy
+            selected = policy.policy
+            resolved = resolve_frame_rate_policy(
+                metadata,
+                choice=selected.choice,
+                custom_rate=selected.custom_rate,
+                enhancement_enabled=selected.enhancement_enabled,
+                enhancement_scope=selected.enhancement_scope,
+                backend=selected.backend,
+            )
         else:
             normalized = (
                 policy if isinstance(policy, FrameRatePolicy) else FrameRatePolicy.from_dict(policy)
@@ -189,7 +198,7 @@ def _resolved_upscale_policy(
         if policy is None:
             return resolved_upscale_from_policy(metadata, UpscalePolicy())
         if isinstance(policy, ResolvedUpscalePolicy):
-            return policy
+            return resolved_upscale_from_policy(metadata, policy.policy)
         normalized = (
             policy if isinstance(policy, UpscalePolicy) else UpscalePolicy.from_dict(policy)
         )

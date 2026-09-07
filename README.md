@@ -119,10 +119,19 @@ framestudio export ~/Videos/source.framestudio.json --output ~/Videos/edited.mp4
 ```
 
 Use `--full-paths` only when automation needs local paths; output redacts them
-by default. Export emits structured progress events followed by a verified
-final result. The complete contract is documented in
+by default. Export emits structured progress events followed by a verified final result.
+When the command is attached to a terminal, it also reports numbered
+preparation, rendering/enhancement, concatenation/composition, verification,
+and publication stages on stderr. Use `--human-progress` to force those
+human-readable stages when stderr is redirected; JSON Lines on stdout remain
+unchanged. The complete contract is documented in
 [`docs/specs/cli-contract.md`](docs/specs/cli-contract.md). From the
 repository, use `make cli ARGS="inspect /absolute/path/to/project.framestudio.json"`.
+
+Long exports keep validated destination-adjacent checkpoints after
+cancellation or failure. Re-run with `--resume` to continue a compatible
+session, `--restart` to discard checkpoints and begin again, or `--discard` to
+remove the pending session without rendering.
 
 Upscale enhancement is enabled by default for eligible sources. The export
 panel and CLI still expose an explicit opt-out with `--no-upscale-enhancement`;
@@ -149,9 +158,14 @@ split/delete-toggle editing, block movement and copy/paste, versioned project
 save/reopen, reusable per-segment focus controls, linked triplicate
 compositions, and verified MP4 export. Audio is analyzed once per input source
 using the legacy mean/median policy and the same decision is reused by every
-included segment from that source. Missing `ffplay` or an audio preview
-process failure is reported explicitly; it is not silently treated as a
-successful audio preview.
+included segment from that source. Source import and project reopen attach
+after metadata probing while full-file audio analysis continues in the
+background; the per-source status reports pending, analyzing, terminal, or
+failed decisions. Export still performs the explicit terminal audio-analysis
+check before rendering, serializes that planning with any in-flight analysis,
+and cancels unresolved analysis when export cancellation is requested. Missing
+`ffplay` or an audio preview process failure is reported explicitly; it is not
+silently treated as a successful audio preview.
 The implementation keeps the public `framestudio.model`, `export`, `app`,
 `timeline`, and `cli` paths as compatibility facades over focused model,
 export, playback, application, timeline, and CLI modules.
@@ -173,11 +187,13 @@ block or blocks, **Shift+Left/Right** to move selected blocks, and
 block. Click **Play** or **Pause**, or press **Space**, to toggle playback.
 Bare
 **Left/Right** moves one output frame at a time. Use **Ctrl+mouse wheel** to
-zoom, **Ctrl+0** to fit, and **Alt/Shift+mouse wheel** or a horizontal
-secondary wheel to move the zoomed timeline viewport. A normal wheel always
-moves the playhead, even when zoomed. The timeline also displays the
-calculated final output duration and export progress includes percentage,
-frames, FPS, elapsed time, and ETA. The editor keeps this area compact; click
+zoom without an upper limit, **Ctrl+0** to fit the default view, and the
+**30 min** button to make 30 minutes span the visible timeline. **Alt/Shift+
+mouse wheel** or a horizontal secondary wheel moves the zoomed timeline
+viewport. A normal wheel always moves the playhead, even when zoomed.
+Triplicate toggles preserve the live playhead and playback state. The timeline
+also displays the calculated final output duration and export progress includes
+percentage, frames, FPS, elapsed time, and ETA. The editor keeps this area compact; click
 **Key bindings** to open the complete keyboard and timeline-control reference.
 
 The `.mp4` file selected in the editor is source media. **Save project** writes
@@ -185,6 +201,14 @@ a `.framestudio.json` editor project. **Export video** writes a separate edited
 video only after FFmpeg/ffprobe verify its playability, duration, dimensions,
 audio-stream presence, sample rate, and channels; the source is never
 overwritten.
+
+The editor also maintains one crash-recovery project at
+`$XDG_STATE_HOME/framestudio/autosave.framestudio.json` (or
+`~/.local/state/framestudio/autosave.framestudio.json`). A newly attached
+source/project replaces the previous autosave, and successful timeline edits
+update it without changing the normal **Save project** destination. Use
+**Recover autosave** to reopen it; FrameStudio validates that every source is
+still available and unchanged before attaching it.
 
 Export uses stream copy when the source and cut boundaries are conservatively
 eligible. Otherwise it reports the reason and uses an H.264/AAC MP4 fallback.
@@ -203,6 +227,16 @@ fallback is selected when the media is eligible. A single compatible, uncut
 source can publish its verified interpolation result directly; cuts, mixed
 sources, visual changes, incompatible media, and audio normalization retain the
 safe fallback render path.
+
+Enhanced exports keep a destination-adjacent
+`.<filename>.framestudio-intermediates` cache while interpolation, restoration,
+or preparation is running. The cache is fingerprinted with the selected
+timeline, source file state, frame-rate/upscale policies, and runtime
+settings. If an export fails before verified publication, a retry validates and
+reuses completed intermediates instead of repeating those expensive stages.
+Changing the source or export policy invalidates the cache; after successful
+verification and atomic publication, the cache is removed. The original source
+and any previously published output are never used as the cache.
 
 ### Makefile shortcuts
 
@@ -373,7 +407,9 @@ Use a short disposable MP4 or a copy of a local source:
 25. Reopen the mixed project and confirm source order, block order, deletion
     state, and the selected output duration are preserved.
 26. For a mixed-source project with different audio levels, confirm the
-   **Audio decisions** status shown after import/open. For an explicit CLI
+   **Audio decisions** status shown immediately after import/open, including
+   per-source `pending`/`analyzing` states while the editor remains usable.
+   For an explicit CLI
    refresh, run `framestudio analyze-audio` and inspect each source's
    status, measurement, and gain decision. Split and reorder segments from one
    source, then confirm the decision remains source-level rather than becoming

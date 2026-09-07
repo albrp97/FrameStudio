@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import shutil
 import subprocess
 import threading
@@ -13,6 +14,7 @@ from framestudio import app_timeline_actions
 from framestudio.app_playback import (
     deliver_latest_frame,
     handle_backend_end,
+    on_close_request,
     on_frame,
     on_key_pressed,
     on_timeline_scroll,
@@ -20,13 +22,20 @@ from framestudio.app_playback import (
     stop_backend,
 )
 from framestudio.app_project import (
+    _audio_analysis_worker,
+    _finish_audio_analysis,
+    _finish_source_audio_analysis,
     _finish_source_load,
+    _invalidate_audio_analysis,
     _load_source_worker,
+    _preview_audio_decisions,
     attach_project,
     load_project_path,
     load_source,
     refresh_playback_backend,
+    refresh_timeline,
 )
+from framestudio.audio import AUDIO_POLICY_VERSION, AudioDecision, pending_audio_decision
 from framestudio.cli import cli_main
 from framestudio.composition import (
     CANVAS_HEIGHT,
@@ -151,7 +160,7 @@ class EditorCompositionTests(unittest.TestCase):
         thread.assert_called_once()
         window._set_status.assert_called_once_with("Loading clip 1/2 (0%)")
 
-    def test_source_loading_worker_reports_monotonic_per_clip_progress(self):
+    def test_source_loading_worker_reports_probe_progress_without_audio_analysis(self):
         statuses = []
         window = SimpleNamespace(
             _source_load_generation=4,
@@ -166,19 +175,12 @@ class EditorCompositionTests(unittest.TestCase):
             progress_callback(2, 2, "probe")
             return object()
 
-        def analyze_audio(_project, progress_callback):
-            progress_callback(1, 2, "audio")
-            progress_callback(2, 2, "audio")
-
         with (
             patch(
                 "framestudio.app_project._build_source_project",
                 side_effect=build_project,
             ),
-            patch(
-                "framestudio.app_project.analyze_project_audio",
-                side_effect=analyze_audio,
-            ),
+            patch("framestudio.app_project.analyze_project_audio") as analyze_audio,
             patch("framestudio.app_project._finish_source_load"),
         ):
             _load_source_worker(
@@ -191,12 +193,448 @@ class EditorCompositionTests(unittest.TestCase):
         self.assertEqual(
             statuses,
             [
-                "Loading clip 1/2 (25%)",
-                "Loading clip 2/2 (50%)",
-                "Loading clip 1/2 (75%)",
+                "Loading clip 1/2 (50%)",
                 "Loading clip 2/2 (100%)",
             ],
         )
+        analyze_audio.assert_not_called()
+
+    def test_source_load_attaches_before_background_audio_analysis(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            window = SimpleNamespace(
+                _source_load_generation=1,
+                _source_load_in_progress=True,
+                _show_error=MagicMock(),
+                _set_status=MagicMock(),
+                _update_segment_controls=MagicMock(),
+            )
+            glib = SimpleNamespace()
+
+            with (
+                patch("framestudio.app_project.attach_project") as attach,
+                patch("framestudio.app_project._start_audio_analysis") as start_analysis,
+            ):
+                self.assertFalse(
+                    _finish_source_load(
+                        window,
+                        1,
+                        (Path("source.mp4"),),
+                        project,
+                        None,
+                        glib,
+                    )
+                )
+
+            attach.assert_called_once_with(window, project, None)
+            start_analysis.assert_called_once_with(window, project, glib)
+            self.assertFalse(window._source_load_in_progress)
+
+    def test_background_audio_analysis_applies_each_source_and_finishes(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first_path = root / "first.mp4"
+            second_path = root / "second.mp4"
+            first_path.write_bytes(b"first")
+            second_path.write_bytes(b"second")
+            first = Project.create(first_path, metadata())
+            second = Project.create(second_path, metadata())
+            project = Project.create_multi((first.source, second.source))
+            sources = project.sources
+            statuses = []
+            window = SimpleNamespace(
+                project=project,
+                _audio_analysis_generation=3,
+                _audio_analysis_in_progress=True,
+                _audio_analysis_source_ids=tuple(source.source_id for source in sources),
+                audio_status_label=SimpleNamespace(set_text=statuses.append),
+                _set_status=statuses.append,
+                _update_segment_controls=MagicMock(),
+            )
+            glib = SimpleNamespace(
+                idle_add=lambda callback, *args: callback(*args),
+            )
+            decisions = [
+                AudioDecision(
+                    status="not-applicable",
+                    gain_db=0.0,
+                    policy_version=AUDIO_POLICY_VERSION,
+                    measurements=None,
+                    source_fingerprint={
+                        "size_bytes": source.size_bytes,
+                        "modified_time_ns": source.modified_time_ns,
+                    },
+                    audio_metadata={"codec": None, "sample_rate": None, "channels": None},
+                    diagnostic="Source has no audio stream",
+                )
+                for source in sources
+            ]
+
+            with (
+                patch(
+                    "framestudio.app_project.analyze_source_audio",
+                    side_effect=decisions,
+                ),
+                patch("framestudio.app_project.refresh_playback_backend") as refresh,
+            ):
+                _audio_analysis_worker(window, project, 3, sources, glib)
+
+            self.assertEqual(
+                [project.source_audio_settings(source.source_id)["status"] for source in sources],
+                ["not-applicable", "not-applicable"],
+            )
+            self.assertFalse(window._audio_analysis_in_progress)
+            self.assertEqual(window._audio_analysis_source_ids, ())
+            self.assertEqual(refresh.call_count, 0)
+            self.assertIn("Audio analysis complete", statuses)
+
+    def test_empty_edit_refresh_stops_preview_without_reporting_an_error(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            segment_id = project.timeline.segments[0].segment_id
+            project.timeline.set_deleted(segment_id, True)
+            backend = MagicMock()
+            window = SimpleNamespace(
+                project=project,
+                segment_timeline=project.timeline,
+                backend=backend,
+                controller=None,
+                selected_segment_id=segment_id,
+                selected_segment_ids=(segment_id,),
+                timeline_canvas=MagicMock(),
+                audio_status_label=MagicMock(),
+                _stop_backend=lambda: stop_backend(window),
+                _update_selected_clip_label=MagicMock(),
+                _update_segment_controls=MagicMock(),
+                _update_playback_controls=MagicMock(),
+                _autosave_current_project=MagicMock(),
+                _show_error=MagicMock(),
+                _set_status=MagicMock(),
+            )
+
+            refresh_timeline(window)
+
+        backend.close.assert_called_once_with()
+        self.assertIsNone(window.backend)
+        self.assertIsNone(window.controller)
+        window._show_error.assert_not_called()
+        window._set_status.assert_called_once_with("No included clips in the timeline")
+
+    def test_attach_empty_edit_keeps_a_valid_editable_project_state(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            project.timeline.set_deleted(project.timeline.segments[0].segment_id, True)
+            window = SimpleNamespace(
+                project=None,
+                project_path=None,
+                backend=None,
+                controller=None,
+                _audio_analysis_generation=0,
+                _stop_backend=MagicMock(),
+                timeline_canvas=MagicMock(),
+                audio_status_label=MagicMock(),
+                _on_frame=MagicMock(),
+                _on_backend_error=MagicMock(),
+                _on_backend_end=MagicMock(),
+                _on_backend_warning=MagicMock(),
+                _update_selected_clip_label=MagicMock(),
+                _update_playback_controls=MagicMock(),
+                _update_segment_controls=MagicMock(),
+                _autosave_current_project=MagicMock(),
+            )
+
+            attach_project(window, project, None)
+
+        self.assertIs(window.project, project)
+        self.assertIsNone(window.backend)
+        self.assertIsNone(window.controller)
+        window.timeline_canvas.set_timeline.assert_called_once()
+        window._update_segment_controls.assert_called_once_with()
+        window._autosave_current_project.assert_called_once_with()
+
+    def test_cancelled_background_audio_analysis_does_not_publish_completion(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            cancel_event = threading.Event()
+            cancel_event.set()
+            idle_add = MagicMock()
+            glib = SimpleNamespace(idle_add=idle_add)
+            window = SimpleNamespace(project=project)
+
+            with patch("framestudio.app_project.analyze_source_audio") as analyze:
+                _audio_analysis_worker(
+                    window,
+                    project,
+                    3,
+                    (project.source,),
+                    glib,
+                    cancel_event,
+                )
+
+            analyze.assert_not_called()
+            idle_add.assert_not_called()
+
+    def test_stale_background_audio_result_is_ignored_for_replaced_project(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "old").mkdir()
+            (root / "new").mkdir()
+            old_project = make_project(root / "old")
+            new_project = make_project(root / "new")
+            source = old_project.source
+            decision = pending_audio_decision(source)
+            window = SimpleNamespace(
+                project=new_project,
+                _audio_analysis_generation=4,
+                _audio_analysis_in_progress=True,
+                _audio_analysis_source_ids=(source.source_id,),
+                audio_status_label=MagicMock(),
+                _set_status=MagicMock(),
+            )
+
+            self.assertFalse(
+                _finish_source_audio_analysis(
+                    window,
+                    old_project,
+                    4,
+                    source,
+                    decision,
+                    1,
+                    1,
+                )
+            )
+
+            self.assertEqual(
+                new_project.source_audio_settings(new_project.source.source_id)["status"],
+                "pending",
+            )
+            window.audio_status_label.set_text.assert_not_called()
+
+    def test_background_audio_result_with_changed_fingerprint_is_ignored(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            source = project.source
+            decision = pending_audio_decision(source)
+            source_path = Path(source.path)
+            source_path.write_bytes(b"changed source")
+            window = SimpleNamespace(
+                project=project,
+                _audio_analysis_generation=4,
+                _audio_analysis_in_progress=True,
+                _audio_analysis_source_ids=(source.source_id,),
+                audio_status_label=MagicMock(),
+                _set_status=MagicMock(),
+            )
+
+            with patch("framestudio.app_project.refresh_playback_backend"):
+                self.assertFalse(
+                    _finish_source_audio_analysis(
+                        window,
+                        project,
+                        4,
+                        source,
+                        decision,
+                        1,
+                        1,
+                    )
+                )
+
+            self.assertEqual(
+                project.source_audio_settings(source.source_id)["status"],
+                "pending",
+            )
+            window.audio_status_label.set_text.assert_not_called()
+
+    def test_incomplete_audio_analysis_is_not_reported_as_complete(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            source = project.source
+            source_path = Path(source.path)
+            source_path.write_bytes(b"changed source")
+            statuses = []
+            window = SimpleNamespace(
+                project=project,
+                _audio_analysis_generation=4,
+                _audio_analysis_in_progress=True,
+                _audio_analysis_source_ids=(source.source_id,),
+                audio_status_label=SimpleNamespace(set_text=statuses.append),
+                _set_status=statuses.append,
+                _update_segment_controls=MagicMock(),
+            )
+
+            _finish_audio_analysis(window, project, 4)
+
+            self.assertFalse(window._audio_analysis_in_progress)
+            self.assertIn("incomplete", statuses[-1].lower())
+            self.assertNotIn("audio analysis complete", statuses[-1].lower())
+
+    def test_invalidating_audio_analysis_signals_cancellation(self):
+        cancel_event = threading.Event()
+        window = SimpleNamespace(
+            _audio_analysis_generation=4,
+            _audio_analysis_in_progress=True,
+            _audio_analysis_source_ids=("source",),
+            _audio_analysis_cancel_event=cancel_event,
+        )
+
+        _invalidate_audio_analysis(window)
+
+        self.assertTrue(cancel_event.is_set())
+        self.assertEqual(window._audio_analysis_generation, 5)
+        self.assertFalse(window._audio_analysis_in_progress)
+        self.assertEqual(window._audio_analysis_source_ids, ())
+
+    def test_close_invalidates_audio_analysis_before_stopping_playback(self):
+        cancel_event = threading.Event()
+        window = SimpleNamespace(
+            _audio_analysis_generation=4,
+            _audio_analysis_in_progress=True,
+            _audio_analysis_source_ids=("source",),
+            _audio_analysis_cancel_event=cancel_event,
+            _stop_backend=MagicMock(),
+        )
+
+        self.assertFalse(on_close_request(window, None))
+
+        self.assertTrue(cancel_event.is_set())
+        self.assertEqual(window._audio_analysis_generation, 5)
+        window._stop_backend.assert_called_once_with()
+
+    def test_close_request_cancels_export_before_deferring_window_close(self):
+        audio_cancel_event = threading.Event()
+        export_cancel_event = threading.Event()
+        window = SimpleNamespace(
+            _audio_analysis_generation=4,
+            _audio_analysis_in_progress=True,
+            _audio_analysis_source_ids=("source",),
+            _audio_analysis_cancel_event=audio_cancel_event,
+            _export_in_progress=True,
+            _export_cancel_event=export_cancel_event,
+            _export_cancellation_lock=threading.Lock(),
+            cancel_export_button=MagicMock(),
+            _stop_backend=MagicMock(),
+            _set_status=MagicMock(),
+        )
+
+        self.assertTrue(on_close_request(window, None))
+
+        self.assertTrue(audio_cancel_event.is_set())
+        self.assertTrue(export_cancel_event.is_set())
+        self.assertTrue(window._close_after_export)
+        self.assertEqual(window._audio_analysis_generation, 5)
+        window._stop_backend.assert_called_once_with()
+
+    def test_failed_background_audio_result_remains_visible(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            source = project.source
+            pending = pending_audio_decision(source)
+            decision = AudioDecision(
+                status="failed",
+                gain_db=0.0,
+                policy_version=pending.policy_version,
+                measurements=None,
+                source_fingerprint=pending.source_fingerprint,
+                audio_metadata=pending.audio_metadata,
+                diagnostic="ffmpeg failed",
+            )
+            statuses = []
+            window = SimpleNamespace(
+                project=project,
+                _audio_analysis_generation=4,
+                _audio_analysis_in_progress=True,
+                _audio_analysis_source_ids=(source.source_id,),
+                audio_status_label=SimpleNamespace(set_text=statuses.append),
+                _set_status=MagicMock(),
+            )
+
+            with patch("framestudio.app_project.refresh_playback_backend"):
+                self.assertFalse(
+                    _finish_source_audio_analysis(
+                        window,
+                        project,
+                        4,
+                        source,
+                        decision,
+                        1,
+                        1,
+                    )
+                )
+
+            self.assertEqual(project.source_audio_settings(source.source_id)["status"], "failed")
+            self.assertIn("failed", statuses[-1])
+            self.assertIn("ffmpeg failed", statuses[-1])
+
+    def test_stale_audio_decision_is_replaced_with_pending_preview_input(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            source = project.source
+            settings = pending_audio_decision(source).to_dict()
+            settings["status"] = "ready"
+            settings["gain_db"] = 6.0
+            project.set_source_audio_settings(source.source_id, settings)
+            replacement_path = root / "replacement.mp4"
+            replacement_path.write_bytes(b"fixture")
+            os.utime(
+                replacement_path,
+                ns=(source.modified_time_ns + 1, source.modified_time_ns + 1),
+            )
+            project.relink_source(source.source_id, replacement_path, source.metadata)
+
+            preview_decisions = _preview_audio_decisions(project)
+
+            self.assertEqual(preview_decisions[source.source_id]["status"], "pending")
+            self.assertEqual(preview_decisions[source.source_id]["gain_db"], 0.0)
+
+    def test_stale_audio_analysis_completion_does_not_clear_newer_generation(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            window = SimpleNamespace(
+                project=project,
+                _audio_analysis_generation=5,
+                _audio_analysis_in_progress=True,
+                _audio_analysis_source_ids=("new-generation",),
+                audio_status_label=MagicMock(),
+                _set_status=MagicMock(),
+                _update_segment_controls=MagicMock(),
+            )
+
+            self.assertFalse(_finish_audio_analysis(window, project, 4))
+
+            self.assertTrue(window._audio_analysis_in_progress)
+            self.assertEqual(window._audio_analysis_source_ids, ("new-generation",))
+            window.audio_status_label.set_text.assert_not_called()
+
+    def test_project_reopen_attaches_before_background_audio_analysis(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            project_path = root / "project.framestudio.json"
+            save_project(project, project_path)
+            window = SimpleNamespace(
+                _export_in_progress=False,
+                _source_load_in_progress=False,
+                _set_status=MagicMock(),
+                _show_error=MagicMock(),
+            )
+            glib = SimpleNamespace()
+
+            with (
+                patch("framestudio.app_project.load_project", return_value=project),
+                patch(
+                    "framestudio.app_project.ensure_project_audio_analysis",
+                    side_effect=AssertionError("reopen must not block on audio analysis"),
+                ) as ensure_audio,
+                patch("framestudio.app_project.attach_project") as attach,
+                patch("framestudio.app_project._start_audio_analysis") as start_analysis,
+            ):
+                self.assertFalse(load_project_path(window, project_path, glib))
+
+            ensure_audio.assert_not_called()
+            attach.assert_called_once_with(window, project, project_path)
+            start_analysis.assert_called_once_with(window, project, glib)
 
     def test_stale_source_load_completion_does_not_replace_current_project(self):
         current_project = object()
@@ -323,9 +761,37 @@ class EditorCompositionTests(unittest.TestCase):
             request_timeline_preview(window, 8.0)
 
             self.assertAlmostEqual(window.controller.snapshot().position_seconds, 4.0)
+            self.assertEqual(window.controller.snapshot().state, PlaybackState.PAUSED)
             backend.request_preview.assert_called_once_with(4.0)
             self.assertAlmostEqual(project.playhead_seconds, 8.0)
             window.timeline_canvas.set_playhead.assert_called_with(8.0)
+
+    def test_timeline_preview_keeps_playing_after_click_seek(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            backend = MagicMock()
+            controller = PlaybackController(
+                backend,
+                project.timeline.edited_duration_seconds,
+            )
+            self.assertTrue(controller.play())
+            window = SimpleNamespace(
+                backend=backend,
+                controller=controller,
+                project=project,
+                segment_timeline=project.timeline,
+                timeline_canvas=MagicMock(),
+                _update_playback_controls=MagicMock(),
+                _show_error=MagicMock(),
+            )
+
+            request_timeline_preview(window, 6.0)
+
+            self.assertEqual(window.controller.snapshot().state, PlaybackState.PLAYING)
+            self.assertEqual(backend.pause.call_count, 1)
+            self.assertEqual(backend.request_preview.call_count, 1)
+            self.assertEqual(backend.play.call_count, 2)
+            window._show_error.assert_not_called()
 
     def test_b_key_splits_at_visible_playhead_after_deleted_block(self):
         with TemporaryDirectory() as temporary_directory:
@@ -578,6 +1044,32 @@ class EditorCompositionTests(unittest.TestCase):
             self.assertIsNotNone(segment.triplicate)
             self.assertEqual(segment.triplicate.shared_transform, segment.visual_transform)
             window._refresh_timeline.assert_called_once_with(segment_id)
+
+    def test_triplicate_toggle_preserves_live_backend_playhead(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            segment_id = project.timeline.segments[0].segment_id
+            backend = MagicMock()
+            backend.current_position.return_value = 6.25
+            window = SimpleNamespace(
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_ids=(segment_id,),
+                selected_segment_id=segment_id,
+                backend=backend,
+                controller=PlaybackController(backend, 10.0, initial_position=0.0),
+                timeline_canvas=MagicMock(),
+                _refresh_timeline=MagicMock(),
+                _set_status=MagicMock(),
+                _show_error=MagicMock(),
+            )
+
+            app_timeline_actions.on_triplicate_clicked(window, None)
+
+            self.assertAlmostEqual(project.playhead_seconds, 6.25)
+            window.timeline_canvas.set_playhead.assert_called_once_with(6.25)
+            window._refresh_timeline.assert_called_once_with(segment_id)
+            window._show_error.assert_not_called()
 
     def test_scroll_outside_focus_controls_keeps_playhead_navigation(self):
         backend = MagicMock()
@@ -1281,6 +1773,45 @@ class EditorCompositionTests(unittest.TestCase):
 
             self.assertAlmostEqual(window.controller.snapshot().position_seconds, 4.0)
             self.assertEqual(window.controller.snapshot().duration_seconds, 6.0)
+
+    def test_forced_refresh_preserves_live_playback_position(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            direct_backend = MagicMock()
+            direct_backend.current_position.return_value = 7.0
+            refreshed_backend = MagicMock()
+            window = SimpleNamespace(
+                backend=direct_backend,
+                controller=PlaybackController(
+                    direct_backend,
+                    project.timeline.edited_duration_seconds,
+                    initial_position=2.0,
+                ),
+                project=project,
+                project_path=None,
+                segment_timeline=project.timeline,
+                source_frame_rate=10.0,
+                timeline_canvas=MagicMock(),
+                audio_status_label=MagicMock(),
+                _stop_backend=lambda: stop_backend(window),
+                _on_frame=MagicMock(),
+                _on_backend_error=MagicMock(),
+                _on_backend_end=MagicMock(),
+                _on_backend_warning=MagicMock(),
+                _update_selected_clip_label=MagicMock(),
+                _update_playback_controls=MagicMock(),
+                _update_segment_controls=MagicMock(),
+            )
+
+            with (
+                patch("framestudio.app_project.FfmpegPlaybackBackend") as backend_type,
+                patch("framestudio.app_project.FfmpegComposedPlaybackBackend"),
+            ):
+                backend_type.return_value = refreshed_backend
+                refresh_playback_backend(window, force=True)
+
+            self.assertAlmostEqual(window.controller.snapshot().position_seconds, 7.0)
+            self.assertAlmostEqual(project.playhead_seconds, 7.0)
 
     def test_cli_focus_and_triplicate_operations_are_persisted(self):
         with TemporaryDirectory() as temporary_directory:

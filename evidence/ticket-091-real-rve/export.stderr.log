@@ -1,0 +1,8 @@
+Step 1/5 - Preparing sources: 0.0% [starting] | frame 0/10 | elapsed 00:00
+[C-----------------------------]   0.00% frame 0/10 pipeline    0.00 fps elapsed 00:00:00 ETA --:--:--
+[=============================C] 100.00% frame 10/10 pipeline    2.58 fps elapsed 00:00:03 ETA 00:00:00
+Step 1/5 - Preparing sources: 30.0% [preparing segment 1/1] | 0.0 fps | elapsed 00:05 | ETA 00:00
+Step 2/5 - Rendering and enhancing: 95.0% [publishing interpolated output] | frame 10/10 | elapsed 00:05 | ETA 00:00
+Step 4/5 - Verifying output: 99.0% [verifying] | frame 10/10 | elapsed 00:05 | ETA 00:00
+Step 5/5 - Publishing output: 100.0% | frame 10/10 | elapsed 00:05 | ETA 00:00
+Export complete.

@@ -39,12 +39,15 @@ under FEAT-021 for the export-panel defaults, presentation, backend fallback,
 and single-source enhanced smart-render boundary; it was closed with the
 Phase 007 delivery set.
 The PHASE-008 section below tracks responsive preview optimization, direct
-focus controls, mixed-FPS render-strategy comparison, and restoration
-research. FEAT-024 through FEAT-028 are complete and closed, including the
-approved Strategy B production default, concrete restoration benchmarks,
-optional upscale enhancement, editor responsiveness corrections, and
-default-zoom triplicate offsets. Historical limitations remain recorded in
-the linked evidence.
+focus controls, mixed-FPS render-strategy comparison, restoration research,
+and editor recovery/observability. FEAT-024 through FEAT-029 are complete and
+closed after implementation, review, user validation, and local delivery
+evidence. This includes single-project recovery, scalable timeline control,
+composition-position preservation, resumable exports, staged console
+observability, continuous seeking, responsive export planning, explicit
+upscale/FPS-count reporting, safe post-export actions, and guarded Wayland
+renderer selection.
+Historical limitations remain recorded in the linked evidence.
 This file does not create implementation work or architecture decisions.
 
 ## Phase and scope boundary
@@ -55,9 +58,9 @@ boundary remains one source video per project for PHASE-001 through PHASE-003.
 PHASE-004 delivered the approved mixed-source expansion and PHASE-006
 completed the approved focus and triplicate composition work. FPS enhancement
 was delivered through PHASE-007, whose feature breakdown and child records
-are now complete and closed. PHASE-008 is also complete and closed after
-FEAT-024 through FEAT-028 and TICKET-061 through TICKET-082 reached closure
-under the user's explicit manual-validation decision on 2026-08-28.
+are now complete and closed. PHASE-008 was closed after FEAT-024 through FEAT-029 and TICKET-061 through
+TICKET-101 reached closure under the user's explicit manual-validation and
+delivery decision on 2026-09-07.
 
 ## Feature summary
 
@@ -111,6 +114,7 @@ features are closed; future feature work remains open in its assigned phase.
 | FEAT-026 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md` |
 | FEAT-027 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-027-researching-video-restoration-and-upscaling.md` |
 | FEAT-028 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-028-adding-optional-upscale-enhancement.md` |
+| FEAT-029 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md` |
 
 ## Open decisions carried into feature readiness
 
@@ -133,12 +137,11 @@ delivery. FEAT-017 through FEAT-019 are complete and closed after their user
 validation, review, and local delivery evidence. FEAT-020 through FEAT-023
 are complete and closed after the user confirmed the PHASE-007 ticket set was
 approved, accepted, and tested; unavailable remote and target-specific checks
-remain recorded as accepted warnings. This index does not own implementation,
-branches, commits, or pull requests. Under PHASE-008, FEAT-024 through
-FEAT-028 and TICKET-061 through TICKET-082 are complete and closed from their
-linked evidence after the user's explicit manual-validation and closeout
-decision on 2026-08-28. Historical generic blocker and environment
-limitations remain recorded in the evidence records.
+remain recorded as accepted warnings. This index does not own implementation, branches, commits, or pull requests.
+Under PHASE-008, FEAT-024 through FEAT-029 and TICKET-061 through TICKET-101
+are complete and closed from their linked evidence after the user's
+manual-validation and closeout decision on 2026-09-07. Historical generic
+blocker and environment limitations remain recorded in the evidence records.
 
 ## PHASE-002 - Feature Decomposition
 
@@ -582,9 +585,9 @@ configured.
 **Status:** complete
 **Approval:** user-authorized on 2026-08-26 to break down the confirmed
 PHASE-008 outcome into features and planned tickets; user-authorized manual
-validation and closeout on 2026-08-28
+validation and closeout on 2026-08-28; FEAT-029 authorized on 2026-08-28
 **Owner:** repository planning; maintainer identity is not recorded
-**Last updated:** 2026-08-28
+**Last updated:** 2026-09-07
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/specs/future-product-direction.md`,
 `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
@@ -594,7 +597,14 @@ validation and closeout on 2026-08-28
 `docs/planning/reviews/CHG-006-real-video-enhancer-restoration-benchmark.md`,
 `docs/planning/reviews/CHG-007-expand-restoration-benchmark-matrix.md`,
 `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`,
-`https://github.com/k4yt3x/video2x`, `.github/aidd-config.yml`
+`https://github.com/k4yt3x/video2x`,
+`docs/planning/tickets/closed/TICKET-091-report-upscale-count-and-preserve-render-route.md`,
+`evidence/ticket-091-report-upscale-count-and-preserve-render-route.md`,
+`docs/planning/tickets/closed/TICKET-092-avoid-wayland-vulkan-swapchain-warning.md`,
+`evidence/ticket-092-avoid-wayland-vulkan-swapchain-warning.md`,
+`docs/planning/tickets/closed/TICKET-093-fix-enhanced-export-frame-count-and-cache-reuse.md`,
+`evidence/ticket-093-fix-enhanced-export-frame-count-and-cache-reuse.md`,
+`.github/aidd-config.yml`
 
 ### Phase boundary
 
@@ -613,27 +623,31 @@ Lossless Cut.
 
 | ID | Outcome | Capability links | Dependencies | Status |
 |---|---|---|---|---|
-| FEAT-024 | Optimize cursor-driven preview | CAP-002, CAP-005, CAP-012 | PHASE-007 baseline; playback runtime; target-workstation benchmark | complete |
+| FEAT-024 | Optimize cursor-driven preview and source attachment | CAP-002, CAP-005, CAP-012 | PHASE-007 baseline; playback runtime; target-workstation benchmark; TICKET-081 lifecycle | complete |
 | FEAT-025 | Streamline segment focus modifications | CAP-003, CAP-009, CAP-010, CAP-012 | PHASE-006 focus/triplicate semantics; GUI and CLI contracts | complete |
 | FEAT-026 | Compare and adopt mixed-FPS render strategy | CAP-005, CAP-011, CAP-012 | PHASE-005 delivery policy; PHASE-007 interpolation; representative media; TICKET-072 evidence | complete |
 | FEAT-027 | Research video restoration and upscaling | CAP-005, CAP-011, CAP-012 | candidate research; supplied degraded media; license/runtime review | complete |
 | FEAT-028 | Add optional SuperUltraCompact upscale enhancement | CAP-005, CAP-011, CAP-012 | TICKET-076; local RVE runtime and weights; fixed output and composition policy | complete |
+| FEAT-029 | Strengthen editor recovery and export observability | CAP-002, CAP-003, CAP-004, CAP-005, CAP-012 | TICKET-083 lifecycle; existing persistence, timeline, composition, and enhanced-export contracts | complete |
 
 ### Capability coverage
 
 | Phase capability | Feature coverage | Coverage status |
 |---|---|---|
-| CAP-002 - Playing and navigating an edit timeline | FEAT-024 | covered |
-| CAP-003 - Editing segments non-destructively | FEAT-025 | covered |
-| CAP-005 - Rendering fast, valid, and safe outputs | FEAT-024, FEAT-026, FEAT-027, FEAT-028 | covered |
+| CAP-002 - Playing and navigating an edit timeline | FEAT-024, FEAT-029 | covered |
+| CAP-003 - Editing segments non-destructively | FEAT-025, FEAT-029 | covered |
+| CAP-004 - Persisting and reopening edit state | FEAT-003, FEAT-029 | covered |
+| CAP-005 - Rendering fast, valid, and safe outputs | FEAT-024, FEAT-026, FEAT-027, FEAT-028, FEAT-029 | covered |
 | CAP-009 - Applying reusable visual modifications | FEAT-025 | covered |
 | CAP-010 - Composing linked triplicate focused-action layouts | FEAT-025 | covered |
 | CAP-011 - Enhancing frame rate to 60 FPS | FEAT-026, FEAT-027, FEAT-028 | covered |
-| CAP-012 - Protecting media, state, and failure recovery | FEAT-024 through FEAT-028 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | FEAT-024 through FEAT-029 | covered |
 
 ### Dependency order
 
 `TICKET-061 -> TICKET-062 -> TICKET-063 -> TICKET-064`
+
+`TICKET-081 -> TICKET-083`
 
 `TICKET-065 -> TICKET-066 -> TICKET-067 -> TICKET-068 -> TICKET-082`
 
@@ -643,8 +657,24 @@ Lossless Cut.
 
 `TICKET-073 -> TICKET-077 -> TICKET-078 -> restoration evidence assimilation`
 
+`TICKET-083 -> {TICKET-084, TICKET-085, TICKET-086, TICKET-087, TICKET-088,
+TICKET-090}`
+
+`TICKET-079 + TICKET-087 + TICKET-090 -> TICKET-091`
+
+`TICKET-089` is independently grounded in the existing playback controller
+and timeline preview request path.
+
+`TICKET-092` is independently grounded in GTK initialization and the target
+Wayland renderer behavior.
+
+`TICKET-093` is independently grounded in enhanced final assembly, strict
+frame-count verification, and the retained intermediate cache contract.
+
 FEAT-024 starts with external preview research and a current baseline before
-experiments and default adoption. FEAT-025 defines the direct-control
+experiments and default adoption. Its TICKET-083 follow-up preserves that
+preview work while separating metadata-first project attachment from
+background source audio analysis. FEAT-025 defines the direct-control
 contract before GUI implementation and coordinate/persistence verification.
 FEAT-026 fixes comparable benchmark inputs before running either route and
 making a routing decision, then implements the approved per-source default.
@@ -653,12 +683,23 @@ recommendation so restoration remains research-only. TICKET-077 is the
 concrete benchmark route enabled by CHG-006, and TICKET-078 is the expanded
 comparison route enabled by CHG-007; neither silently replaces the generic
 blocked records.
+FEAT-029 groups independently verifiable editor-resilience outcomes under the
+same active phase; TICKET-084 through TICKET-088 and TICKET-090 share the
+TICKET-083 lifecycle baseline, TICKET-091 depends on the production upscale,
+resumable-export, and responsive-planning contracts, while TICKET-089 and
+TICKET-092 remain independently implementable against their existing playback
+and GTK initialization paths. TICKET-093 depends on the retained
+enhanced-export and upscale-routing contracts.
 
 ### Planning readiness
 
-PHASE-008 and FEAT-024 through FEAT-028 are complete and closed. TICKET-061
-through TICKET-082 are complete and closed with their linked evidence after
-the user's explicit manual-validation and closeout decision on 2026-08-28.
+PHASE-008 is complete after FEAT-024 and FEAT-029 reached terminal status
+under the user's direct authorization. FEAT-025
+through FEAT-028 and TICKET-061 through TICKET-082 are complete and closed
+with their linked evidence after the user's explicit manual-validation and
+closeout decision on 2026-08-28. TICKET-083 through TICKET-101 are complete
+and closed with implementation, review, repository-gate, and user-validation
+evidence from 2026-09-07.
 The generic restoration blocker history for TICKET-074 and TICKET-075 is
 preserved, while concrete benchmark evidence is recorded by TICKET-077 and
 TICKET-078. Remote, target-workstation, model-runtime, license, and other
@@ -680,10 +721,13 @@ preservation remain protected throughout PHASE-008.
 - `docs/specs/capability-map.md`
 - `docs/specs/future-product-direction.md`
 - `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`
+- `docs/planning/features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md`
 - `framestudio/app_playback.py`
 - `framestudio/ffmpeg_playback.py`
 - `framestudio/export_smart_render.py`
 - `framestudio/export_interpolation.py`
+- `framestudio/graphics.py`
+- `tests/test_editor_graphics.py`
 - `FAST-CONCAT-RESEARCH.md`
 - `FPS-ENHANCEMENT-RESEARCH.md`
 - `.github/aidd-config.yml`

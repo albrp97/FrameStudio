@@ -19,6 +19,7 @@ from .fps_policy import (
     ResolvedFrameRatePolicy,
     policy_source_metadata,
     rate_label,
+    resolve_frame_rate_policy,
 )
 from .interpolation import (
     BackendValidation,
@@ -66,6 +67,13 @@ class ExportPanelState:
             "target_rate": str(self.policy.target_rate),
             "enhancement_enabled": self.policy.policy.enhancement_enabled,
             "eligible_source_ids": list(self.policy.eligible_source_ids),
+            "fps": {
+                "enabled": self.policy.policy.enhancement_enabled,
+                "eligible_source_ids": list(self.policy.eligible_source_ids),
+                "eligible_source_count": len(self.policy.eligible_source_ids),
+                "source_count": len(self.policy.decisions),
+                "decisions": [item.to_dict() for item in self.policy.decisions],
+            },
             "estimate": self.estimate,
             "backend": [item.to_dict() for item in self.backend_validation],
             "upscale": (
@@ -76,6 +84,8 @@ class ExportPanelState:
                     "model": upscale.policy.model,
                     "backend": upscale.policy.backend,
                     "eligible_source_ids": list(upscale.eligible_source_ids),
+                    "eligible_source_count": len(upscale.eligible_source_ids),
+                    "source_count": len(upscale.decisions),
                     "decisions": [item.to_dict() for item in upscale.decisions],
                 }
             ),
@@ -102,6 +112,10 @@ class ExportPanelState:
                 "On" if self.policy.policy.enhancement_enabled else "Off",
             ),
             (
+                "Videos to FPS enhance",
+                str(len(self.policy.eligible_source_ids)),
+            ),
+            (
                 "Estimated processing time",
                 _format_time_estimate(estimate),
             ),
@@ -112,26 +126,44 @@ class ExportPanelState:
         ]
         if self.policy.policy.enhancement_enabled:
             rows.append(("Backend", self.policy.policy.backend))
-        if upscale is not None:
-            rows.append(
-                (
-                    "Upscale enhancement",
-                    "On" if upscale.policy.enhancement_enabled else "Off",
-                )
-            )
-            if upscale.policy.enhancement_enabled:
-                rows.append(("Upscale model", upscale.policy.model))
-                rows.append(
-                    (
-                        "Upscale-eligible sources",
-                        str(len(upscale.eligible_source_ids)),
-                    )
-                )
+        rows.extend(_upscale_display_rows(upscale))
         return tuple(rows)
 
 
 def _metadata(project: Any) -> tuple[dict[str, Any], ...]:
     return policy_source_metadata(project.sources or (project.source,))
+
+
+def _upscale_display_rows(
+    upscale: ResolvedUpscalePolicy | None,
+) -> tuple[tuple[str, str], ...]:
+    if upscale is None:
+        return ()
+    rows = [
+        (
+            "Upscale enhancement",
+            "On" if upscale.policy.enhancement_enabled else "Off",
+        ),
+    ]
+    if upscale.policy.enhancement_enabled:
+        rows.append(("Upscale model", upscale.policy.model))
+    rows.append(("Videos to upscale", str(len(upscale.eligible_source_ids))))
+    return tuple(rows)
+
+
+def _fps_display_rows(
+    policy: ResolvedFrameRatePolicy,
+) -> tuple[tuple[str, str], ...]:
+    return (
+        (
+            "FPS enhancement",
+            "On" if policy.policy.enhancement_enabled else "Off",
+        ),
+        (
+            "Videos to FPS enhance",
+            str(len(policy.eligible_source_ids)),
+        ),
+    )
 
 
 def _resolve_upscale_panel_policy(
@@ -149,6 +181,64 @@ def _resolve_upscale_panel_policy(
             backend=backend,
         ),
     )
+
+
+def resolve_upscale_panel_policy(
+    project: Any,
+    *,
+    enabled: bool | None = None,
+) -> ResolvedUpscalePolicy:
+    current = project.get_upscale_policy()
+    selected_enabled = current.enhancement_enabled if enabled is None else enabled
+    return _resolve_upscale_panel_policy(
+        _metadata(project),
+        enabled=selected_enabled,
+        model=current.model,
+        backend=current.backend,
+    )
+
+
+def upscale_panel_rows(
+    project: Any,
+    *,
+    enabled: bool | None = None,
+) -> tuple[tuple[str, str], ...]:
+    return _upscale_display_rows(
+        resolve_upscale_panel_policy(project, enabled=enabled),
+    )
+
+
+def fps_panel_rows(
+    project: Any,
+    *,
+    choice: str | None = None,
+    custom_rate: str | None = None,
+    enhancement_enabled: bool | None = None,
+    backend: str | None = None,
+) -> tuple[tuple[str, str], ...]:
+    current = project.get_frame_rate_policy()
+    selected_choice = current.choice if choice is None else choice
+    selected_custom = current.custom_rate if custom_rate is None else custom_rate
+    if selected_choice != "custom":
+        selected_custom = None
+    selected_enabled = (
+        current.enhancement_enabled if enhancement_enabled is None else enhancement_enabled
+    )
+    selected_backend = current.backend if backend is None else backend
+    try:
+        policy = resolve_frame_rate_policy(
+            _metadata(project),
+            choice=selected_choice,
+            custom_rate=selected_custom,
+            enhancement_enabled=selected_enabled,
+            backend=selected_backend,
+        )
+    except (FrameRatePolicyError, ValueError):
+        return (
+            ("FPS enhancement", "On" if selected_enabled else "Off"),
+            ("Videos to FPS enhance", "unavailable"),
+        )
+    return _fps_display_rows(policy)
 
 
 def _calibration(policy: ResolvedFrameRatePolicy):
@@ -249,15 +339,9 @@ def prepare_export_panel(
             backend=selected_backend,
             ffmpeg_path=ffmpeg_path,
         )
-        current_upscale = project.get_upscale_policy()
-        selected_upscale_enabled = (
-            current_upscale.enhancement_enabled if upscale_enabled is None else upscale_enabled
-        )
-        upscale_policy = _resolve_upscale_panel_policy(
-            _metadata(project),
-            enabled=selected_upscale_enabled,
-            model=current_upscale.model,
-            backend=current_upscale.backend,
+        upscale_policy = resolve_upscale_panel_policy(
+            project,
+            enabled=upscale_enabled,
         )
     except (FrameRatePolicyError, ValueError) as error:
         return ExportPanelState(
@@ -351,4 +435,10 @@ def prepare_export_panel(
     )
 
 
-__all__ = ["ExportPanelState", "prepare_export_panel"]
+__all__ = [
+    "ExportPanelState",
+    "fps_panel_rows",
+    "prepare_export_panel",
+    "resolve_upscale_panel_policy",
+    "upscale_panel_rows",
+]

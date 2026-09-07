@@ -718,6 +718,66 @@ class FfmpegPlaybackTests(unittest.TestCase):
         finally:
             backend.close()
 
+    def test_audio_preview_is_video_only_by_default_even_when_audio_is_ready(self):
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+            audio_decision={"status": "ready", "gain_db": 0.0},
+        )
+
+        try:
+            self.assertFalse(backend._has_audio_preview())
+        finally:
+            backend.close()
+
+    def test_audio_preview_can_be_explicitly_enabled(self):
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+            audio_decision={"status": "ready", "gain_db": 0.0},
+            audio_preview_enabled=True,
+        )
+
+        try:
+            self.assertTrue(backend._has_audio_preview())
+        finally:
+            backend.close()
+
+    def test_audio_sink_uses_channel_layout_option_supported_by_ffplay(self):
+        backend = FfmpegPlaybackBackend(
+            self.source,
+            16,
+            16,
+            10.0,
+            0.5,
+            lambda _frame: None,
+            lambda _message: None,
+            lambda: None,
+            audio_decision={"status": "ready", "gain_db": 0.0},
+            audio_preview_enabled=True,
+        )
+
+        try:
+            command = backend._audio_sink_command()
+        finally:
+            backend.close()
+
+        self.assertIn("-ch_layout", command)
+        self.assertIn("stereo", command)
+        self.assertNotIn("-ac", command)
+
     def test_audio_preview_requires_ffplay_when_audio_is_enabled(self):
         backend = FfmpegPlaybackBackend(
             self.source,
@@ -729,6 +789,7 @@ class FfmpegPlaybackTests(unittest.TestCase):
             lambda _message: None,
             lambda: None,
             audio_decision={"status": "ready", "gain_db": 0.0},
+            audio_preview_enabled=True,
         )
 
         try:
@@ -753,6 +814,7 @@ class FfmpegPlaybackTests(unittest.TestCase):
             errors.append,
             ended.set,
             audio_decision={"status": "ready", "gain_db": 0.0},
+            audio_preview_enabled=True,
             on_warning=warnings.append,
         )
 
@@ -902,6 +964,7 @@ class FfmpegPlaybackTests(unittest.TestCase):
                     "portrait": {"status": "ready", "gain_db": 0.0},
                     "landscape": {"status": "ready", "gain_db": 0.0},
                 },
+                audio_preview_enabled=True,
                 on_warning=warnings.append,
             )
 

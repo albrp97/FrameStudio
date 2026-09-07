@@ -2,14 +2,22 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+from framestudio.app_project import (
+    autosave_current_project,
+    recover_autosave,
+)
 from framestudio.fps_policy import FrameRatePolicy
 from framestudio.model import Project
 from framestudio.operations import apply_visual_transform, enable_triplicate
 from framestudio.persistence import (
     ProjectPersistenceError,
+    autosave_exists,
+    autosave_path,
+    load_autosave,
     load_project,
+    save_autosave,
     save_project,
 )
 
@@ -32,6 +40,18 @@ def make_project(root):
 
 
 class EditorPersistenceTests(unittest.TestCase):
+    def _recovery_window(self, current_project=None):
+        window = Mock()
+        window.project = current_project
+        window.project_path = Path("/tmp/user-selected.framestudio.json")
+        window.controller = None
+        window.segment_timeline = None
+        window._export_in_progress = False
+        window._source_load_in_progress = False
+        window._show_error = Mock()
+        window._set_status = Mock()
+        return window
+
     def test_frame_rate_policy_survives_save_and_reopen(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -121,6 +141,107 @@ class EditorPersistenceTests(unittest.TestCase):
                 '{"previous": true}\n',
             )
             self.assertEqual(list(root.glob(".edit.framestudio.json.partial-*")), [])
+
+    def test_autosave_uses_one_xdg_state_path_and_round_trips(self):
+        with TemporaryDirectory() as temporary_directory:
+            with patch.dict("os.environ", {"XDG_STATE_HOME": temporary_directory}):
+                project = make_project(Path(temporary_directory))
+
+                saved = save_autosave(project)
+                restored = load_autosave()
+
+                self.assertEqual(
+                    saved,
+                    Path(temporary_directory) / "framestudio" / "autosave.framestudio.json",
+                )
+                self.assertEqual(autosave_path(), saved)
+                self.assertTrue(autosave_exists())
+                self.assertEqual(restored.to_dict(), project.to_dict())
+
+    def test_recovery_attaches_valid_autosave_without_changing_project_path(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            with patch.dict("os.environ", {"XDG_STATE_HOME": temporary_directory}):
+                project = make_project(root)
+                save_autosave(project)
+                window = self._recovery_window(object())
+
+                def attach_recovered_project(target_window, _project, project_path):
+                    target_window.project_path = project_path
+
+                with (
+                    patch(
+                        "framestudio.app_project.attach_project",
+                        side_effect=attach_recovered_project,
+                    ) as attach,
+                    patch("framestudio.app_project._start_audio_analysis") as analyze,
+                ):
+                    self.assertFalse(recover_autosave(window, object()))
+
+                attach.assert_called_once()
+                self.assertIs(attach.call_args.args[0], window)
+                recovered = attach.call_args.args[1]
+                self.assertEqual(recovered.to_dict(), project.to_dict())
+                self.assertIsNone(attach.call_args.args[2])
+                analyze.assert_called_once()
+                self.assertEqual(
+                    window.project_path,
+                    Path("/tmp/user-selected.framestudio.json"),
+                )
+                window._show_error.assert_not_called()
+
+    def test_recovery_rejects_missing_source_and_keeps_current_project(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            with patch.dict("os.environ", {"XDG_STATE_HOME": temporary_directory}):
+                project = make_project(root)
+                save_autosave(project)
+                source_path = root / "source.mp4"
+                source_path.unlink()
+                current_project = object()
+                window = self._recovery_window(current_project)
+
+                with patch("framestudio.app_project.attach_project") as attach:
+                    self.assertFalse(recover_autosave(window, object()))
+
+                attach.assert_not_called()
+                self.assertIs(window.project, current_project)
+                window._show_error.assert_called_once()
+                self.assertIn("missing", str(window._show_error.call_args.args[0]).lower())
+
+    def test_recovery_rejects_changed_source_and_keeps_current_project(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            with patch.dict("os.environ", {"XDG_STATE_HOME": temporary_directory}):
+                project = make_project(root)
+                save_autosave(project)
+                source_path = root / "source.mp4"
+                source_path.write_bytes(b"changed")
+                current_project = object()
+                window = self._recovery_window(current_project)
+
+                with patch("framestudio.app_project.attach_project") as attach:
+                    self.assertFalse(recover_autosave(window, object()))
+
+                attach.assert_not_called()
+                self.assertIs(window.project, current_project)
+                window._show_error.assert_called_once()
+                self.assertIn("changed", str(window._show_error.call_args.args[0]).lower())
+
+    def test_autosave_failure_is_reported(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            with patch.dict("os.environ", {"XDG_STATE_HOME": temporary_directory}):
+                window = self._recovery_window(make_project(root))
+
+                with patch(
+                    "framestudio.app_project.save_autosave",
+                    side_effect=ProjectPersistenceError("disk full"),
+                ):
+                    self.assertFalse(autosave_current_project(window))
+
+                window._show_error.assert_called_once()
+                self.assertIn("Autosave failed", window._show_error.call_args.args[0])
 
     def test_invalid_json_is_reported(self):
         with TemporaryDirectory() as temporary_directory:

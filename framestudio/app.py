@@ -72,8 +72,10 @@ from .app_playback import (
 )
 from .app_project import (
     attach_project,
+    autosave_current_project,
     load_project_path,
     load_source,
+    recover_autosave,
     refresh_playback_backend,
     refresh_timeline,
     save_to,
@@ -81,6 +83,7 @@ from .app_project import (
 from .app_timeline_actions import (
     center_timeline_on_playhead,
     copy_selected_segments,
+    fit_timeline_to_thirty_minutes,
     fit_timeline_zoom,
     move_selected_segments,
     on_apply_focus_clicked,
@@ -105,6 +108,7 @@ from .ffmpeg_playback import (
     FfmpegPlaybackBackend,
     VideoFrame,
 )
+from .graphics import configure_graphics_environment
 from .model import (
     Project,
     Segment,
@@ -152,6 +156,7 @@ def run_gui(
     smoke_test: bool = False,
     smoke_project_path: Path | None = None,
 ) -> int:
+    configure_graphics_environment()
     try:
         import gi
 
@@ -187,8 +192,15 @@ def run_gui(
             self._export_in_progress = False
             self._source_load_in_progress = False
             self._source_load_generation = 0
+            self._audio_analysis_in_progress = False
+            self._audio_analysis_generation = 0
+            self._audio_analysis_source_ids = ()
+            self._audio_analysis_cancel_event = None
+            self._audio_analysis_rejected_source_ids: set[str] = set()
+            self._audio_analysis_worker_lock = threading.Lock()
             self._export_cancel_event = None
             self._export_cancellation_lock = None
+            self._close_after_export = False
             self._export_project_snapshot = None
             self._updating_focus_controls = False
             self._playback_generation = 0
@@ -290,6 +302,9 @@ def run_gui(
             if selected is not None and selected.get_path() is not None:
                 self._load_project_path(Path(selected.get_path()))
 
+        def _on_recover_autosave_clicked(self, _button) -> None:
+            recover_autosave(self, GLib)
+
         def _on_save_clicked(self, _button) -> None:
             if editing_is_locked(self):
                 return
@@ -343,6 +358,9 @@ def run_gui(
         def _save_to(self, path: Path) -> None:
             save_to(self, path)
 
+        def _autosave_current_project(self) -> bool:
+            return autosave_current_project(self)
+
         def _on_reopen_clicked(self, _button) -> None:
             if editing_is_locked(self):
                 return
@@ -355,7 +373,7 @@ def run_gui(
             return load_source(self, paths, GLib)
 
         def _load_project_path(self, path: Path) -> bool:
-            return load_project_path(self, path)
+            return load_project_path(self, path, GLib)
 
         def _attach_project(
             self,
@@ -387,6 +405,9 @@ def run_gui(
 
         def _fit_timeline_zoom(self) -> None:
             fit_timeline_zoom(self)
+
+        def _fit_timeline_to_thirty_minutes(self, _button=None) -> None:
+            fit_timeline_to_thirty_minutes(self)
 
         def _center_timeline_on_playhead(self) -> None:
             center_timeline_on_playhead(self)

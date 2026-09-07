@@ -723,6 +723,7 @@ def _progress_payload(progress: ExportProgress) -> dict[str, Any]:
 def _handle_export(
     args: argparse.Namespace,
     output: TextIO,
+    progress_output: TextIO | None = None,
 ) -> dict[str, Any]:
     project = _load_project_for_cli(args.project)
     args.frame_rate_policy = _frame_rate_policy_override(project, args)
@@ -730,6 +731,7 @@ def _handle_export(
     return handle_export(
         args,
         output,
+        progress_output=progress_output,
         load_project_fn=_load_project_for_cli,
         probe_media_fn=probe_media,
         plan_project_export_fn=plan_project_export,
@@ -924,7 +926,7 @@ def cli_main(
     try:
         args = parser.parse_args(argv)
         if args.command == "export":
-            payload = _handle_export(args, output)
+            payload = _handle_export(args, output, error_output)
         elif args.command == "export-plan":
             payload = _handle_export_plan(args, output)
         else:

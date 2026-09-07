@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import shutil
 import threading
 import time
+import warnings
 from fractions import Fraction
 from pathlib import Path
 
@@ -20,6 +22,11 @@ from .export_process import (
     publish_verified_export,
     remove_partial,
     validate_decoded_output,
+)
+from .export_session import (
+    ExportSession,
+    ExportSessionError,
+    build_export_session_request,
 )
 from .export_types import (
     _DURATION_TOLERANCE,
@@ -93,6 +100,7 @@ def execute_mixed_export(
     progress_callback: ExportProgressCallback | None,
     cancel_event: threading.Event | None = None,
     cancellation_lock: threading.Lock | None = None,
+    resume_mode: str = "fresh",
 ) -> Path:
     if plan.route != "fallback":
         raise ExportExecutionError("Mixed-source exports must use the fallback route")
@@ -111,6 +119,22 @@ def execute_mixed_export(
         ffprobe_path,
         label="mixed export",
     )
+    try:
+        session_request = build_export_session_request(
+            plan=plan,
+            source_paths=source_paths,
+            source_stats=source_stats,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+        )
+        session = ExportSession.open(
+            destination,
+            session_request,
+            ("composition", "verification"),
+            mode=resume_mode,
+        )
+    except ExportSessionError as error:
+        raise ExportExecutionError(str(error)) from error
     started = time.monotonic()
     total_frames, _frame_rate = expected_mixed_export_frames(plan)
     emit_export_progress(
@@ -125,15 +149,39 @@ def execute_mixed_export(
     )
     partial = partial_path(destination)
     try:
-        execute_mixed_fallback(
-            plan,
-            probes,
-            partial,
-            ffmpeg_path,
-            progress_callback=progress_callback,
-            started=started,
-            cancel_event=cancel_event,
+        cached_composition = session.reuse(
+            "composition",
+            lambda candidate: verify_mixed_export_output(
+                plan,
+                candidate,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+            ),
         )
+        if cached_composition is not None:
+            shutil.copyfile(cached_composition, partial)
+            emit_export_progress(
+                progress_callback,
+                stage="resuming composition",
+                current_seconds=plan.expected_duration_seconds,
+                total_duration_seconds=plan.expected_duration_seconds,
+                frame=total_frames,
+                total_frames=total_frames,
+                fps=None,
+                started=started,
+                percent_override=95.0,
+            )
+        else:
+            session.mark_running("composition")
+            execute_mixed_fallback(
+                plan,
+                probes,
+                partial,
+                ffmpeg_path,
+                progress_callback=progress_callback,
+                started=started,
+                cancel_event=cancel_event,
+            )
         emit_export_progress(
             progress_callback,
             stage="verifying",
@@ -147,12 +195,15 @@ def execute_mixed_export(
         )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportExecutionError("Export cancelled")
+        session.mark_running("verification")
         verify_mixed_export_output(
             plan,
             partial,
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
         )
+        if cached_composition is None:
+            session.record("composition", partial)
         publish_verified_export(
             partial,
             destination,
@@ -165,12 +216,23 @@ def execute_mixed_export(
             started=started,
             cancellation_lock=cancellation_lock,
         )
-    except (ExportExecutionError, MediaProbeError, OSError) as error:
+        session.mark_complete("verification")
+        try:
+            session.cleanup_after_success()
+        except ExportSessionError as error:
+            warnings.warn(str(error), RuntimeWarning, stacklevel=2)
+    except (ExportExecutionError, ExportSessionError, MediaProbeError, OSError) as error:
+        session.mark_failure(
+            str(error),
+            cancelled=cancel_event is not None and cancel_event.is_set(),
+        )
         cleanup_error = remove_partial(partial)
         message = f"Could not export {destination.name}: {error}"
         if cleanup_error is not None:
             message += f"; could not remove partial output: {cleanup_error}"
         raise ExportExecutionError(message) from error
+    finally:
+        session.close()
     return destination
 
 
@@ -260,6 +322,7 @@ def execute_export(
     progress_callback: ExportProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
     cancellation_lock: threading.Lock | None = None,
+    resume_mode: str = "fresh",
 ) -> Path:
     if cancel_event is not None and cancel_event.is_set():
         raise ExportExecutionError("Export cancelled")
@@ -273,6 +336,7 @@ def execute_export(
             verify_mixed_output=verify_mixed_export_output,
             cancel_event=cancel_event,
             cancellation_lock=cancellation_lock,
+            resume_mode=resume_mode,
         )
     if plan.source_paths:
         return execute_mixed_export(
@@ -282,6 +346,7 @@ def execute_export(
             progress_callback=progress_callback,
             cancel_event=cancel_event,
             cancellation_lock=cancellation_lock,
+            resume_mode=resume_mode,
         )
     if plan.route not in {"stream-copy", "fallback"}:
         raise ExportExecutionError(f"Unsupported export route: {plan.route}")
@@ -300,6 +365,28 @@ def execute_export(
         raise ExportExecutionError(f"Could not inspect export source: {error}") from error
     started = time.monotonic()
     total_frames = expected_export_frames(plan, source_probe)
+    try:
+        session_request = build_export_session_request(
+            plan=plan,
+            source_paths=(source,),
+            source_stats=(source_stat,),
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+        )
+        stage_ids = (
+            tuple(f"cut-{index}" for index in range(len(plan.segments)))
+            + ("assembly", "verification")
+            if plan.route == "stream-copy" and len(plan.segments) > 1
+            else ("render", "verification")
+        )
+        session = ExportSession.open(
+            destination,
+            session_request,
+            stage_ids,
+            mode=resume_mode,
+        )
+    except ExportSessionError as error:
+        raise ExportExecutionError(str(error)) from error
     emit_export_progress(
         progress_callback,
         stage="starting",
@@ -312,26 +399,55 @@ def execute_export(
     )
     partial = partial_path(destination)
     try:
-        if plan.route == "stream-copy":
-            execute_stream_copy(
+        assembly_stage = (
+            "assembly" if plan.route == "stream-copy" and len(plan.segments) > 1 else "render"
+        )
+        cached_assembly = session.reuse(
+            assembly_stage,
+            lambda candidate: verify_export_output(
                 plan,
                 source_probe,
-                partial,
-                ffmpeg_path,
-                progress_callback=progress_callback,
+                candidate,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+            ),
+        )
+        if cached_assembly is not None:
+            shutil.copyfile(cached_assembly, partial)
+            emit_export_progress(
+                progress_callback,
+                stage=f"resuming {assembly_stage}",
+                current_seconds=plan.expected_duration_seconds,
+                total_duration_seconds=plan.expected_duration_seconds,
+                frame=total_frames,
+                total_frames=total_frames,
+                fps=None,
                 started=started,
-                cancel_event=cancel_event,
+                percent_override=95.0,
             )
         else:
-            execute_fallback(
-                plan,
-                source_probe,
-                partial,
-                ffmpeg_path,
-                progress_callback=progress_callback,
-                started=started,
-                cancel_event=cancel_event,
-            )
+            session.mark_running(assembly_stage)
+            if plan.route == "stream-copy":
+                execute_stream_copy(
+                    plan,
+                    source_probe,
+                    partial,
+                    ffmpeg_path,
+                    progress_callback=progress_callback,
+                    started=started,
+                    cancel_event=cancel_event,
+                    session=session,
+                )
+            else:
+                execute_fallback(
+                    plan,
+                    source_probe,
+                    partial,
+                    ffmpeg_path,
+                    progress_callback=progress_callback,
+                    started=started,
+                    cancel_event=cancel_event,
+                )
         emit_export_progress(
             progress_callback,
             stage="verifying",
@@ -345,6 +461,7 @@ def execute_export(
         )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportExecutionError("Export cancelled")
+        session.mark_running("verification")
         verify_export_output(
             plan,
             source_probe,
@@ -352,6 +469,8 @@ def execute_export(
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
         )
+        if cached_assembly is None:
+            session.record(assembly_stage, partial)
         publish_verified_export(
             partial,
             destination,
@@ -364,10 +483,21 @@ def execute_export(
             started=started,
             cancellation_lock=cancellation_lock,
         )
-    except (ExportExecutionError, MediaProbeError, OSError) as error:
+        session.mark_complete("verification")
+        try:
+            session.cleanup_after_success()
+        except ExportSessionError as error:
+            warnings.warn(str(error), RuntimeWarning, stacklevel=2)
+    except (ExportExecutionError, ExportSessionError, MediaProbeError, OSError) as error:
+        session.mark_failure(
+            str(error),
+            cancelled=cancel_event is not None and cancel_event.is_set(),
+        )
         cleanup_error = remove_partial(partial)
         message = f"Could not export {destination.name}: {error}"
         if cleanup_error is not None:
             message += f"; could not remove partial output: {cleanup_error}"
         raise ExportExecutionError(message) from error
+    finally:
+        session.close()
     return destination

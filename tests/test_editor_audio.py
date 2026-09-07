@@ -2,11 +2,14 @@ import math
 import os
 import shutil
 import subprocess
+import threading
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from framestudio.audio import (
+    AudioAnalysisCancelled,
     AudioStats,
     analyze_audio,
     analyze_source_audio,
@@ -126,6 +129,60 @@ class EditorAudioPolicyTests(unittest.TestCase):
         self.assertEqual(decision.status, "failed")
         self.assertEqual(decision.gain_db, 0.0)
         self.assertIn("ffmpeg", decision.diagnostic.lower())
+
+    def test_audio_analysis_cancellation_terminates_the_ffmpeg_process(self):
+        started = threading.Event()
+        terminated = threading.Event()
+
+        class BlockingStream:
+            def read(self, _size=None):
+                terminated.wait(timeout=2)
+                return b""
+
+            def close(self):
+                return None
+
+        class FakeProcess:
+            def __init__(self):
+                self.stdout = BlockingStream()
+                self.stderr = BlockingStream()
+                started.set()
+
+            def poll(self):
+                return -15 if terminated.is_set() else None
+
+            def terminate(self):
+                terminated.set()
+
+            def kill(self):
+                terminated.set()
+
+            def wait(self, timeout=None):
+                if timeout is not None and not terminated.wait(timeout):
+                    raise subprocess.TimeoutExpired("ffmpeg", timeout)
+                terminated.wait()
+                return -15
+
+        cancel_event = threading.Event()
+        outcomes = []
+
+        def run_analysis():
+            try:
+                analyze_audio(Path("source.mp4"), cancel_event=cancel_event)
+            except Exception as error:
+                outcomes.append(error)
+
+        with patch("framestudio.audio.subprocess.Popen", return_value=FakeProcess()):
+            worker = threading.Thread(target=run_analysis)
+            worker.start()
+            self.assertTrue(started.wait(timeout=1))
+            cancel_event.set()
+            worker.join(timeout=3)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(outcomes), 1)
+        self.assertIsInstance(outcomes[0], AudioAnalysisCancelled)
+        self.assertTrue(terminated.is_set())
 
     @unittest.skipUnless(
         shutil.which("ffmpeg") and shutil.which("ffprobe"),

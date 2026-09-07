@@ -7,6 +7,7 @@ from .model import SegmentTimeline
 from .timeline_geometry import (
     SELECTED_CLIP_BORDER_COLOR,
     TIMELINE_DEFAULT_ZOOM,
+    TIMELINE_FIT_WINDOW_SECONDS,
     TIMELINE_HEIGHT,
     TIMELINE_HORIZONTAL_PADDING,
     TIMELINE_MAX_ZOOM,
@@ -25,6 +26,7 @@ from .timeline_geometry import (
     timeline_pixels_per_second,
     timeline_position_from_x,
     timeline_tick_interval,
+    timeline_zoom_for_window,
     timeline_zoom_label,
 )
 from .timeline_rendering import (
@@ -41,6 +43,7 @@ __all__ = [
     "TIMELINE_HEIGHT",
     "TIMELINE_HORIZONTAL_PADDING",
     "TIMELINE_DEFAULT_ZOOM",
+    "TIMELINE_FIT_WINDOW_SECONDS",
     "TIMELINE_MAX_ZOOM",
     "TIMELINE_MIN_PIXELS_PER_SECOND",
     "TIMELINE_MIN_ZOOM",
@@ -58,6 +61,7 @@ __all__ = [
     "timeline_pixels_per_second",
     "timeline_position_from_x",
     "timeline_tick_interval",
+    "timeline_zoom_for_window",
     "timeline_zoom_label",
 ]
 
@@ -78,6 +82,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._selected_segment_ids: tuple[str, ...] = ()
             self._playhead_seconds = 0.0
             self._zoom = TIMELINE_DEFAULT_ZOOM
+            self._fit_window_seconds: float | None = None
             self._viewport_width = 800.0
             self._on_seek = on_seek
             self._on_segment_selected = on_segment_selected
@@ -177,8 +182,10 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
         def set_zoom(self, zoom: float) -> None:
             parsed = clamp_timeline_zoom(zoom)
             if math.isclose(parsed, self._zoom, rel_tol=0.0, abs_tol=1e-9):
+                self._fit_window_seconds = None
                 return
             self._zoom = parsed
+            self._fit_window_seconds = None
             self._recalculate_content_size()
 
         def zoom_in(self) -> None:
@@ -190,17 +197,33 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
         def fit_to_view(self) -> None:
             self.set_zoom(TIMELINE_DEFAULT_ZOOM)
 
+        def fit_to_duration(
+            self,
+            window_seconds: float = TIMELINE_FIT_WINDOW_SECONDS,
+        ) -> None:
+            if self._timeline is None:
+                return
+            self._zoom = timeline_zoom_for_window(
+                self._timeline.timeline_duration_seconds,
+                window_seconds,
+            )
+            self._fit_window_seconds = float(window_seconds)
+            self._recalculate_content_size()
+
         def get_zoom(self) -> float:
             return self._zoom
 
         def get_content_width(self) -> float:
             if self._timeline is None:
                 return self._viewport_width
-            return timeline_content_width(
+            width = timeline_content_width(
                 self._timeline.timeline_duration_seconds,
                 self._viewport_width,
                 self._zoom,
             )
+            if self._fit_window_seconds is not None:
+                width = max(width, self._viewport_width)
+            return width
 
         def has_horizontal_overflow(self) -> bool:
             return self.get_content_width() > self._viewport_width + 1.0
@@ -440,7 +463,10 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             )
             self._draw_ruler(
                 context,
-                self._timeline.timeline_duration_seconds,
+                max(
+                    self._timeline.timeline_duration_seconds,
+                    self._fit_window_seconds or 0.0,
+                ),
                 pixels_per_second,
                 width,
             )
