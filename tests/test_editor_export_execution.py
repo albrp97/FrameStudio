@@ -566,7 +566,8 @@ class EditorExportExecutionTests(unittest.TestCase):
                 all(
                     following.percent + 1e-6 >= current.percent
                     for current, following in zip(progress, progress[1:], strict=False)
-                )
+                ),
+                [(item.stage, item.percent) for item in progress],
             )
 
     def test_mixed_upscale_export_preserves_target_frame_rate_with_audio_padding(self):
