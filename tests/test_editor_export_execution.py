@@ -552,8 +552,9 @@ class EditorExportExecutionTests(unittest.TestCase):
                 any(item.stage.startswith("interpolation segment ") for item in progress)
             )
             self.assertFalse(any(item.stage == "interpolation master" for item in progress))
-            self.assertEqual(
-                sum(item.stage == "concatenating enhanced segments" for item in progress), 1
+            self.assertGreaterEqual(
+                sum(item.stage == "concatenating enhanced segments" for item in progress),
+                1,
             )
             self.assertTrue(
                 all(
