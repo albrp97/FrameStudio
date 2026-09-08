@@ -1791,6 +1791,124 @@ def _environment(
     }
 
 
+def _prepare_benchmark_fixture(
+    *,
+    source: Path | None,
+    fixture: Path | None,
+    output_root: Path,
+    reuse_root: Path,
+    ffmpeg: str,
+    ffprobe: str,
+    nvidia_smi: str | None,
+    segment_count: int,
+) -> tuple[Path, dict[str, Any], dict[str, Any]]:
+    if source is not None and fixture is not None:
+        raise ValueError("source and fixture are mutually exclusive")
+    selected_fixture = fixture
+    if selected_fixture is None and source is None:
+        default_fixture = reuse_root / "fixture-45s.mp4"
+        selected_fixture = (
+            default_fixture
+            if default_fixture.is_file()
+            else Path.home() / "Videos/editor-test-1m.mp4"
+        )
+    if selected_fixture is not None:
+        return reuse_fixture(
+            selected_fixture.expanduser().resolve(),
+            output_root,
+            ffprobe=ffprobe,
+        )
+    if source is None:
+        raise ValueError("a source or fixture is required")
+    return build_fixture(
+        source.expanduser().resolve(),
+        output_root,
+        ffmpeg=ffmpeg,
+        ffprobe=ffprobe,
+        nvidia_smi=nvidia_smi,
+        window_count=segment_count,
+    )
+
+
+def _run_benchmark_candidate(
+    candidate: Mapping[str, Any],
+    *,
+    fixture_path: Path,
+    fixture_metadata: Mapping[str, Any],
+    output_root: Path,
+    reuse_root: Path,
+    ffmpeg: str,
+    ffprobe: str,
+    nvidia_smi: str | None,
+    video_encoder: str,
+    warm_runs: int,
+    review_timestamps: tuple[float, ...],
+) -> dict[str, Any]:
+    runner = candidate["runner"]
+    if runner == "ffmpeg_filter":
+        result = _run_ffmpeg_candidate(
+            candidate,
+            fixture_path,
+            fixture_metadata,
+            output_root,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+            nvidia_smi=nvidia_smi,
+            video_encoder=video_encoder,
+            warm_runs=warm_runs,
+        )
+    elif runner == "reuse_json":
+        result = _reused_candidate_result(
+            candidate,
+            reuse_root,
+            fixture_metadata,
+            ffmpeg=ffmpeg,
+            ffprobe=ffprobe,
+        )
+    elif runner == "external":
+        result = _external_candidate_result(candidate)
+    else:
+        result = _candidate_base(candidate)
+        result["status"] = "not-comparable"
+        result["reason"] = f"unknown runner: {runner}"
+    if result.get("status") not in TERMINAL_CANDIDATE_STATUSES:
+        result["status"] = "failed"
+        result["reason"] = "candidate did not produce a terminal status"
+    output = result.get("output")
+    if isinstance(output, Mapping):
+        output_path_text = output.get("path")
+        if isinstance(output_path_text, str):
+            output_path = Path(output_path_text).expanduser()
+            if not output_path.is_absolute():
+                output_path = output_root / output_path
+            if output_path.is_file():
+                sheet = _contact_sheet(
+                    candidate,
+                    output_path,
+                    output_root,
+                    ffmpeg=ffmpeg,
+                    timestamps=review_timestamps,
+                )
+                result["visual_review"] = {
+                    "status": sheet["status"],
+                    "contact_sheet": sheet.get("path"),
+                    "contact_sheet_error": sheet.get("error"),
+                }
+    command_record = result.pop("_commands", None)
+    command_payload = {
+        "candidate": candidate["name"],
+        "status": result["status"],
+        "reason": result.get("reason"),
+        "commands": command_record or [],
+        "availability": result.get("availability", {}),
+    }
+    _write_json(
+        output_root / "commands" / f"{candidate['id']}.json",
+        command_payload,
+    )
+    return result
+
+
 def run_benchmark(
     *,
     manifest_path: Path = DEFAULT_MANIFEST,
@@ -1814,32 +1932,16 @@ def run_benchmark(
     )
     output_root = output_root.expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
-    if source is not None and fixture is not None:
-        raise ValueError("source and fixture are mutually exclusive")
-    if fixture is None and source is None:
-        default_fixture = reuse_root / "fixture-45s.mp4"
-        fixture = (
-            default_fixture
-            if default_fixture.is_file()
-            else Path.home() / "Videos/editor-test-1m.mp4"
-        )
-    if fixture is not None:
-        fixture_path, fixture_metadata, preservation = reuse_fixture(
-            fixture.expanduser().resolve(),
-            output_root,
-            ffprobe=ffprobe,
-        )
-    else:
-        if source is None:
-            raise ValueError("a source or fixture is required")
-        fixture_path, fixture_metadata, preservation = build_fixture(
-            source.expanduser().resolve(),
-            output_root,
-            ffmpeg=ffmpeg,
-            ffprobe=ffprobe,
-            nvidia_smi=nvidia_smi,
-            window_count=segment_count,
-        )
+    fixture_path, fixture_metadata, preservation = _prepare_benchmark_fixture(
+        source=source,
+        fixture=fixture,
+        output_root=output_root,
+        reuse_root=reuse_root,
+        ffmpeg=ffmpeg,
+        ffprobe=ffprobe,
+        nvidia_smi=nvidia_smi,
+        segment_count=segment_count,
+    )
     review_timestamps = tuple(
         timestamp
         for timestamp in (7.0, 22.0, 37.0, 52.0)
@@ -1848,68 +1950,21 @@ def run_benchmark(
     video_encoder = detect_video_encoder(ffmpeg)
     results: list[dict[str, Any]] = []
     for candidate in manifest["candidates"]:
-        runner = candidate["runner"]
-        if runner == "ffmpeg_filter":
-            result = _run_ffmpeg_candidate(
+        results.append(
+            _run_benchmark_candidate(
                 candidate,
-                fixture_path,
-                fixture_metadata,
-                output_root,
+                fixture_path=fixture_path,
+                fixture_metadata=fixture_metadata,
+                output_root=output_root,
+                reuse_root=reuse_root,
                 ffmpeg=ffmpeg,
                 ffprobe=ffprobe,
                 nvidia_smi=nvidia_smi,
                 video_encoder=video_encoder,
                 warm_runs=warm_runs,
+                review_timestamps=review_timestamps,
             )
-        elif runner == "reuse_json":
-            result = _reused_candidate_result(
-                candidate,
-                reuse_root,
-                fixture_metadata,
-                ffmpeg=ffmpeg,
-                ffprobe=ffprobe,
-            )
-        elif runner == "external":
-            result = _external_candidate_result(candidate)
-        else:
-            result = _candidate_base(candidate)
-            result["status"] = "not-comparable"
-            result["reason"] = f"unknown runner: {runner}"
-        if result.get("status") not in TERMINAL_CANDIDATE_STATUSES:
-            result["status"] = "failed"
-            result["reason"] = "candidate did not produce a terminal status"
-        if result.get("output"):
-            output_path_text = result["output"].get("path")
-            if isinstance(output_path_text, str):
-                output_path = Path(output_path_text).expanduser()
-                if not output_path.is_absolute():
-                    output_path = output_root / output_path
-                if output_path.is_file():
-                    sheet = _contact_sheet(
-                        candidate,
-                        output_path,
-                        output_root,
-                        ffmpeg=ffmpeg,
-                        timestamps=review_timestamps,
-                    )
-                    result["visual_review"] = {
-                        "status": sheet["status"],
-                        "contact_sheet": sheet.get("path"),
-                        "contact_sheet_error": sheet.get("error"),
-                    }
-        command_record = result.pop("_commands", None)
-        command_payload = {
-            "candidate": candidate["name"],
-            "status": result["status"],
-            "reason": result.get("reason"),
-            "commands": command_record or [],
-            "availability": result.get("availability", {}),
-        }
-        _write_json(
-            output_root / "commands" / f"{candidate['id']}.json",
-            command_payload,
         )
-        results.append(result)
     protected_path = Path(str(preservation.pop("_protected_path"))).expanduser()
     preservation["source_hash_after_runs"] = file_sha256(protected_path)
     preservation["unchanged"] = (

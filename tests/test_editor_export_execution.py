@@ -536,6 +536,7 @@ class EditorExportExecutionTests(unittest.TestCase):
                     second_id: {"status": "ready", "gain_db": -1.0},
                 },
                 frame_rate_policy=policy,
+                upscale_policy=UpscalePolicy(enhancement_enabled=False),
             )
             progress = []
 

@@ -99,6 +99,7 @@ class FfmpegPlaybackBackend:
         self._preview_condition = threading.Condition(self._lock)
         self._preview_request: tuple[int, float, Hashable | None] | None = None
         self._preview_generation = 0
+        self._preview_cancel_serial = 0
         self._preview_process: subprocess.Popen[bytes] | None = None
         self._preview_thread: threading.Thread | None = None
         self._preview_shutdown = False
@@ -659,6 +660,7 @@ class FfmpegPlaybackBackend:
             pass
 
     def _cancel_preview_requests(self) -> None:
+        self._preview_cancel_serial += 1
         with self._preview_condition:
             if self._preview_request is not None:
                 self._preview_coalesced_requests += 1
@@ -722,6 +724,7 @@ class FfmpegPlaybackBackend:
         position_seconds: float,
         generation: int | None = None,
     ) -> VideoFrame:
+        cancel_serial = self._preview_cancel_serial
         try:
             with self._preview_condition:
                 if generation is not None and (
@@ -735,6 +738,7 @@ class FfmpegPlaybackBackend:
                     start_new_session=True,
                 )
                 self._preview_process = process
+                cancelled_during_start = self._preview_cancel_serial != cancel_serial
         except FileNotFoundError as error:
             raise PlaybackBackendError(
                 f"ffmpeg is not installed or not on PATH: {self.ffmpeg_path}"
@@ -742,6 +746,8 @@ class FfmpegPlaybackBackend:
         except OSError as error:
             raise PlaybackBackendError(f"Could not start preview seek: {error}") from error
         try:
+            if cancelled_during_start:
+                self._terminate_preview_process(process)
             try:
                 output, error_output = process.communicate(timeout=15)
             except subprocess.TimeoutExpired as error:
