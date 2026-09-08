@@ -548,15 +548,15 @@ class EditorExportExecutionTests(unittest.TestCase):
             self.assertAlmostEqual(output.duration_seconds, 1.0, delta=0.15)
             self.assertEqual(output.audio_sample_rate, 48000)
             self.assertEqual(output.audio_channels, 2)
-            self.assertTrue(
-                any(
-                    item.stage.startswith(
-                        ("interpolation segment ", "interpolation ", "interpolating segment ")
-                    )
-                    and item.stage != "interpolation master"
-                    for item in progress
+            interpolation_stages = tuple(
+                item.stage
+                for item in progress
+                if item.stage.startswith(
+                    ("interpolation segment ", "interpolation ", "interpolating segment ")
                 )
+                and item.stage != "interpolation master"
             )
+            self.assertTrue(interpolation_stages, [item.stage for item in progress])
             self.assertFalse(any(item.stage == "interpolation master" for item in progress))
             self.assertGreaterEqual(
                 sum(item.stage == "concatenating enhanced segments" for item in progress),
