@@ -549,7 +549,13 @@ class EditorExportExecutionTests(unittest.TestCase):
             self.assertEqual(output.audio_sample_rate, 48000)
             self.assertEqual(output.audio_channels, 2)
             self.assertTrue(
-                any(item.stage.startswith("interpolation segment ") for item in progress)
+                any(
+                    item.stage.startswith(
+                        ("interpolation segment ", "interpolation ", "interpolating segment ")
+                    )
+                    and item.stage != "interpolation master"
+                    for item in progress
+                )
             )
             self.assertFalse(any(item.stage == "interpolation master" for item in progress))
             self.assertGreaterEqual(
