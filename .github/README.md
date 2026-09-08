@@ -1,7 +1,30 @@
-# AIDD Repository Workflow
+# FrameStudio contributor workflow
 
-This directory contains a repository-neutral, evidence-first workflow for
-turning an objective into focused implementation tickets.
+FrameStudio is a local Linux video editor with a GTK 4 interface, FFmpeg
+playback and export, a deterministic CLI, and preserved media-preparation
+workflows. The product overview, installation instructions, editor commands,
+and export behavior are in the repository's [main README](../README.md).
+
+This directory contains the evidence-first workflow used to plan, implement,
+verify, and deliver FrameStudio changes without losing the project's product
+boundaries or compatibility surfaces.
+
+## FrameStudio surfaces
+
+- `framestudio` launches the GTK editor and exposes the editor CLI.
+- `framestudio media` preserves the original media-preparation workflow.
+- `framestudio concat` preserves folder concatenation and audio handling.
+- `framestudio fps` preserves direct frame-rate enhancement.
+- `resolve_*` scripts and legacy project formats remain compatibility
+  surfaces while users migrate to the canonical FrameStudio identity.
+
+The first product horizon is a safe local editor for importing footage,
+playing and seeking, editing timeline segments, saving and reopening projects,
+and exporting verified videos. Multi-source composition, source-level audio
+decisions, FPS enhancement, upscale enhancement, and resumable rendering are
+implemented only where the approved scope and architecture support them.
+Future product direction remains documented separately and is not an
+automatic requirement for every change.
 
 ## Planning hierarchy
 
