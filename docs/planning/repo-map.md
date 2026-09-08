@@ -2,8 +2,8 @@
 
 **Map ID:** RM-001
 **Status:** confirmed
-**Last updated:** 2026-08-22
-**Repository revision:** `b624234` (working tree includes the editor refactor)
+**Last updated:** 2026-09-07
+**Repository revision:** `37d6515` (completed editor recovery and resumable export delivery)
 **Owner:** repository maintainer; maintainer identity is not recorded in the repository
 
 ## Purpose
@@ -20,7 +20,7 @@ tickets.
 | FrameStudio media preparation | `framestudio_media.py` | Probes media, classifies Resolve compatibility, converts unsupported media, manages safe partial outputs, and provides a curses TUI. | Observed and tested. |
 | Concatenation and FPS workflow | `framestudio_concat.py` | Selects videos, probes clips, analyzes audio, chooses stream-copy or normalization, joins clips, and invokes FPS enhancement. | Observed and tested. |
 | FPS enhancement | `framestudio_fps.py` | Runs the RIFE/VapourSynth or REAL-Video-Enhancer pipeline, preserves/remuxes audio, validates frame rate/count, and reports progress. | Observed and tested. |
-| Installation wrappers | `install.sh` | Installs canonical FrameStudio commands and legacy `resolve-*` aliases into `~/bin`. | Observed. |
+| Installation wrapper | `install.sh` | Installs the canonical `~/bin/framestudio` command and removes obsolete standalone workflow aliases. | Observed. |
 | Benchmark harness | `benchmarks/fps.vpy`, `benchmarks/vsrawpipe.py` | Supports the validated FPS processing path and benchmark reproduction. | Observed. |
 | Editor application facade | `framestudio/app.py` | GTK application lifecycle and compatibility-preserving orchestration for source loading, playback, timeline actions, and export. | Implemented; `make check`, smoke, and UI evidence. |
 | Editor application modules | `framestudio/app_*.py` | Focused UI construction, project lifecycle, timeline actions, playback, and export workflows used by the application facade. | Implemented; stable callback seams covered by editor tests. |
@@ -40,21 +40,22 @@ tickets.
 | `tests/test_classification.py` | Media classification, profiles, output commands, GPU/lossless behavior. | Existing unittest coverage. |
 | `tests/test_concat.py` | Clip probing decisions, stream-copy eligibility, audio gain, normalization commands, cleanup. | Existing unittest coverage. |
 | `tests/test_fps.py` | FPS counts, output commands, RVE behavior, progress, and pipeline branching. | Existing unittest coverage. |
-| `tests/test_editor_*.py` | Editor model, operations, persistence, playback, timeline, export, CLI, and UI-helper regression coverage. | 158 tests passed on 2026-08-22. |
+| `tests/test_editor_*.py` | Editor model, operations, persistence, playback, timeline, export, CLI, and UI-helper regression coverage. | Included in the 453-test repository suite passed after the final delivery. |
 | `tests/__init__.py` | Test package marker. | Observed. |
 
 Baseline command:
-`python3 -m unittest discover -s tests` — 158 tests passed on 2026-08-22.
+`python3 -m unittest discover -s tests` — 453 tests passed after the final
+editor recovery and resumable-export delivery.
 
 ## Documentation and Research
 
 | Path | Responsibility | Evidence / status |
 |---|---|---|
-| `README.md` | Human-facing usage, safety policy, current commands, supported profiles, and research links. | Existing authoritative project README. |
+| `README.md` | Human-facing current product guide, safety policy, commands, export recovery, compatibility, and research links. | Current authoritative project README. |
 | `FAST-CONCAT-RESEARCH.md` | Benchmarks and design rationale for parallel normalization and stream-copy joining. | Existing research; informs future export decisions but is not a GUI specification. |
 | `FLOWFRAMES-RESEARCH.md` | Flowframes and interpolation implementation research. | Existing research. |
 | `FPS-ENHANCEMENT-RESEARCH.md` | Current FPS/VFI research, local GPU findings, and RIFE/RVE recommendations. | Existing research. |
-| `docs/specs/future-product-direction.md` | Durable record of deferred multi-video editing, segment operations, audio, triplicate composition, render, FPS, project, and CLI intent. | Confirmed context; not an implementation backlog. |
+| `docs/specs/future-product-direction.md` | Historical record of broader multi-video editing, segment operations, audio, triplicate composition, render, FPS, project, and CLI intent. | Partly delivered; remaining items are future context, not an implementation backlog. |
 | `.github/copilot-instructions.md` | Repository-neutral AIDD operating guidance. | Existing guidance; preserved and not duplicated in `AGENTS.md`. |
 | `.github/README.md` | AIDD workflow and artifact inventory. | Existing guidance. |
 | `.github/aidd-map.md` | AIDD artifact inventory and workflow map. | Existing guidance; not the configured repository map. |
@@ -92,6 +93,8 @@ Baseline command:
 - `make quality PYTHON=.venv/bin/python`
 - `./install.sh`
 - `./framestudio.py --help`
+- `framestudio inspect <project>`
+- `framestudio export <project> --output <video> [--resume|--restart|--discard]`
 - `./framestudio_media.py --help`
 - `./framestudio_media.py --dry-run --root <directory>`
 - `framestudio concat --dry-run <directory>`
@@ -116,5 +119,6 @@ is made that they pass for every environment.
 
 - Packaging and distribution beyond the current local Python/GTK/FFmpeg
   runtime.
-- Future audio, visual composition, and 60-FPS enhancement behavior.
+- Advanced audio editing, multiple tracks, and compositor behavior beyond the
+  delivered source-level and segment-focused features.
 - Maintainer/ownership and remote PR/check configuration.

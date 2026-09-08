@@ -3,7 +3,7 @@
 **Record ID:** FUTURE-001
 **Parent objective:** OBJ-001
 **Parent scope:** SCOPE-001
-**Status:** confirmed context; deferred from the first horizon
+**Status:** confirmed historical context; partly delivered, partly deferred
 **Last updated:** 2026-08-26
 
 ## Purpose
@@ -13,8 +13,28 @@ does not lose features that are intentionally deferred from the first
 implementation. It is a durable context record, not an implementation
 backlog, capability map, phase plan, or approval to build every item.
 
-The first horizon remains the one-source cut workflow defined in
-[`project-scope.md`](project-scope.md).
+The first horizon was the one-source cut workflow defined in
+[`project-scope.md`](project-scope.md). That horizon is complete, and approved
+later phases delivered several items from this inventory. The README and
+closed phase/feature records are authoritative for current status; this file
+continues to preserve the original product intent and unresolved future
+questions.
+
+## Delivered portions
+
+The following inventory areas are implemented in the current repository:
+
+- Mixed-source projects and a composed 1920x1080 timeline.
+- Segment split, delete, restore, movement, copy/paste, and multi-selection.
+- Source-level audio analysis and persisted audio decisions.
+- Segment focus controls and linked triplicate composition.
+- Smart rendering, verified fallback export, optional 60 FPS enhancement, and
+  optional orientation-aware upscale enhancement.
+- Versioned project files, deterministic CLI operations, autosave/recovery,
+  persistent export checkpoints, and resumable GUI/CLI exports.
+
+The remaining bullets below are retained as design context. They must not be
+treated as a promise that every future feature is already implemented.
 
 ## Long-Term Product Shape
 

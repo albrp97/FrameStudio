@@ -123,11 +123,12 @@ be replaced by media output. `export-plan` resolves a collision-safe
 destination when no output is supplied and never starts media processing.
 Both export commands accept the persisted frame-rate policy choices: lowest
 input FPS, highest input FPS, a positive rational custom FPS, or 60 FPS.
-Frame-rate enhancement remains disabled by default, while upscale enhancement
-is enabled by default for eligible sources. Upscale enhancement can be
-disabled per export or persisted with `set-upscale-policy`; eligible
-landscape sources have a short side of at most 1000 pixels and
-eligible portrait sources have a short side of at most 720 pixels. The default
+The default frame-rate policy targets 60 FPS and enables validated enhancement
+for eligible sources, while upscale enhancement is also enabled by default for
+eligible sources. Either enhancement can be disabled per export or persisted
+with its policy command; eligible landscape sources have a short side of at
+most 1000 pixels and eligible portrait sources have a short side of at most
+720 pixels. The default
 SuperUltraCompact restoration runs before spatial preparation and never
 downscales an eligible source. Export results include the normalized policies,
 per-source eligibility decisions, stage estimates, and verified output

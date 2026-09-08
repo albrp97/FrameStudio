@@ -4,7 +4,7 @@
 **Objective ID:** OBJ-001
 **Status:** confirmed
 **Planning depth:** full
-**Last updated:** 2026-08-21
+**Last updated:** 2026-09-07
 **Approval:** user-approved
 **Repository map:** `docs/planning/repo-map.md`
 
@@ -28,7 +28,7 @@ split and delete unwanted segments, save and reopen the edit, and export a
 playable result quickly and safely. The same edit state is available through
 a deterministic machine-readable CLI surface for Copilot-assisted operations.
 
-## Current Horizon
+## Initial Horizon (Delivered)
 
 Included:
 
@@ -51,27 +51,48 @@ Included:
 - Deterministic CLI/project operations suitable for agent automation.
 - Automated tests and a real-media playback/export smoke test.
 
-## Deferred / Out of Scope
+The initial one-source horizon is complete. The current delivered product
+includes the approved extensions below.
 
-- Multiple source videos in one timeline.
+## Delivered Extensions
+
+- Mixed-source projects with multiple videos, different dimensions, and
+  different frame rates.
+- Atomic segment movement, multi-selection, copy/paste, and deterministic CLI
+  parity.
+- Source-level audio analysis and persisted input audio decisions.
+- Reusable segment focus controls with zoom, offsets, persistence, and clean
+  actions.
+- Linked triplicate composition for portrait and center-focused footage.
+- Persisted frame-rate policy, optional validated 60 FPS enhancement, and
+  orientation-aware optional upscale enhancement.
+- Metadata-first source attachment with background audio analysis.
+- One-project autosave and recovery, unlimited timeline zoom, and a 30-minute
+  fit action.
+- Staged export progress, retained intermediates, persistent export sessions,
+  and Resume/Start over/Discard controls across GUI and CLI.
+- Safe post-export actions and failure logs.
+
+These extensions are implemented and closed in PHASE-004 through PHASE-008.
+See [`docs/planning/phases.md`](../planning/phases.md),
+[`docs/planning/features.md`](../planning/features.md), and
+[`docs/planning/backlog.md`](../planning/backlog.md) for the delivery record.
+
+## Current Deferred / Out of Scope
+
 - Multiple video or audio tracks.
-- Multiple mixed-source timelines with different dimensions, frame rates,
-  codecs, or source normalization.
-- Per-input audio-level analysis or normalization.
-- Portrait triplicate/background composition and linked transforms.
-- Zoom/pan/keyframing or segment-level visual modifications beyond cutting.
-- Automatic FPS enhancement to 60 FPS.
-- Advanced effects, transitions, titles, captions, color grading, and full
-  Resolve parity.
+- Keyframed or animated transforms, advanced effects, transitions, titles,
+  captions, color grading, and full Resolve parity.
 - Cloud, collaboration, accounts, telemetry, and non-Linux support.
 - Destructive deletion or replacement of source files.
 
 ## Future Direction (Captured, Deferred)
 
-The broader feature intent is recorded in
+The broader feature intent was recorded in
 [`future-product-direction.md`](future-product-direction.md) so it remains
-available for later capability and phase planning without expanding the first
-horizon.
+available for later capability and phase planning. That document preserves the
+original discovery inventory, including capabilities that were subsequently
+delivered. Current status is defined by the README and closed planning records.
 
 The deferred direction includes:
 
@@ -140,8 +161,10 @@ children.
 - Linux filesystem access.
 - `python3`.
 - `ffmpeg` and `ffprobe`.
-- A playback/runtime stack to be selected.
-- A GUI/runtime packaging approach to be selected.
+- GTK 4/PyGObject and FFmpeg raw-frame playback are selected and documented
+  in the editor foundation decision.
+- A broader GUI/runtime packaging approach beyond the local workstation
+  remains future work.
 - Existing scripts and their tested media-processing behavior.
 
 ## Durable Constraints

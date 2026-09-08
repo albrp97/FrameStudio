@@ -1,727 +1,405 @@
 # FrameStudio
 
-FrameStudio is a local Linux video editor with a deterministic CLI, GTK
-playback UI, timeline editing, and safe FFmpeg export. Its supporting
-`framestudio media` workflow is a dependency-free Python/curses browser and
-preparation tool for Resolve-compatible media workflows. It starts in
-`~/Documents/edit`, or accepts a different root with `--root`. The default
-profile is optimized for speed and editing compatibility rather than
-mathematical losslessness.
+FrameStudio is a fast, local video editor for Linux. It combines a GTK 4
+timeline editor, FFmpeg playback and export, and a deterministic CLI for
+automation.
 
-The only globally installed command is `framestudio`. The editor opens with no
-subcommand, while media preparation, concatenation, and FPS enhancement use
-the `media`, `concat`, and `fps` subcommands. The repository's Python
-entrypoints and legacy imports remain available for compatibility, but
-separate workflow command aliases are not installed.
+It is built for one practical workflow: import footage, make precise
+non-destructive edits, preview the result, and export a verified video without
+touching the original media. The repository also preserves the media
+preparation, concatenation, and frame-rate workflows that came before the
+editor.
 
-## Safety and codec policy
+## What is delivered
 
-The policy is intentionally conservative for the installed Resolve Free
-(`davinci-resolve 21.0.4-1`), based on the official Resolve 20 Linux codec list:
+The current editor supports:
 
-* **Ready video:** FFV1, DNxHD/DNxHR, ProRes, Huffyuv, Ut Video, v210, v410, or
-  rawvideo (intra-frame formats documented here as explicitly safe).
-* **Ready audio:** PCM (`pcm_*`) or FLAC.
-* H.264/H.265 are treated as Studio-only on Linux. AAC is treated as unsupported
-  for Linux decode.
+- One or several source videos in a project, including mixed dimensions and
+  frame rates.
+- A fixed 1920x1080 project canvas with contain scaling and letterboxing.
+- FFmpeg-backed video playback with play, pause, seek, and frame navigation.
+- A visual timeline with selection, split, delete/restore, movement, copy, and
+  paste operations.
+- Multi-selection with `Ctrl`-click and range selection with `Shift`-click.
+- Per-segment focus controls with zoom and X/Y offsets.
+- Linked triplicate composition for portrait or center-focused footage.
+- Versioned JSON projects with atomic saves and source identity validation.
+- One current-project autosave with crash recovery.
+- Background source-level audio analysis without blocking initial project use.
+- Unlimited timeline zoom and a 30-minute viewport-fit action.
+- Export planning with frame-rate and upscale counts before rendering.
+- Verified stream-copy exports when safe, with an explicit fallback render path
+  when decoding is required.
+- Optional frame-rate enhancement and orientation-aware SuperUltraCompact
+  upscale enhancement.
+- Resumable ordinary and enhanced exports across cancellation, failure,
+  process restart, project reopen, and time-sliced work.
+- Numbered export stages on the terminal, while stdout remains valid JSON Lines.
+- Explicit GTK actions for Resume, Start over, and Discard.
+- Failure logs and optional sleep or shutdown actions after export.
 
-Anything else with a video stream, or with non-PCM/FLAC audio, is prepared.
-The default `fast` profile encodes unsupported video as DNxHR SQ and audio as
-PCM in MXF (`.mxf`). DNxHR SQ is an intra-frame editing intermediate and is
-fast enough to run several times faster than real time on this machine. A
-10-bit source automatically uses DNxHR HQX so the conversion does not
-unnecessarily reduce its bit depth. Audio-only preparation uses Matroska
-because MXF requires a video stream.
+FrameStudio is not a full DaVinci Resolve replacement. It is a focused,
+single-user Linux editor with a safe, inspectable workflow.
 
-The fast profile is intentionally CPU-encoded: the installed FFmpeg has no
-GPU DNxHR encoder, and the tested GPU ProRes path is slower. `--gpu` remains
-available for the explicit `lossless` profile, which can use CUDA decoding and
-Vulkan FFV1.
+## Requirements
 
-The choice was benchmarked on this Ryzen 5 9600X/RTX 5070 Ti system with a
-10-second 1920x1080 H.264/AAC sample:
+FrameStudio targets a Linux workstation and requires:
 
-| Path | Wall time | Result |
-| --- | ---: | --- |
-| CPU decode + DNxHR SQ | ~1.1s | MXF, ~184 MB |
-| CUDA decode + CPU DNxHR SQ | ~1.6s | MXF, ~184 MB |
-| GPU ProRes LT/Standard | ~3.4s | MOV, ~135/189 MB |
+- Python 3.10 or newer. Python 3.14 is validated on the development
+  workstation.
+- GTK 4 and PyGObject (`gi`).
+- FFmpeg and FFprobe.
 
-`--profile lossless` remains available when mathematical losslessness is
-required. It writes FFV1 video and PCM audio to Matroska (`.mkv`). The legacy
-`--profile dnxhr` name is accepted as an alias for `fast`.
+`ffplay` is optional and is used for audio preview. The editor remains usable
+without it and reports audio-preview failures explicitly.
 
-## Usage
+The optional FPS and upscale paths may use NVIDIA/CUDA/NVENC, Vulkan, and a
+local REAL-Video-Enhancer installation. If the preferred RVE runtime is not
+available, eligible editor exports use the validated FFmpeg interpolation
+fallback. The legacy media workflows also support CPU-only operation.
 
-```sh
-framestudio media
-framestudio media --root ~/Videos/to-edit
-framestudio media --dry-run --root ~/Documents/edit
-framestudio media --profile fast --root ~/Videos/to-edit
-framestudio media --profile lossless --root ~/Videos/to-edit --gpu on
-framestudio media --jobs 1                 # force sequential processing
-framestudio media --performance-mode off   # leave the current system profile alone
-framestudio media --keep-originals    # opt out of the default Trash move
-framestudio media --gpu off            # disable NVIDIA acceleration for lossless mode
-framestudio media --gpu auto           # quiet GPU detection with CPU fallback
-framestudio media --version
-```
+## Install the command
 
-To open the combined concat-and-FPS selector anywhere in a terminal:
+The repository uses the system GTK/PyGObject runtime rather than packaging the
+GUI as a Python wheel.
 
 ```sh
-framestudio concat
+git clone <repository-url>
+cd FrameStudio
+./install.sh
 ```
 
-To open the focused one-source editor:
+`install.sh` installs one canonical command at `~/bin/framestudio` and removes
+the obsolete standalone `framestudio-*` and `resolve-*` workflow aliases.
+Ensure `~/bin` is on `PATH`, then verify:
+
+```sh
+framestudio --help
+framestudio --version
+```
+
+You can always run the repository entrypoint directly:
+
+```sh
+python3 framestudio.py --help
+```
+
+## Start the editor
+
+Launch an empty editor and choose media from the interface:
 
 ```sh
 framestudio
+```
+
+Open a source directly:
+
+```sh
 framestudio --source ~/Videos/source.mp4
+```
+
+Reopen a saved project:
+
+```sh
 framestudio --project ~/Videos/source.framestudio.json
 ```
 
-The same executable also provides deterministic, machine-readable editor
-operations. Successful commands emit versioned JSON on stdout; errors emit
-structured JSON on stderr with a non-zero status:
-
-```sh
-framestudio import ~/Videos/source.mp4 --project ~/Videos/source.framestudio.json
-framestudio import ~/Videos/landscape.mp4 ~/Videos/portrait.mp4 \
-  --project ~/Videos/mixed.framestudio.json
-framestudio inspect ~/Videos/source.framestudio.json
-framestudio analyze-audio ~/Videos/source.framestudio.json
-framestudio split ~/Videos/source.framestudio.json --at 12.5
-framestudio delete ~/Videos/source.framestudio.json --segment SEGMENT_ID
-framestudio restore ~/Videos/source.framestudio.json --segment SEGMENT_ID
-framestudio move ~/Videos/source.framestudio.json --segment SEGMENT_ID \
-  --direction left
-framestudio copy ~/Videos/mixed.framestudio.json --segment SEGMENT_ID
-framestudio paste ~/Videos/mixed.framestudio.json --segment SEGMENT_ID --at 0
-framestudio focus ~/Videos/source.framestudio.json --segment SEGMENT_ID \
-  --zoom 2 --offset-x 120 --offset-y -80
-framestudio copy-focus ~/Videos/source.framestudio.json \
-  --source-segment SOURCE_SEGMENT_ID --segment DESTINATION_SEGMENT_ID
-framestudio triplicate-enable ~/Videos/source.framestudio.json --segment SEGMENT_ID
-framestudio triplicate-disable ~/Videos/source.framestudio.json --segment SEGMENT_ID
-framestudio clean-focus ~/Videos/source.framestudio.json --segment SEGMENT_ID
-framestudio relink ~/Videos/mixed.framestudio.json --source SOURCE_ID \
-  --path ~/Videos/relocated.mp4
-framestudio duration ~/Videos/source.framestudio.json
-framestudio set-fps-policy ~/Videos/source.framestudio.json --choice 60 \
-  --enhance-fps --fps-backend ffmpeg-minterpolate
-framestudio set-upscale-policy ~/Videos/source.framestudio.json \
-  --enable-upscale --upscale-model SuperUltraCompact \
-  --upscale-backend rve-restoration
-framestudio export-plan ~/Videos/source.framestudio.json
-framestudio export ~/Videos/source.framestudio.json --output ~/Videos/edited.mp4 \
-  --upscale-enhancement
-```
-
-Use `--full-paths` only when automation needs local paths; output redacts them
-by default. Export emits structured progress events followed by a verified final result.
-When the command is attached to a terminal, it also reports numbered
-preparation, rendering/enhancement, concatenation/composition, verification,
-and publication stages on stderr. Use `--human-progress` to force those
-human-readable stages when stderr is redirected; JSON Lines on stdout remain
-unchanged. The complete contract is documented in
-[`docs/specs/cli-contract.md`](docs/specs/cli-contract.md). From the
-repository, use `make cli ARGS="inspect /absolute/path/to/project.framestudio.json"`.
-
-Long exports keep validated destination-adjacent checkpoints after
-cancellation or failure. Re-run with `--resume` to continue a compatible
-session, `--restart` to discard checkpoints and begin again, or `--discard` to
-remove the pending session without rendering.
-
-Upscale enhancement is enabled by default for eligible sources. The export
-panel and CLI still expose an explicit opt-out with `--no-upscale-enhancement`;
-`set-upscale-policy --disable-upscale` persists that choice for the project.
-
-The simplest workflow is to start the editor first and choose media inside the
-interface:
+The same commands are available from the repository:
 
 ```sh
 make start
-```
-
-Use **Select video(s)** to choose one or several local video files. One-source
-projects retain the original schema and editing behavior; selecting several
-files creates a mixed-source project with stable source identities and a
-sequential timeline.
-
-The editor uses Python with PyGObject/GTK 4 and FFmpeg raw-frame preview and
-audio pipes. The target workstation must provide GTK 4, PyGObject, FFmpeg,
-ffprobe, and `ffplay` for audio preview. The editor supports one-source and
-mixed-source projects, real-time composed preview with source-level audio
-decisions, play/pause, seek, a visual clip timeline, non-destructive
-split/delete-toggle editing, block movement and copy/paste, versioned project
-save/reopen, reusable per-segment focus controls, linked triplicate
-compositions, and verified MP4 export. Audio is analyzed once per input source
-using the legacy mean/median policy and the same decision is reused by every
-included segment from that source. Source import and project reopen attach
-after metadata probing while full-file audio analysis continues in the
-background; the per-source status reports pending, analyzing, terminal, or
-failed decisions. Export still performs the explicit terminal audio-analysis
-check before rendering, serializes that planning with any in-flight analysis,
-and cancels unresolved analysis when export cancellation is requested. Missing
-`ffplay` or an audio preview process failure is reported explicitly; it is not
-silently treated as a successful audio preview.
-The implementation keeps the public `framestudio.model`, `export`, `app`,
-`timeline`, and `cli` paths as compatibility facades over focused model,
-export, playback, application, timeline, and CLI modules.
-Every project uses a fixed 1920x1080 (1080p) canvas. Inputs with another
-dimension or orientation are contain-scaled and letterboxed without stretching
-or cropping.
-
-The timeline shows every source block in order. Included blocks use colored
-blocks; deleted blocks remain visible with a red hatched treatment. Click or
-drag across the timeline to move the playhead precisely and select the block
-under the pointer. Block colors belong to each block, so moving or
-copying/pasting preserves its color; splitting creates fresh child colors and
-restoring a deleted block reveals its original color. Use **Ctrl-click** to
-add or remove blocks from the selection, **Shift-click** to select an
-inclusive range, and a normal click to replace the selection. Use **Space**
-for play/pause, **B** to split at the playhead, **Delete** to toggle the selected
-block or blocks, **Shift+Left/Right** to move selected blocks, and
-**Ctrl+C/Ctrl+V** to copy and paste them immediately after the selected
-block. Click **Play** or **Pause**, or press **Space**, to toggle playback.
-Bare
-**Left/Right** moves one output frame at a time. Use **Ctrl+mouse wheel** to
-zoom without an upper limit, **Ctrl+0** to fit the default view, and the
-**30 min** button to make 30 minutes span the visible timeline. **Alt/Shift+
-mouse wheel** or a horizontal secondary wheel moves the zoomed timeline
-viewport. A normal wheel always moves the playhead, even when zoomed.
-Triplicate toggles preserve the live playhead and playback state. The timeline
-also displays the calculated final output duration and export progress includes
-percentage, frames, FPS, elapsed time, and ETA. The editor keeps this area compact; click
-**Key bindings** to open the complete keyboard and timeline-control reference.
-
-The `.mp4` file selected in the editor is source media. **Save project** writes
-a `.framestudio.json` editor project. **Export video** writes a separate edited
-video only after FFmpeg/ffprobe verify its playability, duration, dimensions,
-audio-stream presence, sample rate, and channels; the source is never
-overwritten.
-
-The editor also maintains one crash-recovery project at
-`$XDG_STATE_HOME/framestudio/autosave.framestudio.json` (or
-`~/.local/state/framestudio/autosave.framestudio.json`). A newly attached
-source/project replaces the previous autosave, and successful timeline edits
-update it without changing the normal **Save project** destination. Use
-**Recover autosave** to reopen it; FrameStudio validates that every source is
-still available and unchanged before attaching it.
-
-Export uses stream copy when the source and cut boundaries are conservatively
-eligible. Otherwise it reports the reason and uses an H.264/AAC MP4 fallback.
-Both routes write to a temporary partial file and publish atomically only
-after validation. Empty edits are rejected.
-
-For a non-1080p input, fixed-canvas scaling requires the fallback render path.
-The established render profile owns the output container, codecs, audio, and
-pixel format; source codec/container differences do not change it. New export
-plans default to 60 FPS with enhancement enabled; explicit saved project
-settings remain authoritative. The export panel names the lowest and highest
-input-rate choices, shows the edited duration, estimated processing time, and
-estimated output size, and reports the selected interpolation backend. If the
-preferred RVE environment is unavailable, a validated FFmpeg interpolation
-fallback is selected when the media is eligible. A single compatible, uncut
-source can publish its verified interpolation result directly; cuts, mixed
-sources, visual changes, incompatible media, and audio normalization retain the
-safe fallback render path.
-
-Enhanced exports keep a destination-adjacent
-`.<filename>.framestudio-intermediates` cache while interpolation, restoration,
-or preparation is running. The cache is fingerprinted with the selected
-timeline, source file state, frame-rate/upscale policies, and runtime
-settings. If an export fails before verified publication, a retry validates and
-reuses completed intermediates instead of repeating those expensive stages.
-Changing the source or export policy invalidates the cache; after successful
-verification and atomic publication, the cache is removed. The original source
-and any previously published output are never used as the cache.
-
-### Makefile shortcuts
-
-From the repository root:
-
-```sh
-make setup
-make help
-make start
-make editor
 make editor ARGS="--source /absolute/path/to/video.mp4"
 make editor ARGS="--project /absolute/path/to/project.framestudio.json"
-make cli ARGS="inspect /absolute/path/to/project.framestudio.json"
-make smoke
-make restoration-benchmark ARGS="--source /absolute/path/to/video.mp4"
-make test
-make check
-make quality
 ```
 
-The restoration benchmark is a research-only comparison of the versioned
-candidate matrix in `benchmarks/restoration_candidates.json`. It defaults to
-the existing TICKET-077 fixture when available, keeps unavailable or
-license-blocked candidates in the report, and writes uncommitted JSON,
-Markdown, CSV, command, log, and contact-sheet artifacts under
-`~/Documents/edit/restoration-cross-model-YYYYMMDD/`. Use
-`--fixture /path/to/fixture-45s.mp4` to reuse a specific fixture or
-`--source /path/to/video.mp4` to create the deterministic three-window
-fixture. Use `--segment-count 4` to create four deterministic 15-second
-windows, for example:
+## Editor workflow
+
+1. Select one or more local videos.
+2. Wait for metadata probing to attach the project. Full-file audio analysis
+   continues in the background and is shown per source.
+3. Play, pause, seek, or use `Left` and `Right` for frame navigation.
+4. Split at the playhead with `B`.
+5. Select blocks with click, `Ctrl`-click, or `Shift`-click.
+6. Toggle deletion with `Delete`, move blocks with `Shift+Left` and
+   `Shift+Right`, and copy/paste with `Ctrl+C` and `Ctrl+V`.
+7. Use Focus and Triplicate controls when a segment needs a different visual
+   framing.
+8. Save a normal project when a durable named project file is needed.
+9. Use Recover autosave after an unexpected exit.
+10. Export only after reviewing the plan, target frame rate, upscale count, and
+    estimated work.
+
+Useful timeline controls:
+
+| Control | Action |
+| --- | --- |
+| `Space` | Play or pause |
+| `B` | Split at the playhead |
+| `Delete` | Toggle the selected block deleted/included |
+| `Shift+Left` / `Shift+Right` | Move selected blocks |
+| `Ctrl+C` / `Ctrl+V` | Copy and paste selected blocks |
+| `Ctrl` + mouse wheel | Zoom the timeline without an upper limit |
+| `Ctrl+0` | Fit the default timeline view |
+| `30 min` | Fit a 30-minute viewport |
+| Normal mouse wheel | Move the playhead |
+| `Alt`/`Shift` + mouse wheel | Move the zoomed timeline viewport |
+
+Seeking while playing preserves playback. Enabling or disabling Triplicate
+preserves the current playhead and play/pause state.
+
+## Projects and recovery
+
+Normal project files use the `.framestudio.json` suffix. They contain versioned
+editor state, source identities, timeline blocks, playback position, visual
+modifications, triplicate state, and output policies. Project writes are
+atomic, and a source is rejected when its stored identity no longer matches.
+
+FrameStudio also keeps one autosave for the current project:
+
+```text
+$XDG_STATE_HOME/framestudio/autosave.framestudio.json
+```
+
+When `XDG_STATE_HOME` is not set, the default is:
+
+```text
+~/.local/state/framestudio/autosave.framestudio.json
+```
+
+Loading another project or attaching new sources replaces the previous
+autosave. Autosave is separate from the normal Save project destination.
+
+## Export
+
+The editor and CLI use the same export planning and execution paths.
+
+### Safety guarantees
+
+- Original source files are never overwritten or deleted by editor export.
+- The destination is written to a temporary or partial path first.
+- FFmpeg and FFprobe verify the result before publication.
+- The final output is published atomically only after verification.
+- Failed or cancelled exports remove incomplete final output but preserve
+  validated work that can be resumed.
+- Empty edits and incompatible export destinations are rejected explicitly.
+
+### Render behavior
+
+Every editor project renders to the fixed 1920x1080 canvas. Sources with other
+dimensions or orientations are contain-scaled and letterboxed. Stream copy is
+used only when the source, cut boundaries, and policies make it safe.
+Otherwise FrameStudio uses the validated fallback render profile.
+
+The persisted frame-rate policy defaults to a 60 FPS target with enhancement
+enabled for eligible sources. The export panel reports how many sources need
+enhancement. The RVE 4.26 backend is preferred when available and
+`ffmpeg-minterpolate` is the validated fallback.
+
+Upscale enhancement is enabled by default for eligible sources. It uses the
+SuperUltraCompact model and orientation-aware thresholds. The export panel
+reports the eligible source count, and both the GUI and CLI support an
+explicit opt-out.
+
+Audio analysis is source-level, not segment-level. Export waits for terminal
+audio decisions and fails explicitly when analysis cannot complete.
+
+### Resumable exports
+
+Each destination can have two adjacent working areas:
+
+```text
+.<destination-name>.framestudio-session/
+.<destination-name>.framestudio-intermediates/
+```
+
+The session manifest records compatible checkpoints for cuts, preparation,
+interpolation, upscale, assembly, and verification. The enhanced intermediate
+cache stores validated expensive work. Both are fingerprinted against the
+project, timeline, sources, destination, policies, runtime, and media tools.
+
+The GTK export panel offers:
+
+- **Resume export** to continue a compatible session.
+- **Start over** to invalidate checkpoints and rebuild.
+- **Discard** to remove a pending session without rendering.
+
+The same controls are available from the CLI:
 
 ```sh
-make restoration-benchmark ARGS="--source /path/to/video.mp4 --segment-count 4"
+framestudio export PROJECT --output OUTPUT.mp4 --resume
+framestudio export PROJECT --output OUTPUT.mp4 --restart
+framestudio export PROJECT --output OUTPUT.mp4 --discard
 ```
 
-It does not download model weights, add production dependencies, or enable
-restoration in editor export. Runnable controls record one cold run and two
-warm runs by default; use `--warm-runs N` to change the repeat count.
+Normal export remains fresh when no mode is supplied. A changed source,
+project, destination, policy, runtime, or FFmpeg/FFprobe identity is rejected
+instead of reusing unsafe artifacts. Session and intermediate directories are
+removed only after verified final publication.
 
-The Video2X benchmark configuration is pinned to release 6.4.0, ncnn/Vulkan,
-device 0, filtering/upscale-only mode, and the documented
-`realesr-animevideov3` model. The measured configuration uses `h264_nvenc`
-with `cq=18`, `preset=p5`, and `--max-b-frames 0`; the prior
-`realesrgan-plus` result remains in the report as a separate baseline. CUDA
-decode is not enabled because Video2X's frame conversion rejects CUDA input
-frames on this workstation.
+## Deterministic CLI
 
-The completed four-window run against the requested real video is summarized
-in `benchmarks/results/ticket-078-480p-4x15s.json` and
-`benchmarks/results/ticket-078-480p-4x15s.md`. The output videos, raw logs,
-telemetry, and contact sheets remain in the external artifact directory
-`~/Documents/edit/restoration-cross-model-20260827-480p-4x15s/` so large
-generated media and private source data are not tracked in the repository.
+Editor commands emit versioned JSON on stdout and structured errors on stderr.
+Absolute local paths are redacted by default. Use `--full-paths` only when an
+automation workflow explicitly needs them.
 
-The `media`, `concat`, and `fps` targets keep the existing workflow scripts
-available, for example `make media ARGS="--dry-run --root ~/Videos"`.
+Create and inspect projects:
 
-### Quality setup
+```sh
+framestudio import ~/Videos/landscape.mp4 ~/Videos/portrait.mp4 \
+  --project ~/Videos/mixed.framestudio.json
+framestudio inspect ~/Videos/mixed.framestudio.json
+framestudio duration ~/Videos/mixed.framestudio.json
+framestudio analyze-audio ~/Videos/mixed.framestudio.json
+framestudio reopen ~/Videos/mixed.framestudio.json
+```
 
-`make setup` creates `.venv` with the system GTK bindings visible, installs
-the pinned Python quality tools from `requirements-dev.txt`, and installs the
-pinned local npm tools from `package-lock.json`. Use the environment explicitly
-when running checks:
+Edit timeline blocks:
+
+```sh
+framestudio split PROJECT.framestudio.json --at 12.5
+framestudio delete PROJECT.framestudio.json --segment SEGMENT_ID
+framestudio restore PROJECT.framestudio.json --segment SEGMENT_ID
+framestudio move PROJECT.framestudio.json --segment SEGMENT_ID \
+  --direction right
+framestudio copy PROJECT.framestudio.json --segment SEGMENT_ID
+framestudio paste PROJECT.framestudio.json --segment SEGMENT_ID --at 0
+```
+
+Apply visual modifications:
+
+```sh
+framestudio focus PROJECT.framestudio.json --segment SEGMENT_ID \
+  --zoom 2 --offset-x 120 --offset-y -80
+framestudio copy-focus PROJECT.framestudio.json \
+  --source-segment SOURCE_SEGMENT_ID --segment DESTINATION_SEGMENT_ID
+framestudio triplicate-enable PROJECT.framestudio.json --segment SEGMENT_ID
+framestudio triplicate-disable PROJECT.framestudio.json --segment SEGMENT_ID
+framestudio clean-focus PROJECT.framestudio.json --segment SEGMENT_ID
+```
+
+Configure and inspect export policy:
+
+```sh
+framestudio set-fps-policy PROJECT.framestudio.json \
+  --choice 60 --enhance-fps --fps-backend rve-4.26
+framestudio set-upscale-policy PROJECT.framestudio.json \
+  --enable-upscale --upscale-model SuperUltraCompact \
+  --upscale-backend rve-restoration
+framestudio export-plan PROJECT.framestudio.json
+```
+
+Export with machine-readable progress and terminal stage output:
+
+```sh
+framestudio export PROJECT.framestudio.json \
+  --output ~/Videos/edited.mp4 \
+  --human-progress
+```
+
+Export progress is JSON Lines on stdout. Human-readable numbered stages are
+written to stderr, so scripts can parse stdout without filtering terminal
+messages. The full versioned contract is documented in
+[`docs/specs/cli-contract.md`](docs/specs/cli-contract.md).
+
+## Preserved media workflows
+
+The canonical command also exposes the original preparation workflows:
+
+### Media preparation
+
+```sh
+framestudio media --root ~/Videos/to-edit
+framestudio media --dry-run --root ~/Videos/to-edit
+framestudio media --profile fast --keep-originals --root ~/Videos/to-edit
+framestudio media --profile lossless --gpu auto --root ~/Videos/to-edit
+```
+
+The default `fast` profile prepares unsupported media as DNxHR/PCM editing
+intermediates. The `lossless` profile uses FFV1/PCM. Conversions use partial
+outputs, verification, and safe cleanup. Original files are retained when
+`--keep-originals` is selected.
+
+### Concatenation and FPS enhancement
+
+```sh
+framestudio concat ~/Videos/to-edit
+framestudio concat ~/Videos/to-edit --concat-only
+framestudio concat ~/Videos/to-edit --engine ffmpeg-minterpolate
+framestudio fps ~/Videos/source.mp4 --target-fps 60
+framestudio fps ~/Videos/source.mp4 --engine ffmpeg-minterpolate
+```
+
+`concat` is the integrated folder workflow. `fps` is the direct single-input
+workflow. Both report progress and can temporarily switch to the system
+performance profile, restoring the previous profile afterward when that
+behavior is enabled.
+
+The research and benchmark records remain separate from product behavior:
+
+- [`FAST-CONCAT-RESEARCH.md`](FAST-CONCAT-RESEARCH.md)
+- [`FPS-ENHANCEMENT-RESEARCH.md`](FPS-ENHANCEMENT-RESEARCH.md)
+- [`FLOWFRAMES-RESEARCH.md`](FLOWFRAMES-RESEARCH.md)
+- [`docs/research/video-restoration-strategies.md`](docs/research/video-restoration-strategies.md)
+
+## Development
+
+Create the local quality environment:
 
 ```sh
 make setup
+```
+
+Run the repository checks:
+
+```sh
+make test
+make compile
+make check
+make contract
+make smoke
 make quality PYTHON=.venv/bin/python
 ```
 
-The quality suite runs Ruff formatting/lint checks, source-only mypy checks,
-scoped C901 complexity checks for the editor CLI/domain surfaces, jscpd,
-the repository dependency-boundary check, pip-audit, Bandit, and the AIDD
-churn report. Generated JSON reports are written to
-`evidence/static-analysis/`; sensitive values and absolute paths must not be
-added to those artifacts. jscpd currently reports approximately a 1.89%
-duplication baseline against a configured 2% ceiling, so new duplication
-remains visible without blocking on the existing helper/test overlap. The
-GTK/rendering/export
-adapters retain known complexity debt outside the current CLI/domain gate and
-remain a review follow-up rather than being hidden. The same commands run in
-[`.github/workflows/quality.yml`](.github/workflows/quality.yml).
+The full test suite uses Python `unittest`. Quality checks use the pinned
+Ruff, mypy, Bandit, pip-audit, jscpd, dependency, and churn tools configured
+by the repository. Generated static-analysis reports belong under
+`evidence/static-analysis/`.
 
-On a Hyprland Wayland desktop, focus the editor window and capture configured
-UI evidence with `make screenshot LABEL=before`, then repeat with
-`make screenshot LABEL=after`. The target captures only the active window
-using `grim` and `hyprctl`; screenshots are saved under
-`evidence/screenshots/` and are not required for CLI-only changes. The
-quality-tool setup evidence includes
-[`quality-before.png`](evidence/screenshots/quality-before.png) and
-[`quality-after.png`](evidence/screenshots/quality-after.png).
+The GitHub Actions quality workflow is defined in
+[`.github/workflows/quality.yml`](.github/workflows/quality.yml). The local
+quality command is intended to match that workflow.
 
-### Manual editor test
+## Documentation map
 
-Use a short disposable MP4 or a copy of a local source:
+| Document | Purpose |
+| --- | --- |
+| [`vision.md`](vision.md) | Product direction and durable constraints |
+| [`docs/specs/project-scope.md`](docs/specs/project-scope.md) | Approved scope and acceptance outcomes |
+| [`docs/specs/future-product-direction.md`](docs/specs/future-product-direction.md) | Deferred product intent beyond the delivered work |
+| [`docs/specs/editor-foundation-decision.md`](docs/specs/editor-foundation-decision.md) | GTK, FFmpeg playback, and project-format decisions |
+| [`docs/specs/cli-contract.md`](docs/specs/cli-contract.md) | Versioned CLI and export contract |
+| [`docs/planning/repo-map.md`](docs/planning/repo-map.md) | Repository surfaces and validation commands |
+| [`docs/planning/phases.md`](docs/planning/phases.md) | Delivery phase index |
+| [`docs/planning/features.md`](docs/planning/features.md) | Feature index and capability coverage |
+| [`docs/planning/backlog.md`](docs/planning/backlog.md) | Ticket lifecycle and delivery traceability |
 
-1. Launch with `make start`.
-2. Click **Select video(s)** and choose one local video, or choose two
-   disposable videos with different dimensions or frame rates for the
-   mixed-source flow.
-3. Confirm the preview loads, the duration is shown, and the timeline is
-   enabled.
-4. Press **Space** and confirm the preview starts, the position label/playhead
-   advance together, and pressing **Space** again pauses it.
-5. Click inside different colored timeline blocks and confirm the selected
-   block is outlined, the source details update, and the playhead seeks there.
-6. Drag across the timeline and confirm the playhead and preview image update
-   while the pointer moves, stale intermediate renders do not hold up the
-   latest position, and the final frame matches the exact released position.
-7. Press **Left** and **Right** repeatedly while paused. Confirm each press
-   moves the playhead by exactly one source frame.
-8. Press **B** at an interior playhead position. Confirm a new clip block
-   appears at the split and both clips remain included.
-9. Select a clip in the timeline and press **Delete**. Confirm it remains
-   visible with the deleted styling, the **Final output** duration decreases,
-   and the selected clip status changes to **Deleted**.
-10. Press **Delete** again and confirm the clip returns to included styling and
-    the final output duration returns.
-11. Split the source into three clips, select the middle clip, and press
-    **Shift+Left** or **Shift+Right**. Confirm the whole block changes
-    timeline position while its source range, color, and duration remain
-    attached to it.
-12. Seek across the moved blocks and confirm the preview follows timeline
-    order; split the selected moved block and confirm both children stay in
-    that position.
-13. Hold **Ctrl** and click another block. Confirm both blocks have orange
-    selected outlines; click it again with **Ctrl** to remove it from the
-    selection. Click a different block normally and confirm the previous
-    selection clears.
-14. Select a block, hold **Shift**, and click another block. Confirm every
-    block between the two endpoints is selected inclusively.
-15. Select a block, press **Ctrl+C**, then **Ctrl+V**. Confirm a fresh copy is
-    inserted immediately after the selected block, later blocks move forward,
-    the copied color/state remain attached, and the final timeline duration
-    increases by the copied block duration.
-16. Hold **Ctrl** and scroll up/down. Confirm the zoom percentage changes.
-17. Press **Ctrl+0** and confirm the complete source returns to view.
-18. At any zoom level, scroll normally and confirm the playhead moves by about
-    one second instead of moving the horizontal scrollbar.
-19. Hold **Alt** or **Shift** while scrolling, or use a horizontal secondary
-    wheel, and confirm the zoomed timeline viewport moves left/right.
-20. Click **Save project**, choose a path ending in `.framestudio.json`, and
-   confirm the status reports a saved project. Verify the source file's size
-   and modification time are unchanged.
-21. Click **Reopen project**, or close the app and run
-   `make editor ARGS="--project /absolute/path/to/project.framestudio.json"`.
-   Confirm the same source, duration, and saved playhead reopen.
-22. Save the project, close/reopen it, and confirm the clip deleted/included
-    state is preserved.
-23. Click **Export video**, choose a new `.mp4` path, and watch the export
-    panel. Confirm it shows percentage, current frame/total frames, FPS,
-    elapsed time, and ETA while the export runs. Confirm the output plays and
-    inspect it with:
+## Compatibility
 
-    ```sh
-    ffprobe -v error -show_entries format=duration:stream=codec_type,width,height,codec_name \
-      -of compact /absolute/path/to/exported-edited.mp4
-    ```
+FrameStudio is the canonical product identity and command. Existing
+`resolve_*` scripts, legacy imports, compatibility wrappers, cache locations,
+and `.resolve.json` projects remain supported while users migrate.
 
-    Confirm the duration matches the edited duration, required audio remains
-    present, the source file is unchanged, and the output dimensions are
-    exactly 1920x1080.
-24. For the mixed-source flow, seek across the source boundary, use
-    **Ctrl-click** to select blocks from both sources and **Shift-click** to
-    select an inclusive range, move them with **Shift+Left/Right**, and use
-    **Ctrl+C/Ctrl+V** to insert copies after the selected block. Confirm
-    order, source coverage, fresh pasted identities, final duration, and the
-    fixed 1920x1080 preview/output canvas.
-25. Reopen the mixed project and confirm source order, block order, deletion
-    state, and the selected output duration are preserved.
-26. For a mixed-source project with different audio levels, confirm the
-   **Audio decisions** status shown immediately after import/open, including
-   per-source `pending`/`analyzing` states while the editor remains usable.
-   For an explicit CLI
-   refresh, run `framestudio analyze-audio` and inspect each source's
-   status, measurement, and gain decision. Split and reorder segments from one
-   source, then confirm the decision remains source-level rather than becoming
-   a per-segment setting. Preview and export the project, confirm the same
-   source decisions are used, and inspect the result with `ffprobe` for
-   48 kHz stereo audio and the expected duration. If `ffplay` is unavailable,
-   confirm the editor reports that dependency failure instead of claiming
-   audio preview succeeded.
-27. Check an error path safely with an invalid disposable project:
-   `printf '{' > /tmp/invalid.framestudio.json`, then run
-   `make editor ARGS="--project /tmp/invalid.framestudio.json"`. Confirm the
-   status shows an actionable error and does not replace valid state.
-28. Select one or more clips and use the **Focus** controls. Apply zoom and
-    X/Y offsets, confirm the preview changes without changing clip duration,
-    source bounds, colors, or ordering, then use **Clean modifications** and
-    confirm the default view returns.
-29. Select a primary clip and additional clips, then use **Copy to selection**.
-    Confirm the destination clips receive the primary clip's focus values while
-    retaining their own identities and timing.
-30. Enable **Triplicate** on portrait or vertically focused landscape footage.
-    Confirm the preview shows black-backed left, center, and right copies using
-    the same focus values. Disable it and confirm the source interval and
-    ordinary clip state are unchanged.
-31. Save and reopen a focused/triplicate project, then run `inspect` through
-    the CLI. Confirm the transform, group ID, roles, and segment state match
-    the GUI.
-32. Export a focused/triplicate project and confirm the route explanation says
-    decoded fallback rendering, the output is verified 1920x1080, the duration
-    is correct, and the source and any previous valid output remain unchanged
-    if a render fails.
+The old standalone `resolve-*` and `framestudio-*` shell aliases are no longer
+installed. Use `framestudio media`, `framestudio concat`, and `framestudio fps`
+instead.
 
-The TUI starts in `~/Documents/edit`. Navigate with the arrow keys or `j/k`,
-use `Right/l` to enter a folder, press `Space` on each video to select it, and
-press `Enter` to run the complete workflow. One selected video goes directly
-to FPS enhancement with audio stream-copy; multiple selected videos are
-concatenated once and then enhanced globally. `a` selects every video in the
-current folder, `n` clears the selection, and `Left/h/Backspace` goes up. Use
-`framestudio concat --root ~/Videos` to start in a different folder.
+## Current boundaries
 
-For a non-interactive run, pass the folder directly:
+FrameStudio is local and offline. It does not provide cloud storage,
+collaboration, accounts, telemetry, Windows/macOS support, multiple tracks,
+advanced transitions, titles, captions, color grading, or full compositor
+behavior. GPU and restoration performance depends on the local workstation,
+media, drivers, and installed runtimes.
 
-```sh
-framestudio concat ~/Documents/edit/copy
-```
-
-For a multiple-video run it chooses the most common resolution and the lowest
-nominal frame rate, normalizes each file independently with bounded GPU
-workers when needed, joins the temporary parts, and then performs one RIFE
-pass. `--concat-only` preserves the older concat-without-FPS behavior. The
-single-process filter graph remains available with `--strategy single`. The
-delivery output is MP4 with H.264, 8-bit `yuv420p`, BT.709 tags, `faststart`,
-and the original audio stream copied at the final remux. The default NVENC
-delivery profile is preset `p1` with constant QP 18, the fastest tested
-quality/storage balance for the current RTX 5070 Ti pipeline. LosslessCut uses
-the same FFmpeg engine, but its stream-copy merge cannot normalize a mixed
-30/29.97 fps folder. The benchmark and redesign results are recorded in
-[`FAST-CONCAT-RESEARCH.md`](FAST-CONCAT-RESEARCH.md).
-
-Frame-rate enhancement research is recorded in
-[`FPS-ENHANCEMENT-RESEARCH.md`](FPS-ENHANCEMENT-RESEARCH.md). It compares
-current RIFE, TensorRT/TensorRT-RTX, NCNN/Vulkan, anime-focused GMFSS, newer
-diffusion methods, and a reproducible RTX 5070 Ti benchmark plan. The
-Flowframes-specific investigation is in
-[`FLOWFRAMES-RESEARCH.md`](FLOWFRAMES-RESEARCH.md).
-
-The local RIFE test found that pure TensorRT FP16 produced a regular grid
-artifact on this RTX 5070 Ti. Executing only RIFE's
-`aten.pixel_shuffle` operation in PyTorch fixes it while retaining the rest of
-the TensorRT FP16 path; TensorRT FP32 remains the fallback. The validated
-experimental reference uses explicit scene-cut protection and an exact
-output-frame trim, with reproduction details recorded in the two research
-documents above.
-
-REAL-Video-Enhancer is now the default FPS backend for the unified workflow.
-Its RIFE 4.26 weights are the same as the validated local weights, and its
-unmodified TensorRT FP16 path reproduces the same grid artifact. The installed
-RVE checkout includes the PixelShuffle fallback, RGB/frame-pacing corrections,
-and exact output-FPS support validated on this RTX 5070 Ti. The older
-VapourSynth implementation remains available with `--engine vs-rife`. If the
-preferred RVE environment is unavailable, the unified and direct commands
-automatically use the validated FFmpeg `minterpolate` fallback; select it
-explicitly with `--engine ffmpeg-minterpolate`.
-
-Audio is analyzed per source before encoding. The default gain is chosen to
-balance mean RMS `-35 dBFS` and median absolute sample level `-50 dBFS`, with a
-`-1 dBFS` peak cap. A single gain cannot make both statistics exact for every
-recording, so the result is an intentionally conservative compromise that
-preserves each source's dynamics. Use `--audio-normalization off` to retain
-source gain; this is also required for an eligible stream-copy run.
-
-Keys: arrows or `j/k` move, `Right/l` enters a folder, `Left/h/Backspace` goes
-up, `Enter` converts, `Space` toggles selection, `a` selects all current
-contents, `n` clears selection, `g` cycles GPU mode, `D` toggles deletion,
-`p` cycles performance mode, `r` rescans, `?` opens help, and `q` quits.
-Folders process recursively. If nothing is selected, `Enter` processes the
-current folder recursively.
-
-Only files needing preparation are converted. Output is deterministic:
-`<stem>.framestudio-ready.mxf` for video conversion, or
-`<stem>.framestudio-ready.mkv` for audio-only preparation. The explicit lossless
-profile writes `<stem>.framestudio-lossless.mkv`. Existing generated outputs,
-including outputs from the older lossless default, are recognized and skipped;
-when deletion is enabled, their source can be removed after verification.
-Conversion writes a unique `.partial-*` file, uses FFmpeg progress output,
-verifies duration and stream presence with ffprobe, then atomically renames it.
-Failures leave the source untouched.
-
-Deletion is ON by default. The TUI always requires an explicit confirmation
-before processing when deletion is enabled. After successful verification it
-uses `gio trash`, never an irreversible unlink. Each source is moved only
-after its own output is verified, before the next source starts. If `gio` is
-unavailable or fails, the original is retained and a warning is shown. Use
-`--keep-originals` or press `D` to disable it.
-
-Performance mode is AUTO by default. When a batch starts, the TUI temporarily
-selects the system `performance` profile through `powerprofilesctl`, then
-restores the profile that was active before the batch. Use
-`--performance-mode off` or press `p` to cycle to OFF. Fast mode also uses
-bounded parallel conversion automatically; use `--jobs 1` for sequential
-processing or `--jobs N` to choose a specific worker count. On the benchmark
-sample, `performance` reduced one conversion from about 1.08s to 0.89s.
-
-The integrated workflow cleans normalized parts after the final join, preserves
-source files, and retries with CPU H.264 if automatic GPU encoding fails.
-Use `--concat-only` to reproduce the older one-process concat behavior.
-
-### FPS enhancement: concatenate first, then interpolate once
-
-The single-tool production workflow is `framestudio concat`; direct FPS-only
-processing is available as the `framestudio fps` subcommand:
-
-```sh
-framestudio concat
-```
-
-Select one video and it goes directly to the selected FPS backend: no
-concatenation and no audio transformation are performed; the original audio
-stream is copied into the final MP4. When multiple videos are selected, they
-are concatenated once with audio normalization disabled, then one global FPS
-enhancement pass runs over the temporary master. Use
-`framestudio fps /path/to/video.mp4 --force` only when a separate FPS-only
-workflow is desired. Run `./install.sh` once to install the single
-`framestudio` command into `~/bin`.
-
-During interpolation the console shows a live Pacman-style bar with percent,
-frame count, end-to-end pipeline FPS, elapsed time, and ETA. The displayed
-pipeline FPS includes decoding, RIFE, and delivery encoding; it is not the
-model-only inference FPS from the benchmark. The default backend is corrected
-REAL-Video-Enhancer RIFE 4.26; use `--engine vs-rife` for the VapourSynth path
-or `--engine ffmpeg-minterpolate` for the explicit FFmpeg fallback. When the
-default RVE prerequisites are missing, the command reports the reason and
-selects the FFmpeg fallback automatically.
-
-The RVE backend expects the validated local setup at these paths:
-
-```text
-~/.cache/framestudio-fps/trt/bin/python
-~/.cache/framestudio-fps/REAL-Video-Enhancer
-~/.cache/framestudio-fps/rve-models-pixel-fallback/rife4.26.pkl
-~/.cache/framestudio-fps/rve-shims
-```
-
-Override them with `--rve-root`, `--rve-model`, and `--rve-shims`, or set
-`FRAMESTUDIO_RVE_ROOT`, `FRAMESTUDIO_RVE_MODEL`, and `FRAMESTUDIO_RVE_SHIMS`. RVE output is
-padded or trimmed to the existing rational target-frame policy, so a
-29.97-to-60 conversion preserves the timeline (for example, 900 input frames
-become 1,802 output frames). Constant-frame-rate fractional conversions such
-as 23.976-to-60 use the next safe integer RVE oversampling pass and then
-normalize to the exact target rate with GPU NVENC. Variable-frame-rate input
-remains explicitly unsupported rather than silently changing cadence.
-
-On the RTX 5070 Ti, use a Blackwell-compatible runtime such as PyTorch
-2.10.0+cu128, Torch-TensorRT 2.10.0, and TensorRT 10.14.1.48.post1. Older
-CUDA/PyTorch builds can report that CUDA is available while failing to launch
-`sm_120` kernels; the RVE preflight executes a CUDA probe and falls back
-explicitly when that happens. The adapter also exposes the CUDA 13 and
-TensorRT shared-library directories bundled with the isolated runtime.
-
-Press `Ctrl+C` to cancel safely. The active FFmpeg/RIFE processes are stopped,
-the hidden `.partial` output is deleted, and any temporary multi-input master
-and normalized parts are removed. The source files and any previously completed
-output remain unchanged. Frames are streamed through a pipe rather than stored
-as an intermediate image sequence. The RVE backend uses a temporary encoded
-video inside its private temporary directory so it can remux the original
-audio exactly; that file is removed after success or cancellation. The
-TensorRT engine cache is intentionally kept for faster future runs. A forced
-`SIGKILL` or power loss can prevent cleanup, so inspect `/tmp/framestudio-fps-*`,
-the RVE temporary directories, and hidden `.partial` files if the machine is
-forcibly stopped.
-
-The validated strategy is a two-stage run. First create one compatible
-stream-copy master; then run one global interpolation pass over that master
-using RVE when available or the explicit FFmpeg fallback otherwise. Do not run
-interpolation separately on each input clip, because resetting the 29.97-to-60
-cadence at every clip boundary is slower and can introduce timing drift.
-The integrated RVE path was 2.3x to 2.5x faster than the fallback on the
-one-clip/three-clip benchmark; exact measurements and caveats are recorded in
-[`FPS-ENHANCEMENT-RESEARCH.md`](FPS-ENHANCEMENT-RESEARCH.md).
-
-From the project directory:
-
-```sh
-INPUT_DIR="$HOME/Documents/edit/copy"
-MASTER="$HOME/Documents/edit/copy-concatenated-29.97fps.mp4"
-OUTPUT="$HOME/Documents/edit/copy-concatenated-rife4.26-60fps.mp4"
-
-framestudio concat "$INPUT_DIR" --concat-only --output "$MASTER" --mode auto \
-  --audio-normalization off --performance-mode off --force
-
-# This is the normal integrated command; it concatenates once and uses RVE
-# when available, otherwise the validated FFmpeg fallback.
-framestudio concat "$INPUT_DIR" --engine rve --output "$OUTPUT" \
-  --performance-mode auto --force
-```
-
-For a manual reproduction of the older VapourSynth fallback, first create the
-master with `--concat-only`, then run:
-
-```sh
-INPUT_FRAMES=$(ffprobe -v error -select_streams v:0 \
-  -show_entries stream=nb_frames -of csv=p=0 "$MASTER")
-TARGET_FRAMES=$((INPUT_FRAMES * 2))
-FPS_PYTHON="$HOME/.cache/framestudio-fps/trt/bin/python"
-FPS_SITE="$HOME/.cache/framestudio-fps/trt/lib/python3.13/site-packages"
-FPS_SCRIPT="$HOME/.cache/framestudio-fps/benchmark.vpy"
-TRT_CACHE="$HOME/.cache/framestudio-fps/engines-pixel-fallback"
-BESTSOURCE="$HOME/.cache/framestudio-fps/plugins/usr/lib/python3.14/site-packages/vapoursynth/plugins/libbestsource.so"
-PARTIAL="$OUTPUT.partial.mp4"
-
-SOURCE="$MASTER" MODEL=4.26 TRT_CACHE="$TRT_CACHE" INPUT_FORMAT=RGBH \
-TRT_TORCH_PIXEL=1 BESTSOURCE_PLUGIN="$BESTSOURCE" LIMIT_SECONDS=999999 \
-TARGET_FRAMES="$TARGET_FRAMES" PYTHONPATH="$FPS_SITE" \
-"$FPS_PYTHON" benchmarks/vsrawpipe.py "$FPS_SCRIPT" | \
-ffmpeg -hide_banner -y -f yuv4mpegpipe -i - -i "$MASTER" \
-  -map 0:v:0 -map 1:a:0? -c:v h264_nvenc -preset p1 -rc constqp -qp 18 \
-  -profile:v high -pix_fmt yuv420p -color_range tv -colorspace bt709 \
-  -color_primaries bt709 -color_trc bt709 -c:a copy \
-  -movflags +faststart "$PARTIAL" && mv "$PARTIAL" "$OUTPUT"
-```
-
-`TARGET_FRAMES=$((INPUT_FRAMES * 2))` matches the validated 29.97-to-60
-legacy benchmark policy. The integrated adapter uses rational frame-count
-math and may pad the factor-two RVE output (900 input frames become 1,802
-frames). Keep `TRT_TORCH_PIXEL=1` and the separate
-`engines-pixel-fallback` cache; pure TensorRT FP16 is known to produce grid
-artifacts on this RTX 5070 Ti. The specialized Python 3.13 environment is
-required because the system VSPipe/Python 3.14 installation has an incompatible
-NumPy/VapourSynth ABI. The runner writes progress to stderr and leaves the
-source and concatenated master untouched.
-
-## GPU behavior
-
-`--gpu on` is the default setting, but it affects only the explicit `lossless`
-profile. The fast profile deliberately uses the CPU DNxHR encoder because that
-is the fastest Resolve-compatible path on this system.
-
-For `--profile lossless`, GPU mode attempts CUDA decoding plus the experimental
-Vulkan FFV1 encoder for every supported video codec. The conversion preserves
-decoded pixels exactly; GPU mode changes the processing path, not the lossless
-policy. Audio remains PCM/stream-copy as appropriate.
-
-GPU FFV1 is experimental in FFmpeg. Every GPU conversion is verified, and any
-GPU command failure, missing GPU, or unsupported GPU decoder automatically
-falls back to the CPU FFV1 encoder. Use `--gpu auto` for quiet detection or
-`--gpu off` if a particular source needs the CPU path.
-
-## Replicating or repairing the setup
-
-From the project directory, reinstall the global command with:
-
-```sh
-./install.sh
-```
-
-Check the installed capabilities with:
-
-```sh
-nvidia-smi
-ffmpeg -hide_banner -decoders | grep cuvid
-ffmpeg -hide_banner -encoders | grep -E 'dnxhd|ffv1_vulkan'
-powerprofilesctl get
-framestudio media --dry-run --root ~/Documents/edit
-```
-
-The implementation keeps the source safe by using atomic partial outputs,
-ffprobe verification, automatic GPU-to-CPU fallback for lossless mode, and
-`gio trash` only after successful verification. Performance mode restoration is
-also guarded so a profile changed externally is not overwritten. If the TUI or
-conversion path misbehaves, rerun with
-`framestudio media --profile fast --gpu off --keep-originals`; this gives a
-non-destructive recovery path. Use `--profile lossless --gpu off` to force the
-CPU lossless encoder.
-
-## Install
-
-From this directory:
-
-```sh
-./install.sh
-```
-
-This creates only `~/bin/framestudio`; the requested environment already has
-`~/bin` on `PATH`. Re-running the installer removes obsolete
-`framestudio-*` and `resolve-*` workflow aliases. FFmpeg (`ffmpeg` and
-`ffprobe`) and the GTK 4/PyGObject runtime must be installed for the editor.
-
-## Checks
-
-```sh
-python3 -m py_compile framestudio_media.py tests/test_classification.py
-python3 -m unittest discover -s tests
-./framestudio_media.py --help
-./framestudio_media.py --dry-run --root ~/Documents/edit
-framestudio concat --dry-run ~/Documents/edit/copy
-```
+When a codec, timestamp, runtime, or export policy is unsupported, the
+application reports the reason and preserves the source and last valid output.

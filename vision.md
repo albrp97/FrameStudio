@@ -5,7 +5,7 @@
 
 **Objective ID:** OBJ-001
 **Status:** confirmed
-**Last updated:** 2026-08-21
+**Last updated:** 2026-09-07
 
 ## Overview
 
@@ -18,9 +18,17 @@ timeline. A deterministic CLI and machine-readable project format provide an
 automation surface for Copilot and other agents when the user wants edits or
 exports performed without manually operating the interface.
 
-The first delivery horizon is intentionally narrow: import one video, review
+The first delivery horizon was intentionally narrow: import one video, review
 it in a timeline, split and delete unwanted segments, save and reopen the
 project, and export the result while preserving the original source.
+
+That foundation has since been extended through the approved PHASE-004 through
+PHASE-008 delivery work. The current product also supports mixed-source
+timelines, source-level audio decisions, reusable focus controls, linked
+triplicate composition, optional 60 FPS and upscale enhancement, background
+audio analysis, autosave/recovery, and resumable verified exports. The
+current user-facing contract is documented in [`README.md`](README.md), while
+the phase and ticket records remain the traceable delivery history.
 
 ## Goals
 
@@ -36,24 +44,26 @@ project, and export the result while preserving the original source.
   project inspection and editing.
 - Preserve the existing media-preparation, concatenation, and FPS scripts
   while the editor is developed.
-- Provide a foundation that can later support multiple clips, mixed media,
-  audio handling, composition, and frame-rate enhancement without committing
-  the first version to those features.
+- Keep the editor model extensible without turning it into a full
+  professional NLE.
 
-## Future Direction (Deferred)
+## Original Future Direction and Remaining Work
 
 The broader product intent is preserved in
 [`docs/specs/future-product-direction.md`](docs/specs/future-product-direction.md).
-It includes multi-video timelines with mixed media parameters, source-level
-audio handling, reusable segment modifications, linked triplicate portrait and
-focused-action layouts with shared X/Y/zoom controls, efficient smart
-rendering, automatic 60 FPS enhancement, and deterministic agent operations.
-These are future development context, not first-horizon implementation scope.
+That record was created before the later phases and includes capabilities that
+are now delivered as well as capabilities that remain future work. Consult
+the closed phase and feature indexes for current implementation status.
+Remaining direction includes multiple tracks, advanced audio editing,
+keyframed or animated transforms, richer compositor behavior, broader
+packaging, and other features beyond the focused editor contract.
 
-## Non-Goals (Out of Scope)
+## Historical First-Horizon Boundaries
 
-The following items are deferred from the first horizon and are captured for
-future planning in the future product direction record.
+The following list records what was intentionally excluded from the original
+first horizon. Most of the listed editor capabilities were later delivered
+through approved scope extensions; the list is retained to explain the
+sequencing decision.
 
 - Reimplementing DaVinci Resolve or becoming a general-purpose NLE.
 - Cloud storage, accounts, collaboration, telemetry, or multi-user workflows.
@@ -66,6 +76,15 @@ future planning in the future product direction record.
 - Automatic FPS enhancement to 60 FPS in the first horizon.
 - Advanced effects, color grading, transitions, titles, captions, or
   compositor features in the first horizon.
+
+## Current Non-Goals
+
+- Multiple video or audio tracks and timeline mixing beyond the current
+  composed sequence model.
+- Keyframes, animated transforms, advanced transitions, titles, captions,
+  color grading, and full compositor behavior.
+- Cloud storage, accounts, collaboration, telemetry, and non-Linux support.
+- Replacing or removing the existing compatibility workflows.
 
 ## Key Constraints
 
@@ -104,9 +123,9 @@ future planning in the future product direction record.
   operations explicitly rather than silently falling back to an unsafe result.
 - Release or merge evidence must distinguish automated checks from manual
   playback/export evidence.
-- Exact GUI runtime, packaging method, project schema, and playback backend
-  are unresolved and must be decided through the next planning/architecture
-  step.
+- The GUI runtime, project schema, and playback backend are confirmed in
+  [`docs/specs/editor-foundation-decision.md`](docs/specs/editor-foundation-decision.md).
+  Packaging beyond the local Linux setup remains future work.
 
 ## Architectural Decisions
 
@@ -143,9 +162,9 @@ projects remain supported as compatibility surfaces while users migrate.
 
 ## Success Criteria
 
-- The user can complete the first-horizon workflow without opening DaVinci
-  Resolve: import one source, play/seek it, split and delete segments, save,
-  reopen, and export.
+- The user can complete the focused editing workflow without opening DaVinci
+  Resolve: import sources, play/seek them, edit segments, save/reopen, and
+  export safely.
 - Reopening a saved project restores the same source reference and edit
   decisions without altering the original media.
 - Eligible edits use a validated stream-copy/smart-render path and report when
@@ -154,6 +173,8 @@ projects remain supported as compatibility surfaces while users migrate.
   not exposed as complete until validation succeeds.
 - A CLI or agent can inspect and apply the same basic edit operations through
   the project representation.
+- A cancelled or failed export can resume validated work without repeating
+  completed stages.
 - Existing scripts and their baseline tests continue to work while the editor
   is introduced.
 - The resulting workflow is measurably faster and simpler for the user's
