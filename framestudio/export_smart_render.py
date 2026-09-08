@@ -756,12 +756,22 @@ def _segment_preparation_progress(
     start_percent: float,
     end_percent: float,
     stage: str,
+    progress_offset_seconds: float,
+    progress_total_duration_seconds: float,
+    segment_duration_seconds: float,
 ) -> ExportProgressCallback | None:
     if callback is None:
         return None
 
     def forward(progress: ExportProgress) -> None:
-        local_fraction = max(0.0, min(1.0, progress.percent / 30.0))
+        scaled_fraction = max(0.0, min(1.0, progress.percent / 30.0))
+        current_seconds = scaled_fraction * progress_total_duration_seconds
+        local_fraction = (
+            (current_seconds - progress_offset_seconds) / segment_duration_seconds
+            if segment_duration_seconds > 0.0
+            else 1.0
+        )
+        local_fraction = max(0.0, min(1.0, local_fraction))
         callback(
             replace(
                 progress,
@@ -844,6 +854,15 @@ def prepare_enhanced_sources(
         cut_path = probe.path
         cut_probe = probe
         selected_segment = segment
+        preparation_progress = _segment_preparation_progress(
+            progress_callback,
+            start_percent=30.0 * segment_index / total_segments,
+            end_percent=30.0 * (segment_index + 1) / total_segments,
+            stage=f"preparing segment {segment_index + 1}/{total_segments}",
+            progress_offset_seconds=progress_offset,
+            progress_total_duration_seconds=progress_total,
+            segment_duration_seconds=segment.duration_seconds,
+        )
         if (
             not full_selection
             and not has_visual_modifications
@@ -873,12 +892,7 @@ def prepare_enhanced_sources(
                     include_audio=policy.audio_stream_present,
                     ffmpeg_path=ffmpeg_path,
                     ffprobe_path=ffprobe_path,
-                    progress_callback=_segment_preparation_progress(
-                        progress_callback,
-                        start_percent=30.0 * segment_index / total_segments,
-                        end_percent=30.0 * (segment_index + 1) / total_segments,
-                        stage=f"preparing segment {segment_index + 1}/{total_segments}",
-                    ),
+                    progress_callback=preparation_progress,
                     started=started,
                     progress_offset_seconds=progress_offset,
                     progress_total_duration_seconds=progress_total,
@@ -984,12 +998,7 @@ def prepare_enhanced_sources(
                     preserve_resolution=use_preserve_resolution,
                     content_width=content_width,
                     content_height=content_height,
-                    progress_callback=_segment_preparation_progress(
-                        progress_callback,
-                        start_percent=30.0 * segment_index / total_segments,
-                        end_percent=30.0 * (segment_index + 1) / total_segments,
-                        stage=f"preparing segment {segment_index + 1}/{total_segments}",
-                    ),
+                    progress_callback=preparation_progress,
                     started=started,
                     progress_offset_seconds=progress_offset,
                     progress_total_duration_seconds=progress_total,

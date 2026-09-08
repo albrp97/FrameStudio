@@ -363,7 +363,8 @@ make quality PYTHON=.venv/bin/python
 The full test suite uses Python `unittest`. Quality checks use the pinned
 Ruff, mypy, Bandit, pip-audit, jscpd, dependency, and churn tools configured
 by the repository. Generated static-analysis reports belong under
-`evidence/static-analysis/`.
+`evidence/static-analysis/`. Duplication keeps an approved baseline and gates
+only newly introduced clone findings.
 
 The GitHub Actions quality workflow is defined in
 [`.github/workflows/quality.yml`](.github/workflows/quality.yml). The local

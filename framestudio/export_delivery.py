@@ -17,6 +17,7 @@ from .export_interpolation import execute_enhanced_export, probe_frame_count
 from .export_process import (
     emit_export_progress,
     expected_export_frames,
+    monotonic_progress_callback,
     partial_path,
     prepare_export_sources,
     publish_verified_export,
@@ -326,6 +327,7 @@ def execute_export(
 ) -> Path:
     if cancel_event is not None and cancel_event.is_set():
         raise ExportExecutionError("Export cancelled")
+    progress_callback = monotonic_progress_callback(progress_callback)
     if plan.route == "enhanced":
         return execute_enhanced_export(
             plan,

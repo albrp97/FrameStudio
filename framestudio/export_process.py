@@ -7,6 +7,7 @@ import threading
 import time
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
 from typing import Protocol
@@ -94,6 +95,27 @@ def emit_export_progress(
             eta_seconds=eta,
         )
     )
+
+
+def monotonic_progress_callback(
+    callback: ExportProgressCallback | None,
+) -> ExportProgressCallback | None:
+    if callback is None:
+        return None
+    last_percent = 0.0
+    last_frame = 0
+
+    def forward(progress: ExportProgress) -> None:
+        nonlocal last_frame, last_percent
+        percent = max(last_percent, progress.percent)
+        frame = max(last_frame, progress.frame)
+        last_percent = percent
+        last_frame = frame
+        if percent != progress.percent or frame != progress.frame:
+            progress = replace(progress, percent=percent, frame=frame)
+        callback(progress)
+
+    return forward
 
 
 def prepare_export_sources(
