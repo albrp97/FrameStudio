@@ -57,7 +57,7 @@ editor recovery and resumable-export delivery.
 | `FPS-ENHANCEMENT-RESEARCH.md` | Current FPS/VFI research, local GPU findings, and RIFE/RVE recommendations. | Existing research. |
 | `docs/specs/future-product-direction.md` | Historical record of broader multi-video editing, segment operations, audio, triplicate composition, render, FPS, project, and CLI intent. | Partly delivered; remaining items are future context, not an implementation backlog. |
 | `.github/copilot-instructions.md` | Repository-neutral AIDD operating guidance. | Existing guidance; preserved and not duplicated in `AGENTS.md`. |
-| `.github/README.md` | AIDD workflow and artifact inventory. | Existing guidance. |
+| `.github/README.md` | Short FrameStudio product pointer for the GitHub configuration directory. | Existing project guidance; the full product guide is `README.md`. |
 | `.github/aidd-map.md` | AIDD artifact inventory and workflow map. | Existing guidance; not the configured repository map. |
 
 ## Configuration and Automation
