@@ -65,6 +65,63 @@ class MixedSourceModelTests(unittest.TestCase):
                 [source.source_id for source in restored.sources],
             )
 
+    def test_append_sources_migrates_one_source_edits_and_round_trips(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first_path = root / "first.mp4"
+            second_path = root / "second.mp4"
+            first_path.write_bytes(b"first")
+            second_path.write_bytes(b"second")
+            project = Project.create(first_path, metadata(4.0, 1920, 1080, "24/1"))
+            project.timeline.split(1.0)
+            deleted = project.timeline.segments[1]
+            project.timeline.set_deleted(deleted.segment_id, True)
+            project.set_playhead(0.5)
+            original_ids = [segment.segment_id for segment in project.timeline.segments]
+
+            project.append_sources(
+                (
+                    Project.create(
+                        second_path,
+                        metadata(3.0, 1080, 1920, "30/1"),
+                    ).source,
+                )
+            )
+
+            self.assertEqual(project.schema_version, 3)
+            self.assertEqual(project.duration_seconds, 7.0)
+            self.assertEqual(project.playhead_seconds, 0.5)
+            self.assertEqual(len(project.sources), 2)
+            self.assertEqual(
+                [segment.segment_id for segment in project.timeline.blocks[:2]],
+                original_ids,
+            )
+            self.assertEqual(
+                [segment.source_id for segment in project.timeline.blocks[:2]],
+                [project.sources[0].source_id] * 2,
+            )
+            self.assertTrue(project.timeline.blocks[1].deleted)
+            self.assertEqual(project.timeline.blocks[-1].source_id, project.sources[1].source_id)
+            self.assertEqual(project.timeline.blocks[-1].timeline_start, 4.0)
+            self.assertEqual(project.timeline.blocks[-1].timeline_end, 7.0)
+            self.assertEqual(project.timeline.edited_duration_seconds, 4.0)
+
+            restored = Project.from_dict(project.to_dict())
+            self.assertEqual(restored.to_dict(), project.to_dict())
+
+    def test_append_sources_rejects_duplicate_paths_without_mutating_project(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first_path = root / "first.mp4"
+            first_path.write_bytes(b"first")
+            project = Project.create(first_path, metadata(4.0, 1920, 1080, "24/1"))
+            before = project.to_dict()
+
+            with self.assertRaisesRegex(ProjectValidationError, "already belongs"):
+                project.append_sources((project.source,))
+
+            self.assertEqual(project.to_dict(), before)
+
     def test_relink_requires_explicit_identity_and_matching_media_metadata(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

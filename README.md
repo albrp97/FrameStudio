@@ -119,7 +119,7 @@ python3 framestudio.py --help
 
 ## Open the editor
 
-Start with an empty project and choose videos in the interface:
+Start with an empty project and add videos in the interface:
 
 ```sh
 framestudio
@@ -147,19 +147,22 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 
 ## Edit in the GTK interface
 
-1. Select one or more local videos.
-2. Wait for metadata probing to attach the project. Audio analysis continues
+1. Click **Add clips** and choose one or more local videos.
+2. When a project is already open, **Add clips** appends the new videos to the
+   existing edited timeline. It does not replace the saved cuts, deleted
+   segments, focus settings, or triplicate settings.
+3. Wait for metadata probing to attach or append the clips. Audio analysis continues
    in the background.
-3. Play, pause, seek, or use `Left` and `Right` for frame navigation.
-4. Press `B` to split at the playhead.
-5. Select segments with click, `Ctrl`-click, or `Shift`-click.
-6. Press `Delete` to toggle a selected segment between deleted and included.
-7. Move selected segments with `Shift+Left` and `Shift+Right`.
-8. Copy and paste segments with `Ctrl+C` and `Ctrl+V`.
-9. Use Focus and Triplicate controls when a segment needs a different framing.
-10. Save a normal project when a durable named project file is needed.
-11. Use Recover autosave after an unexpected exit.
-12. Review the export plan, enhancement counts, and destination before
+4. Play, pause, seek, or use `Left` and `Right` for frame navigation.
+5. Press `B` to split at the playhead.
+6. Select segments with click, `Ctrl`-click, or `Shift`-click.
+7. Press `Delete` to toggle a selected segment between deleted and included.
+8. Move selected segments with `Shift+Left` and `Shift+Right`.
+9. Copy and paste segments with `Ctrl+C` and `Ctrl+V`.
+10. Use Focus and Triplicate controls when a segment needs a different framing.
+11. Save a normal project when a durable named project file is needed.
+12. Use Recover autosave after an unexpected exit.
+13. Review the export plan, enhancement counts, and destination before
     starting the render.
 
 ### Timeline controls
@@ -198,9 +201,11 @@ When `XDG_STATE_HOME` is not set, FrameStudio uses:
 ~/.local/state/framestudio/autosave.framestudio.json
 ```
 
-There is one current autosave. Loading another project or attaching a new
-source set replaces it. Autosave is separate from the normal Save project
-destination.
+There is one current autosave. Opening another project replaces it, while
+adding clips updates the current autosave with the expanded source set.
+Autosave is separate from the normal Save project destination. To render the
+same edited project with different additional videos, reopen the saved base
+project before each new **Add clips** operation.
 
 ## Export and resume
 
@@ -259,6 +264,7 @@ Commands return JSON on stdout and structured errors on stderr.
 ```sh
 framestudio import ~/Videos/landscape.mp4 ~/Videos/portrait.mp4 \
   --project ~/Videos/mixed.framestudio.json
+framestudio add ~/Videos/edit.framestudio.json ~/Videos/next-source.mp4
 framestudio inspect ~/Videos/mixed.framestudio.json
 framestudio duration ~/Videos/mixed.framestudio.json
 framestudio analyze-audio ~/Videos/mixed.framestudio.json

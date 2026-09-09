@@ -35,7 +35,7 @@ code, create speculative planning children, or change unrelated project files.
 Before writing anything:
 
 1. Inspect `.github/aidd-config.yml`, `.github/copilot-instructions.md`,
-   `.github/README.md`, `.github/aidd-map.md`, and the repository's existing
+   the root `README.md`, `.github/aidd-map.md`, and the repository's existing
    planning sources, including `docs/`, `docs/planning/`, `docs/specs/`,
    `plan/`, `tickets/`, issue exports, and project-board exports when present.
 2. Identify the current source of truth and detect whether the repository is

@@ -6,7 +6,13 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .app_helpers import _metadata_float, editing_is_locked, format_audio_decisions
+from .app_helpers import (
+    MAX_SOURCES_PER_PROJECT,
+    _metadata_float,
+    editing_is_locked,
+    format_audio_decisions,
+    validate_source_selection,
+)
 from .audio import (
     AUDIO_POLICY_VERSION,
     AudioAnalysisCancelled,
@@ -56,7 +62,8 @@ def _source_load_progress(
     if generation != getattr(window, "_source_load_generation", generation):
         return False
     percentage = round(index * 100 / total)
-    window._set_status(f"Loading clip {index}/{total} ({percentage}%)")
+    action = "Adding" if getattr(window, "project", None) is not None else "Loading"
+    window._set_status(f"{action} clip {index}/{total} ({percentage}%)")
     return False
 
 
@@ -78,13 +85,23 @@ def _build_source_project(
 def _load_source_blocking(window: Any, selected_paths: tuple[Path, ...]) -> bool:
     try:
         project = _build_source_project(selected_paths)
-        analyze_project_audio(project)
+        current_project = getattr(window, "project", None)
+        if current_project is None:
+            analyze_project_audio(project)
+            status_prefix = "Loaded"
+            project_path = None
+        else:
+            current_project.append_sources(project.sources or (project.source,))
+            ensure_project_audio_analysis(current_project)
+            project = current_project
+            status_prefix = "Added"
+            project_path = getattr(window, "project_path", None)
     except (MediaProbeError, ProjectValidationError) as error:
         window._show_error(str(error))
         return False
-    attach_project(window, project, None)
+    attach_project(window, project, project_path)
     names = ", ".join(path.name for path in selected_paths)
-    window._set_status(f"Loaded source video(s): {names} (project not saved)")
+    window._set_status(f"{status_prefix} source video(s): {names} (project not saved)")
     return False
 
 
@@ -151,12 +168,24 @@ def _finish_source_load(
             window._show_error(error_message or "Source loading failed")
             return False
         try:
-            attach_project(window, project, None)
+            current_project = getattr(window, "project", None)
+            if current_project is None:
+                attach_project(window, project, None)
+                status_prefix = "Loaded"
+            else:
+                current_project.append_sources(project.sources or (project.source,))
+                project = current_project
+                attach_project(
+                    window,
+                    project,
+                    getattr(window, "project_path", None),
+                )
+                status_prefix = "Added"
         except (MediaProbeError, ProjectValidationError, ValueError) as error:
             window._show_error(str(error))
             return False
         names = ", ".join(path.name for path in selected_paths)
-        window._set_status(f"Loaded source video(s): {names} (project not saved)")
+        window._set_status(f"{status_prefix} source video(s): {names} (project not saved)")
         should_analyze = glib is not None
         return False
     finally:
@@ -590,6 +619,17 @@ def load_source(
     if not selected_paths:
         window._show_error("At least one source is required")
         return False
+    current_project = getattr(window, "project", None)
+    existing_source_count = 0 if current_project is None else len(current_project.sources)
+    try:
+        selected_paths = validate_source_selection(
+            selected_paths,
+            max_sources=MAX_SOURCES_PER_PROJECT,
+            existing_source_count=existing_source_count,
+        )
+    except ValueError as error:
+        window._show_error(str(error))
+        return False
     if getattr(window, "_source_load_in_progress", False):
         window._set_status("Source loading is already in progress")
         return False
@@ -598,7 +638,8 @@ def load_source(
     generation = int(getattr(window, "_source_load_generation", 0)) + 1
     window._source_load_generation = generation
     window._source_load_in_progress = True
-    window._set_status(f"Loading clip 1/{len(selected_paths)} (0%)")
+    action = "Adding" if getattr(window, "project", None) is not None else "Loading"
+    window._set_status(f"{action} clip 1/{len(selected_paths)} (0%)")
     window._update_segment_controls()
     worker = threading.Thread(
         target=_load_source_worker,
@@ -753,7 +794,11 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
     )
     active_segments = window.segment_timeline.active_blocks()
     if not active_segments:
-        window._stop_backend()
+        stop_backend = getattr(window, "_stop_backend_nonblocking", None)
+        if callable(stop_backend):
+            stop_backend()
+        else:
+            window._stop_backend()
         window.audio_status_label.set_text(
             format_audio_decisions(
                 window.project,

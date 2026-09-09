@@ -68,6 +68,7 @@ from .app_playback import (
     start_smoke_test,
     step_playhead,
     stop_backend,
+    stop_backend_nonblocking,
     update_playback_controls,
 )
 from .app_project import (
@@ -251,7 +252,7 @@ def run_gui(
             if editing_is_locked(self):
                 return
             dialog = Gtk.FileDialog.new()
-            dialog.set_title("Select source video(s)")
+            dialog.set_title("Add clips to the project")
             dialog.open_multiple(self, None, self._on_source_dialog_done, None)
 
         def _on_source_dialog_done(self, dialog, result, _data) -> None:
@@ -278,6 +279,11 @@ def run_gui(
                 selected = validate_source_selection(
                     selected_paths,
                     max_sources=MAX_SOURCES_PER_PROJECT,
+                    existing_source_count=(
+                        0
+                        if self.project is None
+                        else len(self.project.sources or (self.project.source,))
+                    ),
                 )
             except ValueError as error:
                 self._show_error(str(error))
@@ -450,6 +456,9 @@ def run_gui(
 
         def _stop_backend(self) -> None:
             stop_backend(self)
+
+        def _stop_backend_nonblocking(self) -> None:
+            stop_backend_nonblocking(self)
 
         def _on_play_clicked(self, _button) -> None:
             on_play_clicked(self, _button)

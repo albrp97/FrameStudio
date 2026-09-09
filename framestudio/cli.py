@@ -180,21 +180,15 @@ def _project_result(
     return success_payload(command, data)
 
 
-def _handle_import(args: argparse.Namespace) -> dict[str, Any]:
-    sources = tuple(path.expanduser() for path in args.source)
-    destination = args.output.expanduser()
-    if destination.resolve() in {source.resolve() for source in sources}:
-        raise CliError(
-            "invalid_arguments",
-            "Project destination must differ from every source video",
-            exit_code=CLI_EXIT_INVALID,
-        )
+def _create_project_from_cli_sources(
+    sources: tuple[Path, ...],
+    *,
+    ffprobe_path: str,
+) -> Project:
     try:
         if len(sources) == 1:
-            project = create_project_from_source(sources[0], ffprobe_path=args.ffprobe)
-        else:
-            project = create_project_from_sources(sources, ffprobe_path=args.ffprobe)
-        analyze_project_audio(project)
+            return create_project_from_source(sources[0], ffprobe_path=ffprobe_path)
+        return create_project_from_sources(sources, ffprobe_path=ffprobe_path)
     except MediaProbeError as error:
         raise CliError(
             "media_probe",
@@ -209,6 +203,19 @@ def _handle_import(args: argparse.Namespace) -> dict[str, Any]:
             str(error),
             exit_code=CLI_EXIT_INVALID,
         ) from error
+
+
+def _handle_import(args: argparse.Namespace) -> dict[str, Any]:
+    sources = tuple(path.expanduser() for path in args.source)
+    destination = args.output.expanduser()
+    if destination.resolve() in {source.resolve() for source in sources}:
+        raise CliError(
+            "invalid_arguments",
+            "Project destination must differ from every source video",
+            exit_code=CLI_EXIT_INVALID,
+        )
+    project = _create_project_from_cli_sources(sources, ffprobe_path=args.ffprobe)
+    analyze_project_audio(project)
     saved = _save_project_for_cli(project, destination, destination)
     return _project_result(
         "import",
@@ -216,6 +223,25 @@ def _handle_import(args: argparse.Namespace) -> dict[str, Any]:
         saved,
         include_paths=args.full_paths,
         operation={"saved": True},
+    )
+
+
+def _handle_add(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    sources = tuple(path.expanduser() for path in args.source)
+    incoming = _create_project_from_cli_sources(sources, ffprobe_path=args.ffprobe)
+    incoming_sources = incoming.sources or (incoming.source,)
+    project.append_sources(incoming_sources)
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "add",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "added_source_ids": [source.source_id for source in incoming_sources],
+            "source_count": len(project.sources or (project.source,)),
+        },
     )
 
 
@@ -867,6 +893,7 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     handlers: dict[str, Callable[[argparse.Namespace], dict[str, Any]]] = {
         "inspect": _handle_inspect,
         "import": _handle_import,
+        "add": _handle_add,
         "analyze-audio": _handle_analyze_audio,
         "move": _handle_move,
         "copy": _handle_copy,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from .app_export import request_close_after_export
@@ -22,11 +23,30 @@ from .playback import PlaybackState
 from .ui import format_duration
 
 
-def stop_backend(window: Any) -> None:
-    if window.backend is not None:
-        window.backend.close()
+def stop_backend(window: Any, *, asynchronous: bool = False) -> None:
+    backend = window.backend
+    window._playback_generation = int(getattr(window, "_playback_generation", 0)) + 1
     window.backend = None
     window.controller = None
+    if backend is None:
+        return
+    if not asynchronous:
+        backend.close()
+        return
+
+    cleanup = threading.Thread(
+        target=backend.close,
+        name="framestudio-editor-playback-cleanup",
+        daemon=True,
+    )
+    try:
+        cleanup.start()
+    except RuntimeError:
+        backend.close()
+
+
+def stop_backend_nonblocking(window: Any) -> None:
+    stop_backend(window, asynchronous=True)
 
 
 def on_play_clicked(window: Any, _button: Any) -> None:

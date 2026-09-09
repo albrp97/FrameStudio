@@ -230,6 +230,48 @@ class EditorCompositionTests(unittest.TestCase):
             start_analysis.assert_called_once_with(window, project, glib)
             self.assertFalse(window._source_load_in_progress)
 
+    def test_source_load_appends_to_existing_project_without_replacing_edited_timeline(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            existing = make_project(root)
+            existing.timeline.split(4.0)
+            deleted_id = existing.timeline.segments[1].segment_id
+            existing.timeline.set_deleted(deleted_id, True)
+            incoming_path = root / "added.mp4"
+            incoming_path.write_bytes(b"added")
+            incoming = Project.create(incoming_path, metadata(3.0))
+            project_path = root / "edit.framestudio.json"
+            window = SimpleNamespace(
+                _source_load_generation=1,
+                _source_load_in_progress=True,
+                project=existing,
+                project_path=project_path,
+                _show_error=MagicMock(),
+                _set_status=MagicMock(),
+                _update_segment_controls=MagicMock(),
+            )
+
+            with patch("framestudio.app_project.attach_project") as attach:
+                self.assertFalse(
+                    _finish_source_load(
+                        window,
+                        1,
+                        (incoming_path,),
+                        incoming,
+                        None,
+                    )
+                )
+
+            attach.assert_called_once_with(window, existing, project_path)
+            self.assertEqual(len(existing.sources), 2)
+            self.assertEqual(existing.timeline.blocks[0].source_id, existing.sources[0].source_id)
+            self.assertTrue(existing.timeline.blocks[1].deleted)
+            self.assertEqual(existing.timeline.blocks[-1].source_id, existing.sources[1].source_id)
+            window._show_error.assert_not_called()
+            window._set_status.assert_called_once_with(
+                "Added source video(s): added.mp4 (project not saved)",
+            )
+
     def test_background_audio_analysis_applies_each_source_and_finishes(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -1137,6 +1179,61 @@ class EditorCompositionTests(unittest.TestCase):
                 old_backend_end()
 
             self.assertEqual(window.controller.snapshot().state, PlaybackState.PLAYING)
+
+    def test_deleting_final_clip_returns_before_backend_cleanup_finishes(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            segment_id = project.timeline.segments[0].segment_id
+            close_started = threading.Event()
+            release_close = threading.Event()
+            close_finished = threading.Event()
+
+            class BlockingBackend:
+                def close(self):
+                    close_started.set()
+                    release_close.wait(timeout=2.0)
+                    close_finished.set()
+
+            window = SimpleNamespace(
+                _export_in_progress=False,
+                _source_load_in_progress=False,
+                _set_status=MagicMock(),
+                _show_error=MagicMock(),
+                project=project,
+                segment_timeline=project.timeline,
+                selected_segment_id=segment_id,
+                selected_segment_ids=(segment_id,),
+                backend=BlockingBackend(),
+                controller=None,
+                timeline_canvas=MagicMock(),
+                audio_status_label=MagicMock(),
+                _stop_backend_nonblocking=lambda: stop_backend(window, asynchronous=True),
+                _update_selected_clip_label=MagicMock(),
+                _update_playback_controls=MagicMock(),
+                _update_segment_controls=MagicMock(),
+                _autosave_current_project=MagicMock(),
+            )
+            window._refresh_timeline = lambda selected=None: refresh_timeline(window, selected)
+
+            deletion_finished = threading.Event()
+
+            def delete_final_clip():
+                app_timeline_actions.on_delete_segment_clicked(window, None)
+                deletion_finished.set()
+
+            deletion_thread = threading.Thread(target=delete_final_clip, daemon=True)
+            deletion_thread.start()
+            try:
+                self.assertTrue(deletion_finished.wait(timeout=0.5))
+                self.assertTrue(close_started.wait(timeout=0.5))
+                self.assertIsNone(window.backend)
+                self.assertIsNone(window.controller)
+                self.assertEqual(project.timeline.edited_duration_seconds, 0.0)
+            finally:
+                release_close.set()
+                deletion_thread.join(timeout=1.0)
+
+            self.assertTrue(close_finished.wait(timeout=1.0))
 
     def test_transform_contract_clamps_interactive_values_and_rejects_invalid_state(self):
         transform = VisualTransform.clamped(

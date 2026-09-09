@@ -3,6 +3,7 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from framestudio.cli import cli_main
 from framestudio.model import Project
@@ -65,6 +66,44 @@ class MixedSourceCliTests(unittest.TestCase):
                     for block in payload["project"]["timeline"]["blocks"]
                 )
             )
+
+    def test_add_appends_source_without_replacing_existing_cuts(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first_path = root / "one.mp4"
+            first_path.write_bytes(b"one")
+            project = Project.create(first_path, metadata(4.0, 320, 180, "24/1"))
+            project.timeline.split(2.0)
+            deleted_id = project.timeline.blocks[1].segment_id
+            project.timeline.set_deleted(deleted_id, True)
+            project_path = root / "edit.framestudio.json"
+            save_project(project, project_path)
+            added_path = root / "added.mp4"
+            added_path.write_bytes(b"added")
+            incoming = Project.create(added_path, metadata(3.0, 180, 320, "30/1"))
+
+            with patch(
+                "framestudio.cli.create_project_from_source",
+                return_value=incoming,
+            ):
+                result, stdout, stderr = run_cli(
+                    "add",
+                    str(project_path),
+                    str(added_path),
+                )
+
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["command"], "add")
+            self.assertEqual(payload["operation"]["source_count"], 2)
+            self.assertEqual(
+                payload["operation"]["added_source_ids"],
+                [incoming.source.source_id],
+            )
+            restored = load_project(project_path)
+            self.assertTrue(restored.timeline.find(deleted_id).deleted)
+            self.assertEqual(restored.timeline.blocks[-1].source_id, restored.sources[1].source_id)
 
     def test_move_and_paste_are_deterministic_and_persisted(self):
         with TemporaryDirectory() as temporary_directory:

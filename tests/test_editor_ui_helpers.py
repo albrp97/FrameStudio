@@ -63,6 +63,22 @@ class EditorUiHelperTests(unittest.TestCase):
             (Path("/tmp/one.mp4"), Path("/tmp/two.mp4")),
         )
 
+    def test_source_selection_accounts_for_existing_project_sources(self):
+        selected = validate_source_selection(
+            [Path("/tmp/one.mp4")],
+            max_sources=3,
+            existing_source_count=2,
+        )
+
+        self.assertEqual(selected, (Path("/tmp/one.mp4"),))
+
+        with self.assertRaisesRegex(ValueError, "at most one"):
+            validate_source_selection(
+                [Path("/tmp/one.mp4"), Path("/tmp/two.mp4")],
+                max_sources=3,
+                existing_source_count=2,
+            )
+
     def test_timeline_scroll_moves_the_playhead_in_both_directions(self):
         self.assertEqual(timeline_scroll_position(10.0, -1.0, 60.0), 11.0)
         self.assertEqual(timeline_scroll_position(10.0, 1.0, 60.0), 9.0)

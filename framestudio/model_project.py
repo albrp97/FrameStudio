@@ -161,6 +161,133 @@ class Project:
     ) -> Project:
         return cls.create_multi(entries, project_id, frame_rate=frame_rate)
 
+    def append_sources(self, sources: Sequence[SourceReference]) -> tuple[SourceReference, ...]:
+        incoming = tuple(sources)
+        if not incoming:
+            raise ProjectValidationError("At least one source is required")
+        if any(not isinstance(source, SourceReference) for source in incoming):
+            raise ProjectValidationError("Appended sources must be SourceReference values")
+
+        existing_sources = tuple(self.sources or (self.source,))
+        existing_ids = {source.source_id for source in existing_sources}
+        existing_paths = {Path(source.path).expanduser().resolve() for source in existing_sources}
+        incoming_ids: set[str] = set()
+        incoming_paths: set[Path] = set()
+        for source in incoming:
+            path = Path(source.path).expanduser().resolve()
+            if path in existing_paths:
+                raise ProjectValidationError(
+                    f"Source path already belongs to this project: {path.name}"
+                )
+            if path in incoming_paths:
+                raise ProjectValidationError(
+                    f"Duplicate source path cannot be appended: {path.name}"
+                )
+            if source.source_id in existing_ids or source.source_id in incoming_ids:
+                raise ProjectValidationError(
+                    f"Duplicate source_id cannot be appended: {source.source_id}"
+                )
+            duration = source.metadata.get("duration_seconds")
+            if not isinstance(duration, (int, float)) or isinstance(duration, bool):
+                raise ProjectValidationError(
+                    f"Source metadata needs duration_seconds: {source.source_id}"
+                )
+            if _finite_float(duration, "Source duration") <= 0:
+                raise ProjectValidationError("Source duration must be greater than zero")
+            incoming_ids.add(source.source_id)
+            incoming_paths.add(path)
+
+        timeline = self.timeline
+        existing_blocks: tuple[Segment, ...]
+        position = timeline.timeline_duration_seconds
+        if self.schema_version == ONE_SOURCE_SCHEMA_VERSION:
+            original_source_id = existing_sources[0].source_id
+            migrated_blocks: list[Segment] = []
+            position = 0.0
+            for block in timeline.segment_items:
+                migrated_blocks.append(
+                    Segment(
+                        segment_id=block.segment_id,
+                        start_seconds=block.start_seconds,
+                        end_seconds=block.end_seconds,
+                        deleted=block.deleted,
+                        source_id=original_source_id,
+                        timeline_start_seconds=position,
+                        timeline_end_seconds=position + block.duration_seconds,
+                        state=block.state,
+                        block_id=block.block_id,
+                        color_index=block.color_index,
+                        visual_transform=block.visual_transform,
+                        triplicate=block.triplicate,
+                    )
+                )
+                position += block.duration_seconds
+            existing_blocks = tuple(migrated_blocks)
+        else:
+            existing_blocks = timeline.blocks
+
+        source_durations = {
+            source.source_id: _finite_float(
+                source.metadata.get("duration_seconds"),
+                f"Source duration for {source.source_id}",
+            )
+            for source in existing_sources
+        }
+        appended_blocks: list[Segment] = []
+        for source in incoming:
+            duration = source_durations.setdefault(
+                source.source_id,
+                _finite_float(
+                    source.metadata.get("duration_seconds"),
+                    f"Source duration for {source.source_id}",
+                ),
+            )
+            appended_blocks.append(
+                Segment.create(
+                    0.0,
+                    duration,
+                    source_id=source.source_id,
+                    timeline_start_seconds=position,
+                    timeline_end_seconds=position + duration,
+                )
+            )
+            position += duration
+
+        combined_sources = existing_sources + incoming
+        combined_timeline = SegmentTimeline.from_blocks(
+            existing_blocks + tuple(appended_blocks),
+            duration_seconds=position,
+            source_durations=source_durations,
+            timebase=timeline.timebase,
+            frame_rate=timeline.frame_rate,
+            ripple=timeline.ripple,
+        )
+        combined_settings = deepcopy(self.source_settings)
+        for source in incoming:
+            combined_settings[source.source_id] = {
+                "audio": pending_audio_decision(source).to_dict(),
+            }
+
+        candidate = type(self)(
+            project_id=self.project_id,
+            source=combined_sources[0],
+            duration_seconds=position,
+            playhead_seconds=self.playhead_seconds,
+            schema_version=SCHEMA_VERSION,
+            segment_timeline=combined_timeline,
+            sources=combined_sources,
+            source_settings=combined_settings,
+            output_settings=deepcopy(self.output_settings),
+            composition_version=self.composition_version,
+        )
+        self.schema_version = candidate.schema_version
+        self.sources = candidate.sources
+        self.source = candidate.source
+        self.source_settings = candidate.source_settings
+        self.segment_timeline = candidate.segment_timeline
+        self.duration_seconds = candidate.duration_seconds
+        return incoming
+
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> Project:
         if not isinstance(value, Mapping):

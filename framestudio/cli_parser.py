@@ -57,6 +57,19 @@ def build_cli_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="include absolute local paths in output",
     )
+    add_parser = commands.add_parser(
+        "add",
+        help="append one or more source videos to an existing project",
+    )
+    add_parser.add_argument("project", type=Path)
+    add_parser.add_argument("source", type=Path, nargs="+")
+    add_parser.add_argument("--output", type=Path)
+    add_parser.add_argument("--ffprobe", default="ffprobe")
+    add_parser.add_argument(
+        "--full-paths",
+        action="store_true",
+        help="include absolute local paths in output",
+    )
 
     analyze_audio_parser = commands.add_parser(
         "analyze-audio",

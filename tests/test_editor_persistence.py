@@ -122,6 +122,39 @@ class EditorPersistenceTests(unittest.TestCase):
             )
             self.assertTrue(destination.is_file())
 
+    def test_appended_source_preserves_existing_cuts_through_save_and_reopen(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_project(root)
+            project.timeline.split(4.0)
+            deleted_id = project.timeline.segments[1].segment_id
+            project.timeline.set_deleted(deleted_id, True)
+            added_path = root / "added.mp4"
+            added_path.write_bytes(b"added")
+            added = Project.create(
+                added_path,
+                {
+                    "duration_seconds": 3.0,
+                    "width": 180,
+                    "height": 320,
+                    "frame_rate": "30/1",
+                    "video_codec": "h264",
+                    "audio_codec": None,
+                    "format_name": "mp4",
+                },
+            )
+            project.append_sources((added.source,))
+            destination = root / "expanded.framestudio.json"
+
+            save_project(project, destination)
+            restored = load_project(destination)
+
+            self.assertEqual(restored.schema_version, 3)
+            self.assertEqual(len(restored.sources), 2)
+            self.assertTrue(restored.timeline.find(deleted_id).deleted)
+            self.assertEqual(restored.timeline.blocks[-1].source_id, restored.sources[1].source_id)
+            self.assertEqual(restored.timeline.edited_duration_seconds, 7.0)
+
     def test_failed_atomic_replace_keeps_previous_project(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

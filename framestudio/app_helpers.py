@@ -95,18 +95,31 @@ def editing_is_locked(window: Any) -> bool:
 def validate_source_selection(
     paths: Sequence[Path],
     max_sources: int = 1,
+    existing_source_count: int = 0,
 ) -> tuple[Path, ...]:
     if max_sources < 1:
         raise ValueError("The project source limit must be at least one")
+    if existing_source_count < 0:
+        raise ValueError("The existing source count must not be negative")
+    if existing_source_count > max_sources:
+        raise ValueError("The existing source count exceeds the project source limit")
     selected = tuple(Path(path) for path in paths)
-    if len(selected) > max_sources:
-        if max_sources == 1:
+    normalized_paths = tuple(path.expanduser().resolve() for path in selected)
+    if len(set(normalized_paths)) != len(normalized_paths):
+        raise ValueError("Each source video can only be added once")
+    available_sources = max_sources - existing_source_count
+    if len(selected) > available_sources:
+        if existing_source_count == 0 and max_sources == 1:
             raise ValueError(
                 "This editor phase supports one source video per project; "
                 "multi-source timelines are planned for a later phase"
             )
+        if available_sources == 0:
+            raise ValueError("This project cannot add more source videos")
+        limit = "one" if available_sources == 1 else str(available_sources)
         raise ValueError(
-            f"This editor phase supports at most {max_sources} source videos per project"
+            f"This project can add at most {limit} more source video"
+            f"{'' if available_sources == 1 else 's'}"
         )
     return selected
 

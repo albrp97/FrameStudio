@@ -6,6 +6,7 @@ deterministic one-source and mixed-source operations as JSON commands:
 ```sh
 framestudio inspect PROJECT
 framestudio import SOURCE [SOURCE ...] --project PROJECT
+framestudio add PROJECT SOURCE [SOURCE ...] [--output PROJECT]
 framestudio split PROJECT --at SECONDS
 framestudio delete PROJECT --segment SEGMENT_ID
 framestudio restore PROJECT --segment SEGMENT_ID
@@ -85,6 +86,13 @@ Copy and paste on one-source or mixed-source timelines create fresh segment
 identities, preserve source coverage and block-owned state, and return the
 source and pasted IDs in the operation result. Source relinking requires an
 explicit stable `source_id`.
+
+`add` loads an existing project, appends one or more new source blocks, and
+saves the expanded project in place unless `--output` is supplied. Existing
+cuts, deleted blocks, source identities, focus transforms, triplicate state,
+and playhead position are preserved. The operation result reports the added
+source IDs and total source count. Duplicate source paths or source IDs are
+rejected before the project is mutated.
 
 ## Errors and exit statuses
 

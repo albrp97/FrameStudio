@@ -12,7 +12,7 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     header = Gtk.HeaderBar()
     window.set_titlebar(header)
 
-    open_source = Gtk.Button(label="Select video(s)")
+    open_source = Gtk.Button(label="Add clips")
     open_source.connect("clicked", window._on_open_source_clicked)
     header.pack_start(open_source)
     window.open_source_button = open_source
@@ -274,7 +274,7 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     window.export_progress_label = export_progress_label
     window.cancel_export_button = cancel_export
 
-    window.status_label = Gtk.Label(label="Select source video(s) or open a project file")
+    window.status_label = Gtk.Label(label="Add clips or open a project file")
     window.status_label.set_xalign(0.0)
     window.status_label.set_wrap(True)
     root.append(window.status_label)

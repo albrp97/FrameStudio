@@ -81,7 +81,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Input is repository context and a user request; output
   is scoped agent behavior, durable planning guidance, and evidence-backed
   delivery decisions.
-- **Relationships:** Points to `aidd-config.yml`, `.github/README.md`, the
+- **Relationships:** Points to `aidd-config.yml`, the root `README.md`, the
   planning skills/prompts, repository manifests, CI, and existing project
   documentation.
 - **Constraints and cautions:** Do not assume paths, commands, providers, or
