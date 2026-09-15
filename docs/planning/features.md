@@ -115,6 +115,8 @@ features are closed; future feature work remains open in its assigned phase.
 | FEAT-027 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-027-researching-video-restoration-and-upscaling.md` |
 | FEAT-028 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-028-adding-optional-upscale-enhancement.md` |
 | FEAT-029 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md` |
+| FEAT-030 | active | OBJ-001, SCOPE-001, PHASE-009 | `features/open/FEAT-030-benchmarking-and-selecting-efficient-export-pipelines.md` |
+| FEAT-031 | active | OBJ-001, SCOPE-001, PHASE-009 | `features/open/FEAT-031-executing-efficient-resumable-export-pipelines.md` |
 
 ## Open decisions carried into feature readiness
 
@@ -730,4 +732,75 @@ preservation remain protected throughout PHASE-008.
 - `tests/test_editor_graphics.py`
 - `FAST-CONCAT-RESEARCH.md`
 - `FPS-ENHANCEMENT-RESEARCH.md`
+- `.github/aidd-config.yml`
+
+## PHASE-009 - Feature Decomposition
+
+**Feature index ID:** FEAT-INDEX-009
+**Objective:** OBJ-001
+**Scope:** SCOPE-001
+**Phase:** PHASE-009
+**Capability map:** CAP-MAP-001
+**Status:** active
+**Approval:** user-authorized on 2026-09-09 before implementation and
+benchmark execution
+**Owner:** repository implementation in the active worktree
+**Last updated:** 2026-09-09
+**Source paths:** `docs/planning/phases/open/PHASE-009-selecting-and-delivering-efficient-export-pipelines.md`,
+`docs/specs/project-scope.md`, `docs/specs/future-product-direction.md`,
+`.github/aidd-config.yml`
+
+### Phase boundary
+
+PHASE-009 is limited to export efficiency and its evidence. It preserves the
+existing project model, fixed output policy, source-level audio behavior,
+validated interpolation/upscale backends, safe publication, and resumable
+session/cache identity. It does not introduce unrelated editor behavior or
+new media runtimes.
+
+### Feature summary
+
+| ID | Outcome | Capability links | Dependencies | Status |
+|---|---|---|---|---|
+| FEAT-030 | Benchmark and select efficient export pipelines | CAP-005, CAP-011, CAP-012 | PHASE-008 baseline; representative media; target workstation | active |
+| FEAT-031 | Execute efficient resumable export pipelines | CAP-005, CAP-011, CAP-012 | FEAT-030 recommendation; existing enhanced export and recovery contracts | active |
+
+### Capability coverage
+
+| Phase capability | Feature coverage | Coverage status |
+|---|---|---|
+| CAP-005 - Rendering fast, valid, and safe outputs | FEAT-030, FEAT-031 | covered |
+| CAP-011 - Enhancing frame rate to 60 FPS | FEAT-030, FEAT-031 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | FEAT-030, FEAT-031 | covered |
+
+### Dependency order
+
+`TICKET-102 -> TICKET-103 -> TICKET-104`
+
+### Planning readiness
+
+PHASE-009, FEAT-030, and FEAT-031 are active under the user's explicit
+optimization request. TICKET-102 establishes comparable evidence before
+TICKET-103 changes production routing. TICKET-104 owns functionality,
+generated-media, resume, review, and user-validation evidence before closure.
+
+### Protected behavior
+
+Existing one-source and mixed-source editing, fixed 1920x1080 output,
+source-level audio decisions, project compatibility, atomic export,
+structured CLI errors, legacy scripts, interpolation behavior, restoration
+gates, resumable sessions, and source preservation remain protected.
+
+### Source references
+
+- `docs/planning/phases/open/PHASE-009-selecting-and-delivering-efficient-export-pipelines.md`
+- `docs/planning/features/open/FEAT-030-benchmarking-and-selecting-efficient-export-pipelines.md`
+- `docs/planning/features/open/FEAT-031-executing-efficient-resumable-export-pipelines.md`
+- `docs/planning/tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md`
+- `docs/planning/tickets/open/TICKET-103-implement-conditional-grouped-export-route.md`
+- `docs/planning/tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md`
+- `framestudio/export_smart_render.py`
+- `framestudio/export_interpolation.py`
+- `framestudio/export_cache.py`
+- `framestudio/export_session.py`
 - `.github/aidd-config.yml`

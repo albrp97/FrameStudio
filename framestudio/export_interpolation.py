@@ -886,6 +886,8 @@ def _execute_per_source_enhanced_render(
     cancel_event: threading.Event | None,
     cache: ExportCache | None = None,
 ) -> None:
+    preparation_options = dict(options)
+    preparation_options.pop("pipeline_strategy", None)
     prepared_sources = prepare_enhanced_sources(
         plan,
         original_probes,
@@ -896,8 +898,9 @@ def _execute_per_source_enhanced_render(
         progress_callback=progress_callback,
         started=started,
         cancel_event=cancel_event,
-        backend_kwargs=options,
+        backend_kwargs=preparation_options,
         cache=cache,
+        grouped_preparation=options.get("pipeline_strategy", "adaptive") == "adaptive",
     )
     active_segments = tuple(segment for segment in plan.segments if not segment.deleted)
     if len(prepared_sources) != len(active_segments):
@@ -1311,6 +1314,7 @@ def _interpolate_probe(
 ) -> MediaProbe:
     if cancel_event is not None and cancel_event.is_set():
         raise ExportExecutionError("Export cancelled")
+    backend_kwargs.pop("pipeline_strategy", None)
     source_frames = probe_frame_count(probe.path, ffprobe_path)
     if target_frames is None:
         target_frames = target_frame_count(
@@ -1410,6 +1414,11 @@ def execute_enhanced_export(
     partial = partial_path(destination)
     options = dict(backend_kwargs or {})
     options.setdefault("backend", policy.backend)
+    options.setdefault("pipeline_strategy", "adaptive")
+    if options["pipeline_strategy"] not in {"adaptive", "per-segment"}:
+        raise ExportExecutionError(
+            "Enhanced export pipeline strategy must be 'adaptive' or 'per-segment'"
+        )
     runtime_paths = _enhanced_runtime_paths(plan, options)
     try:
         cache_request = build_export_cache_request(

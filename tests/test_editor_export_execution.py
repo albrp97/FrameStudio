@@ -9,7 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from framestudio import export_ffmpeg, export_interpolation
+from framestudio import export_ffmpeg, export_interpolation, export_smart_render
 from framestudio.export import (
     ExportExecutionError,
     ExportPlan,
@@ -244,6 +244,81 @@ class EditorExportExecutionTests(unittest.TestCase):
             ]
             self.assertTrue(any(item.frame > 0 for item in interpolation_progress))
             self.assertTrue(any(item.fps is not None for item in interpolation_progress))
+
+    def test_adaptive_mixed_export_batches_source_preparation_without_crossing_deleted_gaps(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            first = self.make_source(
+                root,
+                name="first.mp4",
+                size="96x64",
+                rate=10,
+                duration=1.2,
+                gop=10,
+            )
+            second = self.make_source(
+                root,
+                name="second.mp4",
+                size="96x64",
+                rate=20,
+                duration=0.5,
+                frequency=990,
+                gop=10,
+            )
+            first_probe = probe_media(first)
+            second_probe = probe_media(second)
+            timeline = SegmentTimeline.from_blocks(
+                (
+                    Segment.create(0.0, 0.4, source_id="first"),
+                    Segment.create(0.4, 0.8, source_id="first", deleted=True),
+                    Segment.create(0.8, 1.2, source_id="first"),
+                    Segment.create(0.0, 0.5, source_id="second"),
+                ),
+                source_durations={
+                    "first": first_probe.duration_seconds,
+                    "second": second_probe.duration_seconds,
+                },
+            )
+            policy = FrameRatePolicy(
+                choice="custom",
+                custom_rate="20/1",
+                target_rate="20/1",
+                enhancement_enabled=True,
+                backend="ffmpeg-minterpolate",
+            )
+            destination = root / "adaptive.mp4"
+            plan = plan_mixed_export(
+                (first_probe, second_probe),
+                timeline,
+                destination,
+                source_ids=("first", "second"),
+                frame_rate_policy=policy,
+                upscale_policy=UpscalePolicy(enhancement_enabled=False),
+            )
+            self.assertEqual(plan.route, "enhanced")
+            source_before = (first.read_bytes(), second.read_bytes())
+
+            result = execute_enhanced_export(
+                plan,
+                ffmpeg_path="ffmpeg",
+                ffprobe_path="ffprobe",
+                progress_callback=None,
+                verify_single_output=lambda _plan, _probe, candidate, **_kwargs: probe_media(
+                    candidate
+                ),
+                verify_mixed_output=lambda _plan, candidate, **_kwargs: probe_media(candidate),
+                backend_kwargs={"pipeline_strategy": "adaptive"},
+            )
+
+            self.assertEqual(result, destination)
+            output = probe_media(destination)
+            self.assertEqual(output.frame_rate, "20/1")
+            self.assertEqual((output.width, output.height), (1920, 1080))
+            self.assertAlmostEqual(output.duration_seconds, 1.3, delta=0.2)
+            self.assertEqual((first.read_bytes(), second.read_bytes()), source_before)
+            self.assertFalse(
+                (destination.parent / f".{destination.name}.framestudio-intermediates").exists()
+            )
 
     def test_enhanced_export_resume_reuses_persisted_assembly(self):
         with TemporaryDirectory() as temporary_directory:
@@ -1318,7 +1393,9 @@ class EditorExportExecutionTests(unittest.TestCase):
             self.assertEqual(plan.route, "enhanced")
             cancel_event = threading.Event()
             first_attempt_calls = 0
+            preparation_calls = 0
             original_interpolate = export_interpolation._interpolate_probe
+            original_grouped_prepare = export_smart_render._execute_source_normalization_split
 
             def cancel_after_first_interpolation(*args, **kwargs):
                 nonlocal first_attempt_calls
@@ -1328,13 +1405,25 @@ class EditorExportExecutionTests(unittest.TestCase):
                     cancel_event.set()
                 return result
 
-            with patch(
-                "framestudio.export_interpolation._interpolate_probe",
-                side_effect=cancel_after_first_interpolation,
+            def count_grouped_prepare(*args, **kwargs):
+                nonlocal preparation_calls
+                preparation_calls += 1
+                return original_grouped_prepare(*args, **kwargs)
+
+            with (
+                patch(
+                    "framestudio.export_interpolation._interpolate_probe",
+                    side_effect=cancel_after_first_interpolation,
+                ),
+                patch(
+                    "framestudio.export_smart_render._execute_source_normalization_split",
+                    side_effect=count_grouped_prepare,
+                ),
             ):
                 with self.assertRaisesRegex(ExportExecutionError, "cancelled"):
                     execute_export(plan, cancel_event=cancel_event)
 
+            self.assertEqual(preparation_calls, 1)
             session_info = discover_export_session(destination)
             self.assertTrue(session_info.exists)
             self.assertEqual(session_info.state, "cancelled")
@@ -1351,14 +1440,21 @@ class EditorExportExecutionTests(unittest.TestCase):
                 resumed_calls += 1
                 return original_interpolate(*args, **kwargs)
 
-            with patch(
-                "framestudio.export_interpolation._interpolate_probe",
-                side_effect=count_resumed_interpolation,
+            with (
+                patch(
+                    "framestudio.export_interpolation._interpolate_probe",
+                    side_effect=count_resumed_interpolation,
+                ),
+                patch(
+                    "framestudio.export_smart_render._execute_source_normalization_split",
+                    side_effect=count_grouped_prepare,
+                ),
             ):
                 result = execute_export(plan, resume_mode="resume")
 
             self.assertEqual(result, destination)
             self.assertEqual(resumed_calls, 1)
+            self.assertEqual(preparation_calls, 1)
             self.assertEqual(source.read_bytes(), source_before)
             output = probe_media(destination)
             self.assertEqual(output.frame_rate, "20/1")

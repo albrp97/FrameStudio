@@ -7,9 +7,12 @@ QUALITY_PATHS = framestudio.py framestudio tests/test_editor_*.py \
 	tests/test_framestudio_compatibility.py \
 	benchmarks/restoration_benchmark.py tests/test_restoration_benchmark.py \
 	benchmarks/render_strategy_benchmark.py tests/test_render_strategy_benchmark.py \
+	benchmarks/efficient_export_pipeline_benchmark.py \
+	tests/test_efficient_export_pipeline_benchmark.py \
 	tools/check_dependencies.py tools/check_duplication.py
 COMPLEXITY_PATHS = framestudio.py framestudio/cli.py framestudio/operations.py \
-	benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py
+	benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py \
+	benchmarks/efficient_export_pipeline_benchmark.py
 
 .PHONY: help setup test compile diff-check check format-check lint type-check \
 	complexity duplication duplication-baseline dependency-check dependency-audit security churn \
@@ -33,6 +36,7 @@ help:
 		'make concat     Run framestudio concat (pass ARGS="...")' \
 		'make fps        Run framestudio fps (pass ARGS="...")' \
 		'make restoration-benchmark  Run the research benchmark (pass ARGS="...")' \
+		'make efficient-export-benchmark  Compare enhanced export routes' \
 		'make duplication-baseline  Refresh the approved jscpd baseline' \
 		'make install    Install command wrappers into ~/bin'
 
@@ -66,6 +70,8 @@ type-check:
 	$(PYTHON) -m mypy --config-file pyproject.toml framestudio.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/restoration_benchmark.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/render_strategy_benchmark.py
+	$(PYTHON) -m mypy --config-file pyproject.toml \
+		benchmarks/efficient_export_pipeline_benchmark.py
 	$(PYTHON) -m mypy --config-file pyproject.toml tools/check_dependencies.py
 	$(PYTHON) -m mypy --config-file pyproject.toml tools/check_duplication.py
 
@@ -101,6 +107,7 @@ security:
 	@mkdir -p $(STATIC_ANALYSIS_DIR)
 	$(PYTHON) -m bandit -r framestudio.py framestudio \
 		benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py \
+		benchmarks/efficient_export_pipeline_benchmark.py \
 		tools/check_dependencies.py tools/check_duplication.py \
 		--configfile pyproject.toml --format json \
 		--output $(STATIC_ANALYSIS_DIR)/bandit.json
@@ -172,6 +179,9 @@ fps:
 
 restoration-benchmark:
 	$(PYTHON) benchmarks/restoration_benchmark.py $(ARGS)
+
+efficient-export-benchmark:
+	$(PYTHON) benchmarks/efficient_export_pipeline_benchmark.py $(ARGS)
 
 install:
 	./install.sh

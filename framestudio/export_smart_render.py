@@ -19,6 +19,7 @@ from .export_process import (
     run_ffmpeg,
     segment_is_full_source,
 )
+from .export_strategy import build_export_runs, segment_source_id
 from .export_types import (
     _BOUNDARY_TOLERANCE,
     _DURATION_TOLERANCE,
@@ -475,20 +476,30 @@ def _segment_frame_counts(
     return tuple(counts)
 
 
-def build_source_normalization_command(
-    source: Path,
-    destination: Path,
+def _normalization_seek_seconds(segments: Sequence[Segment]) -> float:
+    """Earliest retained segment start, used to seek the input instead of
+
+    decoding from the start of the file. Mirrors the input-offset convention
+    used by the preview backend (see ``ffmpeg_playback._render_plan``).
+    """
+    if not segments:
+        return 0.0
+    return min(segment.start_seconds for segment in segments)
+
+
+def _build_source_normalization_filter_parts(
     segments: Sequence[Segment],
     *,
     target_rate: Fraction | int | float | str,
     policy: OutputPolicy,
     audio_decision: AudioDecision | Mapping[str, Any] | None,
     has_audio: bool,
-    ffmpeg_path: str = "ffmpeg",
-    preserve_resolution: bool = False,
-    content_width: int | None = None,
-    content_height: int | None = None,
-) -> list[str]:
+    preserve_resolution: bool,
+    content_width: int | None,
+    content_height: int | None,
+    concatenate: bool,
+    seek_seconds: float = 0.0,
+) -> tuple[list[str], tuple[str, ...], tuple[str, ...], tuple[int, ...]]:
     if not segments:
         raise ExportExecutionError("Source normalization requires at least one segment")
     rate = _rate_expression(target_rate)
@@ -506,6 +517,8 @@ def build_source_normalization_command(
             policy.height,
             output_label,
             frame_rate=rate,
+            source_start_seconds=segment.start_seconds - seek_seconds,
+            source_duration_seconds=segment.duration_seconds,
             preserve_resolution=preserve_resolution,
             content_width=content_width,
             content_height=content_height,
@@ -534,6 +547,13 @@ def build_source_normalization_command(
                     f"{normalized_audio}asplit={len(split_labels)}{''.join(split_labels)}"
                 )
                 audio_labels.extend(split_labels)
+            for index, audio_label in enumerate(audio_labels):
+                filters.append(
+                    f"{audio_label}atrim=start={segments[index].start_seconds - seek_seconds:.6f}:"
+                    f"duration={segments[index].duration_seconds:.6f},"
+                    f"asetpts=PTS-STARTPTS[aout_{index}]"
+                )
+                audio_labels[index] = f"[aout_{index}]"
         else:
             for index, segment in enumerate(segments):
                 filters.append(
@@ -543,25 +563,28 @@ def build_source_normalization_command(
                 )
                 audio_labels.append(f"[a{index}]")
 
-    if policy.audio_stream_present:
-        for index, (_video_label, audio_label) in enumerate(
-            zip(video_labels, audio_labels, strict=True)
-        ):
+    if concatenate:
+        if policy.audio_stream_present:
             filters.append(
-                f"{audio_label}atrim=start={segments[index].start_seconds:.6f}:"
-                f"duration={segments[index].duration_seconds:.6f},"
-                f"asetpts=PTS-STARTPTS[aout_{index}]"
+                "".join(
+                    f"{video_labels[index]}{audio_labels[index]}"
+                    for index in range(len(video_labels))
+                )
+                + f"concat=n={len(video_labels)}:v=1:a=1[outv][outa]"
             )
-            audio_labels[index] = f"[aout_{index}]"
-        filters.append(
-            "".join(
-                f"{video_labels[index]}{audio_labels[index]}" for index in range(len(video_labels))
-            )
-            + f"concat=n={len(video_labels)}:v=1:a=1[outv][outa]"
-        )
-    else:
+            return filters, ("[outv]",), ("[outa]",), frame_counts
         filters.append("".join(video_labels) + f"concat=n={len(video_labels)}:v=1:a=0[outv]")
+        return filters, ("[outv]",), (), frame_counts
+    return filters, tuple(video_labels), tuple(audio_labels), frame_counts
 
+
+def _normalization_command_prefix(
+    source: Path,
+    filters: Sequence[str],
+    *,
+    ffmpeg_path: str,
+    seek_seconds: float = 0.0,
+) -> list[str]:
     command = [
         ffmpeg_path,
         "-hide_banner",
@@ -569,26 +592,48 @@ def build_source_normalization_command(
         "error",
         "-nostdin",
         "-y",
-        "-i",
-        str(source),
-        "-filter_complex",
-        ";".join(filters),
-        "-map",
-        "[outv]",
-        "-c:v",
-        policy.video_codec,
-        "-preset",
-        "medium",
-        "-crf",
-        "18",
-        "-pix_fmt",
-        policy.pixel_format,
     ]
-    if policy.audio_stream_present:
-        command.extend(
+    if seek_seconds > 0:
+        command.extend(["-ss", f"{seek_seconds:.6f}"])
+    command.extend(
+        [
+            "-i",
+            str(source),
+            "-filter_complex",
+            ";".join(filters),
+        ]
+    )
+    return command
+
+
+def _normalization_output_options(
+    policy: OutputPolicy,
+    *,
+    video_label: str,
+    audio_label: str | None,
+    frame_count: int | None,
+    destination: Path,
+) -> list[str]:
+    options = ["-map", video_label]
+    if frame_count is not None:
+        options.extend(["-frames:v", str(frame_count)])
+    options.extend(
+        [
+            "-c:v",
+            policy.video_codec,
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            policy.pixel_format,
+        ]
+    )
+    if audio_label is not None:
+        options.extend(
             [
                 "-map",
-                "[outa]",
+                audio_label,
                 "-c:a",
                 policy.audio_codec or "aac",
                 "-b:a",
@@ -599,7 +644,7 @@ def build_source_normalization_command(
                 str(policy.audio_channels),
             ]
         )
-    command.extend(
+    options.extend(
         [
             "-movflags",
             "+faststart",
@@ -611,6 +656,102 @@ def build_source_normalization_command(
             str(destination),
         ]
     )
+    return options
+
+
+def build_source_normalization_command(
+    source: Path,
+    destination: Path,
+    segments: Sequence[Segment],
+    *,
+    target_rate: Fraction | int | float | str,
+    policy: OutputPolicy,
+    audio_decision: AudioDecision | Mapping[str, Any] | None,
+    has_audio: bool,
+    ffmpeg_path: str = "ffmpeg",
+    preserve_resolution: bool = False,
+    content_width: int | None = None,
+    content_height: int | None = None,
+) -> list[str]:
+    filters, _, _, _ = _build_source_normalization_filter_parts(
+        segments,
+        target_rate=target_rate,
+        policy=policy,
+        audio_decision=audio_decision,
+        has_audio=has_audio,
+        preserve_resolution=preserve_resolution,
+        content_width=content_width,
+        content_height=content_height,
+        concatenate=True,
+        seek_seconds=_normalization_seek_seconds(segments),
+    )
+
+    command = _normalization_command_prefix(
+        source,
+        filters,
+        ffmpeg_path=ffmpeg_path,
+        seek_seconds=_normalization_seek_seconds(segments),
+    )
+    command.extend(
+        _normalization_output_options(
+            policy,
+            video_label="[outv]",
+            audio_label="[outa]" if policy.audio_stream_present else None,
+            frame_count=None,
+            destination=destination,
+        )
+    )
+    return command
+
+
+def build_source_normalization_split_command(
+    source: Path,
+    destinations: Sequence[Path],
+    source_segments: Sequence[Segment],
+    *,
+    target_rate: Fraction | int | float | str,
+    policy: OutputPolicy,
+    audio_decision: AudioDecision | Mapping[str, Any] | None,
+    has_audio: bool,
+    ffmpeg_path: str = "ffmpeg",
+    preserve_resolution: bool = False,
+    content_width: int | None = None,
+    content_height: int | None = None,
+) -> list[str]:
+    """Normalize several source segments in one FFmpeg process.
+
+    Each output remains an independent stream, so later interpolation backends
+    cannot blend across a deleted or edited boundary.
+    """
+    if len(destinations) != len(source_segments):
+        raise ExportExecutionError("Split normalization destinations must match the segments")
+    seek_seconds = _normalization_seek_seconds(source_segments)
+    filters, video_labels, audio_labels, frame_counts = _build_source_normalization_filter_parts(
+        source_segments,
+        target_rate=target_rate,
+        policy=policy,
+        audio_decision=audio_decision,
+        has_audio=has_audio,
+        preserve_resolution=preserve_resolution,
+        content_width=content_width,
+        content_height=content_height,
+        concatenate=False,
+        seek_seconds=seek_seconds,
+    )
+
+    command = _normalization_command_prefix(
+        source, filters, ffmpeg_path=ffmpeg_path, seek_seconds=seek_seconds
+    )
+    for index, destination in enumerate(destinations):
+        command.extend(
+            _normalization_output_options(
+                policy,
+                video_label=video_labels[index],
+                audio_label=audio_labels[index] if policy.audio_stream_present else None,
+                frame_count=frame_counts[index],
+                destination=destination,
+            )
+        )
     return command
 
 
@@ -627,20 +768,6 @@ def _source_id(plan: ExportPlan, index: int) -> str:
     if len(unique) == 1:
         return unique[0]
     return "source"
-
-
-def _segment_source_id(
-    plan: ExportPlan,
-    segment: Segment,
-    decision_ids: Sequence[str],
-) -> str:
-    if segment.source_id:
-        return segment.source_id
-    if len(decision_ids) == 1:
-        return decision_ids[0]
-    if len(plan.source_ids) == 1:
-        return plan.source_ids[0]
-    raise ExportExecutionError("Enhanced export segment has no source identity")
 
 
 def _source_segments(
@@ -783,6 +910,132 @@ def _segment_preparation_progress(
     return forward
 
 
+def _grouped_preparation_outputs(
+    plan: ExportPlan,
+    probes: Sequence[MediaProbe],
+    decisions: Mapping[str, SourceRateDecision],
+    cache_root: Path,
+    *,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    progress_callback: ExportProgressCallback | None,
+    started: float,
+    cancel_event: threading.Event | None,
+    cache: ExportCache | None,
+    preserve_resolution: bool,
+) -> dict[int, tuple[Path, MediaProbe]]:
+    """Prepare compatible multi-segment runs in one FFmpeg invocation."""
+    if plan.output_policy is None:
+        raise ExportExecutionError("Enhanced export is missing its output policy")
+    source_probes = (
+        dict(zip(plan.source_ids, probes, strict=True))
+        if plan.source_paths
+        else {next(iter(decisions)): probes[0]}
+    )
+    runs = build_export_runs(
+        plan,
+        decisions,
+        upscale_decisions=_upscale_decisions(plan),
+    )
+    active_indices = tuple(
+        index for index, segment in enumerate(plan.segments) if not segment.deleted
+    )
+    active_positions = {
+        original_index: position for position, original_index in enumerate(active_indices)
+    }
+    outputs: dict[int, tuple[Path, MediaProbe]] = {}
+    total_duration = max(1.0, plan.expected_duration_seconds)
+    for run in runs:
+        if (
+            len(run.segments) <= 1
+            or not run.can_batch_source_preparation
+            or run.action not in {"interpolate", "passthrough", "convert", "convert-down"}
+        ):
+            continue
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportExecutionError("Export cancelled")
+        probe = source_probes.get(run.source_id)
+        decision = decisions.get(run.source_id)
+        if probe is None or decision is None:
+            raise ExportExecutionError(
+                f"Enhanced export has no probe or rate decision for source {run.source_id}"
+            )
+        preparation_rate = (
+            run.source_rate if run.action in {"interpolate", "passthrough"} else run.target_rate
+        )
+        audio_decision = _audio_decision(plan, run.source_id)
+        content_width = probe.width if preserve_resolution else None
+        content_height = probe.height if preserve_resolution else None
+        destinations = tuple(
+            cache_root / f"run-{run.run_index}-segment-{index}-prepared.mp4"
+            for index in range(len(run.segments))
+        )
+        cached: list[tuple[Path, MediaProbe]] = []
+        for segment_index, segment, _destination in zip(
+            run.segment_indices,
+            run.segments,
+            destinations,
+            strict=True,
+        ):
+            active_position = active_positions[segment_index]
+            artifact_id = f"enhanced-segment-{active_position}-prepared"
+            cached_probe = _reuse_cached_probe(
+                cache,
+                artifact_id,
+                ffprobe_path=ffprobe_path,
+                expected=_prepared_probe_validator(
+                    segment,
+                    plan.output_policy,
+                    preparation_rate,
+                ),
+            )
+            if cached_probe is None:
+                cached = []
+                break
+            cached.append((cached_probe.path, cached_probe))
+        if len(cached) != len(destinations):
+            progress_offset = sum(
+                segment.duration_seconds
+                for index, segment in enumerate(plan.segments)
+                if not segment.deleted and index < run.segment_indices[0]
+            )
+            probes_for_run = _execute_source_normalization_split(
+                probe.path,
+                destinations,
+                run.segments,
+                target_rate=preparation_rate,
+                policy=plan.output_policy,
+                audio_decision=audio_decision,
+                has_audio=probe.has_audio_stream,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+                progress_callback=progress_callback,
+                started=started,
+                progress_offset_seconds=progress_offset,
+                progress_total_duration_seconds=total_duration,
+                cancel_event=cancel_event,
+                preserve_resolution=preserve_resolution,
+                content_width=content_width,
+                content_height=content_height,
+            )
+            cached = list(zip(destinations, probes_for_run, strict=True))
+            for segment_index, (_path, prepared_probe) in zip(
+                run.segment_indices,
+                cached,
+                strict=True,
+            ):
+                active_position = active_positions[segment_index]
+                artifact_id = f"enhanced-segment-{active_position}-prepared"
+                _record_cached_probe(cache, artifact_id, prepared_probe)
+        for segment_index, (path, prepared_probe) in zip(
+            run.segment_indices,
+            cached,
+            strict=True,
+        ):
+            outputs[active_positions[segment_index]] = (path, prepared_probe)
+    return outputs
+
+
 def prepare_enhanced_sources(
     plan: ExportPlan,
     probes: Sequence[MediaProbe],
@@ -796,6 +1049,7 @@ def prepare_enhanced_sources(
     cancel_event: threading.Event | None,
     backend_kwargs: Mapping[str, object] | None = None,
     cache: ExportCache | None = None,
+    grouped_preparation: bool = True,
 ) -> tuple[PreparedSource, ...]:
     """Prepare each retained timeline segment without changing its source rate."""
     policy = plan.output_policy
@@ -814,12 +1068,29 @@ def prepare_enhanced_sources(
     source_probes = (
         dict(zip(plan.source_ids, probes, strict=True))
         if plan.source_paths
-        else {_segment_source_id(plan, plan.segments[0], decision_ids): probes[0]}
+        else {segment_source_id(plan, plan.segments[0], decision_ids): probes[0]}
     )
     active_segments = tuple(segment for segment in plan.segments if not segment.deleted)
     if not active_segments:
         raise ExportExecutionError("Enhanced export has no active segments")
 
+    grouped_outputs = (
+        _grouped_preparation_outputs(
+            plan,
+            probes,
+            decisions,
+            temporary,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            progress_callback=progress_callback,
+            started=started,
+            cancel_event=cancel_event,
+            cache=cache,
+            preserve_resolution=use_preserve_resolution,
+        )
+        if grouped_preparation
+        else {}
+    )
     prepared: list[PreparedSource] = []
     total_segments = len(active_segments)
     progress_total = max(1.0, plan.expected_duration_seconds)
@@ -827,7 +1098,7 @@ def prepare_enhanced_sources(
     for segment_index, segment in enumerate(active_segments):
         if cancel_event is not None and cancel_event.is_set():
             raise ExportExecutionError("Export cancelled")
-        source_id = _segment_source_id(plan, segment, decision_ids)
+        source_id = segment_source_id(plan, segment, decision_ids)
         probe = source_probes.get(source_id)
         decision = decisions.get(source_id)
         if probe is None or decision is None:
@@ -839,6 +1110,20 @@ def prepare_enhanced_sources(
             raise ExportExecutionError(
                 f"Enhanced export rate decision does not match source {source_id}"
             )
+        grouped_output = grouped_outputs.get(segment_index)
+        if grouped_output is not None:
+            grouped_path, grouped_probe = grouped_output
+            prepared.append(
+                PreparedSource(
+                    source_id=source_id,
+                    segment_index=segment_index,
+                    path=grouped_path,
+                    probe=grouped_probe,
+                    source_rate=source_rate,
+                )
+            )
+            progress_offset += segment.duration_seconds
+            continue
         if decision.action == "unsupported":
             raise ExportExecutionError(
                 f"Enhanced export cannot process source {source_id}: {decision.reason}"
@@ -1151,6 +1436,33 @@ def _execute_lossless_selection(
         shutil.rmtree(parts_directory, ignore_errors=True)
 
 
+def _run_normalization_ffmpeg(
+    command: list[str],
+    *,
+    stage: str,
+    selected_duration: float,
+    progress_callback: ExportProgressCallback | None,
+    started: float,
+    progress_offset_seconds: float,
+    progress_total_duration_seconds: float,
+    cancel_event: threading.Event | None,
+) -> None:
+    run_ffmpeg(
+        command,
+        progress_callback=_scaled_progress_callback(
+            progress_callback,
+            start_percent=0.0,
+            end_percent=30.0,
+        ),
+        stage=stage,
+        command_duration_seconds=selected_duration,
+        progress_offset_seconds=progress_offset_seconds,
+        progress_total_duration_seconds=progress_total_duration_seconds,
+        started=started,
+        cancel_event=cancel_event,
+    )
+
+
 def _execute_source_normalization(
     source: Path,
     destination: Path,
@@ -1187,18 +1499,14 @@ def _execute_source_normalization(
         content_height=content_height,
     )
     try:
-        run_ffmpeg(
+        _run_normalization_ffmpeg(
             command,
-            progress_callback=_scaled_progress_callback(
-                progress_callback,
-                start_percent=0.0,
-                end_percent=30.0,
-            ),
             stage="normalizing source",
-            command_duration_seconds=selected_duration,
+            selected_duration=selected_duration,
+            progress_callback=progress_callback,
+            started=started,
             progress_offset_seconds=progress_offset_seconds,
             progress_total_duration_seconds=progress_total_duration_seconds,
-            started=started,
             cancel_event=cancel_event,
         )
         if not partial.is_file() or partial.stat().st_size <= 0:
@@ -1212,6 +1520,73 @@ def _execute_source_normalization(
             ) from error
     finally:
         partial.unlink(missing_ok=True)
+
+
+def _execute_source_normalization_split(
+    source: Path,
+    destinations: Sequence[Path],
+    segments: Sequence[Segment],
+    *,
+    target_rate: Fraction,
+    policy: OutputPolicy,
+    audio_decision: AudioDecision | Mapping[str, Any] | None,
+    has_audio: bool,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    progress_callback: ExportProgressCallback | None,
+    started: float,
+    progress_offset_seconds: float,
+    progress_total_duration_seconds: float,
+    cancel_event: threading.Event | None,
+    preserve_resolution: bool = False,
+    content_width: int | None = None,
+    content_height: int | None = None,
+) -> tuple[MediaProbe, ...]:
+    if len(destinations) != len(segments):
+        raise ExportExecutionError("Split normalization destinations must match the segments")
+    selected_duration = sum(segment.duration_seconds for segment in segments)
+    partials = tuple(partial_path(destination) for destination in destinations)
+    command = build_source_normalization_split_command(
+        source,
+        partials,
+        segments,
+        target_rate=target_rate,
+        policy=policy,
+        audio_decision=audio_decision,
+        has_audio=has_audio,
+        ffmpeg_path=ffmpeg_path,
+        preserve_resolution=preserve_resolution,
+        content_width=content_width,
+        content_height=content_height,
+    )
+    try:
+        _run_normalization_ffmpeg(
+            command,
+            stage="normalizing source run",
+            selected_duration=selected_duration,
+            progress_callback=progress_callback,
+            started=started,
+            progress_offset_seconds=progress_offset_seconds,
+            progress_total_duration_seconds=progress_total_duration_seconds,
+            cancel_event=cancel_event,
+        )
+        probes: list[MediaProbe] = []
+        for partial, destination in zip(partials, destinations, strict=True):
+            if not partial.is_file() or partial.stat().st_size <= 0:
+                raise ExportExecutionError(
+                    "Grouped source normalization did not create all outputs"
+                )
+            os.replace(partial, destination)
+            try:
+                probes.append(probe_media(destination, ffprobe_path))
+            except MediaProbeError as error:
+                raise ExportExecutionError(
+                    f"Grouped normalized source could not be inspected: {error}"
+                ) from error
+        return tuple(probes)
+    finally:
+        for partial in partials:
+            partial.unlink(missing_ok=True)
 
 
 def _master_segments_duration(segments: Sequence[Segment]) -> float:
@@ -1408,6 +1783,7 @@ __all__ = [
     "build_concat_copy_command",
     "build_lossless_cut_command",
     "build_source_normalization_command",
+    "build_source_normalization_split_command",
     "build_video_only_copy_command",
     "prepare_enhanced_master",
     "prepare_enhanced_sources",

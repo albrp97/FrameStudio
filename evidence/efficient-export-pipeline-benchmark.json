@@ -1,0 +1,581 @@
+{
+  "benchmark": "efficient-export-pipeline",
+  "protocol": {
+    "sources": [
+      "640x360 H.264 30 FPS with red/green/blue ranges",
+      "480x640 HEVC 60 FPS"
+    ],
+    "retained_ranges": [
+      "source-a 0-1s",
+      "source-a 2-3s",
+      "source-b 0-2s"
+    ],
+    "deleted_range": "source-a 1-2s",
+    "target_rate": "60/1",
+    "upscale": "disabled for comparable routing benchmark",
+    "backend": "ffmpeg-minterpolate",
+    "repetitions": 3,
+    "strategy_order": [
+      [
+        "per-segment",
+        "adaptive"
+      ],
+      [
+        "adaptive",
+        "per-segment"
+      ],
+      [
+        "per-segment",
+        "adaptive"
+      ]
+    ],
+    "cache_note": "Each repetition uses a fresh destination-scoped export cache. The operating-system file cache is not flushed between runs."
+  },
+  "strategies": {
+    "per-segment": {
+      "strategy": "per-segment",
+      "status": "passed",
+      "wall_seconds": 68.2237,
+      "child_user_seconds": 77.3358,
+      "child_system_seconds": 1.6338,
+      "child_max_rss_kb_cumulative": 1341516.0,
+      "gpu_before": {
+        "name": "NVIDIA GeForce RTX 5070 Ti",
+        "utilization_percent": 11.0,
+        "memory_used_mb": 730.0,
+        "power_watts": 30.35
+      },
+      "gpu_after": {
+        "name": "NVIDIA GeForce RTX 5070 Ti",
+        "utilization_percent": 15.0,
+        "memory_used_mb": 730.0,
+        "power_watts": 30.96
+      },
+      "ffmpeg_process_count": 11,
+      "normalization_process_count": 3,
+      "interpolation_process_count": 4,
+      "interpolation_calls": 2,
+      "restoration_calls": 0,
+      "stage_seconds": {
+        "interpolation segment 1/3": 25.7872,
+        "concatenating enhanced segments": 0.0398,
+        "composing enhanced segments": 0.7451,
+        "interpolation segment 2/3": 25.7501,
+        "normalizing source": 0.79,
+        "interpolation": 12.8759,
+        "cut 1/1": 0.0524
+      },
+      "intermediate_peak_bytes": 1148571,
+      "output_bytes": 980887,
+      "output": {
+        "duration_seconds": 4.021333,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 240,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 980887
+      },
+      "source_hashes_before": {
+        "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+        "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+      },
+      "source_hashes_after": {
+        "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+        "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+      },
+      "source_preserved": true,
+      "boundary_safe": true,
+      "boundary_samples": {
+        "before_deleted_gap": "red",
+        "after_deleted_gap": "blue"
+      },
+      "error": null,
+      "run_count": 3,
+      "wall_seconds_min": 68.175,
+      "wall_seconds_max": 68.3439,
+      "runs": [
+        {
+          "strategy": "per-segment",
+          "status": "passed",
+          "wall_seconds": 68.175,
+          "child_user_seconds": 77.3358,
+          "child_system_seconds": 1.6338,
+          "child_max_rss_kb_cumulative": 1336584,
+          "gpu_before": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 11.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 30.35
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 15.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 30.96
+          },
+          "ffmpeg_process_count": 11,
+          "normalization_process_count": 3,
+          "interpolation_process_count": 4,
+          "interpolation_calls": 2,
+          "restoration_calls": 0,
+          "stage_seconds": {
+            "cut 1/1": 0.0534,
+            "normalizing source": 0.7773,
+            "interpolation": 12.8555,
+            "interpolation segment 1/3": 25.7872,
+            "interpolation segment 2/3": 25.7501,
+            "concatenating enhanced segments": 0.0398,
+            "composing enhanced segments": 0.7368
+          },
+          "intermediate_peak_bytes": 1148571,
+          "output_bytes": 980887,
+          "output": {
+            "duration_seconds": 4.021333,
+            "width": 1920,
+            "height": 1080,
+            "video_codec": "h264",
+            "pixel_format": "yuv420p",
+            "fps": "60",
+            "frames": 240,
+            "audio": true,
+            "audio_codec": "aac",
+            "audio_sample_rate": 48000,
+            "audio_channels": 2,
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "size_bytes": 980887
+          },
+          "source_hashes_before": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_hashes_after": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_preserved": true,
+          "boundary_safe": true,
+          "boundary_samples": {
+            "before_deleted_gap": "red",
+            "after_deleted_gap": "blue"
+          },
+          "error": null
+        },
+        {
+          "strategy": "per-segment",
+          "status": "passed",
+          "wall_seconds": 68.3439,
+          "child_user_seconds": 77.4225,
+          "child_system_seconds": 1.6628,
+          "child_max_rss_kb_cumulative": 1341516,
+          "gpu_before": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 18.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.93
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 10.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 32.02
+          },
+          "ffmpeg_process_count": 11,
+          "normalization_process_count": 3,
+          "interpolation_process_count": 4,
+          "interpolation_calls": 2,
+          "restoration_calls": 0,
+          "stage_seconds": {
+            "cut 1/1": 0.0523,
+            "normalizing source": 0.8155,
+            "interpolation": 12.8759,
+            "interpolation segment 1/3": 25.8305,
+            "interpolation segment 2/3": 25.8172,
+            "concatenating enhanced segments": 0.0395,
+            "composing enhanced segments": 0.7451
+          },
+          "intermediate_peak_bytes": 1148571,
+          "output_bytes": 980887,
+          "output": {
+            "duration_seconds": 4.021333,
+            "width": 1920,
+            "height": 1080,
+            "video_codec": "h264",
+            "pixel_format": "yuv420p",
+            "fps": "60",
+            "frames": 240,
+            "audio": true,
+            "audio_codec": "aac",
+            "audio_sample_rate": 48000,
+            "audio_channels": 2,
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "size_bytes": 980887
+          },
+          "source_hashes_before": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_hashes_after": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_preserved": true,
+          "boundary_safe": true,
+          "boundary_samples": {
+            "before_deleted_gap": "red",
+            "after_deleted_gap": "blue"
+          },
+          "error": null
+        },
+        {
+          "strategy": "per-segment",
+          "status": "passed",
+          "wall_seconds": 68.2237,
+          "child_user_seconds": 77.3255,
+          "child_system_seconds": 1.6283,
+          "child_max_rss_kb_cumulative": 1341516,
+          "gpu_before": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 10.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.92
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 11.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.75
+          },
+          "ffmpeg_process_count": 11,
+          "normalization_process_count": 3,
+          "interpolation_process_count": 4,
+          "interpolation_calls": 2,
+          "restoration_calls": 0,
+          "stage_seconds": {
+            "cut 1/1": 0.0524,
+            "normalizing source": 0.79,
+            "interpolation": 12.9058,
+            "interpolation segment 1/3": 25.7849,
+            "interpolation segment 2/3": 25.7232,
+            "concatenating enhanced segments": 0.0398,
+            "composing enhanced segments": 0.7643
+          },
+          "intermediate_peak_bytes": 1148571,
+          "output_bytes": 980887,
+          "output": {
+            "duration_seconds": 4.021333,
+            "width": 1920,
+            "height": 1080,
+            "video_codec": "h264",
+            "pixel_format": "yuv420p",
+            "fps": "60",
+            "frames": 240,
+            "audio": true,
+            "audio_codec": "aac",
+            "audio_sample_rate": 48000,
+            "audio_channels": 2,
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "size_bytes": 980887
+          },
+          "source_hashes_before": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_hashes_after": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_preserved": true,
+          "boundary_safe": true,
+          "boundary_samples": {
+            "before_deleted_gap": "red",
+            "after_deleted_gap": "blue"
+          },
+          "error": null
+        }
+      ]
+    },
+    "adaptive": {
+      "strategy": "adaptive",
+      "status": "passed",
+      "wall_seconds": 67.8984,
+      "child_user_seconds": 77.253,
+      "child_system_seconds": 1.5505,
+      "child_max_rss_kb_cumulative": 1341516.0,
+      "gpu_before": {
+        "name": "NVIDIA GeForce RTX 5070 Ti",
+        "utilization_percent": 15.0,
+        "memory_used_mb": 730.0,
+        "power_watts": 30.83
+      },
+      "gpu_after": {
+        "name": "NVIDIA GeForce RTX 5070 Ti",
+        "utilization_percent": 11.0,
+        "memory_used_mb": 730.0,
+        "power_watts": 31.18
+      },
+      "ffmpeg_process_count": 8,
+      "normalization_process_count": 2,
+      "interpolation_process_count": 4,
+      "interpolation_calls": 2,
+      "restoration_calls": 0,
+      "stage_seconds": {
+        "interpolation segment 1/3": 25.7916,
+        "concatenating enhanced segments": 0.0398,
+        "normalizing source run": 0.208,
+        "composing enhanced segments": 0.7518,
+        "interpolation segment 2/3": 25.7287,
+        "normalizing source": 0.5225,
+        "interpolation": 12.8606
+      },
+      "intermediate_peak_bytes": 1107174,
+      "output_bytes": 980834,
+      "output": {
+        "duration_seconds": 4.021333,
+        "width": 1920,
+        "height": 1080,
+        "video_codec": "h264",
+        "pixel_format": "yuv420p",
+        "fps": "60",
+        "frames": 240,
+        "audio": true,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 2,
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "size_bytes": 980834
+      },
+      "source_hashes_before": {
+        "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+        "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+      },
+      "source_hashes_after": {
+        "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+        "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+      },
+      "source_preserved": true,
+      "boundary_safe": true,
+      "boundary_samples": {
+        "before_deleted_gap": "red",
+        "after_deleted_gap": "blue"
+      },
+      "error": null,
+      "run_count": 3,
+      "wall_seconds_min": 67.8779,
+      "wall_seconds_max": 68.0519,
+      "runs": [
+        {
+          "strategy": "adaptive",
+          "status": "passed",
+          "wall_seconds": 68.0519,
+          "child_user_seconds": 77.3816,
+          "child_system_seconds": 1.4778,
+          "child_max_rss_kb_cumulative": 1341516,
+          "gpu_before": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 15.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 30.83
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 11.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.18
+          },
+          "ffmpeg_process_count": 8,
+          "normalization_process_count": 2,
+          "interpolation_process_count": 4,
+          "interpolation_calls": 2,
+          "restoration_calls": 0,
+          "stage_seconds": {
+            "normalizing source run": 0.208,
+            "normalizing source": 0.5296,
+            "interpolation": 12.8604,
+            "interpolation segment 1/3": 25.7916,
+            "interpolation segment 2/3": 25.7995,
+            "concatenating enhanced segments": 0.0398,
+            "composing enhanced segments": 0.7736
+          },
+          "intermediate_peak_bytes": 1107174,
+          "output_bytes": 980834,
+          "output": {
+            "duration_seconds": 4.021333,
+            "width": 1920,
+            "height": 1080,
+            "video_codec": "h264",
+            "pixel_format": "yuv420p",
+            "fps": "60",
+            "frames": 240,
+            "audio": true,
+            "audio_codec": "aac",
+            "audio_sample_rate": 48000,
+            "audio_channels": 2,
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "size_bytes": 980834
+          },
+          "source_hashes_before": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_hashes_after": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_preserved": true,
+          "boundary_safe": true,
+          "boundary_samples": {
+            "before_deleted_gap": "red",
+            "after_deleted_gap": "blue"
+          },
+          "error": null
+        },
+        {
+          "strategy": "adaptive",
+          "status": "passed",
+          "wall_seconds": 67.8984,
+          "child_user_seconds": 77.253,
+          "child_system_seconds": 1.5638,
+          "child_max_rss_kb_cumulative": 1341516,
+          "gpu_before": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 11.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.29
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 14.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.71
+          },
+          "ffmpeg_process_count": 8,
+          "normalization_process_count": 2,
+          "interpolation_process_count": 4,
+          "interpolation_calls": 2,
+          "restoration_calls": 0,
+          "stage_seconds": {
+            "normalizing source run": 0.2047,
+            "normalizing source": 0.5192,
+            "interpolation": 12.8769,
+            "interpolation segment 1/3": 25.7082,
+            "interpolation segment 2/3": 25.7287,
+            "concatenating enhanced segments": 0.0407,
+            "composing enhanced segments": 0.7518
+          },
+          "intermediate_peak_bytes": 1107174,
+          "output_bytes": 980834,
+          "output": {
+            "duration_seconds": 4.021333,
+            "width": 1920,
+            "height": 1080,
+            "video_codec": "h264",
+            "pixel_format": "yuv420p",
+            "fps": "60",
+            "frames": 240,
+            "audio": true,
+            "audio_codec": "aac",
+            "audio_sample_rate": 48000,
+            "audio_channels": 2,
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "size_bytes": 980834
+          },
+          "source_hashes_before": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_hashes_after": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_preserved": true,
+          "boundary_safe": true,
+          "boundary_samples": {
+            "before_deleted_gap": "red",
+            "after_deleted_gap": "blue"
+          },
+          "error": null
+        },
+        {
+          "strategy": "adaptive",
+          "status": "passed",
+          "wall_seconds": 67.8779,
+          "child_user_seconds": 77.2254,
+          "child_system_seconds": 1.5505,
+          "child_max_rss_kb_cumulative": 1341516,
+          "gpu_before": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 10.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.7
+          },
+          "gpu_after": {
+            "name": "NVIDIA GeForce RTX 5070 Ti",
+            "utilization_percent": 11.0,
+            "memory_used_mb": 730.0,
+            "power_watts": 31.89
+          },
+          "ffmpeg_process_count": 8,
+          "normalization_process_count": 2,
+          "interpolation_process_count": 4,
+          "interpolation_calls": 2,
+          "restoration_calls": 0,
+          "stage_seconds": {
+            "normalizing source run": 0.2161,
+            "normalizing source": 0.5225,
+            "interpolation": 12.8606,
+            "interpolation segment 1/3": 25.7921,
+            "interpolation segment 2/3": 25.6517,
+            "concatenating enhanced segments": 0.0398,
+            "composing enhanced segments": 0.743
+          },
+          "intermediate_peak_bytes": 1107174,
+          "output_bytes": 980834,
+          "output": {
+            "duration_seconds": 4.021333,
+            "width": 1920,
+            "height": 1080,
+            "video_codec": "h264",
+            "pixel_format": "yuv420p",
+            "fps": "60",
+            "frames": 240,
+            "audio": true,
+            "audio_codec": "aac",
+            "audio_sample_rate": 48000,
+            "audio_channels": 2,
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "size_bytes": 980834
+          },
+          "source_hashes_before": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_hashes_after": {
+            "source-a.mp4": "9bb124dae93f32af33f137f749e07379490ed377efe3649fdc51de9764b39ab5",
+            "source-b.mp4": "77a2dd99ced0d21d1cc1b48041a4b3461bb7a5f820a99cbf3c4b684d5411834e"
+          },
+          "source_preserved": true,
+          "boundary_safe": true,
+          "boundary_samples": {
+            "before_deleted_gap": "red",
+            "after_deleted_gap": "blue"
+          },
+          "error": null
+        }
+      ]
+    }
+  },
+  "recommendation": {
+    "selected_strategy": "adaptive",
+    "reason": "Selected the fastest candidate that passed the technical integrity gates.",
+    "wall_seconds": 67.8984,
+    "normalization_process_count": 2,
+    "interpolation_calls": 2
+  }
+}

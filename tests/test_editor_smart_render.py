@@ -10,11 +10,13 @@ from framestudio.export_smart_render import (
     build_concat_copy_command,
     build_lossless_cut_command,
     build_source_normalization_command,
+    build_source_normalization_split_command,
 )
-from framestudio.export_types import OutputPolicy
+from framestudio.export_types import ExportExecutionError, ExportPlan, OutputPolicy
 from framestudio.fps_policy import FrameRatePolicy
 from framestudio.media import MediaProbe
 from framestudio.model import Segment
+from tests.editor_test_helpers import make_output_policy
 
 
 def make_probe(
@@ -113,20 +115,7 @@ class EditorSmartRenderCommandTests(unittest.TestCase):
         self.assertNotIn("-filter_complex", command)
 
     def test_source_normalization_applies_audio_gain_once_before_concat(self):
-        policy = OutputPolicy(
-            width=1920,
-            height=1080,
-            scaling_mode="contain-letterbox",
-            frame_rate="60/1",
-            timebase="1/1000000",
-            container="mp4",
-            video_codec="libx264",
-            audio_codec="aac",
-            pixel_format="yuv420p",
-            audio_stream_present=True,
-            requires_normalization=True,
-            reason="test",
-        )
+        policy = make_output_policy()
         segments = (
             Segment.create(0.0, 1.0),
             Segment.create(1.0, 2.0),
@@ -152,20 +141,7 @@ class EditorSmartRenderCommandTests(unittest.TestCase):
         self.assertEqual(command[command.index("-c:a") + 1], "aac")
 
     def test_source_normalization_allocates_segment_frames_cumulatively(self):
-        policy = OutputPolicy(
-            width=1920,
-            height=1080,
-            scaling_mode="contain-letterbox",
-            frame_rate="60/1",
-            timebase="1/1000000",
-            container="mp4",
-            video_codec="libx264",
-            audio_codec="aac",
-            pixel_format="yuv420p",
-            audio_stream_present=True,
-            requires_normalization=True,
-            reason="test",
-        )
+        policy = make_output_policy()
         segments = (
             Segment.create(0.0, 2.1484375),
             Segment.create(2.1484375, 3.02180733267717),
@@ -185,6 +161,129 @@ class EditorSmartRenderCommandTests(unittest.TestCase):
         filter_graph = command[command.index("-filter_complex") + 1]
         self.assertIn("trim=end_frame=64", filter_graph)
         self.assertIn("trim=end_frame=27", filter_graph)
+
+    def test_source_normalization_without_audio_supports_multiple_segments(self):
+        policy = OutputPolicy(
+            width=1920,
+            height=1080,
+            scaling_mode="contain-letterbox",
+            frame_rate="60/1",
+            timebase="1/1000000",
+            container="mp4",
+            video_codec="libx264",
+            audio_codec=None,
+            pixel_format="yuv420p",
+            audio_stream_present=False,
+            requires_normalization=True,
+            reason="video-only test",
+        )
+        segments = (
+            Segment.create(0.0, 1.0),
+            Segment.create(2.0, 3.0),
+        )
+
+        command = build_source_normalization_command(
+            Path("source.mp4"),
+            Path("prepared.mp4"),
+            segments,
+            target_rate=Fraction(30, 1),
+            policy=policy,
+            audio_decision=None,
+            has_audio=False,
+            ffmpeg_path="ffmpeg",
+        )
+
+        filter_graph = command[command.index("-filter_complex") + 1]
+        self.assertIn("concat=n=2:v=1:a=0[outv]", filter_graph)
+        self.assertEqual(command.count("-map"), 1)
+        self.assertNotIn("anullsrc", filter_graph)
+
+    def test_source_normalization_split_command_keeps_each_segment_independent(self):
+        policy = make_output_policy()
+        segments = (
+            Segment.create(0.0, 1.0),
+            Segment.create(2.0, 3.0),
+        )
+        normalization_options = {
+            "target_rate": Fraction(30, 1),
+            "policy": policy,
+            "audio_decision": {"status": "ready", "gain_db": 3.0},
+            "has_audio": True,
+            "ffmpeg_path": "ffmpeg",
+        }
+
+        command = build_source_normalization_split_command(
+            source=Path("source.mp4"),
+            destinations=(Path("prepared-0.mp4"), Path("prepared-1.mp4")),
+            source_segments=segments,
+            **normalization_options,
+        )
+
+        filter_graph = command[command.index("-filter_complex") + 1]
+        self.assertNotIn("concat=n=", filter_graph)
+        self.assertEqual(filter_graph.count("volume=3.00dB"), 1)
+        self.assertEqual(command.count("-map"), 4)
+        self.assertIn("[v0]", command)
+        self.assertIn("[v1]", command)
+        self.assertEqual(command[-2], "mp4")
+
+    def test_source_normalization_seeks_input_instead_of_decoding_from_zero(self):
+        """Regression test: normalizing a segment deep inside a long source
+
+        must seek the input near the segment start instead of decoding the
+        entire preceding portion of the file via the trim filter alone. That
+        historic gap made normalization slow and, on real long-form sources,
+        could silently drop the video stream entirely if decoding hit an
+        issue anywhere before the segment (reported failure: "Normalized
+        source could not be inspected: Could not read a video stream").
+        """
+        policy = make_output_policy()
+        segments = (Segment.create(3008.368545, 3061.925287),)
+
+        command = build_source_normalization_command(
+            Path("source.mp4"),
+            Path("prepared.mp4"),
+            segments,
+            target_rate=Fraction(30, 1),
+            policy=policy,
+            audio_decision={"status": "ready", "gain_db": 0.0},
+            has_audio=True,
+            ffmpeg_path="ffmpeg",
+        )
+
+        self.assertIn("-ss", command)
+        seek_index = command.index("-ss")
+        self.assertEqual(command[seek_index + 1], "3008.368545")
+        # The seek must come before the input so ffmpeg can fast-seek to it.
+        self.assertLess(seek_index, command.index("-i"))
+        filter_graph = command[command.index("-filter_complex") + 1]
+        self.assertIn("trim=start=0.000000:duration=53.556742", filter_graph)
+        self.assertIn("atrim=start=0.000000:duration=53.556742", filter_graph)
+
+    def test_source_normalization_split_seeks_to_earliest_segment_start(self):
+        policy = make_output_policy()
+        segments = (
+            Segment.create(120.0, 121.0),
+            Segment.create(125.0, 126.0),
+        )
+
+        command = build_source_normalization_split_command(
+            source=Path("source.mp4"),
+            destinations=(Path("prepared-0.mp4"), Path("prepared-1.mp4")),
+            source_segments=segments,
+            target_rate=Fraction(30, 1),
+            policy=policy,
+            audio_decision={"status": "ready", "gain_db": 0.0},
+            has_audio=True,
+            ffmpeg_path="ffmpeg",
+        )
+
+        seek_index = command.index("-ss")
+        self.assertEqual(command[seek_index + 1], "120.000000")
+        self.assertLess(seek_index, command.index("-i"))
+        filter_graph = command[command.index("-filter_complex") + 1]
+        self.assertIn("trim=start=0.000000:duration=1.000000", filter_graph)
+        self.assertIn("trim=start=5.000000:duration=1.000000", filter_graph)
 
     def test_concat_command_uses_fast_concat_demuxer_and_stream_copy(self):
         command = build_concat_copy_command(
@@ -285,7 +384,6 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
 
     def test_video_only_preparation_requests_audio_free_lossless_cuts(self):
         from framestudio.export_smart_render import prepare_enhanced_sources
-        from framestudio.export_types import ExportPlan
         from framestudio.fps_policy import SourceRateDecision
 
         with TemporaryDirectory() as temporary_directory:
@@ -365,9 +463,66 @@ class EditorSmartRenderPipelineTests(unittest.TestCase):
             self.assertEqual(captured_audio_setting, [False])
             self.assertEqual(prepared[0].probe.audio_codec, None)
 
+    def test_unsupported_rate_decision_never_uses_grouped_preparation(self):
+        from framestudio.export_smart_render import prepare_enhanced_sources
+        from framestudio.fps_policy import SourceRateDecision
+
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"source")
+            source_probe = make_probe(source, frame_rate="30/1", duration=2.0)
+            plan = ExportPlan(
+                route="enhanced",
+                source=source,
+                destination=root / "output.mp4",
+                segments=(
+                    Segment.create(0.0, 1.0),
+                    Segment.create(1.0, 2.0),
+                ),
+                expected_duration_seconds=2.0,
+                reason="unsupported rate decision",
+                output_policy=make_output_policy(),
+            )
+            decision = SourceRateDecision(
+                source_id="source",
+                source_rate=Fraction(30, 1),
+                target_rate=Fraction(60, 1),
+                action="unsupported",
+                eligible=False,
+                reason="variable frame rate",
+            )
+
+            with (
+                patch(
+                    "framestudio.export_smart_render._execute_source_normalization_split",
+                    return_value=(source_probe, source_probe),
+                ) as grouped_prepare,
+                patch(
+                    "framestudio.export_smart_render._can_losslessly_select",
+                    return_value=False,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    ExportExecutionError,
+                    "Enhanced export cannot process source",
+                ):
+                    prepare_enhanced_sources(
+                        plan,
+                        (source_probe,),
+                        {"source": decision},
+                        root / "temporary",
+                        ffmpeg_path="ffmpeg",
+                        ffprobe_path="ffprobe",
+                        progress_callback=None,
+                        started=0.0,
+                        cancel_event=None,
+                    )
+
+            grouped_prepare.assert_not_called()
+
     def test_enhanced_export_does_not_select_concat_first_strategy(self):
         from framestudio.export_interpolation import _should_use_concat_first
-        from framestudio.export_types import ExportPlan
 
         source = Path("portrait.mp4")
         plan = ExportPlan(

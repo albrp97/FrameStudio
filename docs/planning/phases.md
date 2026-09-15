@@ -38,6 +38,9 @@ implementation work.
    scope are explicit and testable.
 9. Optimize interactive preview and validate future media-processing choices
    with measured target-workstation evidence before changing defaults.
+10. Measure and deliver conditional export pipelines that reduce redundant
+    preparation and enhancement work without weakening boundary, output, or
+    resumability guarantees.
 
 The first usable product is the combined outcome of PHASE-001 through
 PHASE-003. PHASE-004 onward is future expansion and must not be pulled into
@@ -56,6 +59,7 @@ the first horizon without approved scope change.
 | 6 | PHASE-006 | Focus and compose important action | CAP-005, CAP-009, CAP-010, CAP-012 | PHASE-004A, PHASE-005 | complete |
 | 7 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | complete |
 | 8 | PHASE-008 | Optimize responsive preview and select evidence-based media strategies | CAP-002, CAP-003, CAP-004, CAP-005, CAP-009, CAP-011, CAP-012 | PHASE-006, PHASE-007; target-workstation media and benchmark evidence | complete |
+| 9 | PHASE-009 | Select and deliver efficient export pipelines | CAP-005, CAP-011, CAP-012 | PHASE-008; benchmark protocol, representative media, and target-workstation evidence | active |
 
 ## Common Phase Rules
 
@@ -86,6 +90,7 @@ are closed; confirmed future phases remain open.
 | 7 | PHASE-006 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-006-focusing-and-composing-important-action.md` |
 | 8 | PHASE-007 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-007-producing-validated-60-fps-edits.md` |
 | 9 | PHASE-008 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md` |
+| 10 | PHASE-009 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-009-selecting-and-delivering-efficient-export-pipelines.md` |
 
 ## Capability Coverage
 
@@ -95,14 +100,14 @@ are closed; confirmed future phases remain open.
 | CAP-002 | PHASE-001, PHASE-004, PHASE-008 | One-source playback and seek | Composed mixed-source preview, responsive cursor-driven preview, and scalable timeline navigation |
 | CAP-003 | PHASE-002, PHASE-004, PHASE-008 | Split/delete | Movement, multi-selection, copy/paste, expanded segment model, and resilient timeline controls |
 | CAP-004 | PHASE-001, PHASE-003, PHASE-008 | Save/reopen | Future schema expansion and current-project recovery |
-| CAP-005 | PHASE-002, PHASE-004, PHASE-005, PHASE-006, PHASE-007, PHASE-008 | Fast verified cut export | Composition, audio, mixed-source, FPS delivery, and measured rendering strategies |
+| CAP-005 | PHASE-002, PHASE-004, PHASE-005, PHASE-006, PHASE-007, PHASE-008, PHASE-009 | Fast verified cut export | Composition, audio, mixed-source, FPS delivery, and measured rendering strategies |
 | CAP-006 | PHASE-003 | Basic agentable workflow | Future full editing command surface |
 | CAP-007 | PHASE-004 | Not included | Multiple mixed-media sources |
 | CAP-008 | PHASE-005 | Not included | Per-input audio handling |
 | CAP-009 | PHASE-006, PHASE-008 | Not included | Reusable transforms and direct focus interaction |
 | CAP-010 | PHASE-006 | Not included | Linked triplicate composition |
-| CAP-011 | PHASE-007, PHASE-008 | Not included | Validated 60 FPS enhancement and mixed-FPS strategy evidence |
-| CAP-012 | PHASE-001 through PHASE-008, PHASE-004A | Source/project/output safety | Cross-cutting future safety and maintainable boundaries |
+| CAP-011 | PHASE-007, PHASE-008, PHASE-009 | Not included | Validated 60 FPS enhancement and mixed-FPS strategy evidence |
+| CAP-012 | PHASE-001 through PHASE-009, PHASE-004A | Source/project/output safety | Cross-cutting future safety and maintainable boundaries |
 
 ## Phase Approval and Handoff
 
@@ -170,3 +175,8 @@ recorded in the linked evidence.
 - The original phase-index metadata, sequencing rationale, common rules,
   capability coverage, handoff gate, and source references remain in this
   synchronized index.
+- PHASE-009 was added on 2026-09-09 under the user's request to benchmark and
+  implement a more efficient export pipeline. It preserves PHASE-008's
+  completed Strategy B behavior as the protected baseline and adds only the
+  conditional batching, benchmark, and verification work required for the
+  new outcome.

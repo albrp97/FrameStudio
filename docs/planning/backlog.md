@@ -57,6 +57,9 @@ playback, deletion responsiveness, FPS-count, and post-export action tickets.
 CHG-010 added the general resumable-export session/checkpoint,
 recovery-control, and CLI-parity tickets without changing the first-horizon
 scope; all four are now delivered.
+The PHASE-009 section adds the active benchmark and implementation tickets for
+conditional export batching, boundary-safe enhancement ordering, and
+resumable artifact reuse without changing the fixed delivery contract.
 
 ## Ticket Lifecycle Records
 
@@ -174,6 +177,9 @@ gates, and review evidence.
 | 99 | TICKET-099 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md` |
 | 100 | TICKET-100 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md` |
 | 101 | TICKET-101 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
+| 102 | TICKET-102 | active | FEAT-030 | PHASE-009 | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
+| 103 | TICKET-103 | active | FEAT-031 | PHASE-009 | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
+| 104 | TICKET-104 | active | FEAT-031 | PHASE-009 | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
 
 ## Ticket summary
 
@@ -1021,6 +1027,9 @@ cancellation or failure.
 | 99 | TICKET-099 | Checkpoint and resume all export stages | FEAT-029 | TICKET-098, TICKET-087, TICKET-093; staged export execution | complete | `tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md` |
 | 100 | TICKET-100 | Offer export resume, restart, and discard controls | FEAT-029 | TICKET-098, TICKET-099, TICKET-090; GTK project lifecycle | complete | `tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md` |
 | 101 | TICKET-101 | Preserve the CLI export resume contract | FEAT-029 | TICKET-098, TICKET-099, TICKET-088; CLI JSON Lines | complete | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
+| 102 | TICKET-102 | Benchmark efficient export pipeline candidates | FEAT-030 | protected export baseline; representative media; target workstation | active | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
+| 103 | TICKET-103 | Implement the conditional grouped export route | FEAT-031 | TICKET-102; enhanced export/cache/session contracts | active | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
+| 104 | TICKET-104 | Verify export pipeline integrity and resume | FEAT-031 | TICKET-103; output verification and user-validation gates | active | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
 
 ### Dependency order
 
@@ -1049,6 +1058,8 @@ cancellation or failure.
 `TICKET-098 + TICKET-099 + TICKET-090 -> TICKET-100`
 
 `TICKET-098 + TICKET-099 + TICKET-088 -> TICKET-101`
+
+`TICKET-102 -> TICKET-103 -> TICKET-104`
 
 `TICKET-089` is independently grounded in the existing playback controller
 and timeline preview request path.
@@ -1150,3 +1161,43 @@ available as evidence and safe fallback behavior where required.
 - `FPS-ENHANCEMENT-RESEARCH.md`
 - `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`
 - `.github/aidd-config.yml`
+
+## PHASE-009 - Efficient Export Pipeline Delivery
+
+PHASE-009 is active under the user's 2026-09-09 request to benchmark and
+implement the most efficient safe export pipeline. TICKET-102 must establish
+equivalent benchmark data before TICKET-103 changes production routing.
+TICKET-104 owns automated functionality evidence, generated-media verification,
+resume behavior, review, and the exact user-validation handoff.
+
+### Feature coverage
+
+| Feature outcome | Ticket coverage | Coverage status |
+|---|---|---|
+| Benchmark and select efficient export pipelines | TICKET-102 | covered |
+| Execute efficient resumable export pipelines | TICKET-103, TICKET-104 | covered |
+| CAP-005 - Rendering fast, valid, and safe outputs | TICKET-102 through TICKET-104 | covered |
+| CAP-011 - Enhancing frame rate to 60 FPS | TICKET-102 through TICKET-104 | covered |
+| CAP-012 - Protecting media, state, and failure recovery | TICKET-102 through TICKET-104 | covered |
+
+### Protected behavior
+
+The current per-segment Strategy B route remains the protected baseline.
+Fixed 1920x1080 output, target FPS, audio policy, visual transforms,
+triplicate composition, source preservation, atomic publication, cache/session
+identity, cancellation, cleanup, and strict verification cannot be weakened by
+the optimization.
+
+### Source references
+
+- `docs/planning/phases/open/PHASE-009-selecting-and-delivering-efficient-export-pipelines.md`
+- `docs/planning/features/open/FEAT-030-benchmarking-and-selecting-efficient-export-pipelines.md`
+- `docs/planning/features/open/FEAT-031-executing-efficient-resumable-export-pipelines.md`
+- `docs/planning/tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md`
+- `docs/planning/tickets/open/TICKET-103-implement-conditional-grouped-export-route.md`
+- `docs/planning/tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md`
+- `benchmarks/render_strategy_benchmark.py`
+- `framestudio/export_smart_render.py`
+- `framestudio/export_interpolation.py`
+- `framestudio/export_cache.py`
+- `framestudio/export_session.py`
