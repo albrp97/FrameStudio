@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -174,6 +175,20 @@ def find_selected_inputs(paths: list[Path], output: Path | None) -> list[Path]:
     if not selected:
         raise RuntimeError("No supported video files were selected")
     return selected
+
+
+def randomize_timeline_order(paths: list[Path]) -> list[Path]:
+    """Shuffle the order videos are appended to the timeline.
+
+    Discovery and selection stay deterministically sorted (see
+    ``_video_paths``); only the final concatenation order is randomized, and
+    only when more than one video is being added.
+    """
+    if len(paths) <= 1:
+        return paths
+    shuffled = list(paths)
+    random.shuffle(shuffled)
+    return shuffled
 
 
 def nominal_rate(clip: Clip) -> Fraction:
@@ -1305,6 +1320,7 @@ def main(argv: list[str] | None = None, *, prog: str | None = None) -> int:
             input_dir = input_dir.parent
         else:
             raise RuntimeError(f"Input path does not exist: {input_dir}")
+    paths = randomize_timeline_order(paths)
     if arguments.concat_only:
         return concatenate(paths, input_dir, requested_output, arguments)
     from framestudio_fps import run_combined_pipeline

@@ -17,6 +17,7 @@ from framestudio_concat import (
     h264_level,
     nominal_rate,
     parse_arguments,
+    randomize_timeline_order,
     run_normalization,
 )
 
@@ -67,6 +68,23 @@ class ConcatTests(unittest.TestCase):
                 find_selected_inputs([first, output, second], output),
                 [second, first],
             )
+
+    def test_single_video_order_is_left_unchanged(self):
+        paths = [Path("solo.mp4")]
+        self.assertEqual(randomize_timeline_order(paths), paths)
+
+    def test_multiple_videos_are_shuffled_onto_the_timeline(self):
+        paths = [Path(f"clip-{index}.mp4") for index in range(6)]
+        with patch("framestudio_concat.random.shuffle") as shuffle_mock:
+            result = randomize_timeline_order(paths)
+        shuffle_mock.assert_called_once_with(result)
+        self.assertEqual(sorted(result), sorted(paths))
+
+    def test_randomize_timeline_order_does_not_mutate_input_list(self):
+        paths = [Path("a.mp4"), Path("b.mp4"), Path("c.mp4")]
+        original = list(paths)
+        randomize_timeline_order(paths)
+        self.assertEqual(paths, original)
 
     def test_lowest_frame_rate_is_selected(self):
         clips = [clip("30.mp4", "30/1"), clip("2997.mp4")]
