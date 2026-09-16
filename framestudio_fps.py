@@ -186,6 +186,30 @@ def probe_video(path: Path) -> tuple[Fraction, int]:
     return frame_rate, frame_count
 
 
+FRAME_RATE_TOLERANCE = Fraction(1, 100_000)
+
+
+def frame_rates_match(
+    actual: Fraction,
+    expected: Fraction,
+    tolerance: Fraction = FRAME_RATE_TOLERANCE,
+) -> bool:
+    """Compare a probed frame rate against an expected rate with rounding slack.
+
+    ``ffprobe`` derives ``r_frame_rate``/``avg_frame_rate`` from the encoded
+    container's own timing, which can differ from an exactly computed
+    expected rational by a tiny amount (observed in production: a relative
+    error around 1e-7) even when the produced output is otherwise correct.
+    Reject only differences that exceed a small relative tolerance rather
+    than requiring exact rational equality.
+    """
+    if actual == expected:
+        return True
+    if actual <= 0 or expected <= 0:
+        return False
+    return abs(actual - expected) / expected <= tolerance
+
+
 def target_frame_count(
     source_rate: Fraction,
     source_frames: int,
@@ -1283,7 +1307,7 @@ def run_interpolation_rve(
             if not rve_video.is_file():
                 raise RuntimeError("REAL-Video-Enhancer did not produce an output file")
             actual_rate, actual_frames = probe_video(rve_video)
-            if actual_rate != render_rate or actual_frames != render_frames:
+            if not frame_rates_match(actual_rate, render_rate) or actual_frames != render_frames:
                 raise RuntimeError(
                     "REAL-Video-Enhancer produced invalid output timing: "
                     f"{actual_rate} FPS, {actual_frames} frames; expected "
@@ -1335,7 +1359,7 @@ def run_interpolation_rve(
                 cancel_event=cancel_event,
             )
             final_rate, final_frames = probe_video(partial)
-            if final_rate != target_rate or final_frames != target_frames:
+            if not frame_rates_match(final_rate, target_rate) or final_frames != target_frames:
                 raise RuntimeError(
                     "The final RVE remux changed output timing: "
                     f"{final_rate} FPS, {final_frames} frames; expected "
@@ -1480,7 +1504,7 @@ def run_restoration_rve(
             if not rve_video.is_file():
                 raise RuntimeError("REAL-Video-Enhancer restoration did not produce an output file")
             actual_rate, actual_frames = probe_video(rve_video)
-            if actual_rate != source_rate or actual_frames != source_frames:
+            if not frame_rates_match(actual_rate, source_rate) or actual_frames != source_frames:
                 raise RuntimeError(
                     "REAL-Video-Enhancer restoration produced invalid output timing: "
                     f"{actual_rate} FPS, {actual_frames} frames; expected "
@@ -1493,7 +1517,7 @@ def run_restoration_rve(
                 cancel_event=cancel_event,
             )
             final_rate, final_frames = probe_video(partial)
-            if final_rate != source_rate or final_frames != source_frames:
+            if not frame_rates_match(final_rate, source_rate) or final_frames != source_frames:
                 raise RuntimeError(
                     "The final RVE restoration remux changed output timing: "
                     f"{final_rate} FPS, {final_frames} frames; expected "

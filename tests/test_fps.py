@@ -16,6 +16,7 @@ from framestudio_fps import (
     build_rve_normalization_command,
     build_rve_restoration_command,
     default_output,
+    frame_rates_match,
     parse_arguments,
     probe_video,
     progress_line,
@@ -331,6 +332,28 @@ class FpsTests(unittest.TestCase):
         self.assertIn("elapsed 00:00:10", line)
         self.assertIn("ETA 00:00:10", line)
         self.assertIn("C", line)
+
+    def test_frame_rates_match_accepts_exact_equality(self):
+        rate = Fraction(60000, 1001)
+        self.assertTrue(frame_rates_match(rate, rate))
+
+    def test_frame_rates_match_accepts_container_rounding_noise(self):
+        # Reproduces a real production failure: ffprobe reported
+        # 916004/7641 FPS for an output whose exactly computed expected
+        # rate was 3330227188/27779645 FPS (relative difference ~1.3e-7),
+        # even though the encoded output was otherwise correct.
+        actual = Fraction(916004, 7641)
+        expected = Fraction(3330227188, 27779645)
+        self.assertTrue(frame_rates_match(actual, expected))
+
+    def test_frame_rates_match_rejects_meaningfully_different_rates(self):
+        self.assertFalse(
+            frame_rates_match(Fraction(30000, 1001), Fraction(60000, 1001))
+        )
+
+    def test_frame_rates_match_rejects_non_positive_rates(self):
+        self.assertFalse(frame_rates_match(Fraction(0), Fraction(60)))
+        self.assertFalse(frame_rates_match(Fraction(60), Fraction(0)))
 
     def test_single_input_skips_concat(self):
         with TemporaryDirectory() as temporary_directory:
