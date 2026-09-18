@@ -1,4 +1,5 @@
 import json
+import os
 import unittest
 from fractions import Fraction
 from pathlib import Path
@@ -7,9 +8,12 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from benchmarks.render_strategy_benchmark import (
+    BENCHMARK_ARTIFACT_DIRECTORY,
+    DEFAULT_ARTIFACT_ROOT,
     SourceSpec,
     StageResult,
     _concat_command,
+    _default_artifact_root,
     _prepare_command,
     _probe,
     _write_concat_list,
@@ -23,6 +27,21 @@ from benchmarks.render_strategy_benchmark import (
 
 
 class RenderStrategyBenchmarkCalculationsTests(unittest.TestCase):
+    def test_default_artifact_root_uses_xdg_cache_instead_of_edit_directory(self):
+        with patch.dict(os.environ, {"XDG_CACHE_HOME": "/tmp/framestudio-test-cache"}):
+            self.assertEqual(
+                _default_artifact_root(),
+                Path("/tmp/framestudio-test-cache")
+                / "framestudio"
+                / "benchmarks"
+                / BENCHMARK_ARTIFACT_DIRECTORY,
+            )
+
+        self.assertNotIn(
+            Path.home() / "Documents" / "edit",
+            DEFAULT_ARTIFACT_ROOT.parents,
+        )
+
     def test_expected_frame_count_rounds_rational_duration_consistently(self):
         self.assertEqual(expected_frame_count(1.25, Fraction(20, 1)), 25)
         self.assertEqual(expected_frame_count(1.001, Fraction(60000, 1001)), 60)

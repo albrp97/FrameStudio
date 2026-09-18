@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import platform
 import resource
 import shutil
@@ -25,9 +26,16 @@ if str(ROOT) not in sys.path:
 DEFAULT_OUTPUT_WIDTH = 1920
 DEFAULT_OUTPUT_HEIGHT = 1080
 DEFAULT_TARGET_RATE = Fraction(60, 1)
-DEFAULT_ARTIFACT_ROOT = (
-    Path.home() / "Documents" / "edit" / "ticket-080-upscale-render-strategy-20260827"
-)
+BENCHMARK_ARTIFACT_DIRECTORY = "ticket-080-upscale-render-strategy-20260827"
+
+
+def _default_artifact_root() -> Path:
+    cache_root = os.environ.get("XDG_CACHE_HOME")
+    base = Path(cache_root).expanduser() if cache_root else Path.home() / ".cache"
+    return base / "framestudio" / "benchmarks" / BENCHMARK_ARTIFACT_DIRECTORY
+
+
+DEFAULT_ARTIFACT_ROOT = _default_artifact_root()
 
 
 @dataclass(frozen=True)
@@ -1270,7 +1278,7 @@ def run_benchmark(
         "python": sys.version.split()[0],
         "ffmpeg": "available" if ffmpeg else "unavailable",
         "ffprobe": "available" if ffprobe else "unavailable",
-        "artifact_root": "~/Documents/edit/ticket-080-upscale-render-strategy-20260827",
+        "artifact_root": report_path(artifact_root),
         "limits": "Single workstation; one cold repetition; generated fixtures; reports redact private paths.",
     }
     rve = _rve_context()
