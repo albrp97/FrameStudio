@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import os
 import subprocess
@@ -430,3 +431,160 @@ def segment_is_full_source(
         source_duration_seconds,
         abs_tol=_BOUNDARY_TOLERANCE,
     )
+
+
+def probe_frame_count(path: Path, ffprobe_path: str = "ffprobe") -> int:
+    command = [
+        ffprobe_path,
+        "-v",
+        "error",
+        "-count_frames",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=nb_read_frames",
+        "-of",
+        "json",
+        str(path),
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        raise ExportExecutionError(
+            f"Could not start ffprobe for frame counting: {ffprobe_path}"
+        ) from error
+    if result.returncode != 0:
+        detail = result.stderr.strip() or "ffprobe could not count video frames"
+        raise ExportExecutionError(detail)
+    try:
+        value = json.loads(result.stdout)["streams"][0]["nb_read_frames"]
+        count = int(value)
+    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ExportExecutionError(f"Could not count frames in {path.name}") from error
+    if count <= 0:
+        raise ExportExecutionError(f"Frame count is invalid for {path.name}")
+    return count
+
+
+def ensure_exact_video_frame_count(
+    destination: Path,
+    expected_frames: int,
+    *,
+    frame_rate: Fraction,
+    video_codec: str,
+    pixel_format: str,
+    container: str,
+    has_audio: bool,
+    audio_codec: str | None,
+    audio_sample_rate: int,
+    audio_channels: int,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+) -> MediaProbe:
+    """Repair a rendered clip whose frame count drifted from its rounded target.
+
+    Frame-accurate seeking and constant-rate conversion can legitimately land
+    one or more frames short (or, rarely, over) of the exact frame count
+    implied by rounding a segment's duration to the output frame rate.
+    Interpolated segments already enforce their target frame count, but
+    passthrough/converted segments did not, so this closes that gap in place
+    by cloning or trimming the trailing frame(s) before the drift can
+    accumulate into a final "frame count does not match" export failure.
+    """
+    actual_frames = probe_frame_count(destination, ffprobe_path)
+    if actual_frames == expected_frames:
+        return probe_media(destination, ffprobe_path)
+    deficit = expected_frames - actual_frames
+    corrected = destination.with_name(
+        f".{destination.name}.frame-fix-{uuid.uuid4().hex}{destination.suffix}"
+    )
+    command = [
+        ffmpeg_path,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-nostdin",
+        "-y",
+        "-i",
+        str(destination),
+    ]
+    if deficit > 0:
+        video_expr = f"[0:v]tpad=stop_mode=clone:stop={deficit}[v]"
+        pad_seconds = deficit / float(frame_rate)
+    else:
+        video_expr = f"[0:v]trim=end_frame={expected_frames},setpts=PTS-STARTPTS[v]"
+        pad_seconds = 0.0
+    if has_audio:
+        audio_expr = (
+            f"[0:a]apad=pad_dur={pad_seconds:.6f}[a]" if deficit > 0 else "[0:a]anull[a]"
+        )
+        command.extend(
+            ["-filter_complex", f"{video_expr};{audio_expr}", "-map", "[v]", "-map", "[a]"]
+        )
+    else:
+        command.extend(["-filter_complex", video_expr, "-map", "[v]"])
+    command.extend(
+        [
+            "-frames:v",
+            str(expected_frames),
+            "-c:v",
+            video_codec,
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            pixel_format,
+        ]
+    )
+    if has_audio:
+        command.extend(
+            [
+                "-c:a",
+                audio_codec or "aac",
+                "-b:a",
+                "192k",
+                "-ar",
+                str(audio_sample_rate),
+                "-ac",
+                str(audio_channels),
+            ]
+        )
+    command.append("-movflags")
+    command.append("+faststart")
+    if deficit < 0:
+        command.append("-shortest")
+    command.extend(["-f", container, str(corrected)])
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+    except OSError as error:
+        corrected.unlink(missing_ok=True)
+        raise ExportExecutionError(
+            f"Could not start FFmpeg to correct frame count: {ffmpeg_path}"
+        ) from error
+    if result.returncode != 0:
+        corrected.unlink(missing_ok=True)
+        detail = result.stderr.strip() or "FFmpeg frame-count correction failed"
+        raise ExportExecutionError(detail)
+    if not corrected.is_file() or corrected.stat().st_size <= 0:
+        corrected.unlink(missing_ok=True)
+        raise ExportExecutionError(
+            f"Frame count correction did not create an output for {destination.name}"
+        )
+    corrected_frames = probe_frame_count(corrected, ffprobe_path)
+    if corrected_frames != expected_frames:
+        corrected.unlink(missing_ok=True)
+        raise ExportExecutionError(
+            f"Frame count correction for {destination.name} still does not match the target "
+            f"({corrected_frames} != {expected_frames})"
+        )
+    os.replace(corrected, destination)
+    try:
+        return probe_media(destination, ffprobe_path)
+    except MediaProbeError as error:
+        raise ExportExecutionError(f"Corrected source could not be inspected: {error}") from error

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
 import math
 import os
 import shutil
-import subprocess
 import threading
 import time
 import warnings
@@ -24,8 +22,10 @@ from .export_cache import (
 from .export_ffmpeg import execute_fallback, execute_mixed_fallback
 from .export_process import (
     emit_export_progress,
+    ensure_exact_video_frame_count,
     partial_path,
     prepare_export_sources,
+    probe_frame_count,
     publish_verified_export,
     remove_partial,
     run_ffmpeg,
@@ -67,44 +67,6 @@ from .upscale_policy import DEFAULT_UPSCALE_MODEL, UpscaleDecision
 
 VerifySingle = Callable[..., MediaProbe]
 VerifyMixed = Callable[..., MediaProbe]
-
-
-def probe_frame_count(path: Path, ffprobe_path: str = "ffprobe") -> int:
-    command = [
-        ffprobe_path,
-        "-v",
-        "error",
-        "-count_frames",
-        "-select_streams",
-        "v:0",
-        "-show_entries",
-        "stream=nb_read_frames",
-        "-of",
-        "json",
-        str(path),
-    ]
-    try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError as error:
-        raise ExportExecutionError(
-            f"Could not start ffprobe for frame counting: {ffprobe_path}"
-        ) from error
-    if result.returncode != 0:
-        detail = result.stderr.strip() or "ffprobe could not count video frames"
-        raise ExportExecutionError(detail)
-    try:
-        value = json.loads(result.stdout)["streams"][0]["nb_read_frames"]
-        count = int(value)
-    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
-        raise ExportExecutionError(f"Could not count frames in {path.name}") from error
-    if count <= 0:
-        raise ExportExecutionError(f"Frame count is invalid for {path.name}")
-    return count
 
 
 def _policy(plan: ExportPlan) -> FrameRatePolicy:
@@ -867,6 +829,27 @@ def _execute_enhanced_clip_assembly(
         total_frames=total_frames,
         cancel_event=cancel_event,
     )
+    # The concat filter graph re-quantizes each input's timestamps onto the
+    # output frame grid; even when every input segment already carries its
+    # exact per-segment target frame count, this re-quantization can drop or
+    # duplicate a small number of frames at segment boundaries. Enforce the
+    # authoritative total here too, the same way individual segments are
+    # enforced, so the final assembled output always matches the
+    # verification target regardless of concat-stage drift.
+    ensure_exact_video_frame_count(
+        partial,
+        total_frames,
+        frame_rate=Fraction(policy.frame_rate),
+        video_codec=policy.video_codec,
+        pixel_format=policy.pixel_format,
+        container=policy.container,
+        has_audio=policy.audio_stream_present,
+        audio_codec=policy.audio_codec,
+        audio_sample_rate=policy.audio_sample_rate,
+        audio_channels=policy.audio_channels,
+        ffmpeg_path=ffmpeg_path,
+        ffprobe_path=ffprobe_path,
+    )
 
 
 def _execute_per_source_enhanced_render(
@@ -888,6 +871,12 @@ def _execute_per_source_enhanced_render(
 ) -> None:
     preparation_options = dict(options)
     preparation_options.pop("pipeline_strategy", None)
+    active_segments = tuple(segment for segment in plan.segments if not segment.deleted)
+    target_frames = _segment_target_frame_counts(
+        active_segments,
+        policy.target_rate,
+        total_frames,
+    )
     prepared_sources = prepare_enhanced_sources(
         plan,
         original_probes,
@@ -901,15 +890,10 @@ def _execute_per_source_enhanced_render(
         backend_kwargs=preparation_options,
         cache=cache,
         grouped_preparation=options.get("pipeline_strategy", "adaptive") == "adaptive",
+        segment_target_frames=target_frames,
     )
-    active_segments = tuple(segment for segment in plan.segments if not segment.deleted)
     if len(prepared_sources) != len(active_segments):
         raise ExportExecutionError("Enhanced source preparation changed the timeline")
-    target_frames = _segment_target_frame_counts(
-        active_segments,
-        policy.target_rate,
-        total_frames,
-    )
     enhanced_paths: list[Path] = []
     enhanced_probes: list[MediaProbe] = []
     total_segments = len(prepared_sources)

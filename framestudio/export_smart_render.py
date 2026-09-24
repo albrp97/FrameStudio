@@ -14,8 +14,10 @@ from .audio import AudioDecision, audio_filter
 from .composition_render import segment_video_filters
 from .export_cache import CachedArtifactInvalid, ExportCache
 from .export_process import (
+    ensure_exact_video_frame_count,
     output_format,
     partial_path,
+    probe_frame_count,
     run_ffmpeg,
     segment_is_full_source,
 )
@@ -91,15 +93,26 @@ def _prepared_probe_validator(
     segment: Segment,
     policy: OutputPolicy,
     preparation_rate: Fraction,
+    *,
+    expected_frames: int | None = None,
+    ffprobe_path: str | None = None,
 ) -> Callable[[MediaProbe], bool]:
     def validate(candidate: MediaProbe) -> bool:
-        return (
+        if (
             abs(candidate.duration_seconds - segment.duration_seconds)
-            <= max(_DURATION_TOLERANCE, 0.1)
-            and (candidate.width, candidate.height) == (policy.width, policy.height)
-            and canonical_rate(candidate.frame_rate) == canonical_rate(preparation_rate)
-            and candidate.has_audio_stream == policy.audio_stream_present
-        )
+            > max(_DURATION_TOLERANCE, 0.1)
+            or (candidate.width, candidate.height) != (policy.width, policy.height)
+            or canonical_rate(candidate.frame_rate) != canonical_rate(preparation_rate)
+            or candidate.has_audio_stream != policy.audio_stream_present
+        ):
+            return False
+        if expected_frames is not None and ffprobe_path is not None:
+            try:
+                if probe_frame_count(candidate.path, ffprobe_path) != expected_frames:
+                    return False
+            except ExportExecutionError:
+                return False
+        return True
 
     return validate
 
@@ -923,6 +936,7 @@ def _grouped_preparation_outputs(
     cancel_event: threading.Event | None,
     cache: ExportCache | None,
     preserve_resolution: bool,
+    segment_target_frames: Sequence[int] | None = None,
 ) -> dict[int, tuple[Path, MediaProbe]]:
     """Prepare compatible multi-segment runs in one FFmpeg invocation."""
     if plan.output_policy is None:
@@ -970,11 +984,19 @@ def _grouped_preparation_outputs(
             cache_root / f"run-{run.run_index}-segment-{index}-prepared.mp4"
             for index in range(len(run.segments))
         )
+        run_frame_counts: tuple[int, ...] | None = None
+        if segment_target_frames is not None and canonical_rate(
+            preparation_rate
+        ) == canonical_rate(plan.output_policy.frame_rate):
+            run_frame_counts = tuple(
+                segment_target_frames[active_positions[index]] for index in run.segment_indices
+            )
         cached: list[tuple[Path, MediaProbe]] = []
-        for segment_index, segment, _destination in zip(
+        for segment_index, segment, _destination, expected_frames in zip(
             run.segment_indices,
             run.segments,
             destinations,
+            run_frame_counts if run_frame_counts is not None else (None,) * len(run.segments),
             strict=True,
         ):
             active_position = active_positions[segment_index]
@@ -987,6 +1009,8 @@ def _grouped_preparation_outputs(
                     segment,
                     plan.output_policy,
                     preparation_rate,
+                    expected_frames=expected_frames,
+                    ffprobe_path=ffprobe_path,
                 ),
             )
             if cached_probe is None:
@@ -1017,6 +1041,7 @@ def _grouped_preparation_outputs(
                 preserve_resolution=preserve_resolution,
                 content_width=content_width,
                 content_height=content_height,
+                expected_frame_counts=run_frame_counts,
             )
             cached = list(zip(destinations, probes_for_run, strict=True))
             for segment_index, (_path, prepared_probe) in zip(
@@ -1050,6 +1075,7 @@ def prepare_enhanced_sources(
     backend_kwargs: Mapping[str, object] | None = None,
     cache: ExportCache | None = None,
     grouped_preparation: bool = True,
+    segment_target_frames: Sequence[int] | None = None,
 ) -> tuple[PreparedSource, ...]:
     """Prepare each retained timeline segment without changing its source rate."""
     policy = plan.output_policy
@@ -1073,6 +1099,10 @@ def prepare_enhanced_sources(
     active_segments = tuple(segment for segment in plan.segments if not segment.deleted)
     if not active_segments:
         raise ExportExecutionError("Enhanced export has no active segments")
+    if segment_target_frames is not None and len(segment_target_frames) != len(active_segments):
+        raise ExportExecutionError(
+            "Enhanced export segment frame targets do not match the active segments"
+        )
 
     grouped_outputs = (
         _grouped_preparation_outputs(
@@ -1087,6 +1117,7 @@ def prepare_enhanced_sources(
             cancel_event=cancel_event,
             cache=cache,
             preserve_resolution=use_preserve_resolution,
+            segment_target_frames=segment_target_frames,
         )
         if grouped_preparation
         else {}
@@ -1259,6 +1290,12 @@ def prepare_enhanced_sources(
             if cut_path == probe.path:
                 normalization_source = probe.path
                 normalization_segments = (segment,)
+            segment_expected_frames = (
+                segment_target_frames[segment_index]
+                if segment_target_frames is not None
+                and canonical_rate(preparation_rate) == canonical_rate(policy.frame_rate)
+                else None
+            )
             normalized_probe = _reuse_cached_probe(
                 cache,
                 f"segment-{segment_index}-prepared",
@@ -1267,6 +1304,8 @@ def prepare_enhanced_sources(
                     segment,
                     policy,
                     preparation_rate,
+                    expected_frames=segment_expected_frames,
+                    ffprobe_path=ffprobe_path,
                 ),
             )
             if normalized_probe is None:
@@ -1288,6 +1327,7 @@ def prepare_enhanced_sources(
                     progress_offset_seconds=progress_offset,
                     progress_total_duration_seconds=progress_total,
                     cancel_event=cancel_event,
+                    expected_frame_total=segment_expected_frames,
                 )
                 _record_cached_probe(
                     cache,
@@ -1482,6 +1522,7 @@ def _execute_source_normalization(
     progress_offset_seconds: float,
     progress_total_duration_seconds: float,
     cancel_event: threading.Event | None,
+    expected_frame_total: int | None = None,
 ) -> MediaProbe:
     partial = partial_path(destination)
     selected_duration = sum(segment.duration_seconds for segment in segments)
@@ -1512,8 +1553,28 @@ def _execute_source_normalization(
         if not partial.is_file() or partial.stat().st_size <= 0:
             raise ExportExecutionError("Source normalization did not create an output")
         os.replace(partial, destination)
+        if expected_frame_total is None:
+            try:
+                return probe_media(destination, ffprobe_path)
+            except MediaProbeError as error:
+                raise ExportExecutionError(
+                    f"Normalized source could not be inspected: {error}"
+                ) from error
         try:
-            return probe_media(destination, ffprobe_path)
+            return ensure_exact_video_frame_count(
+                destination,
+                expected_frame_total,
+                frame_rate=canonical_rate(target_rate),
+                video_codec=policy.video_codec,
+                pixel_format=policy.pixel_format,
+                container=policy.container,
+                has_audio=policy.audio_stream_present,
+                audio_codec=policy.audio_codec,
+                audio_sample_rate=policy.audio_sample_rate,
+                audio_channels=policy.audio_channels,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+            )
         except MediaProbeError as error:
             raise ExportExecutionError(
                 f"Normalized source could not be inspected: {error}"
@@ -1541,6 +1602,7 @@ def _execute_source_normalization_split(
     preserve_resolution: bool = False,
     content_width: int | None = None,
     content_height: int | None = None,
+    expected_frame_counts: Sequence[int] | None = None,
 ) -> tuple[MediaProbe, ...]:
     if len(destinations) != len(segments):
         raise ExportExecutionError("Split normalization destinations must match the segments")
@@ -1571,14 +1633,44 @@ def _execute_source_normalization_split(
             cancel_event=cancel_event,
         )
         probes: list[MediaProbe] = []
-        for partial, destination in zip(partials, destinations, strict=True):
+        for partial, destination, expected_frames in zip(
+            partials,
+            destinations,
+            expected_frame_counts
+            if expected_frame_counts is not None
+            else (None,) * len(destinations),
+            strict=True,
+        ):
             if not partial.is_file() or partial.stat().st_size <= 0:
                 raise ExportExecutionError(
                     "Grouped source normalization did not create all outputs"
                 )
             os.replace(partial, destination)
+            if expected_frames is None:
+                try:
+                    probes.append(probe_media(destination, ffprobe_path))
+                except MediaProbeError as error:
+                    raise ExportExecutionError(
+                        f"Grouped normalized source could not be inspected: {error}"
+                    ) from error
+                continue
             try:
-                probes.append(probe_media(destination, ffprobe_path))
+                probes.append(
+                    ensure_exact_video_frame_count(
+                        destination,
+                        expected_frames,
+                        frame_rate=canonical_rate(target_rate),
+                        video_codec=policy.video_codec,
+                        pixel_format=policy.pixel_format,
+                        container=policy.container,
+                        has_audio=policy.audio_stream_present,
+                        audio_codec=policy.audio_codec,
+                        audio_sample_rate=policy.audio_sample_rate,
+                        audio_channels=policy.audio_channels,
+                        ffmpeg_path=ffmpeg_path,
+                        ffprobe_path=ffprobe_path,
+                    )
+                )
             except MediaProbeError as error:
                 raise ExportExecutionError(
                     f"Grouped normalized source could not be inspected: {error}"

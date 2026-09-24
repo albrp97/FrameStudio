@@ -16,6 +16,7 @@ from .export_ffmpeg import (
 from .export_interpolation import execute_enhanced_export, probe_frame_count
 from .export_process import (
     emit_export_progress,
+    ensure_exact_video_frame_count,
     expected_export_frames,
     monotonic_progress_callback,
     partial_path,
@@ -183,6 +184,28 @@ def execute_mixed_export(
                 started=started,
                 cancel_event=cancel_event,
             )
+            # The concat filter graph re-quantizes each segment's timestamps
+            # onto the output frame grid, which can drop or duplicate a
+            # small number of frames at segment boundaries even when each
+            # source segment is otherwise exact. Enforce the authoritative
+            # total here so the composed output always matches the
+            # verification target.
+            policy = plan.output_policy
+            if policy is not None:
+                ensure_exact_video_frame_count(
+                    partial,
+                    total_frames,
+                    frame_rate=Fraction(policy.frame_rate),
+                    video_codec=policy.video_codec,
+                    pixel_format=policy.pixel_format,
+                    container=policy.container,
+                    has_audio=policy.audio_stream_present,
+                    audio_codec=policy.audio_codec,
+                    audio_sample_rate=policy.audio_sample_rate,
+                    audio_channels=policy.audio_channels,
+                    ffmpeg_path=ffmpeg_path,
+                    ffprobe_path=ffprobe_path,
+                )
         emit_export_progress(
             progress_callback,
             stage="verifying",
