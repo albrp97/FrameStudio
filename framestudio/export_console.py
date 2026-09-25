@@ -10,6 +10,7 @@ from .export_types import ExportProgress
 CONSOLE_EXPORT_STEP_COUNT = 5
 _MIN_PROGRESS_INTERVAL_SECONDS = 0.5
 _MIN_PROGRESS_DELTA_PERCENT = 1.0
+_PROGRESS_HEARTBEAT_INTERVAL_SECONDS = 5.0
 
 
 def console_progress_enabled(stream: TextIO, *, force: bool = False) -> bool:
@@ -73,7 +74,11 @@ class ConsoleProgressReporter:
             self._last_report_time is None
             or now - self._last_report_time >= _MIN_PROGRESS_INTERVAL_SECONDS
         )
-        if not stage_changed and not (percent_changed and interval_elapsed):
+        heartbeat_due = (
+            self._last_report_time is not None
+            and now - self._last_report_time >= _PROGRESS_HEARTBEAT_INTERVAL_SECONDS
+        )
+        if not stage_changed and not (percent_changed and interval_elapsed) and not heartbeat_due:
             return
 
         detail = f"Step {step}/{CONSOLE_EXPORT_STEP_COUNT} - {label}: {progress.percent:.1f}%"

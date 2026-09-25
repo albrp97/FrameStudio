@@ -40,9 +40,10 @@ and single-source enhanced smart-render boundary; it was closed with the
 Phase 007 delivery set.
 The PHASE-008 section below tracks responsive preview optimization, direct
 focus controls, mixed-FPS render-strategy comparison, restoration research,
-and editor recovery/observability. FEAT-024 through FEAT-029 are complete and
-closed after implementation, review, user validation, and local delivery
-evidence. This includes single-project recovery, scalable timeline control,
+and editor recovery/observability. FEAT-024 through FEAT-029 were complete
+and closed after implementation, review, user validation, and local delivery
+evidence; CHG-011 reopened FEAT-028 and FEAT-029 for bounded follow-up work.
+This includes single-project recovery, scalable timeline control,
 composition-position preservation, resumable exports, staged console
 observability, continuous seeking, responsive export planning, explicit
 upscale/FPS-count reporting, safe post-export actions, and guarded Wayland
@@ -60,14 +61,14 @@ completed the approved focus and triplicate composition work. FPS enhancement
 was delivered through PHASE-007, whose feature breakdown and child records
 are now complete and closed. PHASE-008 was closed after FEAT-024 through FEAT-029 and TICKET-061 through
 TICKET-101 reached closure under the user's explicit manual-validation and
-delivery decision on 2026-09-07.
+delivery decision on 2026-09-07, then reopened under CHG-011.
 
 ## Feature summary
 
 | ID | Outcome | Capability links | Dependencies | Status |
 |---|---|---|---|---|
 | FEAT-001 | Open a supported source as a non-destructive project | CAP-001, CAP-012 | PHASE-001 entry decisions; FFmpeg/ffprobe | complete |
-| FEAT-002 | Control playback and navigate the source timeline | CAP-002, CAP-012 | FEAT-001; selected playback/runtime approach | complete |
+| FEAT-002 | Control playback and navigate the source timeline | CAP-002, CAP-012 | FEAT-001; selected playback/runtime approach | active |
 | FEAT-003 | Save and reopen the source edit foundation | CAP-004, CAP-012 | FEAT-001; initial project schema and relinking policy | complete |
 
 ## Capability coverage
@@ -87,7 +88,7 @@ features are closed; future feature work remains open in its assigned phase.
 | ID | Status | Parent links | Current path |
 |---|---|---|---|
 | FEAT-001 | complete | OBJ-001, SCOPE-001, PHASE-001 | `features/closed/FEAT-001-opening-a-supported-source-as-a-non-destructive-project.md` |
-| FEAT-002 | complete | OBJ-001, SCOPE-001, PHASE-001 | `features/closed/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md` |
+| FEAT-002 | active | OBJ-001, SCOPE-001, PHASE-001 | `features/open/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md` |
 | FEAT-003 | complete | OBJ-001, SCOPE-001, PHASE-001 | `features/closed/FEAT-003-saving-and-reopening-the-source-edit-foundation.md` |
 | FEAT-004 | complete | OBJ-001, SCOPE-001, PHASE-002 | `features/closed/FEAT-004-removing-unwanted-portions-from-one-source.md` |
 | FEAT-005 | complete | OBJ-001, SCOPE-001, PHASE-002 | `features/closed/FEAT-005-exporting-a-verified-edited-video.md` |
@@ -96,7 +97,7 @@ features are closed; future feature work remains open in its assigned phase.
 | FEAT-008 | complete | OBJ-001, SCOPE-001, PHASE-003 | `features/closed/FEAT-008-applying-one-source-edits-through-cli.md` |
 | FEAT-009 | complete | OBJ-001, SCOPE-001, PHASE-003 | `features/closed/FEAT-009-sharing-domain-behavior-between-gui-and-cli.md` |
 | FEAT-010 | complete | OBJ-001, SCOPE-001, PHASE-004 | `features/closed/FEAT-010-importing-and-retaining-mixed-source-project-identity.md` |
-| FEAT-011 | complete | OBJ-001, SCOPE-001, PHASE-004 | `features/closed/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md` |
+| FEAT-011 | active | OBJ-001, SCOPE-001, PHASE-004 | `features/open/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md` |
 | FEAT-012 | complete | OBJ-001, SCOPE-001, PHASE-004 | `features/closed/FEAT-012-previewing-and-exporting-mixed-source-edits.md` |
 | FEAT-013 | complete | OBJ-001, SCOPE-001, PHASE-004A | `features/closed/FEAT-013-modular-editor-architecture.md` |
 | FEAT-014 | complete | OBJ-001, SCOPE-001, PHASE-005 | `features/closed/FEAT-014-balancing-each-source-consistently.md` |
@@ -113,8 +114,8 @@ features are closed; future feature work remains open in its assigned phase.
 | FEAT-025 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-025-streamlining-segment-focus-modifications.md` |
 | FEAT-026 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md` |
 | FEAT-027 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-027-researching-video-restoration-and-upscaling.md` |
-| FEAT-028 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-028-adding-optional-upscale-enhancement.md` |
-| FEAT-029 | complete | OBJ-001, SCOPE-001, PHASE-008 | `features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md` |
+| FEAT-028 | active | OBJ-001, SCOPE-001, PHASE-008 | `features/open/FEAT-028-adding-optional-upscale-enhancement.md` |
+| FEAT-029 | active | OBJ-001, SCOPE-001, PHASE-008 | `features/open/FEAT-029-strengthening-editor-recovery-and-export-observability.md` |
 | FEAT-030 | active | OBJ-001, SCOPE-001, PHASE-009 | `features/open/FEAT-030-benchmarking-and-selecting-efficient-export-pipelines.md` |
 | FEAT-031 | active | OBJ-001, SCOPE-001, PHASE-009 | `features/open/FEAT-031-executing-efficient-resumable-export-pipelines.md` |
 
@@ -130,9 +131,10 @@ by this feature index:
 
 ## Approval and downstream gate
 
-This feature index is approved for the phase plan. FEAT-001 and FEAT-003
-through FEAT-012 are individual lifecycle files that remain complete and
-closed after user approval on 2026-08-22. FEAT-002 and FEAT-014 through
+This feature index is approved for the phase plan. FEAT-001, FEAT-003 through
+FEAT-010, FEAT-012, and FEAT-013 remain complete and closed after user
+approval on 2026-08-22. FEAT-002 and FEAT-011 are active under CHG-011.
+FEAT-014 through
 FEAT-016 are also complete and closed after their corrective playback and
 source-level audio delivery work passed user validation, review, and local
 delivery. FEAT-017 through FEAT-019 are complete and closed after their user
@@ -141,8 +143,9 @@ are complete and closed after the user confirmed the PHASE-007 ticket set was
 approved, accepted, and tested; unavailable remote and target-specific checks
 remain recorded as accepted warnings. This index does not own implementation, branches, commits, or pull requests.
 Under PHASE-008, FEAT-024 through FEAT-029 and TICKET-061 through TICKET-101
-are complete and closed from their linked evidence after the user's
-manual-validation and closeout decision on 2026-09-07. Historical generic
+were completed and closed from their linked evidence after the user's
+manual-validation and closeout decision on 2026-09-07. CHG-011 reopened
+FEAT-028 and FEAT-029 with TICKET-106 and TICKET-107. Historical generic
 blocker and environment limitations remain recorded in the evidence records.
 
 ## PHASE-002 - Feature Decomposition
@@ -261,7 +264,7 @@ through PHASE-007.
 | ID | Outcome | Capability links | Dependencies | Status |
 |---|---|---|---|---|
 | FEAT-010 | Import and retain mixed-source project identity | CAP-007, CAP-012 | PHASE-003 project identity; mixed-media probing | complete |
-| FEAT-011 | Arrange and edit a mixed-source timeline | CAP-002, CAP-003, CAP-007, CAP-012 | FEAT-010; approved timebase, placement, and atomic block semantics | complete |
+| FEAT-011 | Arrange and edit a mixed-source timeline | CAP-002, CAP-003, CAP-007, CAP-012 | FEAT-010; approved timebase, placement, and atomic block semantics | active |
 | FEAT-012 | Preview and export mixed-source edits | CAP-002, CAP-005, CAP-007, CAP-012 | FEAT-010, FEAT-011; approved output policy | complete |
 
 ### Capability coverage
@@ -276,14 +279,16 @@ through PHASE-007.
 
 ### Approval and downstream gate
 
-The parent PHASE-004 record is complete and closed after user approval on
-2026-08-22. CHG-001 records the later user-authorized clarification that
+The parent PHASE-004 record was complete and closed after user approval on
+2026-08-22; it was reopened under CHG-011. CHG-001 records the later
+user-authorized clarification that
 segment blocks are atomic and support structural copy/paste in this phase,
 while visual modification authoring and reset remain assigned to PHASE-006.
 CHG-002 records the fixed 1920x1080 project render profile, including
-one-source outputs, and the deferral of 60 FPS enhancement. The Phase 4
-tickets and features are complete in `closed`; remote checks remain
-unavailable and are recorded as an accepted warning.
+one-source outputs, and the deferral of 60 FPS enhancement. Phase 4's prior
+ticket/feature delivery remains complete; FEAT-011 and TICKET-105 are open
+again for the randomized-add-order correction under CHG-011. Remote checks
+remain unavailable and are recorded as an accepted warning.
 
 ## PHASE-004A - Feature Decomposition
 
@@ -629,8 +634,8 @@ Lossless Cut.
 | FEAT-025 | Streamline segment focus modifications | CAP-003, CAP-009, CAP-010, CAP-012 | PHASE-006 focus/triplicate semantics; GUI and CLI contracts | complete |
 | FEAT-026 | Compare and adopt mixed-FPS render strategy | CAP-005, CAP-011, CAP-012 | PHASE-005 delivery policy; PHASE-007 interpolation; representative media; TICKET-072 evidence | complete |
 | FEAT-027 | Research video restoration and upscaling | CAP-005, CAP-011, CAP-012 | candidate research; supplied degraded media; license/runtime review | complete |
-| FEAT-028 | Add optional SuperUltraCompact upscale enhancement | CAP-005, CAP-011, CAP-012 | TICKET-076; local RVE runtime and weights; fixed output and composition policy | complete |
-| FEAT-029 | Strengthen editor recovery and export observability | CAP-002, CAP-003, CAP-004, CAP-005, CAP-012 | TICKET-083 lifecycle; existing persistence, timeline, composition, and enhanced-export contracts | complete |
+| FEAT-028 | Add optional SuperUltraCompact upscale enhancement | CAP-005, CAP-011, CAP-012 | TICKET-076; local RVE runtime and weights; fixed output and composition policy | active |
+| FEAT-029 | Strengthen editor recovery and export observability | CAP-002, CAP-003, CAP-004, CAP-005, CAP-012 | TICKET-083 lifecycle; existing persistence, timeline, composition, and enhanced-export contracts | active |
 
 ### Capability coverage
 
@@ -695,13 +700,14 @@ enhanced-export and upscale-routing contracts.
 
 ### Planning readiness
 
-PHASE-008 is complete after FEAT-024 and FEAT-029 reached terminal status
-under the user's direct authorization. FEAT-025
-through FEAT-028 and TICKET-061 through TICKET-082 are complete and closed
-with their linked evidence after the user's explicit manual-validation and
-closeout decision on 2026-08-28. TICKET-083 through TICKET-101 are complete
-and closed with implementation, review, repository-gate, and user-validation
-evidence from 2026-09-07.
+PHASE-008 was complete after FEAT-024 and FEAT-029 reached terminal status
+under the user's direct authorization; it is active again under CHG-011.
+FEAT-025 through FEAT-027 and TICKET-061 through TICKET-082 remain complete
+and closed with their linked evidence after the user's explicit
+manual-validation and closeout decision on 2026-08-28. FEAT-028 and FEAT-029
+are active again with TICKET-106 and TICKET-107. TICKET-083 through
+TICKET-101 were complete and closed with implementation, review,
+repository-gate, and user-validation evidence from 2026-09-07.
 The generic restoration blocker history for TICKET-074 and TICKET-075 is
 preserved, while concrete benchmark evidence is recorded by TICKET-077 and
 TICKET-078. Remote, target-workstation, model-runtime, license, and other

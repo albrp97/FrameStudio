@@ -75,6 +75,7 @@ from .persistence import (
     load_project,
     save_project,
 )
+from .timeline_order import randomize_clip_order
 from .upscale_policy import (
     ResolvedUpscalePolicy,
     UpscalePolicy,
@@ -185,6 +186,7 @@ def _create_project_from_cli_sources(
     *,
     ffprobe_path: str,
 ) -> Project:
+    sources = randomize_clip_order(sources)
     try:
         if len(sources) == 1:
             return create_project_from_source(sources[0], ffprobe_path=ffprobe_path)

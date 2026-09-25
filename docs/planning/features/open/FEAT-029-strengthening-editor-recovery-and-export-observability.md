@@ -3,7 +3,7 @@
 **Feature ID:** FEAT-029
 **Parent links:** OBJ-001, SCOPE-001, PHASE-008
 **Capability links:** CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-012
-**Status:** complete
+**Status:** active
 **Horizon:** future
 **Priority:** 1
 **Owner:** repository implementation in the active worktree
@@ -12,7 +12,9 @@ review the editor recovery, timeline, playback, export, progress, and
 upscale-count improvements without waiting for separate ticket approval.
 General resumable-export planning was authorized by the 2026-09-06 request;
 execution remains subject to the configured gates.
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-09
+**Change control:** reopened under CHG-011 for practical timeline wheel seek
+pacing.
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`,
 `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
@@ -44,7 +46,7 @@ CLI and GUI progress reporting, tests, evidence, and documentation
 **Planned tickets:** TICKET-084, TICKET-085, TICKET-086, TICKET-087, TICKET-088,
 TICKET-089, TICKET-090, TICKET-091, TICKET-092, TICKET-093, TICKET-094,
 TICKET-095, TICKET-096, TICKET-097, TICKET-098, TICKET-099, TICKET-100,
-TICKET-101
+TICKET-101, TICKET-106
 **Evidence paths:** `evidence/ticket-084-editor-autosave.md`,
 `evidence/ticket-085-timeline-fit-and-unlimited-zoom.md`,
 `evidence/ticket-086-triplicate-playhead-preservation.md`,
@@ -62,12 +64,15 @@ TICKET-101
 `evidence/ticket-098-export-session-checkpoints.md`,
 `evidence/ticket-099-resumable-export-execution.md`,
 `evidence/ticket-100-export-resume-controls.md`,
-`evidence/ticket-101-cli-export-resume-contract.md`
+`evidence/ticket-101-cli-export-resume-contract.md`,
+`evidence/ticket-106-timeline-wheel-seek-pacing.md`
 **Path history:** created at
 `features/open/FEAT-029-strengthening-editor-recovery-and-export-observability.md`
 -> moved to
 `features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md`
-on 2026-09-07 after all child tickets and user validation completed.
+on 2026-09-07 after all child tickets and user validation completed ->
+reopened under CHG-011 at
+`features/open/FEAT-029-strengthening-editor-recovery-and-export-observability.md`.
 
 ## Outcome
 
@@ -104,6 +109,8 @@ failure, application restart, or project reopen.
   JSON Lines output stable for automation.
 - Keep timeline seeking and export-plan preparation responsive in the GTK main
   loop.
+- Use a 30-second normal-wheel seek step on long timelines while retaining
+  duration clamping and other scroll-gesture behavior.
 - Select a supported non-Vulkan GTK renderer by default on Wayland without
   overriding explicit user configuration.
 
@@ -143,6 +150,9 @@ failure, application restart, or project reopen.
 - Given a Wayland editor session without an explicit renderer, GTK should use
   the supported GL renderer and avoid the known non-fatal Vulkan swapchain
   warning; explicit renderer choices remain unchanged.
+- Given normal vertical wheel input on the timeline, the playhead should move
+  30 seconds per unit and stay within the project duration; other scroll
+  gestures retain their established behavior.
 - Given an enhanced mixed export with fractional segment durations, final
   composition should preserve the exact target frame count and reuse valid
   retained intermediates on retry.

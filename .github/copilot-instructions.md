@@ -1,4 +1,4 @@
-# Repository AIDD Copilot Instructions
+# Harmonic Coding Copilot Instructions
 
 Use these instructions for repository-neutral, evidence-first delivery. Adapt
 to the repository's actual structure, tooling, provider, and conventions; do
@@ -25,7 +25,73 @@ not invent files, commands, APIs, stakeholders, or architecture.
    `aidd-project-bootstrap` before downstream planning. It coordinates
    `create-vision`, `aidd-create-repository-map`, and
    `aidd-planning-bootstrap` without silently creating child planning layers.
+   During bootstrap, require and persist the guided or automatic development
+   mode before the foundational write. After that write verifies, guided mode
+   returns to the configured approval flow; automatic mode hands off to the
+   orchestrator loop without another question.
 6. Load only the lifecycle and domain skills relevant to the current work.
+
+## Development modes
+
+Resolve the development mode from `.github/aidd-config.yml`:
+`delivery.development.mode`. A missing value defaults to `guided`. Project
+bootstrap must ask for exactly one mode, persist the selected value in the
+configuration, and mirror it in `vision.md` and `AGENTS.md`; the configuration
+value is authoritative. Use
+[`skills/development-mode.md`](skills/development-mode.md) as the shared
+contract.
+
+- **Guided development:** preserve configured approval gates, run all
+  agent-owned technical checks and automated functionality tests, then present
+  a functionality-only handoff and wait for the user's terminal
+  `PASS`/`FAIL`/`BLOCKED` result when user validation is required.
+- **Automatic development:** after the foundational bootstrap write is
+  approved and verified, continue through repository mapping, discovery,
+  planning, TDD, technical verification, automated functionality validation,
+  review/remediation, commit, push, PR or configured local closeout, lifecycle
+  moves, and subsequent ready phases without asking or waiting for another
+  user response. Record the agent-run functionality charter as
+  `automaticValidation`, never as `userValidation`.
+
+Automatic mode uses confirmed context and safe defaults for routine decisions,
+but it never bypasses missing tools or services, contradictory requirements,
+missing parents or evidence, credentials, branch protection, remote checks,
+required approvals, or provider/merge policy. Both modes keep technical
+validation agent-owned and stop with a precise blocker when a required gate
+cannot be satisfied. In automatic mode, every validation decision uses the
+configured Rubber Duck validator from
+`delivery.development.automatic_validation`: `gpt-5.6-luna` with high
+reasoning and `all-validation` scope. Deterministic tools still provide raw
+results, but no other model, validator, or fallback may produce the automatic
+pass or readiness decision; a missing or mismatched profile is a blocker.
+
+After resolving the mode, apply the matching
+`delivery.mode_overrides.<mode>` policy over the base approval,
+version-control, gate, and static-analysis settings. This makes automatic
+bootstrap authorization explicit and disables guided-only user-validation and
+routine approval requirements without weakening branch, provider, credential,
+security, remote-check, or merge-protection gates. The configured profile
+declares the requirement; the runtime must separately expose an available
+matching `rubber-duck` validator capability.
+
+### Explicit user delivery directives
+
+An explicit current user instruction to commit, stage and commit, push, or
+commit and push overrides repository workflow gates such as missing evidence,
+review, validation, approval, lifecycle readiness, dedicated-branch policy, or
+clean-worktree preferences. Before acting, issue one concise warning that names
+the bypassed gates and confirm once when the user has not already acknowledged
+the risk. After confirmation, perform the requested operation and record the
+gates as `userDirectiveOverride`; never misreport them as passed.
+
+"Commit everything" and equivalent wording authorizes staging all current
+changes, including untracked files, after showing the path list and checking
+for secrets. It does not authorize secret exposure, force push, history
+rewriting, deletion, or another destructive action unless that exact action is
+separately requested. Missing credentials or remotes, provider or
+branch-protection rejection, and impossible Git states remain actual blockers.
+These override rules apply to delivery side effects only; they do not make a
+ticket validated, reviewed, complete, or eligible for lifecycle closeout.
 
 ## Canonical planning hierarchy
 
@@ -57,7 +123,9 @@ For a new repository or broad initiative, use this order:
    configuration is missing or inconsistent. It reuses `create-vision`,
    `aidd-product-manager`, `aidd-create-repository-map`, and
    `aidd-planning-bootstrap`, drafts the foundational files, and waits for
-   explicit approval before writing.
+   explicit approval before writing. After approval, it must perform and
+   verify the repository file operations; response-only Markdown is not a
+   successful write.
 2. **Discover and scope:** load `aidd-product-manager`; run `/discover` to
    establish or refine the initiative objective, problem, users, success
    signals, scope horizon, non-goals, constraints, dependencies, risks,
@@ -66,8 +134,8 @@ For a new repository or broad initiative, use this order:
    requirements. Obtain approval before downstream planning.
 3. **Map capabilities:** load `aidd-create-capability-map`; run
    `/create-capability-map` for work beyond a small change. Describe system
-   abilities, link them to scope and outcomes, mark prerequisites, and check
-   coverage.
+   abilities, link them to scope and outcomes, mark prerequisites, check
+   coverage, and persist the approved map at the configured path.
 4. **Create phases:** load `aidd-create-phases`; run `/create-phases`. Give
    each phase a meaningful outcome, ordering rationale, entry conditions, exit
    conditions, risks, and validation focus. Create each phase record in the
@@ -95,41 +163,71 @@ For a new repository or broad initiative, use this order:
 8. **Implement and record evidence:** load `aidd-tdd`,
    `aidd-evidence`, and only the domain skills relevant to the changed
    surfaces. Run `/execute` for one approved ticket, establish the protected
-   baseline, use TDD or the strongest applicable evidence method, run
-   real-system flows when required, append all results with `/evidence`, and
-   return the exact user-validation handoff before calling the ticket done.
+   baseline, use TDD or the strongest applicable evidence method, and define
+   at least one automated functionality test that exercises the supported
+   system boundary for every ticket. Run all applicable agent-owned technical
+   checks (including smoke, baseline, unit, regression, fixture, acquisition,
+   contract, integration, migration, security, static-analysis, deployment,
+   and quality checks), then run the automated functionality test after
+   focused checks. Append technical and functionality results with
+   `/evidence`. In guided mode, return a functionality-only handoff before
+   calling the ticket done; in automatic mode, execute that same charter as
+   the agent and record `automaticValidation`. Never ask the user to run
+   technical scripts; a missing or failed required check is a blocker, not a
+   coverage warning.
 9. **User validation and review:** load `aidd-user-testing`,
    `aidd-static-analysis`, and `aidd-review`; use `/user-test` or `/run-test`
-   to produce or execute the applicable charter, then present the exact setup,
-   steps, expected visible and persisted/external results, failure paths,
-   cleanup, and evidence response. `/review` must run the deterministic
-   static-analysis suite, prove local-to-PR parity, apply `aidd-structure` and
-   `aidd-churn`, and orchestrate approved `/aidd-fix` remediation for
-   actionable introduced findings before readiness. Keep the ticket in
-   `verifying` until the user returns `PASS` or an approved `NOT APPLICABLE`;
-   record the result with `/evidence`. Add `aidd-riteway-ai`,
+   to execute agent-owned technical verification and the automated
+   functionality test. In guided mode, present only the exact functionality
+   setup, user steps, expected visible and persisted/external results,
+   user-observable failure behavior, cleanup, and evidence response; keep the
+   ticket in `verifying` until the user returns a functionality-only `PASS` or
+   an approved `NOT APPLICABLE`. In automatic mode, execute the same
+   functionality charter as the agent and record terminal
+   `automaticValidation` without waiting. In both modes, `/review` must
+   require terminal technical and automated functionality evidence and rerun
+   the deterministic static-analysis suite against the final diff as an
+   agent-only readiness gate, prove local-to-PR parity, apply `aidd-structure`
+   and `aidd-churn`, and orchestrate approved `/aidd-fix` remediation for
+   actionable introduced findings before readiness. Add `aidd-riteway-ai`,
    `aidd-observe`, or domain-specific security skills only when the ticket
    requires those capabilities.
-10. **Commit, publish, and deliver:** after technical evidence, required user
-    validation, local gates, and review/remediation are terminal, load
-    `aidd-commit` and run `/commit` for the reviewed staged scope. Do not
-    stage files implicitly. After a successful commit, load `aidd-push` and run
-    `/push` only when the commit is unpublished or ahead of its configured
-    upstream and push policy permits it. After the branch is published, load
-    `aidd-pr` and run `/aidd-pr` when pull-request policy requires a PR, or
-    recheck the existing PR after every new push.
+10. **Commit, publish, and deliver:** after technical evidence,
+    mode-appropriate validation, local gates, and review/remediation are
+    terminal, load `aidd-commit` and run `/commit` for the reviewed staged
+    scope. Do not stage files implicitly. In automatic mode, perform these
+    configured operations internally after bootstrap authorization; in guided
+    mode, preserve the configured approval handoffs. After a successful
+    commit, load `aidd-push` and run `/push` only when the commit is
+    unpublished or ahead of its configured upstream and push policy permits
+    it. After the branch is published, load `aidd-pr` and run `/aidd-pr` when
+    pull-request policy requires a PR, or recheck the existing PR after every
+    new push. Provider, branch, credential, remote-check, approval, and merge
+    blockers remain binding in both modes.
+    When the user explicitly directs commit or push before readiness, follow
+    the explicit-user-directive policy above instead of refusing because
+    workflow evidence or approval is missing.
 11. **Close and learn:** load `clean-pr-branch` and `aidd-phase-feedback`; use
     `aidd-change-control` for material scope or dependency changes and
     `aidd-log` for significant outcomes. Move the same terminal ticket,
     feature, or phase record from `open` to `closed` only after the configured
     commit, push, PR, merge, or local-delivery policy is satisfied. Synchronize
     the relevant index/backlog and parent links, and move it back to `open`
-    before any approved reopening.
+    before any approved reopening. In automatic mode, after verified phase
+    feedback, continue to the next ready phase or stop with the exact blocker;
+    in guided mode, preserve the configured phase handoff.
 
 Parent approval is required before child planning when configured. A blocked
 or contradictory parent blocks downstream generation. Local backlog grooming
 does not require a formal replan; material changes use
 `/replan-when-necessary`.
+
+In automatic mode, the orchestrator repeats the planning-to-delivery loop for
+each ready ticket, then each ready feature and phase, until the configured
+scope is terminal or a real blocker is recorded. It may not ask a follow-up
+question or treat its own validation as human confirmation; routine internal
+approvals are recorded as bootstrap-authorized decisions and functionality
+closure is recorded as `automaticValidation`.
 
 ## Workflow skill selection
 
@@ -151,6 +249,7 @@ apply to the current work:
 | Change control | `aidd-change-control` | `/replan-when-necessary` |
 | Implementation readiness | `aidd-preimplementation-checklist` | `/run-preimplementation-checklist` |
 | Implementation and evidence | `aidd-tdd`, `aidd-evidence`, `aidd-ticket-creator` | `/execute`, `/evidence` |
+| Technical and automated verification | `aidd-user-testing`, `aidd-tdd`, `aidd-evidence` | `/run-test` |
 | Deterministic static analysis | `aidd-static-analysis` plus repository-native analyzers | `/aidd-static-analysis` |
 | Verification and review | `aidd-review`, `aidd-static-analysis`, `aidd-structure`, `aidd-churn`, plus applicable `aidd-user-testing`, `aidd-riteway-ai`, `aidd-observe`, or `aidd-fix` | `/review`, `/user-test`, `/run-test`, `/aidd-fix` |
 | Commit | `aidd-commit` | `/commit` |
@@ -212,6 +311,29 @@ index/backlog entries synchronized. Blocked records remain in `open`, and a
 closed record cannot be selected for implementation or receive new children
 until explicitly reopened.
 
+## Artifact persistence
+
+Bootstrap and planning commands distinguish report-only work from mutation:
+
+- `draft`, `inspect`, `review`, and `status` are read-only modes.
+- A default approval-gated flow may propose artifacts first, but explicit
+  approval authorizes only the listed paths and approved sections.
+- `write` means the owning skill must use the repository's file creation or
+  editing operation for every approved artifact. Printing Markdown, YAML, or
+  SudoLang in the response never counts as creating a file.
+- After each write, re-read or otherwise inspect the resulting path and report
+  `created`, `updated`, `unchanged`, `skipped`, or `blocked` plus verification.
+- A `created` or `updated` result requires a host file create/edit tool call in
+  the execution. A response code block or natural-language claim is not a
+  write; required parent directories must be created and verified as part of
+  the operation.
+- If writing or verification fails, report the exact path as blocked and do not
+  claim that bootstrap, mapping, or planning completed.
+
+Do not generate downstream phases, features, or tickets as an incidental side
+effect of persisting project context, a repository map, a scope, or a
+capability map.
+
 ## Delivery rules
 
 - Keep discovery UI-agnostic and separate from implementation decomposition.
@@ -235,8 +357,10 @@ until explicitly reopened.
   duplicate the file, or close a parent while required children remain open.
 - When reopening work, move the unchanged-ID record from `closed/` to `open/`
   before generating children or resuming implementation.
-- Do not commit or push before configured approval, evidence, review, and gate
-  checks are satisfied. Do not create a PR for an unpublished branch.
+- Do not autonomously commit or push before configured approval, evidence,
+  review, and gate checks are satisfied. A confirmed explicit user directive
+  overrides those workflow gates, with warnings and bypass evidence recorded.
+  Do not create a PR for an unpublished branch.
 - Always provide the context-aware next-step and skill handoff described above;
   a completed response still recommends the next permitted workflow action or
   explicitly states that approval or a blocker must be resolved first.
@@ -297,9 +421,10 @@ approval mode, and required gates. Use the first applicable rule:
 | An approved feature lacks focused tickets | Decompose it with `aidd-create-tickets` — `/create-tickets` |
 | A ticket is not implementation-ready | Run `aidd-preimplementation-checklist` — `/run-preimplementation-checklist` |
 | An approved ticket is ready to implement | Implement it with `aidd-tdd` — `/execute` |
-| Technical work is complete but user validation is pending | Validate it with `aidd-user-testing` — `/user-test` |
+| Agent technical checks and automated functionality are complete but mode-appropriate validation is pending | In guided mode validate only the delivered functionality with `aidd-user-testing` — `/user-test`; in automatic mode run the same charter and record `automaticValidation` |
+| Unit/regression tests pass but automated functionality evidence is missing | Run the ticket's automated functionality test with `aidd-user-testing` — `/run-test` |
 | Validation failed or a required gate is blocked | Resolve it with `aidd-fix` or `aidd-change-control` — `/aidd-fix` or `/replan-when-necessary` |
-| Technical and user-validation evidence is terminal, but review is missing | Review with `aidd-review` — `/review` |
+| Technical and mode-appropriate validation evidence is terminal, but review is missing | Review with `aidd-review` — `/review` |
 | Review and required evidence are terminal, with staged intended changes | Commit with `aidd-commit` — `/commit` |
 | A successful commit is unpublished or ahead of upstream | Publish with `aidd-push` — `/push` |
 | The source branch is published and PR policy requires a PR | Create or monitor it with `aidd-pr` — `/aidd-pr` |

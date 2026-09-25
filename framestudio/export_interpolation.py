@@ -22,7 +22,10 @@ from .export_cache import (
 from .export_ffmpeg import execute_fallback, execute_mixed_fallback
 from .export_process import (
     emit_export_progress,
-    ensure_exact_video_frame_count,
+    emit_verification_progress,
+    ensure_video_frame_count_for_policy,
+    make_output_validation_heartbeats,
+    make_progress_heartbeat,
     partial_path,
     prepare_export_sources,
     probe_frame_count,
@@ -836,19 +839,20 @@ def _execute_enhanced_clip_assembly(
     # authoritative total here too, the same way individual segments are
     # enforced, so the final assembled output always matches the
     # verification target regardless of concat-stage drift.
-    ensure_exact_video_frame_count(
+    ensure_video_frame_count_for_policy(
         partial,
         total_frames,
         frame_rate=Fraction(policy.frame_rate),
-        video_codec=policy.video_codec,
-        pixel_format=policy.pixel_format,
-        container=policy.container,
-        has_audio=policy.audio_stream_present,
-        audio_codec=policy.audio_codec,
-        audio_sample_rate=policy.audio_sample_rate,
-        audio_channels=policy.audio_channels,
+        policy=policy,
         ffmpeg_path=ffmpeg_path,
         ffprobe_path=ffprobe_path,
+        heartbeat_callback=make_progress_heartbeat(
+            progress_callback,
+            stage="checking output frame count",
+            total_frames=total_frames,
+            started=started,
+            percent=95.0,
+        ),
     )
 
 
@@ -1385,6 +1389,11 @@ def execute_enhanced_export(
         raise ExportExecutionError("Enhanced export has no eligible source ranges")
     started = time.monotonic()
     total_frames = _expected_frames(plan)
+    validation_heartbeat, cached_validation_heartbeat = make_output_validation_heartbeats(
+        progress_callback,
+        total_frames=total_frames,
+        started=started,
+    )
     emit_export_progress(
         progress_callback,
         stage="starting",
@@ -1455,6 +1464,7 @@ def execute_enhanced_export(
                     candidate,
                     ffmpeg_path=ffmpeg_path,
                     ffprobe_path=ffprobe_path,
+                    heartbeat_callback=cached_validation_heartbeat,
                 )
                 if plan.source_paths
                 else verify_single_output(
@@ -1463,6 +1473,7 @@ def execute_enhanced_export(
                     candidate,
                     ffmpeg_path=ffmpeg_path,
                     ffprobe_path=ffprobe_path,
+                    heartbeat_callback=cached_validation_heartbeat,
                 )
             ),
         )
@@ -1525,16 +1536,11 @@ def execute_enhanced_export(
                 "upscale",
                 metadata={"cached_artifact_count": cache.reused_artifact_count},
             )
-        emit_export_progress(
+        emit_verification_progress(
+            plan,
+            total_frames,
             progress_callback,
-            stage="verifying",
-            current_seconds=plan.expected_duration_seconds,
-            total_duration_seconds=plan.expected_duration_seconds,
-            frame=total_frames,
-            total_frames=total_frames,
-            fps=None,
-            started=started,
-            percent_override=99.0,
+            started,
         )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportExecutionError("Export cancelled")
@@ -1545,6 +1551,7 @@ def execute_enhanced_export(
                 partial,
                 ffmpeg_path=ffmpeg_path,
                 ffprobe_path=ffprobe_path,
+                heartbeat_callback=validation_heartbeat,
             )
         else:
             verify_single_output(
@@ -1553,6 +1560,7 @@ def execute_enhanced_export(
                 partial,
                 ffmpeg_path=ffmpeg_path,
                 ffprobe_path=ffprobe_path,
+                heartbeat_callback=validation_heartbeat,
             )
         if cached_assembly is None:
             session.record("assembly", partial)

@@ -4,7 +4,15 @@ description: Document completed features in a structured changelog with emoji ca
 allowed-tools: Bash(git:*)
 ---
 
+import ../lifecycle-interface.md
+
 # Changelog Log
+
+```sudolang
+Lifecycle {
+  profile = documentationMutation
+}
+```
 
 Act as a senior software engineer to log completed features using the following
 template. This is a global changelog, not an active ticket evidence record:

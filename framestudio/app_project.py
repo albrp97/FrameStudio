@@ -42,7 +42,8 @@ from .persistence import (
 from .persistence import (
     load_autosave as load_autosave_project,
 )
-from .playback import PlaybackController, PlaybackState
+from .playback import PlaybackBackendError, PlaybackController, PlaybackState
+from .timeline_order import randomize_clip_order
 
 
 def _schedule_on_main(glib: Any | None, callback: Callable[..., bool], *args: Any) -> None:
@@ -71,6 +72,7 @@ def _build_source_project(
     selected_paths: tuple[Path, ...],
     progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> Project:
+    selected_paths = randomize_clip_order(selected_paths)
     if len(selected_paths) == 1:
         return create_project_from_source(
             selected_paths[0],
@@ -440,28 +442,36 @@ def _invalidate_audio_analysis(window: Any) -> None:
     window._audio_analysis_rejected_source_ids = set()
 
 
-def _create_backend_callbacks(window: Any) -> tuple[Any, Any, Any, Any]:
-    generation = int(getattr(window, "_playback_generation", 0)) + 1
-    window._playback_generation = generation
+def _create_backend_callbacks(
+    window: Any,
+    *,
+    generation: int | None = None,
+    pending_events: list[tuple[Callable[..., None], tuple[Any, ...]]] | None = None,
+) -> tuple[Any, Any, Any, Any]:
+    if generation is None:
+        generation = int(getattr(window, "_playback_generation", 0)) + 1
+        window._playback_generation = generation
 
     def is_current() -> bool:
-        return generation == getattr(window, "_playback_generation", generation)
+        return generation == getattr(window, "_playback_generation", 0)
+
+    def dispatch(callback: Callable[..., None], *args: Any) -> None:
+        if is_current():
+            callback(*args)
+        elif pending_events is not None:
+            pending_events.append((callback, args))
 
     def on_frame(frame) -> None:
-        if is_current():
-            window._on_frame(frame, generation)
+        dispatch(window._on_frame, frame, generation)
 
     def on_error(message: str) -> None:
-        if is_current():
-            window._on_backend_error(message, generation)
+        dispatch(window._on_backend_error, message, generation)
 
     def on_end() -> None:
-        if is_current():
-            window._on_backend_end(generation)
+        dispatch(window._on_backend_end, generation)
 
     def on_warning(message: str) -> None:
-        if is_current():
-            window._on_backend_warning(message, generation)
+        dispatch(window._on_backend_warning, message, generation)
 
     return on_frame, on_error, on_end, on_warning
 
@@ -570,7 +580,7 @@ def _attach_loaded_project(
     previous_project_path = getattr(window, "project_path", None)
     try:
         attach_project(window, project, project_path)
-    except (MediaProbeError, ProjectValidationError, ValueError) as error:
+    except (MediaProbeError, PlaybackBackendError, ProjectValidationError, ValueError) as error:
         window._show_error(str(error))
         return False
     finally:
@@ -694,86 +704,106 @@ def attach_project(
     project: Project,
     project_path: Path | None,
 ) -> None:
-    _invalidate_audio_analysis(window)
-    window._stop_backend()
-    on_frame, on_error, on_end, on_warning = _create_backend_callbacks(window)
     sources = project.sources or (project.source,)
     policy = resolve_output_policy([source.metadata for source in sources])
     audio_decisions = _preview_audio_decisions(project)
-    window.project = project
-    window.project_path = project_path
-    window.source_frame_rate = _metadata_float(
+    frame_rate = _metadata_float(
         {"frame_rate": policy.frame_rate},
         "frame_rate",
     )
-    window.segment_timeline = project.segment_timeline
-    if window.segment_timeline is None:
+    timeline = project.segment_timeline
+    if timeline is None:
         raise ProjectValidationError("Project segment timeline is required")
-    active_segments = window.segment_timeline.active_blocks()
-    segments = window.segment_timeline.segment_items
+    active_segments = timeline.active_blocks()
+    segments = timeline.segment_items
     if not segments:
         raise ProjectValidationError("Project segment timeline must contain a segment")
     use_composed_preview = (
-        window.segment_timeline.mixed_source
-        or window.segment_timeline.has_explicit_timeline
+        timeline.mixed_source
+        or timeline.has_explicit_timeline
         or any(segment.deleted for segment in segments)
         or any(segment.has_visual_modifications for segment in active_segments)
     )
-    window.selected_segment_id = segments[0].segment_id
-    window.selected_segment_ids = (window.selected_segment_id,)
+    selected_segment_id = segments[0].segment_id
+    selected_segment_ids = (selected_segment_id,)
+    generation = int(getattr(window, "_playback_generation", 0)) + 1
+    pending_events: list[tuple[Callable[..., None], tuple[Any, ...]]] = []
+    callbacks = _create_backend_callbacks(
+        window,
+        generation=generation,
+        pending_events=pending_events,
+    )
+    on_frame, on_error, on_end, on_warning = callbacks
+    backend: FfmpegPlaybackBackend | None = None
+    controller: PlaybackController | None = None
+    if active_segments:
+        if use_composed_preview:
+            backend = _create_composed_preview_backend(
+                sources,
+                active_segments,
+                policy,
+                frame_rate,
+                timeline.edited_duration_seconds,
+                callbacks,
+                audio_decisions,
+                getattr(window, "audio_preview_enabled", False),
+            )
+        else:
+            backend = FfmpegPlaybackBackend(
+                Path(project.source.path),
+                policy.width,
+                policy.height,
+                frame_rate,
+                timeline.edited_duration_seconds,
+                on_frame,
+                on_error,
+                on_end,
+                audio_decision=audio_decisions[project.source.source_id],
+                audio_preview_enabled=getattr(window, "audio_preview_enabled", False),
+                on_warning=on_warning,
+            )
+        initial_position = timeline.timeline_to_edited_position(project.playhead_seconds)
+        controller = PlaybackController(
+            backend,
+            timeline.edited_duration_seconds,
+            initial_position,
+        )
+        if not controller.seek(initial_position):
+            error = controller.snapshot().error or "Could not show source preview"
+            backend.close()
+            raise MediaProbeError(error)
+
+    previous_backend = getattr(window, "backend", None)
+    if previous_backend is not None and previous_backend is not backend:
+        previous_backend.close()
+
+    _invalidate_audio_analysis(window)
+    window.project = project
+    window.project_path = project_path
+    window.source_frame_rate = frame_rate
+    window.segment_timeline = timeline
+    window.selected_segment_id = selected_segment_id
+    window.selected_segment_ids = selected_segment_ids
+    window.backend = backend
+    window.controller = controller
     window.timeline_canvas.set_timeline(
-        window.segment_timeline,
-        window.selected_segment_id,
-        window.selected_segment_ids,
+        timeline,
+        selected_segment_id,
+        selected_segment_ids,
     )
     window.timeline_canvas.set_sensitive(True)
     window.audio_status_label.set_text(format_audio_decisions(project))
+    window._update_selected_clip_label()
+    window._playback_generation = generation
+    for callback, args in pending_events:
+        callback(*args)
     if not active_segments:
-        window.backend = None
-        window.controller = None
-        window._update_selected_clip_label()
         window._update_playback_controls()
         window._update_segment_controls()
         autosave_callback = getattr(window, "_autosave_current_project", None)
         if callable(autosave_callback):
             autosave_callback()
         return
-    if use_composed_preview:
-        window.backend = _create_composed_preview_backend(
-            sources,
-            active_segments,
-            policy,
-            window.source_frame_rate,
-            window.segment_timeline.edited_duration_seconds,
-            (on_frame, on_error, on_end, on_warning),
-            audio_decisions,
-            getattr(window, "audio_preview_enabled", False),
-        )
-    else:
-        window.backend = FfmpegPlaybackBackend(
-            Path(project.source.path),
-            policy.width,
-            policy.height,
-            window.source_frame_rate,
-            window.segment_timeline.edited_duration_seconds,
-            on_frame,
-            on_error,
-            on_end,
-            audio_decision=audio_decisions[project.source.source_id],
-            audio_preview_enabled=getattr(window, "audio_preview_enabled", False),
-            on_warning=on_warning,
-        )
-    initial_position = window.segment_timeline.timeline_to_edited_position(
-        project.playhead_seconds,
-    )
-    window.controller = PlaybackController(
-        window.backend,
-        window.segment_timeline.edited_duration_seconds,
-        initial_position,
-    )
-    window._update_selected_clip_label()
-    if not window.controller.seek(initial_position):
-        raise MediaProbeError(window.controller.snapshot().error or "Could not show source preview")
     window._update_playback_controls()
     window._update_segment_controls()
     autosave_callback = getattr(window, "_autosave_current_project", None)

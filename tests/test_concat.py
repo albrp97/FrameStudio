@@ -75,9 +75,20 @@ class ConcatTests(unittest.TestCase):
 
     def test_multiple_videos_are_shuffled_onto_the_timeline(self):
         paths = [Path(f"clip-{index}.mp4") for index in range(6)]
-        with patch("framestudio_concat.random.shuffle") as shuffle_mock:
+        with patch("framestudio.timeline_order.random.shuffle") as shuffle_mock:
             result = randomize_timeline_order(paths)
-        shuffle_mock.assert_called_once_with(result)
+        shuffle_mock.assert_called_once()
+        self.assertCountEqual(shuffle_mock.call_args.args[0], paths)
+        self.assertEqual(sorted(result), sorted(paths))
+
+    def test_multiple_video_shuffle_never_keeps_the_original_order(self):
+        paths = [Path("first.mp4"), Path("second.mp4")]
+        with (
+            patch("framestudio.timeline_order.random.shuffle"),
+            patch("framestudio.timeline_order.random.randrange", return_value=1),
+        ):
+            result = randomize_timeline_order(paths)
+        self.assertNotEqual(result, paths)
         self.assertEqual(sorted(result), sorted(paths))
 
     def test_randomize_timeline_order_does_not_mutate_input_list(self):

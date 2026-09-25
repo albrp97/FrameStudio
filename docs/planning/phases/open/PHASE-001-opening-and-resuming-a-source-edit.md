@@ -4,17 +4,19 @@
 **Parent links:** OBJ-001, SCOPE-001
 **Capability links:** CAP-001, CAP-002, CAP-004, CAP-012
 **Sequence:** 1
-**Status:** complete
-**Closure:** user-approved on 2026-08-22 after the post-seek playback
+**Status:** active
+**Prior closure:** user-approved on 2026-08-22 after the post-seek playback
 correction passed automated, target-workstation, review, and local delivery
 evidence; remote checks remain unavailable and are recorded as an accepted
 warning.
 **Reopened:** user-reported on 2026-08-22 to correct timeline playback pacing
-after a cursor seek.
+after a cursor seek; reopened under CHG-011 on 2026-09-09 to verify explicit
+playback-backend errors during project reopen.
 **Path history:** `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md`
 -> `phases/closed/PHASE-001-opening-and-resuming-a-source-edit.md`
 -> `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md`
 -> `phases/closed/PHASE-001-opening-and-resuming-a-source-edit.md`
+-> `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md`
 **Horizon:** first
 **Owner:** repository planning; maintainer identity is not recorded
 **Approval:** user-approved on 2026-08-21 before feature generation
@@ -26,6 +28,8 @@ after a cursor seek.
 with the phase content preserved.
 **Affected surfaces:** source import, media probing, GTK interface, FFmpeg
 playback, project persistence, timeline state, and user-facing errors
+**Change control:** CHG-011 reopens project-reopen error handling without
+changing the one-source project or source-preservation contract.
 
 ## Outcome
 

@@ -21,8 +21,12 @@ push, preserves evidence, and focuses attention on what still needs work.
 
 1. Reads the configured provider and delivery evidence
 2. Verifies a published source branch, target base, required checks, approvals,
-   conflicts, conversations, linked work, mergeability, and terminal
-   user-validation evidence
+   conflicts, conversations, linked work, mergeability, terminal agent-owned
+   technical and automated functionality evidence, and terminal
+   mode-appropriate validation evidence (`userValidation` in guided mode or
+   `automaticValidation` in automatic mode, with the exact Rubber Duck
+   `gpt-5.6-luna` high-reasoning `all-validation` profile for every automatic
+   validation decision)
 3. Rechecks remote state after every push
 4. For GitHub, paginates review threads, presents addressed threads for approval,
    and leaves newly-fixed threads open

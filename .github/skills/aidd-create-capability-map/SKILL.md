@@ -3,66 +3,55 @@ name: aidd-create-capability-map
 description: Derive a capability map from an approved objective, scope, and repository map. Use before phase or feature planning.
 ---
 
+import ../planning-skill-interface.md
+
 # aidd-create-capability-map
 
 Connect desired outcomes to evidenced product or operational capabilities.
 
+Apply [../development-mode.md](../development-mode.md) when deciding whether
+capability approval is requested or bootstrap-authorized automatic planning
+continues.
+
 ## Contract
 
 ```sudolang
-PlanningSkillContract {
-  inputs[]
-  outputs[]
-  filesRead[]
-  filesWritten[]
-  sideEffects[]
-  owner
-  approvalConditions[]
-  stopConditions[]
-  requiredEvidence[]
-  failureAndBlockerBehavior
-  mayImplement = false
-  mayCommit = false
-  mayPush = false
-  mayMerge = false
+Lifecycle {
+  profile = planningMutation
+}
+
+PlanningSkill {
+  profile = planningMutation
+  layer = capability
+  parentLayers = [objective, scope, repositoryMap]
+  childLayers = [phase, feature]
+  writableArtifacts = [capabilityMap]
+  mode = inspect | draft | write
 }
 ```
 
 ## Inputs
 
 - Repository root and the relevant approved planning artifact IDs.
-- `.github/aidd-config.yml` when present; its artifact paths, vocabulary, statuses, depth, and approval rules override defaults.
-- Existing ancestor/child records, repository map, requirements, decisions, and evidence available at configured paths.
-- User request and any explicitly supplied constraints; unknowns remain unresolved.
+- The configured capability-map path
+  (`delivery.artifacts.capability_map`, normally
+  `docs/specs/capability-map.md`).
 
 ## Outputs
 
-- Markdown/SudoLang planning result or an explicitly authorized artifact update.
-- Stable IDs using configured prefixes (`OBJ`, `SCOPE`, `CAP`, `PHASE`, `FEAT`, `TICKET`), explicit status, parent/child links, and coverage/evidence links.
-- A concise readiness, approval, warning, or blocker report; no implied downstream work.
+- A capability-map proposal in `draft` or `review` mode, or the persisted
+  configured capability-map file in `write` mode after explicit approval.
+  Returning the map in chat without writing the configured path is not
+  completion.
 
-## Side effects and ownership
-
-- This skill owns only the planning layer named in its title and its review/report output.
-- It may write only configured planning artifacts when the caller authorizes mutation; otherwise it is read-only.
-- It never owns implementation, branches, commits, pushes, merges, provider operations, or delivery readiness.
-- Every write records owner, reason, source/evidence links, timestamp or revision, and affected IDs; preserve history rather than overwrite it.
-
-## Boundaries
-
-- Canonical hierarchy is **objective -> scope -> capability -> phase -> feature -> ticket**.
-- Use adaptive depth: lightweight for a small fix or documentation change, standard for a meaningful change, full for a broad initiative; never invent layers merely for ceremony.
-- A child requires one existing, unblocked, approved parent. No silent downstream generation, fan-out, or scope expansion.
-- Preserve stable IDs on rename; maintain explicit statuses (`draft`, `confirmed`, `needs-review`, `blocked`, `complete`) and valid transitions.
-- Keep requirements observable and implementation-agnostic. Reject cross-parent or oversized work when it cannot be independently verified.
-
-## Metadata and traceability
-
-Every artifact or report must include: ID, title, status, parent ID(s), objective/scope ancestry, capability/phase/feature links as applicable, owner, source paths, dependencies, risks, non-goals, affected surfaces, approval state, evidence/coverage links, and last-updated revision or timestamp. A ticket is traceable only when it links back to its objective and forward to requirements, protected behaviors, gates, and an evidence path.
-
-## Failure and blocker behavior
-
-Missing parent, approval, evidence, command, ownership, or required capability is a blocker or coverage gap—not a pass. Stop before child generation or readiness claims, name the exact missing input and affected IDs, and propose the smallest next action. Material changes route to `aidd-change-control`; routine corrections must not masquerade as a replan.
+```sudolang
+ArtifactWriteResult {
+  path
+  operation: created | updated | unchanged | skipped | blocked
+  verified
+  reason
+}
+```
 
 ## Process
 
@@ -71,19 +60,44 @@ createCapabilityMap(request) => CapabilityMap {
   1. require an approved objective and scope plus a current repository map
   2. identify capabilities, affected surfaces, dependencies, risks, and coverage gaps
   3. assign stable CAP IDs and link every capability to its objective/scope and source evidence
-  4. present the map for approval before creating phases or features
-  5. do not infer capabilities from unverified assumptions
+  4. in guided mode, present the map for approval before creating phases or
+     features; in automatic mode, record the bootstrap-authorized decision and
+     continue only after the verified map write
+  5. after approval, use a repository file-writing tool to create or update the configured capability-map path
+  6. re-read the path and record a verified write result; stop if writing or verification fails
+   7. in automatic mode, classify the verified map write and coverage result with
+      the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile
+   8. do not infer capabilities from unverified assumptions
 }
 ```
+
+### Artifact persistence
+
+The map is a durable planning artifact, not only a response. In `write` mode,
+create or update `delivery.artifacts.capability_map` with the approved map,
+preserve unrelated content, and verify the resulting file. A map printed in
+the response must be labeled `not written` until that operation succeeds.
+Writing the capability map never authorizes phases, features, or tickets.
+`write` without a recoverable approved map is blocked; do not reconstruct an
+unapproved map from the request.
+For a `created` or `updated` result, the execution must include a host file
+create/edit call and a post-write read. Creating the configured parent
+directory is part of the approved write; a response code block is not.
 
 ## Constraints
 
 ```sudolang
 Constraints {
-  Read configured artifacts and applicable ancestors before proposing changes
-  Do not claim readiness without terminal evidence for every required gate
+  In automatic mode, do not classify map coverage or readiness without the
+    exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile
   Do not create or modify artifacts outside the named planning layer
+  Do not treat a response-only capability map as a saved artifact
+  Use file operations for approved writes and verify the configured map path
+  Report failed or unavailable writes as blockers
   Escalate ambiguity, conflict, or material change instead of guessing
+  In automatic mode, do not ask for capability approval or wait for a user
+    response after verified bootstrap; missing coverage or contradictory scope
+    remains a blocker
 }
 ```
 
@@ -92,6 +106,12 @@ Constraints {
 ```sudolang
 Commands {
   /create-capability-map [request]
-  - derive and review capabilities without creating phase children
+  - derive the map, request approval, and persist it after approval without creating phase children
+
+  /create-capability-map draft [request]
+  - derive and display the map without writing
+
+  /create-capability-map write [request]
+  - persist the previously approved capability map and verify its path
 }
 ```

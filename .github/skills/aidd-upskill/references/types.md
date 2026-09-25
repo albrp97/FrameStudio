@@ -60,6 +60,26 @@ LifecycleContract {
   mayResolve: boolean
   mayMerge: boolean
 }
+
+LifecycleDeclaration {
+  profile: LifecycleProfile
+  overrides {}
+}
+
+DomainContract {
+  inputs: string[]
+  outputs: string[]
+  risks: string[]
+  assumptions: string[]
+  limitations: string[]
+  expectedEvidence: string[]
+  blockers: string[]
+  sideEffects: []
+  mayCommit: false
+  mayPush: false
+  mayResolve: false
+  mayMerge: false
+}
 ```
 
 ## Frontmatter
@@ -88,6 +108,24 @@ Every generated SKILL.md body must include:
 ```
 RequiredSections {
   "# Title"                  // skill name as heading
-  "## Steps" | "## Process"  // ordered execution instructions
+  executionInterface         // `## Steps`, `## Process`, `## Execute`, or a
+                             // named SudoLang function/command pipeline
 }
 ```
+
+An imported process reference satisfies the execution-interface requirement
+only when `SKILL.md` links it explicitly. A formal SudoLang function or command
+pipeline satisfies the requirement when its executable entry point is clear.
+
+## Function Test
+
+Every skill must answer:
+
+1. What single capability does this skill own?
+2. What inputs does it require and what outputs does it produce?
+3. What state may it read or change?
+4. What evidence proves a successful result?
+5. Which conditions require it to stop or hand off?
+
+A skill fails when the answers are absent, contradictory, or spread across
+unlinked files.

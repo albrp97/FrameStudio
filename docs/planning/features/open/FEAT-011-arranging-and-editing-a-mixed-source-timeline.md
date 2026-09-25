@@ -3,12 +3,15 @@
 **Feature ID:** FEAT-011
 **Parent links:** OBJ-001, SCOPE-001, PHASE-004
 **Capability links:** CAP-002, CAP-003, CAP-007, CAP-012
-**Status:** complete
-**Closure:** user-approved on 2026-08-22 after successful implementation,
+**Status:** active
+**Prior closure:** user-approved on 2026-08-22 after successful implementation,
 review evidence, and target-workstation validation; remote checks remain
 unavailable and are recorded as an accepted warning.
+**Change control:** CHG-011 reopens the feature to correct multi-clip batch
+ordering without changing existing timeline edit semantics.
 **Path history:** `features/open/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md`
 -> `features/closed/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md`
+-> `features/open/FEAT-011-arranging-and-editing-a-mixed-source-timeline.md`
 **Horizon:** future
 **Priority:** 2
 **Owner:** repository planning; maintainer identity is not recorded
@@ -25,7 +28,8 @@ inconsistent GUI/CLI edits
 **Affected surfaces:** timeline model, segment operations, selection state,
 playback navigation, GUI, CLI, persistence, and tests
 **Evidence path:** `evidence/phase-004-mixed-source-movement.md`
-**Planned tickets:** TICKET-020, TICKET-021, TICKET-022, TICKET-023
+**Planned tickets:** TICKET-020, TICKET-021, TICKET-022, TICKET-023,
+TICKET-105
 
 ## Outcome
 

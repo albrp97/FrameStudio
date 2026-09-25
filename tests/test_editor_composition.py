@@ -22,6 +22,7 @@ from framestudio.app_playback import (
     stop_backend,
 )
 from framestudio.app_project import (
+    _attach_loaded_project,
     _audio_analysis_worker,
     _finish_audio_analysis,
     _finish_source_audio_analysis,
@@ -49,6 +50,7 @@ from framestudio.composition import (
 )
 from framestudio.composition_render import segment_video_filters
 from framestudio.export import execute_export
+from framestudio.export_process import probe_frame_count
 from framestudio.ffmpeg_playback import VideoFrame
 from framestudio.media import probe_media
 from framestudio.model import Project, ProjectValidationError, SegmentTimeline
@@ -62,7 +64,7 @@ from framestudio.operations import (
     plan_project_export,
 )
 from framestudio.persistence import load_project, save_project
-from framestudio.playback import PlaybackController, PlaybackState
+from framestudio.playback import PlaybackBackendError, PlaybackController, PlaybackState
 from framestudio.upscale_policy import UpscalePolicy
 
 
@@ -83,6 +85,34 @@ def make_project(root: Path) -> Project:
     source = root / "source.mp4"
     source.write_bytes(b"fixture")
     return Project.create(source, metadata())
+
+
+def make_editor_window(**attributes):
+    values = {
+        "backend": None,
+        "controller": None,
+        "project": None,
+        "project_path": None,
+        "source_frame_rate": 0.0,
+        "segment_timeline": None,
+        "selected_segment_id": None,
+        "selected_segment_ids": (),
+        "_playback_generation": 0,
+        "_audio_analysis_generation": 0,
+        "_audio_analysis_in_progress": False,
+        "_audio_analysis_source_ids": (),
+        "timeline_canvas": MagicMock(),
+        "audio_status_label": MagicMock(),
+        "_on_frame": MagicMock(),
+        "_on_backend_error": MagicMock(),
+        "_on_backend_end": MagicMock(),
+        "_on_backend_warning": MagicMock(),
+        "_update_selected_clip_label": MagicMock(),
+        "_update_playback_controls": MagicMock(),
+        "_update_segment_controls": MagicMock(),
+    }
+    values.update(attributes)
+    return SimpleNamespace(**values)
 
 
 def run_cli(*arguments: str):
@@ -678,6 +708,56 @@ class EditorCompositionTests(unittest.TestCase):
             attach.assert_called_once_with(window, project, project_path)
             start_analysis.assert_called_once_with(window, project, glib)
 
+    def test_project_reopen_reports_playback_backend_failure(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "previous").mkdir()
+            (root / "candidate").mkdir()
+            previous_project = make_project(root / "previous")
+            project = make_project(root / "candidate")
+            project_path = root / "project.framestudio.json"
+            save_project(project, project_path)
+            previous_backend = MagicMock()
+            candidate_backend = MagicMock()
+            candidate_backend.seek.side_effect = PlaybackBackendError(
+                "Could not decode project preview"
+            )
+            previous_controller = MagicMock()
+            window = make_editor_window(
+                project=previous_project,
+                project_path=root / "previous.framestudio.json",
+                source_frame_rate=24.0,
+                segment_timeline=previous_project.segment_timeline,
+                selected_segment_id=previous_project.timeline.segments[0].segment_id,
+                selected_segment_ids=(previous_project.timeline.segments[0].segment_id,),
+                backend=previous_backend,
+                controller=previous_controller,
+                _playback_generation=3,
+                _audio_analysis_generation=0,
+                _audio_analysis_in_progress=False,
+                _audio_analysis_source_ids=(),
+                _show_error=MagicMock(),
+            )
+
+            with (
+                patch("framestudio.app_project.ensure_project_audio_analysis"),
+                patch(
+                    "framestudio.app_project.FfmpegPlaybackBackend",
+                    return_value=candidate_backend,
+                ),
+            ):
+                self.assertFalse(_attach_loaded_project(window, project, project_path, glib=None))
+
+            window._show_error.assert_called_once_with("Could not decode project preview")
+            self.assertIs(window.project, previous_project)
+            self.assertEqual(window.project_path, root / "previous.framestudio.json")
+            self.assertIs(window.backend, previous_backend)
+            self.assertIs(window.controller, previous_controller)
+            self.assertEqual(window._playback_generation, 3)
+            previous_backend.close.assert_not_called()
+            candidate_backend.close.assert_called_once_with()
+            window.timeline_canvas.set_timeline.assert_not_called()
+
     def test_stale_source_load_completion_does_not_replace_current_project(self):
         current_project = object()
         window = SimpleNamespace(
@@ -1116,7 +1196,7 @@ class EditorCompositionTests(unittest.TestCase):
     def test_scroll_outside_focus_controls_keeps_playhead_navigation(self):
         backend = MagicMock()
         window = SimpleNamespace(
-            controller=PlaybackController(backend, 60.0, initial_position=10.0),
+            controller=PlaybackController(backend, 60.0, initial_position=40.0),
             _seek_timeline=MagicMock(),
             timeline_viewport=MagicMock(),
         )
@@ -1132,7 +1212,7 @@ class EditorCompositionTests(unittest.TestCase):
         handled = on_timeline_scroll(window, event_controller, 0.0, 1.0, gdk)
 
         self.assertTrue(handled)
-        window._seek_timeline.assert_called_once_with(9.0)
+        window._seek_timeline.assert_called_once_with(10.0)
 
     def test_triplicate_refresh_ignores_completion_from_replaced_backend(self):
         with TemporaryDirectory() as temporary_directory:
@@ -1629,6 +1709,129 @@ class EditorCompositionTests(unittest.TestCase):
         self.assertIn("crop=1080:1080", filters[0])
         self.assertIn("pad=1920:1080", filters[0])
         self.assertNotIn("force_original_aspect_ratio=decrease", filters[0])
+
+    def test_preserve_resolution_mode_downscales_oversized_landscape_content(self):
+        timeline = SegmentTimeline(10.0)
+        segment = timeline.segments[0]
+
+        filters = segment_video_filters(
+            "[0:v:0]",
+            segment,
+            CANVAS_WIDTH,
+            CANVAS_HEIGHT,
+            "[outv]",
+            preserve_resolution=True,
+            content_width=3840,
+            content_height=2160,
+        )
+
+        self.assertIn(
+            "scale=1920:1080:force_original_aspect_ratio=decrease",
+            filters[0],
+        )
+        self.assertIn("pad=1920:1080", filters[0])
+        self.assertNotIn("scale=3840:2160", filters[0])
+
+    @unittest.skipUnless(
+        shutil.which("ffmpeg") and shutil.which("ffprobe"),
+        "FFmpeg and ffprobe are required",
+    )
+    def test_oversized_preserve_resolution_render_keeps_both_source_edges(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "oversized.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=c=black:s=3840x2160:r=10,"
+                    "drawbox=x=0:y=0:w=640:h=2160:color=red:t=fill,"
+                    "drawbox=x=3200:y=0:w=640:h=2160:color=blue:t=fill",
+                    "-t",
+                    "0.6",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    str(source),
+                ],
+                check=True,
+            )
+            source_bytes = source.read_bytes()
+            segment = SegmentTimeline(0.6).segments[0]
+            filters = segment_video_filters(
+                "[0:v:0]",
+                segment,
+                CANVAS_WIDTH,
+                CANVAS_HEIGHT,
+                "[outv]",
+                preserve_resolution=True,
+                content_width=3840,
+                content_height=2160,
+            )
+            destination = root / "fitted.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-i",
+                    str(source),
+                    "-filter_complex",
+                    filters[0],
+                    "-map",
+                    "[outv]",
+                    "-frames:v",
+                    "6",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    str(destination),
+                ],
+                check=True,
+            )
+
+            output = probe_media(destination)
+            self.assertEqual((output.width, output.height), (CANVAS_WIDTH, CANVAS_HEIGHT))
+            self.assertEqual(probe_frame_count(destination), 6)
+
+            def sample_edge_pixel(x: int) -> tuple[int, int, int]:
+                raw_pixel = subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        str(destination),
+                        "-vf",
+                        f"crop=20:20:{x}:500,scale=1:1:flags=area,format=rgb24",
+                        "-frames:v",
+                        "1",
+                        "-f",
+                        "rawvideo",
+                        "-",
+                    ],
+                    check=True,
+                    capture_output=True,
+                ).stdout
+                self.assertEqual(len(raw_pixel), 3)
+                return raw_pixel[0], raw_pixel[1], raw_pixel[2]
+
+            left_edge = sample_edge_pixel(20)
+            right_edge = sample_edge_pixel(CANVAS_WIDTH - 40)
+            self.assertGreater(left_edge[0], left_edge[2])
+            self.assertGreater(right_edge[2], right_edge[0])
+            self.assertEqual(source.read_bytes(), source_bytes)
 
     def test_preserve_resolution_triplicate_crops_each_slot_without_downscaling(self):
         timeline = SegmentTimeline(10.0)

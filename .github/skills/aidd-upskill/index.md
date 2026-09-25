@@ -10,7 +10,7 @@ See [`references/index.md`](./references/index.md) for contents.
 
 ### 📁 scripts/
 
-See [`scripts/index.md`](./scripts/index.md) for contents.
+Contains the deterministic whole-library validator documented in `README.md`.
 
 ## Files
 
@@ -19,4 +19,3 @@ See [`scripts/index.md`](./scripts/index.md) for contents.
 **File:** `SKILL.md`
 
 Guide for crafting high-quality AIDD skills. Use when creating, reviewing, or refactoring skills in .github/skills/.
-

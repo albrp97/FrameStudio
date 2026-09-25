@@ -4,12 +4,15 @@
 **Parent links:** OBJ-001, SCOPE-001
 **Capability links:** CAP-002, CAP-003, CAP-005, CAP-007, CAP-012
 **Sequence:** 4
-**Status:** complete
-**Closure:** user-approved on 2026-08-22 after successful implementation,
+**Status:** active
+**Prior closure:** user-approved on 2026-08-22 after successful implementation,
 review evidence, and target-workstation validation; remote checks remain
 unavailable and are recorded as an accepted warning.
+**Reopened:** user-authorized under CHG-011 on 2026-09-09 to correct and
+verify multi-clip import/add ordering.
 **Path history:** `phases/open/PHASE-004-combining-mixed-source-footage.md`
 -> `phases/closed/PHASE-004-combining-mixed-source-footage.md`
+-> `phases/open/PHASE-004-combining-mixed-source-footage.md`
 **Horizon:** future
 **Owner:** repository planning; maintainer identity is not recorded
 **Approval:** user-approved on 2026-08-21 before feature generation
@@ -22,6 +25,7 @@ the phase content preserved.
 **Affected surfaces:** multi-source import, timeline identity and placement,
 atomic segment-block movement and copy/paste, selection, mixed-media preview,
 normalization, export, and persistence
+**Change control:** CHG-011
 
 ## Outcome
 

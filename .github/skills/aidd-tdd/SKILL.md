@@ -1,9 +1,20 @@
 ---
 name: aidd-tdd
-description: Discover and apply the strongest repository-appropriate test and verification process for an approved ticket, with baseline and evidence discipline.
+description: Discover and apply the strongest repository-appropriate test and verification process for an approved ticket, with baseline and evidence discipline. Use when implementing or repairing observable behavior.
 ---
 
+Apply [../development-mode.md](../development-mode.md) when selecting the
+post-implementation validation and continuation behavior.
+
+import ../lifecycle-interface.md
+
 # TDD and Verification
+
+```sudolang
+Lifecycle {
+  profile = implementationMutation
+}
+```
 
 Use test-first development for new code behavior, while choosing the strongest
 appropriate evidence method for documentation, configuration, migration,
@@ -19,6 +30,9 @@ Repository-specific commands and conventions override generic examples.
 TestPlan {
   framework
   commands
+  technicalVerification[]
+  functionalityCommand
+  automatedFunctionalityTests[]
   phase
   feature
   ticket
@@ -26,7 +40,36 @@ TestPlan {
   requirements[]
   evidencePath
   realSystemRequired
+  validationProfile
   coverageGaps[]
+}
+
+TechnicalVerification {
+  id
+  category: smoke | baseline | unit | regression | fixture | acquisition |
+    contract | integration | migration | security | staticAnalysis |
+    qualityGate | deployment
+  commandOrScript
+  owner: agent
+  validationProfile
+  expected
+  observed
+  status
+  artifacts[]
+}
+
+AutomatedFunctionalityTest {
+  id
+  commandOrScript
+  framework
+  entryPoint
+  setup
+  representativeData
+  steps[]
+  assertions[]
+  expectedPersistedOrExternalEffect
+  cleanup
+  artifacts[]
 }
 
 TicketMethod = codeTdd | configurationVerification | migrationVerification |
@@ -42,8 +85,19 @@ discoverTestPlan(ticket) => TestPlan {
   3. inspect CI and contribution guidance for required gates
   4. identify the test framework and supported local stack
   5. classify the ticket method
-  6. identify protected existing flows and the strongest available evidence
-  7. record missing tooling or unavailable services as coverage gaps
+  6. identify protected existing flows and at least one automated functionality
+     test for every acceptance outcome
+  7. identify applicable agent-owned smoke, baseline, unit, regression, fixture,
+     acquisition, contract, integration, migration, security, static-analysis,
+     deployment, and quality-gate checks; never assign these technical checks
+     to the user handoff
+  8. in automatic mode, resolve the exact Rubber Duck validation profile
+     (`rubber-duck`, `gpt-5.6-luna`, high reasoning, `all-validation`) before
+     running or classifying any check
+  9. verify that the functionality test crosses a supported system boundary
+     and has executable assertions for observable results and relevant state
+  10. record missing tooling or unavailable services as blockers when the
+     required automated functionality gate cannot run
 }
 ```
 
@@ -51,97 +105,11 @@ Do not assume `npm`, Vitest, Riteway, Playwright, pytest, or any other tool
 without repository evidence. If a command is not configured, discover it or
 record why it is unavailable.
 
-## Baseline and red-green verification
+## Verification method reference
 
-For code behavior:
-
-1. Record the ticket requirements, protected flows, and expected evidence.
-2. Run the protected automated and functionality flows before changing code.
-3. Record baseline passes, failures, environment health, and known defects with
-   `/evidence`; do not hide pre-existing failures.
-4. Write a failing, isolated test for one requirement.
-5. Run the narrowest applicable test and confirm it fails for the intended
-   reason.
-6. Implement only the minimum behavior needed to pass.
-7. Rerun the focused test, then the affected regression flows.
-8. Exercise the strongest real-system flow when the change affects API,
-   persistence, integrations, workers, or user-facing behavior.
-9. Run configured local quality gates and record every result.
-
-For documentation, configuration, migration, infrastructure, and exploratory
-tickets, use the strongest applicable evidence instead of inventing a failing
-test. State the chosen method and its coverage limits in the evidence record.
-
-## Post-implementation user-validation handoff
-
-After implementation and technical verification, do not report the ticket as
-done or move it to `closed` yet. Produce a copy/paste-ready handoff that tells
-the user exactly what to validate against the ticket contract.
-
-```sudolang
-UserValidationHandoff {
-  ticket
-  implementationSummary
-  purpose: functionality | usability | regression | notApplicable
-  prerequisites[]
-  representativeData[]
-  steps[] // action, expectedVisibleResult, expectedPersistedOrExternalEffect
-  protectedRegressionChecks[]
-  relevantFailurePaths[]
-  cleanup[]
-  evidenceToReturn[]
-  passCriteria[]
-}
-```
-
-The handoff must:
-
-1. Translate every applicable acceptance criterion into an observable action
-   and expected result; never tell the user only to "test the change".
-2. Include setup, services, permissions, representative data, exact steps,
-   visible results, persisted or external effects, cleanup, and relevant
-   validation, authorization, retry, and failure paths.
-3. Require comparable before/after UI evidence when configured. For backend,
-   integration, migration, infrastructure, or CLI work, specify the supported
-   API, command, service, log, data, or operational observation instead; do
-   not require screenshots when they cannot prove the change.
-4. State what the user must return: `PASS`, `FAIL`, `BLOCKED`, or approved
-   `NOT APPLICABLE`, with notes and safe evidence paths.
-5. Keep the ticket in `verifying` while the handoff is awaiting a result.
-   A failed or blocked user check keeps the ticket open and requires a fix,
-   follow-up, or explicit change-control decision.
-
-Use `/user-test` and `/run-test` when their charter or execution support is
-useful, but agent-run tests do not replace the required user confirmation when
-`delivery.gates.user_validation_required` is enabled.
-
-After the user returns a terminal validation result and it is appended to
-evidence, recommend `/review`. Do not recommend `/commit` until the review is
-terminal and the intended changes are staged.
-
-## Assertions and isolation
-
-```sudolang
-assert({ given, should, actual, expected }) {
-  given and should describe observable acceptance behavior
-  actual exercises the named unit or real integration
-  expected expresses the required result
-  test answers unit, behavior, actual result, expected result, and bug discovery
-}
-```
-
-Tests must be readable, local, independent, and explicit. Use factories for
-repeated data rather than shared mutable fixtures. Prefer real integration
-where technically and economically feasible. A mock is justified only for an
-irrecoverable side effect, unavailable physical infrastructure, or
-non-viable per-run cost; document the reason and the resulting coverage gap.
-
-## Evidence
-
-Record commands, framework, environment/service health, expected and observed
-results, artifacts, failures, fixes, skipped checks, and coverage gaps through
-`/evidence`. A test runner exit code is evidence for that command only; it does
-not replace functionality or remote-gate evidence.
+Load [verification methods](./references/verification-methods.md) when running
+baseline, red-green implementation, automated functionality, user or automatic
+validation, assertions, or evidence recording.
 
 ## Constraints
 
@@ -149,14 +117,28 @@ not replace functionality or remote-gate evidence.
 Constraints {
   Never implement code behavior before its failing test when code TDD applies
   Never claim a baseline or regression passed without running and recording it
+  Never close or gate a ticket without a terminal automated functionality test
+    when delivery.gates.automated_functionality_required is enabled
+  Never treat a unit test, source inspection, human script, or agent narration
+    as an automated functionality test
   Never treat unavailable browser, service, or integration capability as passed
   Never assume a test framework or command
   Never share mutable test state
   Never add tests for type shape alone when type checking covers it
   Stop and report when a required test or service cannot run
-  Always return the exact user-validation handoff after implementation
-  Never report a ticket done or move it to closed before user validation evidence
-  is recorded, unless an approved not-applicable decision is recorded
-  Obtain the configured approval before moving to the next requirement
+  Always perform the mode-appropriate validation after all applicable
+    agent-owned technical checks and automated functionality checks are
+    terminal
+  Never ask the user to run smoke, baseline, unit, regression, fixture,
+    acquisition, contract, integration, migration, security, static-analysis,
+    formatter, lint, type-check, build, deployment, or other technical checks
+  Never report a guided ticket done or move it to closed before user validation
+    evidence is recorded, unless an approved not-applicable decision is recorded
+  Never report an automatic ticket done or move it to closed before
+    automaticValidation evidence is recorded
+  Never accept automatic validation without the exact Rubber Duck
+    `gpt-5.6-luna` high-reasoning profile
+  Obtain the configured approval before moving to the next requirement in
+    guided mode; automatic mode uses verified bootstrap authorization
 }
 ```

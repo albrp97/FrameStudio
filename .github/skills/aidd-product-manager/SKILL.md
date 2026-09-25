@@ -1,12 +1,23 @@
 ---
 name: aidd-product-manager
-description: Plan outcomes, user journeys, delivery contracts, and feature discovery without prematurely creating implementation tickets.
+description: Plan outcomes, user journeys, delivery contracts, and feature discovery without prematurely creating implementation tickets. Use when objective, users, success signals, or scope need clarification.
 ---
+
+import ../lifecycle-interface.md
 
 # ProductManager
 
+```sudolang
+Lifecycle {
+  profile = planningMutation
+}
+```
+
 Conduct product discovery that explains why the work matters and hands an
 approved, verifiable outcome to phase, feature, and ticket planning.
+
+Apply [../development-mode.md](../development-mode.md) when resolving the
+discovery approval and downstream planning handoff.
 
 ## Planning handoff
 
@@ -87,7 +98,9 @@ discover(request) => DeliveryContract {
   5. identify protected existing behaviors and likely failure paths
   6. map each outcome to observable verification and likely evidence
   7. record unknown decisions as open questions or blockers
-  8. present the discovery record for approval before child planning or file mutation
+  8. in guided mode, present the discovery record for approval before child
+     planning or file mutation; in automatic mode, record the
+     bootstrap-authorized planning decision and continue after verified writes
 }
 ```
 
@@ -116,6 +129,19 @@ Do not write files during discovery unless the caller explicitly authorizes
 artifact creation. Approval of the discovery contract is separate from
 approval to derive tickets.
 
+When `/save` or an explicitly authorized bootstrap write is requested, use the
+repository file-writing tool to persist the approved discovery artifact at its
+configured path. Re-read the path after writing and report whether it was
+created, updated, unchanged, skipped, or blocked. A delivery contract or story
+map printed in the response is not saved until the file operation succeeds.
+Until then, label response-only content `not written`.
+For each created or updated discovery artifact, the execution must include a
+host file create/edit call followed by a read-back verification. Creating a
+missing configured parent directory is part of the write. A response code
+block is not a saved artifact.
+An authorized `/save` without a recoverable approved artifact is blocked; do
+not reconstruct and write unapproved discovery content.
+
 ## Interface
 
 ```sudolang
@@ -138,9 +164,18 @@ Constraints {
   Do not invent acceptance outcomes, stakeholders, dependencies, or constraints
   Surface contradictions between user intent and repository evidence
   Mark skipped or unknown answers as open questions or TBD
-  Require approval before handing the contract to /ticket or changing files
+  Require configured approval before handing the contract to /ticket or
+    changing files in guided mode; automatic mode uses verified bootstrap
+    authorization for routine downstream planning
+  Do not treat response-only discovery content as a saved artifact
+  Verify every authorized `/save` write by reading the resulting path
+  Report failed or unavailable writes as blockers
   Keep project-specific metadata configurable rather than universal
   Do not treat a capability, phase, feature, or ticket title as proof of coverage
   Preserve source references, confidence, review status, and planning depth in saved records
+  In automatic mode, do not ask follow-up discovery questions after bootstrap;
+    use confirmed context and repository evidence, or report a blocker. Any
+    automatic planning validation or readiness classification must use the exact
+    Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile
 }
 ```

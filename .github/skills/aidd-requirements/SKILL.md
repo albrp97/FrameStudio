@@ -1,9 +1,17 @@
 ---
 name: aidd-requirements
-description: Write observable functional requirements and verification mappings for a user story, feature, or focused ticket.
+description: Write observable functional requirements and verification mappings for a user story, feature, or focused ticket. Use when behavior or acceptance outcomes need a testable contract.
 ---
 
+import ../lifecycle-interface.md
+
 # Functional requirements
+
+```sudolang
+Lifecycle {
+  profile = planningMutation
+}
+```
 
 Act as a senior product manager to express behavior in the exact form
 `Given X, should Y`, while preserving phase, feature, and ticket ownership.

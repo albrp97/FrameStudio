@@ -7,10 +7,15 @@ an isolated subagent delegation through the configured delegation capability.
 
 Running a multi-step plan manually means re-entering context for each step and
 losing track of which steps succeeded. `/aidd-pipeline` carries the delivery context into each ticket, records
-per-step evidence, stops on failure, and reports artifacts and blockers. Each
-ticket must receive and record its required user-validation result before it
-can close. After integration and review, the integration owner runs the
-configured `/commit` -> `/push` -> `/aidd-pr` sequence.
+per-step evidence, stops on failure, and reports artifacts and blockers. Each ticket must receive and record terminal agent-owned technical verification
+and a terminal automated functionality result for every acceptance outcome
+before mode-appropriate validation and closure. Guided mode records a
+functionality-only user-validation result; automatic mode records
+`automaticValidation` from the same charter through the exact Rubber Duck
+`gpt-5.6-luna` high-reasoning `all-validation` profile and continues without
+waiting.
+After integration and review, the integration owner runs the configured
+`/commit` -> `/push` -> `/aidd-pr` sequence.
 
 ## Usage
 

@@ -28,6 +28,12 @@ Evaluates an existing skill against authoring criteria: function test,
 required sections, size thresholds, command separation, and README quality.
 Reports issues and a pass/fail verdict.
 
+Run the deterministic library checks with:
+
+```bash
+python .github/skills/aidd-upskill/scripts/validate-skills.py .github/skills
+```
+
 ## When to use
 
 - Creating a new skill from scratch in `.github/skills/`

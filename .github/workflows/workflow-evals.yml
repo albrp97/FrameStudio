@@ -1,0 +1,36 @@
+name: Workflow Evals
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  workflow-evals:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run workflow contract evals
+        run: |
+          python tools/eval_workflows.py \
+            --spec ai-evals/workflow-contracts.json \
+            --threshold 1.0
+
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-eval-reports
+          path: ai-evals/reports/

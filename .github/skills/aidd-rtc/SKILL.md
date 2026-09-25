@@ -3,6 +3,8 @@ name: aidd-rtc
 description: Reflective Thought Composition. Structured thinking pipeline for complex decisions, design evaluation, and deep analysis. Use when quality of reasoning matters more than speed of response.
 ---
 
+import ../workflow-interface.md
+
 # aidd-rtc
 
 Reflective Thought Composition (RTC) — a structured thinking pipeline that expands the thinking process of any model.

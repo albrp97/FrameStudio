@@ -30,6 +30,25 @@ Things this project explicitly will NOT do.
 - Durable quality, security, and evidence expectations
 - Rollback, observability, support, or release-readiness constraints
 
+## Development Mode
+
+- **Selected mode:** `guided` or `automatic`
+- **Canonical configuration:** `.github/aidd-config.yml`,
+  `delivery.development.mode`
+- **Guided:** retain configured approval gates and the functionality-only user
+  validation handoff.
+- **Automatic:** after the approved and verified project bootstrap, continue
+  through mapping, planning, implementation, technical verification,
+  automated functionality validation, review/remediation, delivery, and
+  remaining phases without asking or waiting for another user response.
+- **Automatic validation profile:** `rubber-duck`, model `gpt-5.6-luna`,
+  reasoning effort `high`, scope `all-validation`
+- **Profile authority:** `.github/aidd-config.yml`,
+  `delivery.development.automatic_validation`
+- **Mode-policy authority:** `.github/aidd-config.yml`,
+  `delivery.mode_overrides.<mode>`; automatic execution additionally requires
+  an available matching validator capability from the runtime.
+
 ## Architectural Decisions
 
 | Decision | Rationale |

@@ -1,0 +1,17 @@
+name: PR Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install project dependencies
+        run: echo "Replace with the repo's real install command"
+      - name: Run repo quality checks
+        run: echo "Replace with lint, test, type-check, and build commands that matter for this repo"

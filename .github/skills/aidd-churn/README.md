@@ -11,6 +11,9 @@ overlap — the true hotspots worth refactoring or reviewing first.
 
 ## Usage
 
+Invoke `/aidd-churn` to run the configured hotspot analysis. The underlying
+CLI supports:
+
 ```bash
 npx aidd churn                  # top 20 files, 90-day window
 npx aidd churn --days 30        # tighten the window

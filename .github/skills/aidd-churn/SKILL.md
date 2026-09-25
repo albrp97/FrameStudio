@@ -1,10 +1,18 @@
 ---
 name: aidd-churn
-description: Run configurable hotspot analysis and use it as a review-depth risk signal, never as a substitute for functional evidence.
+description: Run configurable hotspot analysis and use it as a review-depth risk signal, never as a substitute for functional evidence. Use before review when change history should influence review depth.
 compatibility: Requires git history and Node.js 16+ for the aidd CLI; availability may be optional per repository configuration.
 ---
 
+import ../lifecycle-interface.md
+
 # aidd-churn
+
+```sudolang
+Lifecycle {
+  profile = analysisEvidence
+}
+```
 
 Identify files where size, change frequency, complexity, and density combine
 into elevated review risk. Use the result to prioritize inspection, regression

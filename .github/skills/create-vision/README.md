@@ -16,7 +16,15 @@ Without a vision document, agents operate on guesswork. With one, they can answe
 /create-vision
 ```
 
-Produces a `vision.md` at the repository root, populated from codebase discovery and 5 targeted questions.
+Use `/create-vision draft` for a read-only proposal and
+`/create-vision write` to persist a previously approved draft. The write mode
+re-reads `vision.md` and reports a blocker if the file operation or verification
+fails. A write request without a recoverable approved draft is also blocked.
+
+Produces a `vision.md` at the repository root, populated from codebase
+discovery and 5 targeted questions. After approval, the skill writes the file
+with a repository file operation and verifies it; returning the Markdown alone
+does not create `vision.md`.
 
 ## What it produces
 
@@ -30,6 +38,10 @@ A `vision.md` file containing:
 - **Architectural Decisions** — major choices with rationale
 - **UX / DX Principles** — how the project should feel to use or extend
 - **Success Criteria** — measurable outcomes that define success
+- **Development Mode** — the selected `guided` or `automatic` workflow mode
+  and the canonical `delivery.development.mode` configuration key. Automatic
+  mode also records the required Rubber Duck validator profile:
+  `gpt-5.6-luna` with high reasoning and `all-validation` scope.
 
 ## Template
 

@@ -8,11 +8,12 @@ This index provides an overview of the contents in this directory.
 
 **File:** `process.md`
 
-*No description available*
+Creation and review pipelines, validation stages, README checks, lifecycle
+contract checks, and reporting requirements.
 
 ### Types & Interfaces
 
 **File:** `types.md`
 
-*No description available*
-
+Skill naming, descriptions, size metrics, lifecycle/domain contracts,
+frontmatter, required sections, and the five-question function test.

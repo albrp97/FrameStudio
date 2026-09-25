@@ -151,6 +151,8 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 2. When a project is already open, **Add clips** appends the new videos to the
    existing edited timeline. It does not replace the saved cuts, deleted
    segments, focus settings, or triplicate settings.
+   Selecting multiple videos in one batch randomizes their timeline order;
+   adding a single video leaves it at the end.
 3. Wait for metadata probing to attach or append the clips. Audio analysis continues
    in the background.
 4. Play, pause, seek, or use `Left` and `Right` for frame navigation.
@@ -177,7 +179,7 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 | `Ctrl` + mouse wheel | Zoom the timeline |
 | `Ctrl+0` | Fit the default timeline view |
 | `30 min` | Fit a 30-minute timeline window |
-| Normal mouse wheel | Move the playhead |
+| Normal mouse wheel | Move the playhead by 30 seconds per scroll unit |
 | `Alt` or `Shift` + mouse wheel | Move the zoomed timeline viewport |
 
 Seeking while playing keeps playback active. Enabling or disabling Triplicate
@@ -251,13 +253,18 @@ session option starts fresh.
 
 When stdout is used for automation, export progress is JSON Lines. Human
 readable numbered stages are written to stderr, so terminal progress does not
-corrupt machine-readable output. The versioned details are in
+corrupt machine-readable output. Human progress refreshes every five seconds
+while progress samples continue, even when the displayed percentage has not
+advanced, and during long FFprobe frame-count and FFmpeg decoded-output
+validation scans. The versioned details are in
 [`docs/specs/cli-contract.md`](docs/specs/cli-contract.md).
 
 ## Use the command-line editor
 
 The CLI and GTK editor operate on the same project format and domain model.
 Commands return JSON on stdout and structured errors on stderr.
+When an import or add command receives multiple videos, their timeline order
+is randomized; a single video is appended without reordering existing clips.
 
 ### Create and inspect projects
 

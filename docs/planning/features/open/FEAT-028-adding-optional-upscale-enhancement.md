@@ -3,15 +3,16 @@
 **Feature ID:** FEAT-028
 **Parent links:** OBJ-001, SCOPE-001, PHASE-008
 **Capability links:** CAP-005, CAP-011, CAP-012
-**Status:** complete
-**Change control:** approved and applied under CHG-008
+**Status:** active
+**Change control:** approved and applied under CHG-008; reopened under
+CHG-011 for final-canvas fitting of oversized preserved-resolution content
 **Horizon:** future
 **Priority:** 2
 **Owner:** repository implementation in the active worktree
 **Approval:** User-authorized by the request to implement the upscale option
-and benchmark its render strategies; execution remains subject to evidence,
-user-validation, review, and delivery gates.
-**Last updated:** 2026-08-28
+and benchmark its render strategies; final-canvas correction authorized under
+CHG-011.
+**Last updated:** 2026-09-09
 **Source paths:** `docs/planning/reviews/CHG-008-add-production-upscale-enhancement.md`,
 `docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
 `docs/specs/future-product-direction.md`, `FPS-ENHANCEMENT-RESEARCH.md`,
@@ -27,10 +28,11 @@ interaction between spatial enhancement and FPS processing
 RVE integration, FFmpeg scaling/composition, GTK export panel, CLI export,
 tests, fixtures, benchmark reports, and evidence
 **Evidence path:** `evidence/ticket-079-production-upscale-enhancement.md`
-**Planned tickets:** TICKET-079, TICKET-080, TICKET-081
+**Planned tickets:** TICKET-079, TICKET-080, TICKET-081, TICKET-107
 **Path history:** created at
 `features/open/FEAT-028-adding-optional-upscale-enhancement.md` ->
-`features/closed/FEAT-028-adding-optional-upscale-enhancement.md`
+`features/closed/FEAT-028-adding-optional-upscale-enhancement.md` ->
+`features/open/FEAT-028-adding-optional-upscale-enhancement.md`
 
 ## Outcome
 
@@ -49,6 +51,8 @@ supported by a reproducible target-workstation benchmark.
 - Enhance landscape sources whose short side is at or below 1000 pixels and
   portrait sources whose short side is at or below 720 pixels to a
   1080-pixel short side, preserving aspect ratio.
+- Fit oversized content to the fixed 1920x1080 canvas during final
+  composition without downscaling restoration/upscale intermediates.
 - Keep square and already-qualified sources unchanged by the spatial
   enhancement decision.
 - Integrate restoration, spatial scaling, FPS enhancement, composition,
@@ -63,7 +67,7 @@ supported by a reproducible target-workstation benchmark.
 ## Explicit non-goals
 
 - Adding multi-track editing, new composition modes, arbitrary crop effects,
-  or automatic downscaling.
+  or downscaling sources before restoration/upscale processing.
 - Adding other restoration models or treating the research candidate matrix
   as production support.
 - Vendoring model weights, external runtimes, proprietary software, or new
@@ -130,8 +134,8 @@ supported by a reproducible target-workstation benchmark.
 
 ## Closure
 
-FEAT-028 is complete. TICKET-079 through TICKET-081 delivered the optional
+FEAT-028 was previously complete. TICKET-079 through TICKET-081 delivered the optional
 upscale route, render-order benchmark, editor responsiveness corrections,
-and GPU interpolation path. The user confirmed the feature was manually
-validated and requested closure of all tickets on 2026-08-28. Existing
-environment, remote-check, and benchmark limitations remain documented.
+and GPU interpolation path. Under CHG-011, FEAT-028 is reopened for TICKET-107;
+the final-canvas fit correction must not reduce resolution before restoration.
+Existing environment, remote-check, and benchmark limitations remain documented.

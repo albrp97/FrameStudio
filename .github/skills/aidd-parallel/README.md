@@ -3,7 +3,7 @@
 `/aidd-parallel` generates focused `/aidd-fix` delegation prompts for a list
 of tickets and can dispatch genuinely independent work in dependency order
 with explicit ownership, evidence aggregation, and integration-owner
-user-validation collection.
+validation collection.
 
 ## Why parallel delegation matters
 
@@ -20,10 +20,15 @@ focused sub-agents without reimplementing prompt generation logic.
 - Any workflow that needs to fan disjoint work out to multiple `/aidd-fix`
   sub-agents without racing on shared files or branches
 
-The integration owner presents each completed ticket's user-validation handoff
-and records its terminal result before closing delegated tickets. Only the
-integration owner performs the final `/commit`, `/push`, `/aidd-pr`, and merge
-handoff for shared delivery.
+The integration owner runs the aggregate automated functionality gate for each
+completed ticket. In guided mode, it presents each ticket's functionality-only
+user-validation handoff and records its terminal result before closing
+delegated tickets. In automatic mode, it records terminal
+`automaticValidation` from the same charter and continues through review and
+configured delivery without waiting; every automatic validation decision uses
+the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile.
+Only the integration owner performs the final `/commit`, `/push`, `/aidd-pr`,
+and merge handoff for shared delivery.
 
 ## Commands
 

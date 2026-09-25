@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
@@ -19,6 +19,7 @@ from .export_types import (
     ExportPlan,
     ExportProgress,
     ExportProgressCallback,
+    OutputPolicy,
     parse_ffmpeg_progress_values,
 )
 from .media import MediaProbe, MediaProbeError, probe_media
@@ -98,6 +99,81 @@ def emit_export_progress(
     )
 
 
+def make_progress_heartbeat(
+    callback: ExportProgressCallback | None,
+    *,
+    stage: str,
+    total_frames: int,
+    started: float,
+    percent: float,
+    frame: int | None = None,
+) -> Callable[[], None] | None:
+    if callback is None:
+        return None
+    heartbeat_frame = total_frames if frame is None else frame
+    heartbeat_frame = max(0, min(max(0, total_frames), heartbeat_frame))
+
+    def heartbeat() -> None:
+        callback(
+            ExportProgress(
+                stage=stage,
+                percent=max(0.0, min(100.0, percent)),
+                frame=heartbeat_frame,
+                total_frames=max(0, total_frames),
+                fps=None,
+                elapsed_seconds=max(0.0, time.monotonic() - started),
+                eta_seconds=None,
+            )
+        )
+
+    return heartbeat
+
+
+def make_output_validation_heartbeats(
+    callback: ExportProgressCallback | None,
+    *,
+    total_frames: int,
+    started: float,
+) -> tuple[Callable[[], None] | None, Callable[[], None] | None]:
+    return (
+        make_progress_heartbeat(
+            callback,
+            stage="verifying output",
+            total_frames=total_frames,
+            started=started,
+            percent=99.0,
+        ),
+        make_progress_heartbeat(
+            callback,
+            stage="checking cached output",
+            total_frames=total_frames,
+            started=started,
+            percent=0.0,
+            frame=0,
+        ),
+    )
+
+
+def emit_verification_progress(
+    plan: ExportPlan,
+    total_frames: int,
+    progress_callback: ExportProgressCallback | None,
+    started: float,
+) -> None:
+    duration = plan.expected_duration_seconds
+    emit_export_progress(
+        progress_callback,
+        stage="verifying",
+        current_seconds=duration,
+        total_duration_seconds=duration,
+        frame=total_frames,
+        total_frames=total_frames,
+        fps=None,
+        started=started,
+        percent_override=99.0,
+    )
+
+
 def monotonic_progress_callback(
     callback: ExportProgressCallback | None,
 ) -> ExportProgressCallback | None:
@@ -138,9 +214,11 @@ def validate_decoded_output(
     ffmpeg_path: str,
     *,
     label: str,
+    heartbeat_callback: Callable[[], None] | None = None,
+    heartbeat_interval_seconds: float = 5.0,
 ) -> None:
     try:
-        result = subprocess.run(
+        result = _run_command_with_heartbeat(
             [
                 ffmpeg_path,
                 "-hide_banner",
@@ -156,9 +234,8 @@ def validate_decoded_output(
                 "null",
                 "-",
             ],
-            capture_output=True,
-            text=True,
-            check=False,
+            heartbeat_callback=heartbeat_callback,
+            heartbeat_interval_seconds=heartbeat_interval_seconds,
         )
     except OSError as error:
         raise ExportExecutionError(
@@ -243,6 +320,47 @@ def _terminate_process(process: _ManagedProcess) -> None:
         process.wait(timeout=_PROCESS_TERMINATION_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired as error:
         raise ExportExecutionError("FFmpeg did not terminate after cancellation") from error
+
+
+def _run_command_with_heartbeat(
+    command: list[str],
+    *,
+    heartbeat_callback: Callable[[], None] | None,
+    heartbeat_interval_seconds: float,
+) -> subprocess.CompletedProcess[str]:
+    if heartbeat_callback is None:
+        return subprocess.run(command, capture_output=True, text=True, check=False)
+    if not math.isfinite(heartbeat_interval_seconds) or heartbeat_interval_seconds <= 0.0:
+        raise ValueError("Heartbeat interval must be a positive finite number")
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        while True:
+            try:
+                stdout, stderr = process.communicate(timeout=heartbeat_interval_seconds)
+            except subprocess.TimeoutExpired:
+                heartbeat_callback()
+            else:
+                return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    except BaseException:
+        if process.poll() is None:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+            try:
+                process.communicate(timeout=_PROCESS_TERMINATION_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                process.communicate()
+        raise
 
 
 def run_ffmpeg(
@@ -433,7 +551,13 @@ def segment_is_full_source(
     )
 
 
-def probe_frame_count(path: Path, ffprobe_path: str = "ffprobe") -> int:
+def probe_frame_count(
+    path: Path,
+    ffprobe_path: str = "ffprobe",
+    *,
+    heartbeat_callback: Callable[[], None] | None = None,
+    heartbeat_interval_seconds: float = 5.0,
+) -> int:
     command = [
         ffprobe_path,
         "-v",
@@ -448,11 +572,10 @@ def probe_frame_count(path: Path, ffprobe_path: str = "ffprobe") -> int:
         str(path),
     ]
     try:
-        result = subprocess.run(
+        result = _run_command_with_heartbeat(
             command,
-            capture_output=True,
-            text=True,
-            check=False,
+            heartbeat_callback=heartbeat_callback,
+            heartbeat_interval_seconds=heartbeat_interval_seconds,
         )
     except OSError as error:
         raise ExportExecutionError(
@@ -485,6 +608,8 @@ def ensure_exact_video_frame_count(
     audio_channels: int,
     ffmpeg_path: str,
     ffprobe_path: str,
+    heartbeat_callback: Callable[[], None] | None = None,
+    heartbeat_interval_seconds: float = 5.0,
 ) -> MediaProbe:
     """Repair a rendered clip whose frame count drifted from its rounded target.
 
@@ -496,7 +621,12 @@ def ensure_exact_video_frame_count(
     by cloning or trimming the trailing frame(s) before the drift can
     accumulate into a final "frame count does not match" export failure.
     """
-    actual_frames = probe_frame_count(destination, ffprobe_path)
+    actual_frames = probe_frame_count(
+        destination,
+        ffprobe_path,
+        heartbeat_callback=heartbeat_callback,
+        heartbeat_interval_seconds=heartbeat_interval_seconds,
+    )
     if actual_frames == expected_frames:
         return probe_media(destination, ffprobe_path)
     deficit = expected_frames - actual_frames
@@ -520,9 +650,7 @@ def ensure_exact_video_frame_count(
         video_expr = f"[0:v]trim=end_frame={expected_frames},setpts=PTS-STARTPTS[v]"
         pad_seconds = 0.0
     if has_audio:
-        audio_expr = (
-            f"[0:a]apad=pad_dur={pad_seconds:.6f}[a]" if deficit > 0 else "[0:a]anull[a]"
-        )
+        audio_expr = f"[0:a]apad=pad_dur={pad_seconds:.6f}[a]" if deficit > 0 else "[0:a]anull[a]"
         command.extend(
             ["-filter_complex", f"{video_expr};{audio_expr}", "-map", "[v]", "-map", "[a]"]
         )
@@ -561,7 +689,11 @@ def ensure_exact_video_frame_count(
         command.append("-shortest")
     command.extend(["-f", container, str(corrected)])
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        result = _run_command_with_heartbeat(
+            command,
+            heartbeat_callback=heartbeat_callback,
+            heartbeat_interval_seconds=heartbeat_interval_seconds,
+        )
     except OSError as error:
         corrected.unlink(missing_ok=True)
         raise ExportExecutionError(
@@ -576,7 +708,12 @@ def ensure_exact_video_frame_count(
         raise ExportExecutionError(
             f"Frame count correction did not create an output for {destination.name}"
         )
-    corrected_frames = probe_frame_count(corrected, ffprobe_path)
+    corrected_frames = probe_frame_count(
+        corrected,
+        ffprobe_path,
+        heartbeat_callback=heartbeat_callback,
+        heartbeat_interval_seconds=heartbeat_interval_seconds,
+    )
     if corrected_frames != expected_frames:
         corrected.unlink(missing_ok=True)
         raise ExportExecutionError(
@@ -588,3 +725,32 @@ def ensure_exact_video_frame_count(
         return probe_media(destination, ffprobe_path)
     except MediaProbeError as error:
         raise ExportExecutionError(f"Corrected source could not be inspected: {error}") from error
+
+
+def ensure_video_frame_count_for_policy(
+    destination: Path,
+    expected_frames: int,
+    *,
+    frame_rate: Fraction,
+    policy: OutputPolicy,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    heartbeat_callback: Callable[[], None] | None = None,
+    heartbeat_interval_seconds: float = 5.0,
+) -> MediaProbe:
+    return ensure_exact_video_frame_count(
+        destination,
+        expected_frames,
+        frame_rate=frame_rate,
+        video_codec=policy.video_codec,
+        pixel_format=policy.pixel_format,
+        container=policy.container,
+        has_audio=policy.audio_stream_present,
+        audio_codec=policy.audio_codec,
+        audio_sample_rate=policy.audio_sample_rate,
+        audio_channels=policy.audio_channels,
+        ffmpeg_path=ffmpeg_path,
+        ffprobe_path=ffprobe_path,
+        heartbeat_callback=heartbeat_callback,
+        heartbeat_interval_seconds=heartbeat_interval_seconds,
+    )

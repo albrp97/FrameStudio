@@ -14,3 +14,12 @@ Inputs and outputs are defined in [SKILL.md](SKILL.md). The skill reviews both
 preserves stable IDs and traceability, and stops on missing prerequisites. It
 does not implement, move files, commit, push, merge, or silently generate
 downstream artifacts.
+
+## Commands
+
+```sudolang
+Commands {
+  /review-planning-layer [layer-or-id]
+  - return a read-only planning review and readiness decision
+}
+```

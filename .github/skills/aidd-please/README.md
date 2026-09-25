@@ -28,8 +28,9 @@ step, the single skill and command to use, and why it follows from the current
 workflow state or blocker. When no active context is available, the handoff
 routes to `aidd-agent-orchestrator` for classification.
 
-The delivery handoff is ordered: reviewed scope -> `/commit` -> `/push` when
-the branch is unpublished or ahead -> `/aidd-pr` when a PR is required.
+The delivery handoff is ordered: executable automated functionality -> user
+validation -> review -> `/commit` -> `/push` when the branch is unpublished or
+ahead -> `/aidd-pr` when a PR is required.
 
 ## When to use
 

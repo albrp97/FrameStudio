@@ -1,9 +1,17 @@
 ---
 name: clean-pr-branch
-description: Safely prepare a clean PR branch by removing disposable AI scaffolding from tracking while preserving delivery evidence, protected files, and real code.
+description: Safely prepare a clean PR branch by removing disposable AI scaffolding from tracking while preserving delivery evidence, protected files, and real code. Use before publishing a branch that contains local workflow scaffolding.
 ---
 
+import ../lifecycle-interface.md
+
 # clean-pr-branch
+
+```sudolang
+Lifecycle {
+  profile = repositoryCleanup
+}
+```
 
 Clean only git tracking; never delete source or evidence files from disk.
 Read `.github/aidd-config.yml`, the active ticket evidence summary, branch

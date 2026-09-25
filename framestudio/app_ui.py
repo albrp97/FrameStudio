@@ -206,7 +206,7 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
         range_selection_modifier_mask=int(Gdk.ModifierType.SHIFT_MASK),
     )
     window.timeline_canvas.set_tooltip_text(
-        "Click/drag to seek; normal wheel seeks; Ctrl+wheel zooms; "
+        "Click/drag to seek; normal wheel seeks 30 seconds per unit; Ctrl+wheel zooms; "
         "Alt/Shift/horizontal wheel scrolls; Ctrl-click selects multiple clips"
         "; Shift-click selects an inclusive range"
     )

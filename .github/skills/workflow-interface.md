@@ -4,6 +4,21 @@ Domain skills remain focused on their technical or communication specialty.
 Lifecycle skills provide the surrounding delivery controls.
 
 ```sudolang
+DomainContract {
+  inputs[]
+  outputs[]
+  risks[]
+  assumptions[]
+  limitations[]
+  expectedEvidence[]
+  blockers[]
+  sideEffects = []
+  mayCommit = false
+  mayPush = false
+  mayResolve = false
+  mayMerge = false
+}
+
 DomainInput {
   phase
   feature
@@ -34,3 +49,7 @@ can trace to requirements. `nextStepHint` may identify the lifecycle skill that
 should act next, but it is advisory; the lifecycle orchestrator resolves the
 authoritative next action. Do not create branches, manage PR threads, modify
 shared planning/evidence records, or declare delivery readiness.
+
+Importing this interface resolves the required domain contract. A domain skill
+may narrow inputs, outputs, evidence, risks, assumptions, or limitations, but
+must not expand the side-effect or delivery permissions.
