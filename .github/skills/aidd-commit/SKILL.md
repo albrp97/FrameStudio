@@ -1,15 +1,26 @@
 ---
 name: aidd-commit
-description: Create a scoped conventional commit only after review, evidence, user validation, and configured delivery gates are terminal.
+description: Create a scoped conventional commit after readiness checks, or honor a confirmed explicit user directive with bypassed gates recorded as warnings. Use when local changes must become an auditable commit.
 compatibility: Requires git and the repository's discovered commit policy.
 ---
 
+import ../lifecycle-interface.md
+
 # Commit Delivery
+
+```sudolang
+Lifecycle {
+  profile = deliveryCommit
+}
+```
 
 Create one auditable local commit for the active ticket. A commit is a
 version-control checkpoint, not proof that the ticket has been delivered:
 push, pull-request, remote checks, merge, and lifecycle closeout remain
 separate operations.
+
+Apply [../development-mode.md](../development-mode.md) when evaluating the
+validation and approval prerequisites.
 
 ## Context
 
@@ -29,9 +40,13 @@ CommitContext {
   stagedDiff
   workingTree
   evidencePath
+  automaticValidationProfile
   requiredGates[]
   approvalMode
   commitPolicy
+  userDirective
+  userDirectiveOverride
+  bypassedGates[]
   pushPolicy
   nextAction
 }
@@ -45,20 +60,36 @@ Recommend or create a commit only when all applicable conditions hold:
    its accepted scope is complete for this checkpoint.
 2. The source branch is dedicated to the ticket or the repository explicitly
    permits another branch strategy.
-3. Baseline, regression, functionality, local-quality, review, and required
-   user-validation evidence are terminal. Remote-only checks are not a
-   precondition for the local commit and remain pending until publication.
-   An approved not-applicable decision satisfies only the configured
-   user-validation gate.
+3. All applicable agent-owned technical verification (including baseline,
+   smoke, unit, regression, fixture, acquisition, contract, integration,
+   migration, security, static-analysis, and local-quality checks), automated
+   functionality, review, and the mode-appropriate validation evidence are
+   terminal. Guided mode requires functionality-only user-validation evidence;
+   automatic mode requires `automaticValidation` plus the exact Rubber Duck
+   `gpt-5.6-luna` high-reasoning `all-validation` profile on every validation
+   entry. Remote-only
+   checks are not a precondition for the local commit and remain pending until
+   publication.
+   In guided mode, an approved not-applicable decision satisfies only the
+   configured user-validation gate; automatic mode requires its terminal
+   `automaticValidation` profile instead.
 4. There are no unresolved blockers or unapproved scope changes.
-5. The staged file list and staged diff contain only intended changes. Do not
-   stage files implicitly and do not include unrelated work.
-6. The configured approval mode permits the commit.
+5. The staged file list and staged diff contain only the authorized scope. Do
+   not stage files implicitly during normal readiness.
+6. The configured approval mode permits the commit, or automatic mode has a
+   verified bootstrap authorization for the routine operation.
 
-If intended changes are unstaged, report that the caller must stage them; do
-not silently stage or commit them. If the repository permits intentional WIP
-commits, require an explicit WIP request or configured policy and do not call
-the ticket delivered.
+These are readiness defaults, not grounds to reject a confirmed explicit user
+directive. If the user directly requests a commit while one or more conditions
+are unmet, apply the explicit-user-directive rules in
+`development-mode.md`: warn once, obtain confirmation when required, record
+the bypassed gates, and commit the requested scope.
+
+If intended changes are unstaged, do not stage them unless the user explicitly
+requests staging or uses an unambiguous scope such as "commit everything".
+That scope authorizes staging all current changes after displaying the path
+list and checking for secret-bearing files. An override commit is a requested
+checkpoint, not evidence that the ticket is delivered or ready to close.
 
 ## Process
 
@@ -66,13 +97,17 @@ the ticket delivered.
 commit(ticket, context) {
   1. inspect branch, base, worktree, staged paths, and staged diff
   2. verify evidence, approval, scope, secrets, generated files, migrations,
-     documentation, and repository commit policy
-  3. stop if a required prerequisite is missing or a staged path is unrelated
-  4. create one conventional commit using configured trailers, signing, and
+     documentation, repository commit policy, and the automatic validation
+     profile when automatic mode is active
+  3. if readiness gates are missing and no explicit user directive exists,
+     stop and report the normal blocker
+  4. if an explicit user directive exists, warn once, confirm when required,
+     stage only the explicitly authorized scope, and record bypassed gates
+  5. create one conventional commit using configured trailers, signing, and
      author policy
-  5. capture the commit ID, subject, branch, and included paths
-  6. append a `commit` evidence entry without exposing secrets
-  7. recommend push, PR, or lifecycle closeout from version-control and
+  6. capture the commit ID, subject, branch, and included paths
+  7. append a `commit` evidence entry without exposing secrets
+  8. recommend push, PR, or lifecycle closeout from version-control and
      pull-request policy
 }
 ```
@@ -109,6 +144,7 @@ Record:
 - source branch and intended base;
 - exact committed paths;
 - readiness evidence references and accepted warnings;
+- explicit user directive, confirmation, and bypassed gates when applicable;
 - whether the commit is ahead of an upstream;
 - the next permitted delivery action.
 
@@ -125,12 +161,18 @@ Contract {
 
 Constraints {
   Never commit without staged-scope review
-  Never stage files implicitly
-  Never commit when required evidence, approval, or user validation is missing
-  Never include unrelated or secret-bearing files
+  Never stage files implicitly unless the user explicitly requests staging or
+    uses an unambiguous scope such as "commit everything"
+  Missing evidence, approval, review, mode-appropriate validation, or the
+    automatic validator profile blocks normal readiness but does not block a
+    confirmed explicit user directive
+  Never record a bypassed gate as passed
+  Never include files outside the user's authorized scope or secret-bearing
+    files
   Never amend or rewrite history by default
   Never claim delivery complete from a local commit alone
-  If branch, policy, scope, or evidence is ambiguous, report the blocker
+  If scope is ambiguous, request clarification; if only workflow readiness is
+    incomplete, warn and offer the user-directive override instead of refusing
 }
 ```
 

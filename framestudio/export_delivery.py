@@ -4,6 +4,7 @@ import shutil
 import threading
 import time
 import warnings
+from collections.abc import Callable
 from fractions import Fraction
 from pathlib import Path
 
@@ -16,8 +17,11 @@ from .export_ffmpeg import (
 from .export_interpolation import execute_enhanced_export, probe_frame_count
 from .export_process import (
     emit_export_progress,
-    ensure_exact_video_frame_count,
+    emit_verification_progress,
+    ensure_video_frame_count_for_policy,
     expected_export_frames,
+    make_output_validation_heartbeats,
+    make_progress_heartbeat,
     monotonic_progress_callback,
     partial_path,
     prepare_export_sources,
@@ -46,6 +50,7 @@ def verify_mixed_export_output(
     *,
     ffmpeg_path: str,
     ffprobe_path: str,
+    heartbeat_callback: Callable[[], None] | None = None,
 ) -> MediaProbe:
     policy = plan.output_policy
     if policy is None:
@@ -71,7 +76,11 @@ def verify_mixed_export_output(
         raise ExportExecutionError("Mixed export frame rate metadata is invalid") from error
     if actual_rate != expected_rate:
         raise ExportExecutionError("Mixed export frame rate does not match the output policy")
-    actual_frames = probe_frame_count(candidate, ffprobe_path)
+    actual_frames = probe_frame_count(
+        candidate,
+        ffprobe_path,
+        heartbeat_callback=heartbeat_callback,
+    )
     if actual_frames != expected_frames:
         raise ExportExecutionError("Mixed export frame count does not match the selected target")
     if plan.route == "enhanced":
@@ -90,7 +99,12 @@ def verify_mixed_export_output(
             raise ExportExecutionError(
                 "Mixed export channel count does not match the output policy"
             )
-    validate_decoded_output(candidate, ffmpeg_path, label="mixed output")
+    validate_decoded_output(
+        candidate,
+        ffmpeg_path,
+        label="mixed output",
+        heartbeat_callback=heartbeat_callback,
+    )
     return output_probe
 
 
@@ -139,6 +153,18 @@ def execute_mixed_export(
         raise ExportExecutionError(str(error)) from error
     started = time.monotonic()
     total_frames, _frame_rate = expected_mixed_export_frames(plan)
+    validation_heartbeat, cached_validation_heartbeat = make_output_validation_heartbeats(
+        progress_callback,
+        total_frames=total_frames,
+        started=started,
+    )
+    frame_count_heartbeat = make_progress_heartbeat(
+        progress_callback,
+        stage="checking output frame count",
+        total_frames=total_frames,
+        started=started,
+        percent=95.0,
+    )
     emit_export_progress(
         progress_callback,
         stage="starting",
@@ -158,6 +184,7 @@ def execute_mixed_export(
                 candidate,
                 ffmpeg_path=ffmpeg_path,
                 ffprobe_path=ffprobe_path,
+                heartbeat_callback=cached_validation_heartbeat,
             ),
         )
         if cached_composition is not None:
@@ -192,30 +219,20 @@ def execute_mixed_export(
             # verification target.
             policy = plan.output_policy
             if policy is not None:
-                ensure_exact_video_frame_count(
+                ensure_video_frame_count_for_policy(
                     partial,
                     total_frames,
                     frame_rate=Fraction(policy.frame_rate),
-                    video_codec=policy.video_codec,
-                    pixel_format=policy.pixel_format,
-                    container=policy.container,
-                    has_audio=policy.audio_stream_present,
-                    audio_codec=policy.audio_codec,
-                    audio_sample_rate=policy.audio_sample_rate,
-                    audio_channels=policy.audio_channels,
+                    policy=policy,
                     ffmpeg_path=ffmpeg_path,
                     ffprobe_path=ffprobe_path,
+                    heartbeat_callback=frame_count_heartbeat,
                 )
-        emit_export_progress(
+        emit_verification_progress(
+            plan,
+            total_frames,
             progress_callback,
-            stage="verifying",
-            current_seconds=plan.expected_duration_seconds,
-            total_duration_seconds=plan.expected_duration_seconds,
-            frame=total_frames,
-            total_frames=total_frames,
-            fps=None,
-            started=started,
-            percent_override=99.0,
+            started,
         )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportExecutionError("Export cancelled")
@@ -225,6 +242,7 @@ def execute_mixed_export(
             partial,
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
+            heartbeat_callback=validation_heartbeat,
         )
         if cached_composition is None:
             session.record("composition", partial)
@@ -267,6 +285,7 @@ def verify_export_output(
     *,
     ffmpeg_path: str = "ffmpeg",
     ffprobe_path: str = "ffprobe",
+    heartbeat_callback: Callable[[], None] | None = None,
 ) -> MediaProbe:
     if not candidate.is_file() or candidate.stat().st_size <= 0:
         raise ExportExecutionError("FFmpeg did not create a non-empty output")
@@ -311,7 +330,11 @@ def verify_export_output(
         if actual_rate != expected_rate:
             raise ExportExecutionError("Export frame rate does not match the selected target")
         if plan.route == "enhanced":
-            actual_frames = probe_frame_count(candidate, ffprobe_path)
+            actual_frames = probe_frame_count(
+                candidate,
+                ffprobe_path,
+                heartbeat_callback=heartbeat_callback,
+            )
             expected_frames = max(
                 1,
                 (
@@ -334,7 +357,12 @@ def verify_export_output(
                 ffmpeg_path=ffmpeg_path,
                 label="enhanced output",
             )
-    validate_decoded_output(candidate, ffmpeg_path, label="output")
+    validate_decoded_output(
+        candidate,
+        ffmpeg_path,
+        label="output",
+        heartbeat_callback=heartbeat_callback,
+    )
     return output_probe
 
 
@@ -390,6 +418,11 @@ def execute_export(
         raise ExportExecutionError(f"Could not inspect export source: {error}") from error
     started = time.monotonic()
     total_frames = expected_export_frames(plan, source_probe)
+    validation_heartbeat, cached_validation_heartbeat = make_output_validation_heartbeats(
+        progress_callback,
+        total_frames=total_frames,
+        started=started,
+    )
     try:
         session_request = build_export_session_request(
             plan=plan,
@@ -435,6 +468,7 @@ def execute_export(
                 candidate,
                 ffmpeg_path=ffmpeg_path,
                 ffprobe_path=ffprobe_path,
+                heartbeat_callback=cached_validation_heartbeat,
             ),
         )
         if cached_assembly is not None:
@@ -473,16 +507,11 @@ def execute_export(
                     started=started,
                     cancel_event=cancel_event,
                 )
-        emit_export_progress(
+        emit_verification_progress(
+            plan,
+            total_frames,
             progress_callback,
-            stage="verifying",
-            current_seconds=plan.expected_duration_seconds,
-            total_duration_seconds=plan.expected_duration_seconds,
-            frame=total_frames,
-            total_frames=total_frames,
-            fps=None,
-            started=started,
-            percent_override=99.0,
+            started,
         )
         if cancel_event is not None and cancel_event.is_set():
             raise ExportExecutionError("Export cancelled")
@@ -493,6 +522,7 @@ def execute_export(
             partial,
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
+            heartbeat_callback=validation_heartbeat,
         )
         if cached_assembly is None:
             session.record(assembly_stage, partial)

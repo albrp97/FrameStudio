@@ -6,18 +6,21 @@
 **Phase:** PHASE-001
 **Feature:** FEAT-002
 **Capability links:** CAP-002, CAP-012
-**Status:** complete
-**Closure:** user-approved on 2026-08-22 after successful implementation,
+**Status:** verifying
+**Prior closure:** user-approved on 2026-08-22 after successful implementation,
 review, target-workstation validation, and local delivery evidence; remote
 checks remain unavailable and are recorded as an accepted warning.
 **Reopened:** user-reported on 2026-08-22 after playback stopped advancing
-when Space was pressed following a timeline cursor seek.
+when Space was pressed following a timeline cursor seek; reopened under
+CHG-011 on 2026-09-09 to cover playback-backend errors during project reopen.
 **Path history:** `tickets/open/TICKET-029-restore-space-playback-toggle.md`
 -> `tickets/closed/TICKET-029-restore-space-playback-toggle.md`
 -> `tickets/open/TICKET-029-restore-space-playback-toggle.md`
 -> `tickets/closed/TICKET-029-restore-space-playback-toggle.md`
+-> `tickets/open/TICKET-029-restore-space-playback-toggle.md`
 **Horizon:** first
 **Priority:** 1
+**Last updated:** 2026-09-24
 **Owner:** repository implementation in the active worktree
 **Approval:** user-reported and implementation-authorized on 2026-08-22
 **Provider:** auto; base and target branches are not configured in
@@ -34,6 +37,7 @@ playback
 **Affected surfaces:** GTK transport controls, keyboard handling, playback
 state presentation, focused UI tests, and target-workstation evidence
 **Evidence path:** `evidence/space-playback-toggle.md`
+**Change control:** CHG-011
 
 ## Outcome
 

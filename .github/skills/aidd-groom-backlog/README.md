@@ -14,3 +14,12 @@ Inputs and outputs are defined in [SKILL.md](SKILL.md). The skill inspects
 synchronizes indexes, preserves stable IDs and traceability, and stops on
 missing prerequisites. It does not implement, commit, push, merge, or
 silently generate downstream artifacts.
+
+## Commands
+
+```sudolang
+Commands {
+  /groom-backlog [scope]
+  - report safe grooming updates or a change-control blocker
+}
+```

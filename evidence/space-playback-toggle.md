@@ -256,3 +256,52 @@
 - Status: `passedWithConcerns`
 - Accepted warning: Remote checks and PR parity remain unavailable until a
   remote and upstream branch are configured.
+
+## TICKET-029-REOPEN-001
+
+- Context: CHG-011 reopened TICKET-029 to verify project reopen behavior when
+  preview backend initialization fails.
+- Requirement/flow: Given a valid project is already open, a failed attempt to
+  attach another project must report the playback error without replacing the
+  current project, project path, playback backend, controller, or timeline.
+- Baseline reproduction: The new regression test failed before the fix because
+  `attach_project` replaced the current project before seeking the candidate
+  preview; the failed seek then left the candidate project installed.
+- Regression command:
+  `.venv/bin/python -m unittest
+  tests.test_editor_composition.EditorCompositionTests.test_project_reopen_reports_playback_backend_failure`
+- Fix: `attach_project` now creates and seeks a candidate backend/controller
+  before committing project state. Candidate preview events are held until
+  commit; a failed candidate is closed and the existing project remains
+  active.
+- Observed: The focused rollback test passed. It verifies the prior project,
+  path, backend, controller, playback generation, and timeline view remain
+  unchanged, the error is shown, and the failed candidate backend is closed.
+- Full verification:
+  `make quality PYTHON=.venv/bin/python` passed 489 tests and all configured
+  compilation, formatting, lint, type, complexity, duplication, dependency,
+  audit, security, and churn checks. `make smoke PYTHON=.venv/bin/python` and
+  `make contract PYTHON=.venv/bin/python` also passed.
+- Static-analysis artifacts: `evidence/static-analysis/jscpd-report.json`,
+  `evidence/static-analysis/dependencies.json`,
+  `evidence/static-analysis/pip-audit.json`,
+  `evidence/static-analysis/bandit.json`, and
+  `evidence/static-analysis/churn.json`.
+- Status: `passed` for automated verification; user validation remains
+  pending.
+- User-validation blocker: Confirm on the target workstation that reopening a
+  project whose preview cannot be decoded reports the error and preserves the
+  previously open project.
+- Local/PR parity: `unavailable`; the workflow's Python runtime differs from
+  the local Python 3.14.7 environment, and PR checks have not run.
+
+## TICKET-029-USER-RESPONSE-001
+
+- Requirement/flow: Confirm the complete CHG-011 behavior on the target
+  workstation, including project reopen failure preservation.
+- User response: `PASS` to the combined validation handoff. The user stated
+  they tested it and declined to provide screenshot paths or notes.
+- Evidence received: No window-only before/after screenshot paths, per-flow
+  observations, output metadata, or source-hash results were supplied.
+- Status: `passedWithConcerns` for the user's response; the configured UI
+  evidence requirement remains blocked, so TICKET-029 stays `verifying`.

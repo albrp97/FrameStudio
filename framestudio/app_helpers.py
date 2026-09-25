@@ -14,7 +14,7 @@ from .playback import PlaybackState
 from .ui import format_duration
 
 MAX_SOURCES_PER_PROJECT = 32
-TIMELINE_SCROLL_STEP_SECONDS = 1.0
+TIMELINE_SCROLL_STEP_SECONDS = 30.0
 TIMELINE_SCROLL_PIXELS = 140.0
 FOCUS_ZOOM_SCROLL_STEP = 0.1
 FOCUS_OFFSET_SCROLL_STEP = 10.0
@@ -38,7 +38,7 @@ KEY_BINDINGS: tuple[tuple[str, str], ...] = (
     ("Ctrl+0", "Fit the timeline to the viewport"),
     ("Alt/Shift+mouse wheel", "Scroll the timeline viewport"),
     ("Horizontal wheel", "Scroll the timeline viewport"),
-    ("Normal mouse wheel", "Move the playhead"),
+    ("Normal mouse wheel", "Move the playhead by 30 seconds per scroll unit"),
     ("Click/drag timeline", "Seek and preview while dragging"),
     ("Focus controls: Up / Down", "Adjust the focused Zoom, X, or Y field"),
 )

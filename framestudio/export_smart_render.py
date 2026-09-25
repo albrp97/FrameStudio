@@ -14,7 +14,7 @@ from .audio import AudioDecision, audio_filter
 from .composition_render import segment_video_filters
 from .export_cache import CachedArtifactInvalid, ExportCache
 from .export_process import (
-    ensure_exact_video_frame_count,
+    ensure_video_frame_count_for_policy,
     output_format,
     partial_path,
     probe_frame_count,
@@ -985,9 +985,9 @@ def _grouped_preparation_outputs(
             for index in range(len(run.segments))
         )
         run_frame_counts: tuple[int, ...] | None = None
-        if segment_target_frames is not None and canonical_rate(
-            preparation_rate
-        ) == canonical_rate(plan.output_policy.frame_rate):
+        if segment_target_frames is not None and canonical_rate(preparation_rate) == canonical_rate(
+            plan.output_policy.frame_rate
+        ):
             run_frame_counts = tuple(
                 segment_target_frames[active_positions[index]] for index in run.segment_indices
             )
@@ -1561,17 +1561,11 @@ def _execute_source_normalization(
                     f"Normalized source could not be inspected: {error}"
                 ) from error
         try:
-            return ensure_exact_video_frame_count(
+            return ensure_video_frame_count_for_policy(
                 destination,
                 expected_frame_total,
                 frame_rate=canonical_rate(target_rate),
-                video_codec=policy.video_codec,
-                pixel_format=policy.pixel_format,
-                container=policy.container,
-                has_audio=policy.audio_stream_present,
-                audio_codec=policy.audio_codec,
-                audio_sample_rate=policy.audio_sample_rate,
-                audio_channels=policy.audio_channels,
+                policy=policy,
                 ffmpeg_path=ffmpeg_path,
                 ffprobe_path=ffprobe_path,
             )
@@ -1656,17 +1650,11 @@ def _execute_source_normalization_split(
                 continue
             try:
                 probes.append(
-                    ensure_exact_video_frame_count(
+                    ensure_video_frame_count_for_policy(
                         destination,
                         expected_frames,
                         frame_rate=canonical_rate(target_rate),
-                        video_codec=policy.video_codec,
-                        pixel_format=policy.pixel_format,
-                        container=policy.container,
-                        has_audio=policy.audio_stream_present,
-                        audio_codec=policy.audio_codec,
-                        audio_sample_rate=policy.audio_sample_rate,
-                        audio_channels=policy.audio_channels,
+                        policy=policy,
                         ffmpeg_path=ffmpeg_path,
                         ffprobe_path=ffprobe_path,
                     )

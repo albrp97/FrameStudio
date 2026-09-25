@@ -7,7 +7,6 @@ import argparse
 import json
 import math
 import os
-import random
 import shutil
 import subprocess
 import sys
@@ -23,6 +22,7 @@ from pathlib import Path
 from typing import Any, Iterable, cast
 
 from framestudio.performance import PerformanceMode
+from framestudio.timeline_order import randomize_clip_order
 
 curses: Any = None
 try:
@@ -184,11 +184,7 @@ def randomize_timeline_order(paths: list[Path]) -> list[Path]:
     ``_video_paths``); only the final concatenation order is randomized, and
     only when more than one video is being added.
     """
-    if len(paths) <= 1:
-        return paths
-    shuffled = list(paths)
-    random.shuffle(shuffled)
-    return shuffled
+    return list(randomize_clip_order(paths))
 
 
 def nominal_rate(clip: Clip) -> Fraction:

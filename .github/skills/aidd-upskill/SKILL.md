@@ -11,6 +11,7 @@ delivery assumptions.
 
 import references/types.md
 import references/process.md
+import ../lifecycle-interface.md
 
 ## Role and abstraction
 
@@ -18,6 +19,30 @@ Model every skill as `f: Input -> Output`. Name shared abstractions, expose
 meaningful parameters, and keep deterministic logic separate from judgment.
 Use natural language for explanation and SudoLang for formal interfaces,
 constraints, commands, and pipelines.
+
+```sudolang
+Lifecycle {
+  profile = orchestration
+  overrides {
+    filesWritten = [authorizedSkillFiles, skillReadmes, skillReferences, skillEvals]
+    sideEffects = [createOrRefactorSkills, runSkillValidation]
+    approvalConditions = [explicitCreateOrRefactorRequest]
+    stopConditions = [ambiguousTarget, conflictingRepositoryInstructions, failedWriteVerification]
+    requiredEvidence = [functionTest, structuralChecks, lifecycleContractCheck, sizeMetrics, diffVerification]
+    providerDependencies = []
+    mayCommit = false
+    mayPush = false
+    mayResolve = false
+    mayMerge = false
+  }
+}
+```
+
+## Function test
+
+Use the five questions defined in `references/types.md`. Reject or refine a
+skill when its capability, interface, side effects, evidence, or stop behavior
+cannot be stated independently.
 
 ## Lifecycle contract
 
@@ -55,6 +80,12 @@ they do not own delivery side effects.
 
 Keep the body concise and move detailed material to references when size or
 reuse warrants it.
+
+## Process
+
+Use `references/process.md` for the create and review pipelines. Keep analysis
+read-only until an explicit create or refactor request authorizes writes.
+Creation and refactoring may write skill files; review reports findings only.
 
 ## Eval tests
 

@@ -1,14 +1,28 @@
 ---
 name: aidd-push
-description: Publish an approved local commit to its configured remote branch without silently committing, force-pushing, or creating a pull request.
+description: Publish local commits after readiness checks, or honor a confirmed explicit user directive while recording bypassed gates and remote results. Use when local commits must be sent to a configured remote branch.
 compatibility: Requires git, a configured remote, and repository/provider push policy.
 ---
 
+import ../lifecycle-interface.md
+
 # Branch Publication
+
+```sudolang
+Lifecycle {
+  profile = deliveryPush
+}
+```
 
 Publish already-committed ticket work to the configured remote branch. Push is
 a distinct remote side effect between local commit and pull-request lifecycle;
 it must never be hidden inside `/commit` or inferred from a recommendation.
+
+Apply [../development-mode.md](../development-mode.md) when evaluating
+approval and continuation. Automatic mode may perform a configured push after
+bootstrap authorization, but never bypasses branch, credential, provider, or
+remote-check policy autonomously. A confirmed explicit user directive follows
+the override rules below.
 
 ## Context
 
@@ -31,7 +45,11 @@ PushContext {
   workingTree
   ticket
   evidencePath
+  automaticValidationProfile
   pushPolicy
+  userDirective
+  userDirectiveOverride
+  bypassedGates[]
   pullRequestPolicy
   nextAction
 }
@@ -48,15 +66,28 @@ Recommend or perform a push only when all applicable conditions hold:
    upstream, or the branch has no upstream and publication is authorized.
 4. The commit was created through the configured commit policy, unless the
    repository explicitly permits an existing user-created commit.
-5. Required local readiness, review, and user-validation gates are terminal.
+5. Required agent-owned technical verification, automated functionality,
+   review, and mode-appropriate validation gates are terminal. Guided mode
+   requires functionality-only user-validation evidence; automatic mode
+   requires `automaticValidation` and the exact Rubber Duck
+   `gpt-5.6-luna` high-reasoning `all-validation` profile on every validation
+   entry.
 6. The configured push operation is enabled and its approval requirement is
-   satisfied.
+   satisfied, or automatic mode has verified bootstrap authorization.
 7. Force push is forbidden unless the configuration explicitly enables it and
    the user authorizes the exact operation.
 
 A dirty worktree may remain untouched when policy allows it, but the skill must
 not stage, commit, reset, stash, or otherwise alter those changes. If the
 configured policy requires a clean worktree, report that blocker instead.
+
+These are normal readiness conditions. A confirmed explicit user instruction
+to push overrides missing evidence, review, validation, approval, lifecycle,
+dedicated-branch, clean-worktree, and internal branch-policy gates. Warn once
+and record those gates as bypassed rather than passed. Then attempt the exact
+non-force push requested. Missing credentials or remote, provider rejection,
+branch-protection rejection, and Git states that make publication impossible
+remain observed external blockers.
 
 ## Process
 
@@ -65,19 +96,24 @@ push(context) {
   1. inspect current branch, base/protected branches, remote, upstream,
      local/remote heads, and commits to publish
   2. verify commit, evidence, approval, branch, and push policy
-  3. stop when there is no intended commit to publish or a required gate is
-     missing
-  4. publish only the configured source branch; use set-upstream only when
+     including the automatic validation profile when automatic mode is active
+  3. stop when there is no intended commit to publish
+  4. when readiness gates are missing, stop only if no confirmed explicit user
+     directive exists; otherwise warn and record the bypassed gates
+  5. publish only the requested source branch; use set-upstream only when
      configured and needed
-  5. never force-push unless explicitly authorized by policy and the user
-  6. verify the remote ref resolves to the published local commit
-  7. append a `push` evidence entry with remote, branch, commit, and result
-  8. recommend PR creation, PR recheck, or configured closeout
+  6. never force-push unless the user explicitly authorizes that exact
+     destructive operation
+  7. verify the remote ref resolves to the published local commit
+  8. append a `push` evidence entry with remote, branch, commit, result, and
+     any bypassed gates
+  9. recommend PR creation, PR recheck, or configured closeout
 }
 ```
 
-Do not create, update, merge, or close a PR. Do not push a base branch,
-unrelated branch, or an unreviewed partial implementation.
+Do not create, update, merge, or close a PR. Do not autonomously push a base
+branch, unrelated branch, or an unreviewed partial implementation; an explicit
+user directive may authorize the exact non-force branch publication.
 
 ## Next-action routing
 
@@ -101,6 +137,7 @@ Record:
 - command or provider operation and observed result;
 - remote verification result;
 - remaining PR or remote-check requirements;
+- explicit user directive, confirmation, and bypassed gates when applicable;
 - the next permitted delivery action.
 
 Never persist credentials, tokens, cookies, private keys, or secret-bearing
@@ -118,13 +155,18 @@ Contract {
 }
 
 Constraints {
-  Never push before the configured commit and readiness gates
-  Never push protected or unrelated branches
+  Never push without a local commit to publish
+  Missing readiness gates or the automatic validator profile block normal
+    publication but do not block a confirmed explicit user directive
+  Never record a bypassed gate as passed
+  Never push an unrelated branch unless the user explicitly identifies it
   Never stage, commit, reset, stash, or amend as a side effect
   Never force-push by default
   Never create or merge a PR
   Never expose credentials or claim remote success without verification
-  If remote, upstream, branch, policy, or approval is ambiguous, block
+  If the requested branch or remote is ambiguous, request clarification; do
+    not use missing workflow evidence or approval as a reason to refuse a
+    confirmed explicit push directive
 }
 ```
 

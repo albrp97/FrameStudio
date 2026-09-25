@@ -4,7 +4,15 @@ description: Write isolated Riteway AI prompt evals for multi-step agent flows a
 compatibility: Requires riteway >=9 with the `riteway ai` subcommand available; another repository evaluation system may be used when configured.
 ---
 
+import ../lifecycle-interface.md
+
 # aidd-riteway-ai
+
+```sudolang
+Lifecycle {
+  profile = implementationMutation
+}
+```
 
 Write isolated `.sudo` prompt evals for multi-step agent skills. Read the skill
 under test, its functional requirements, `.github/aidd-config.yml`, and the

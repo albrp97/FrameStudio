@@ -14,3 +14,12 @@ changes may move only affected records between `open` and `closed`, while
 preserving stable IDs, path history, and indexes. The skill stops on missing
 prerequisites and does not implement, commit, push, merge, or silently
 generate downstream artifacts.
+
+## Commands
+
+```sudolang
+Commands {
+  /replan-when-necessary [change]
+  - assess change impact and route approved material changes through controlled replanning
+}
+```

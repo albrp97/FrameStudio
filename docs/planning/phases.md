@@ -50,15 +50,15 @@ the first horizon without approved scope change.
 
 | Sequence | ID | Outcome | Capability links | Dependencies | Status |
 |---:|---|---|---|---|---|
-| 1 | PHASE-001 | Open and resume a source edit | CAP-001, CAP-002, CAP-004, CAP-012 | Approved objective, scope, and capability map | complete |
+| 1 | PHASE-001 | Open and resume a source edit | CAP-001, CAP-002, CAP-004, CAP-012 | Approved objective, scope, and capability map | active |
 | 2 | PHASE-002 | Cut and export one source safely | CAP-003, CAP-005, CAP-012 | PHASE-001 | complete |
 | 3 | PHASE-003 | Repeat the basic edit through agents | CAP-004, CAP-006, CAP-012 | PHASE-001, PHASE-002 | complete |
-| 4 | PHASE-004 | Combine mixed-source footage | CAP-002, CAP-003, CAP-005, CAP-007, CAP-012 | PHASE-001 through PHASE-003 | complete |
+| 4 | PHASE-004 | Combine mixed-source footage | CAP-002, CAP-003, CAP-005, CAP-007, CAP-012 | PHASE-001 through PHASE-003 | active |
 | 4.5 | PHASE-004A | Stabilize editor architecture for future phases | CAP-012 | PHASE-004 | complete |
 | 5 | PHASE-005 | Balance sources and deliver consistent media | CAP-005, CAP-008, CAP-012 | PHASE-004A | complete |
 | 6 | PHASE-006 | Focus and compose important action | CAP-005, CAP-009, CAP-010, CAP-012 | PHASE-004A, PHASE-005 | complete |
 | 7 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | complete |
-| 8 | PHASE-008 | Optimize responsive preview and select evidence-based media strategies | CAP-002, CAP-003, CAP-004, CAP-005, CAP-009, CAP-011, CAP-012 | PHASE-006, PHASE-007; target-workstation media and benchmark evidence | complete |
+| 8 | PHASE-008 | Optimize responsive preview and select evidence-based media strategies | CAP-002, CAP-003, CAP-004, CAP-005, CAP-009, CAP-011, CAP-012 | PHASE-006, PHASE-007; target-workstation media and benchmark evidence | active |
 | 9 | PHASE-009 | Select and deliver efficient export pipelines | CAP-005, CAP-011, CAP-012 | PHASE-008; benchmark protocol, representative media, and target-workstation evidence | active |
 
 ## Common Phase Rules
@@ -81,15 +81,15 @@ are closed; confirmed future phases remain open.
 
 | Sequence | ID | Status | Parent links | Current path |
 |---:|---|---|---|---|
-| 1 | PHASE-001 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-001-opening-and-resuming-a-source-edit.md` |
+| 1 | PHASE-001 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-001-opening-and-resuming-a-source-edit.md` |
 | 2 | PHASE-002 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-002-cutting-and-exporting-one-source-safely.md` |
 | 3 | PHASE-003 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-003-repeating-the-basic-edit-through-agents.md` |
-| 4 | PHASE-004 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-004-combining-mixed-source-footage.md` |
+| 4 | PHASE-004 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-004-combining-mixed-source-footage.md` |
 | 4.5 | PHASE-004A | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-004A-stabilizing-editor-architecture.md` |
 | 6 | PHASE-005 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-005-balancing-sources-and-delivering-consistent-media.md` |
 | 7 | PHASE-006 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-006-focusing-and-composing-important-action.md` |
 | 8 | PHASE-007 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-007-producing-validated-60-fps-edits.md` |
-| 9 | PHASE-008 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md` |
+| 9 | PHASE-008 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md` |
 | 10 | PHASE-009 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-009-selecting-and-delivering-efficient-export-pipelines.md` |
 
 ## Capability Coverage
@@ -113,15 +113,17 @@ are closed; confirmed future phases remain open.
 
 This phase index was approved before downstream planning. Its phase records
 are individual lifecycle files, and each feature record is assigned to exactly
-one phase. PHASE-002 through PHASE-004 are complete and closed after user
-approval on 2026-08-22. PHASE-001, PHASE-005, PHASE-004A, and PHASE-006 are
+one phase. PHASE-002 and PHASE-003 are complete and closed after user approval
+on 2026-08-22. PHASE-005, PHASE-004A, and PHASE-006 are
 complete and closed after user validation, review, and local delivery
 evidence. PHASE-007 is complete and closed after the user confirmed its
 approved ticket set was accepted and tested; unavailable remote and
-target-specific checks remain recorded as accepted warnings. PHASE-008 is
-complete and closed after FEAT-024 through FEAT-029 and TICKET-061 through
-TICKET-101 were implemented, reviewed, manually validated, and explicitly
-closed by the user on 2026-09-07. Historical generic blocker, runtime,
+target-specific checks remain recorded as accepted warnings. PHASE-008 was
+closed after FEAT-024 through FEAT-029 and TICKET-061 through TICKET-101 were
+implemented, reviewed, manually validated, and explicitly closed by the user
+on 2026-09-07, then reopened under CHG-011 for two bounded corrections.
+PHASE-001 and PHASE-004 were also reopened under CHG-011. Historical generic
+blocker, runtime,
 target-workstation, license, remote-check, and benchmark limitations remain
 recorded in the linked evidence.
 
@@ -175,6 +177,9 @@ recorded in the linked evidence.
 - The original phase-index metadata, sequencing rationale, common rules,
   capability coverage, handoff gate, and source references remain in this
   synchronized index.
+- CHG-011 reopened PHASE-001, PHASE-004, and PHASE-008 for approved follow-up
+  tickets; their same-ID records moved from `closed/` to `open/`, and no
+  closure is claimed until the new evidence is terminal.
 - PHASE-009 was added on 2026-09-09 under the user's request to benchmark and
   implement a more efficient export pipeline. It preserves PHASE-008's
   completed Strategy B behavior as the protected baseline and adds only the

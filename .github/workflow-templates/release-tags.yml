@@ -1,0 +1,17 @@
+name: Release From Tags
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release artifacts
+        run: echo "Replace with the repo's real build or packaging command"
+      - name: Publish release
+        run: echo "Replace with the repo's real release action or publish command"

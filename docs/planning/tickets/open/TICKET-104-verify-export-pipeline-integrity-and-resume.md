@@ -6,18 +6,19 @@
 **Phase:** PHASE-009
 **Feature:** FEAT-031
 **Capability links:** CAP-005, CAP-011, CAP-012
-**Status:** active
+**Status:** verifying
 **Horizon:** future
 **Priority:** 1
 **Owner:** repository implementation in the active worktree
 **Approval:** user-authorized by the 2026-09-09 export-optimization request
-**Last updated:** 2026-09-09
+**Last updated:** 2026-09-24
 **Source paths:** `docs/planning/features/open/FEAT-031-executing-efficient-resumable-export-pipelines.md`,
 `docs/planning/tickets/open/TICKET-103-implement-conditional-grouped-export-route.md`,
 `framestudio/export_delivery.py`, `framestudio/export_session.py`,
-`framestudio/export_cache.py`, `tests/test_editor_smart_render.py`,
+`framestudio/export_cache.py`, `framestudio/export_console.py`,
+`tests/test_editor_smart_render.py`,
 `tests/test_editor_interpolation.py`, `tests/test_editor_export_execution.py`,
-`.github/aidd-config.yml`
+`tests/test_editor_export_console.py`, `.github/aidd-config.yml`
 **Dependencies:** TICKET-103 implementation; protected baseline; benchmark
 evidence; existing user-validation and review gates
 **Risks:** tests that validate only units, hidden boundary artifacts, stale
@@ -63,6 +64,13 @@ protected output behavior or resumability.
 - Given cancellation after a completed intermediate, resume reuses that
   artifact and avoids repeating the completed stage.
 - Given changed source or policy identity, stale artifacts are not reused.
+- Given a long-running stage with progress callbacks below the next percentage
+  threshold, human-readable output periodically reports elapsed progress so
+  active work is distinguishable from a stalled export.
+- Given a long output-frame-count scan with no intermediate FFprobe updates,
+  export progress periodically identifies that validation is still running.
+- Given a long decoded-output validation scan, human-readable progress
+  periodically identifies that decoding is still running.
 - Given the completed evidence, the user receives exact setup, steps,
   expected results, failure paths, cleanup, and a `PASS`/`FAIL` response.
 

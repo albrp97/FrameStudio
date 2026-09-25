@@ -14,3 +14,12 @@ individual files in the configured `open` directory; terminal records move to
 `closed` and the feature index is synchronized. The skill preserves stable IDs
 and traceability, stops on missing prerequisites, and does not implement,
 commit, push, merge, or silently generate downstream artifacts.
+
+## Commands
+
+```sudolang
+Commands {
+  /create-features [phase-id]
+  - propose features for one approved phase only
+}
+```

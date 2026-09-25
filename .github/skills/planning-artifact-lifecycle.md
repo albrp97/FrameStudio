@@ -73,7 +73,9 @@ Creation skills create new phase, feature, and ticket records in `open`.
 Planning review is read-only and reports path/status mismatches without moving
 files. Grooming may perform only authorized routine status updates. Completion
 skills move records only after the configured evidence and approval conditions
-pass.
+pass. In automatic mode, every lifecycle closeout validation and readiness
+decision must use the exact `rubber-duck` / `gpt-5.6-luna` / `high` /
+`all-validation` profile.
 
 Closing a ticket does not automatically close its feature or phase. A feature
 may move to `closed` only when its outcome and all required tickets are

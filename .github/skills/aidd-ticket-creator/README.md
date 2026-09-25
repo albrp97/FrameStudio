@@ -19,8 +19,9 @@ approved phase), `/execute` (run one approved ticket), `/list
 The phase and feature indexes and ticket backlog are maintained at their
 configured paths. Each phase, feature, and ticket is an individual record in
 an `open` or `closed` directory, with requirements written in `Given X, should
-Y` form. Execution records baseline, verification, gate, and review results
-through `/evidence`, then moves terminal records to `closed` after approval
+Y` form. Every acceptance outcome includes an executable automated functionality
+test; execution records baseline, functionality, verification, gate, and review
+results through `/evidence`, then moves terminal records to `closed` after approval
 before the next ticket. A checkpoint is taken every three completed tickets.
 
 ## When to use

@@ -12,6 +12,12 @@ records in both their configured `open` and `closed` directories, discover
 applicable repository commands and gates, then identify priorities and suggest
 the next step.
 Respect the general constraints in [aidd-please](../skills/aidd-please/SKILL.md).
+Resolve `delivery.development.mode` from `.github/aidd-config.yml`. In
+automatic mode, `/plan` is an internal routing step: select the next ready
+ticket and continue without waiting for user selection, while preserving all
+blockers and planning gates. Every automatic planning validation and readiness
+decision uses the exact Rubber Duck `gpt-5.6-luna` high-reasoning
+`all-validation` profile.
 
 Constraints {
   Show planning depth, planning-layer status, the active phase, its features,
@@ -33,5 +39,6 @@ Constraints {
   The recommendation must name the next permitted command from the active
   phase and identify the blocker or gate when one prevents execution.
   Respond at depth -d 10.
-  Do not modify any files.
+  Do not modify any files unless the automatic orchestrator explicitly owns
+    the authorized planning update.
 }

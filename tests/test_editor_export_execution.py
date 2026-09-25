@@ -1,3 +1,4 @@
+import io
 import json
 import shutil
 import subprocess
@@ -19,8 +20,17 @@ from framestudio.export import (
     plan_mixed_export,
 )
 from framestudio.export_cache import ExportCacheError
+from framestudio.export_console import ConsoleProgressReporter
 from framestudio.export_interpolation import execute_enhanced_export
-from framestudio.export_process import publish_verified_export, run_ffmpeg
+from framestudio.export_process import (
+    emit_export_progress,
+    make_progress_heartbeat,
+    monotonic_progress_callback,
+    probe_frame_count,
+    publish_verified_export,
+    run_ffmpeg,
+    validate_decoded_output,
+)
 from framestudio.export_smart_render import PreparedSource
 from framestudio.fps_policy import FrameRatePolicy, resolve_frame_rate_policy
 from framestudio.media import MediaProbe, probe_media
@@ -141,6 +151,111 @@ class EditorExportExecutionTests(unittest.TestCase):
             self.assertIsNotNone(output.audio_codec)
             self.assertEqual(progress[-1].stage, "complete")
             self.assertTrue(any(item.fps is not None for item in progress))
+
+    def test_human_progress_heartbeat_during_real_ffmpeg_processing(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = self.make_source(root, duration=2.0)
+            output = io.StringIO()
+            logical_time = 0.0
+
+            def advance_clock() -> float:
+                nonlocal logical_time
+                logical_time += 5.0
+                return logical_time
+
+            reporter = ConsoleProgressReporter(
+                stream=output,
+                force=True,
+                clock=advance_clock,
+            )
+            run_ffmpeg(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-re",
+                    "-i",
+                    str(source),
+                    "-map",
+                    "0:v:0",
+                    "-an",
+                    "-f",
+                    "null",
+                    "-",
+                ],
+                progress_callback=reporter,
+                stage="normalizing source run",
+                command_duration_seconds=2.0,
+                progress_total_duration_seconds=20_000.0,
+                command_total_frames=20,
+                progress_total_frames=87_037,
+            )
+
+            lines = output.getvalue().splitlines()
+            self.assertGreater(len(lines), 1)
+            self.assertTrue(all("0.0%" in line for line in lines))
+            self.assertTrue(all("Step 1/5 - Preparing sources" in line for line in lines))
+
+    def test_frame_count_scan_emits_heartbeats_during_real_ffprobe(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = self.make_source(root, duration=30.0)
+            heartbeats = []
+
+            frame_count = probe_frame_count(
+                source,
+                heartbeat_callback=lambda: heartbeats.append(None),
+                heartbeat_interval_seconds=0.001,
+            )
+
+            self.assertEqual(frame_count, 300)
+            self.assertGreater(len(heartbeats), 0)
+
+    def test_decoded_output_validation_emits_heartbeats_during_real_ffmpeg(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = self.make_source(root, duration=30.0)
+            heartbeats = []
+
+            validate_decoded_output(
+                source,
+                "ffmpeg",
+                label="test output",
+                heartbeat_callback=lambda: heartbeats.append(None),
+                heartbeat_interval_seconds=0.001,
+            )
+
+            self.assertGreater(len(heartbeats), 0)
+
+    def test_cached_validation_heartbeat_preserves_retry_progress(self):
+        progress = []
+        callback = monotonic_progress_callback(progress.append)
+        heartbeat = make_progress_heartbeat(
+            callback,
+            stage="checking cached output",
+            total_frames=300,
+            started=0.0,
+            percent=0.0,
+            frame=0,
+        )
+
+        heartbeat()
+        emit_export_progress(
+            callback,
+            stage="rendering output",
+            current_seconds=5.0,
+            total_duration_seconds=10.0,
+            frame=150,
+            total_frames=300,
+            fps=30.0,
+            started=0.0,
+        )
+
+        self.assertEqual(progress[-1].stage, "rendering output")
+        self.assertEqual(progress[-1].percent, 50.0)
+        self.assertEqual(progress[-1].frame, 150)
 
     def test_failed_export_can_resume_from_persisted_assembly(self):
         with TemporaryDirectory() as temporary_directory:
@@ -621,6 +736,7 @@ class EditorExportExecutionTests(unittest.TestCase):
             self.assertEqual(output.frame_rate, "20/1")
             self.assertEqual((output.width, output.height), (1920, 1080))
             self.assertAlmostEqual(output.duration_seconds, 1.0, delta=0.15)
+            self.assertEqual(probe_frame_count(result), 20)
             self.assertEqual(output.audio_sample_rate, 48000)
             self.assertEqual(output.audio_channels, 2)
             interpolation_stages = tuple(

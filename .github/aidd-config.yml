@@ -1,4 +1,4 @@
-# Optional repository-specific AIDD delivery configuration.
+# Optional repository-specific Harmonic Coding delivery configuration.
 #
 # Empty command arrays mean "discover the repository's command" rather than
 # "skip the check". Do not store credentials, tokens, or other secrets here.
@@ -86,6 +86,60 @@ delivery:
     before_ticket_execution: true
     before_next_ticket: true
 
+  development:
+    # Select once during project bootstrap. Guided preserves interactive
+    # approvals and user functionality validation; automatic continues through
+    # the configured workflow after bootstrap without asking or waiting.
+    mode: guided # guided | automatic
+    # Automatic mode uses this validator for every validation decision. The
+    # deterministic command or analyzer remains the source of raw results.
+    automatic_validation:
+      validator: rubber-duck
+      model: gpt-5.6-luna
+      reasoning_effort: high
+      scope: all-validation
+
+  # Resolve this block after `delivery.development.mode`. It makes the
+  # guided-versus-automatic precedence explicit for runtimes that do not
+  # execute the prose contracts in the skills.
+  mode_overrides:
+    guided:
+      approval:
+        mode: user
+        before_child_planning: true
+        before_ticket_execution: true
+        before_next_ticket: true
+      version_control:
+        commit:
+          require_user_validation: true
+          require_automatic_validation: false
+        push:
+          require_approval: true
+      gates:
+        user_validation_required: true
+        automatic_validation_required: false
+      static_analysis:
+        remediation:
+          require_approval: true
+    automatic:
+      approval:
+        mode: bootstrap
+        before_child_planning: false
+        before_ticket_execution: false
+        before_next_ticket: false
+      version_control:
+        commit:
+          require_user_validation: false
+          require_automatic_validation: true
+        push:
+          require_approval: false
+      gates:
+        user_validation_required: false
+        automatic_validation_required: true
+      static_analysis:
+        remediation:
+          require_approval: false
+
   repository:
     provider: auto # github | azure-devops | other | auto
     base_branch: null
@@ -94,10 +148,24 @@ delivery:
 
   version_control:
     dedicated_branch_required: true
+    user_directive_override:
+      enabled: true
+      require_warning: true
+      require_confirmation_when_gates_missing: true
+      allow_stage_all_when_explicit: true
+      record_bypassed_gates: true
+      cannot_override:
+        - secret-exposure
+        - missing-credentials
+        - missing-remote
+        - provider-rejection
+        - branch-protection-rejection
+        - impossible-git-state
+        - unrequested-destructive-operation
     commit:
       required_before_push: true
       require_review: true
-      require_user_validation: true
+      require_user_validation: true # guided mode; automatic uses automaticValidation
     push:
       enabled: true
       require_approval: true
@@ -107,25 +175,22 @@ delivery:
       require_clean_worktree: false
 
   commands:
-    format:
-      - make format-check
-    lint:
-      - make lint
-    type_check:
-      - make type-check
+    # All configured commands are agent-run technical checks. `functionality`
+    # is the acceptance-boundary automation used before user validation.
+    format: []
+    lint: []
+    type_check: []
     build: []
-    unit:
-      - make test
-    integration:
-      - make smoke
+    smoke: []
+    unit: []
+    integration: []
     end_to_end: []
+    functionality: []
     browser: []
-    security:
-      - make security
+    security: []
     coverage: []
     migration: []
-    contract:
-      - make contract
+    contract: []
 
   static_analysis:
     enabled: true
@@ -135,7 +200,9 @@ delivery:
     deep_mode: full
     report_directory: evidence/static-analysis
     report_formats:
+      - sarif
       - json
+      - markdown
     baseline:
       enabled: true
       path: evidence/static-analysis/baseline.json
@@ -165,55 +232,47 @@ delivery:
       formatter:
         enabled: true
         required: auto
-        command:
-          - make format-check
-        recommended: "ruff format --check"
+        command: []
+        recommended: "prettier --check"
         check_only: true
       linter:
         enabled: true
         required: auto
-        command:
-          - make lint
-        recommended: "ruff check"
+        command: []
+        recommended: "ESLint or the repository-native linter"
         check_only: true
       type_check:
         enabled: true
         required: auto
-        command:
-          - make type-check
-        recommended: "mypy"
+        command: []
+        recommended: "tsc --noEmit or the repository-native type checker"
         check_only: true
       complexity:
         enabled: true
         required: auto
-        command:
-          - make complexity
-        recommended: "Ruff C901 complexity rules"
+        command: []
+        recommended: "language-native complexity rules or Lizard"
         check_only: true
       duplication:
         enabled: true
         required: auto
-        command:
-          - make duplication
+        command: []
         recommended: "jscpd"
         check_only: true
       dependencies:
         enabled: true
         required: auto
-        command:
-          - make dependency-check
-          - make dependency-audit
-        recommended: "repository dependency boundaries and pip-audit"
+        command: []
+        recommended: "dependency-cruiser for JavaScript/TypeScript"
         check_only: true
       security:
         enabled: true
         required: auto
-        command:
-          - make security
-        recommended: "Bandit"
+        command: []
+        recommended: "Semgrep Community or the repository-native SAST tool"
         check_only: true
       sonarqube:
-        enabled: false # Optional deep mode; no local server or scanner is configured.
+        enabled: true
         required: optional
         command: []
         scanner_command: []
@@ -223,20 +282,21 @@ delivery:
       churn:
         enabled: true
         required: optional
-        command:
-          - make churn
+        command: []
         recommended: "npx aidd churn --json"
         check_only: true
 
   gates:
     baseline_required: true
-    user_validation_required: true
+    user_validation_required: true # guided mode; automatic uses automaticValidation
+    automatic_validation_required: true
     real_system_categories:
       - api
       - persistence
       - integration
       - user-facing
     local_quality_required: true
+    automated_functionality_required: true
     remote_checks_required: true
     independent_review: false
     churn: optional # required | optional | disabled

@@ -43,6 +43,23 @@ def make_probe(
     )
 
 
+def build_normalization_command(
+    segments: tuple[Segment, ...],
+    *,
+    audio_gain_db: float,
+) -> list[str]:
+    return build_source_normalization_command(
+        Path("source.mp4"),
+        Path("prepared.mp4"),
+        segments,
+        target_rate=Fraction(30, 1),
+        policy=make_output_policy(),
+        audio_decision={"status": "ready", "gain_db": audio_gain_db},
+        has_audio=True,
+        ffmpeg_path="ffmpeg",
+    )
+
+
 class EditorSmartRenderCommandTests(unittest.TestCase):
     def test_enhanced_concat_fallback_limits_video_to_target_frame_count(self):
         from framestudio.export_interpolation import _execute_clip_concat_fallback
@@ -115,22 +132,12 @@ class EditorSmartRenderCommandTests(unittest.TestCase):
         self.assertNotIn("-filter_complex", command)
 
     def test_source_normalization_applies_audio_gain_once_before_concat(self):
-        policy = make_output_policy()
         segments = (
             Segment.create(0.0, 1.0),
             Segment.create(1.0, 2.0),
         )
 
-        command = build_source_normalization_command(
-            Path("source.mp4"),
-            Path("prepared.mp4"),
-            segments,
-            target_rate=Fraction(30, 1),
-            policy=policy,
-            audio_decision={"status": "ready", "gain_db": 3.0},
-            has_audio=True,
-            ffmpeg_path="ffmpeg",
-        )
+        command = build_normalization_command(segments, audio_gain_db=3.0)
 
         filter_graph = command[command.index("-filter_complex") + 1]
         self.assertEqual(filter_graph.count("volume=3.00dB"), 1)
@@ -141,22 +148,12 @@ class EditorSmartRenderCommandTests(unittest.TestCase):
         self.assertEqual(command[command.index("-c:a") + 1], "aac")
 
     def test_source_normalization_allocates_segment_frames_cumulatively(self):
-        policy = make_output_policy()
         segments = (
             Segment.create(0.0, 2.1484375),
             Segment.create(2.1484375, 3.02180733267717),
         )
 
-        command = build_source_normalization_command(
-            Path("source.mp4"),
-            Path("prepared.mp4"),
-            segments,
-            target_rate=Fraction(30, 1),
-            policy=policy,
-            audio_decision={"status": "ready", "gain_db": 0.0},
-            has_audio=True,
-            ffmpeg_path="ffmpeg",
-        )
+        command = build_normalization_command(segments, audio_gain_db=0.0)
 
         filter_graph = command[command.index("-filter_complex") + 1]
         self.assertIn("trim=end_frame=64", filter_graph)
@@ -237,19 +234,9 @@ class EditorSmartRenderCommandTests(unittest.TestCase):
         issue anywhere before the segment (reported failure: "Normalized
         source could not be inspected: Could not read a video stream").
         """
-        policy = make_output_policy()
         segments = (Segment.create(3008.368545, 3061.925287),)
 
-        command = build_source_normalization_command(
-            Path("source.mp4"),
-            Path("prepared.mp4"),
-            segments,
-            target_rate=Fraction(30, 1),
-            policy=policy,
-            audio_decision={"status": "ready", "gain_db": 0.0},
-            has_audio=True,
-            ffmpeg_path="ffmpeg",
-        )
+        command = build_normalization_command(segments, audio_gain_db=0.0)
 
         self.assertIn("-ss", command)
         seek_index = command.index("-ss")

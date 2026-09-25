@@ -15,7 +15,11 @@ Reports retain the tool, rule, severity, path, line, metric, version,
 configuration, baseline status, and remediation. Results are emitted as
 SARIF, JSON, and Markdown when configured. Existing debt is reported rather
 than hidden, and unavailable required tools or local/PR incompatibility block
-readiness.
+readiness. In automatic mode, the `rubber-duck` validator
+(`gpt-5.6-luna`, high reasoning, `all-validation` scope) must inspect and
+classify the analysis result;
+the deterministic analyzer remains authoritative for raw findings and exit
+codes.
 
 ## Setup in a target repository
 

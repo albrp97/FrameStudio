@@ -3,17 +3,19 @@
 **Feature ID:** FEAT-002
 **Parent links:** OBJ-001, SCOPE-001, PHASE-001
 **Capability links:** CAP-002, CAP-012
-**Status:** complete
-**Closure:** user-approved on 2026-08-22 after the post-seek playback
+**Status:** active
+**Prior closure:** user-approved on 2026-08-22 after the post-seek playback
 correction passed automated, target-workstation, review, and local delivery
 evidence; remote checks remain unavailable and are recorded as an accepted
 warning.
 **Reopened:** user-reported on 2026-08-22 to correct timeline playback pacing
-after a cursor seek.
+after a cursor seek; reopened under CHG-011 on 2026-09-09 for the project
+reopen playback-backend error regression.
 **Path history:** `features/open/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
 -> `features/closed/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
 -> `features/open/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
 -> `features/closed/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
+-> `features/open/FEAT-002-controlling-playback-and-navigating-the-source-timeline.md`
 **Horizon:** first
 **Owner:** repository planning; maintainer identity is not recorded
 **Approval:** user-approved on 2026-08-21 as part of PHASE-001 planning
@@ -26,6 +28,7 @@ after a cursor seek.
 migrated on 2026-08-21 with the feature content preserved.
 **Affected surfaces:** editor interface, playback backend, timeline state,
 source metadata, user-facing error handling, and manual GUI test harness
+**Change control:** CHG-011
 
 ## Outcome
 

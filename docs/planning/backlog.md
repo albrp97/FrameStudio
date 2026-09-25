@@ -41,8 +41,8 @@ verification. Its records were closed after implementation, testing, review,
 and user acceptance; TICKET-060 records the corrective implementation.
 The PHASE-008 section tracks responsive preview optimization, direct focus
 controls, mixed-FPS render-strategy comparison, and restoration research.
-TICKET-061 through TICKET-082 are complete and closed. FEAT-025 through
-FEAT-028 are complete and closed, including the approved Strategy B route,
+TICKET-061 through TICKET-082 were complete and closed. FEAT-025 through
+FEAT-028 were complete and closed, including the approved Strategy B route,
 restoration benchmarks, optional SuperUltraCompact enhancement, editor
 responsiveness corrections, and default-zoom triplicate offsets. FEAT-024 and
 FEAT-029 are complete and closed after implementation, review, user
@@ -56,7 +56,9 @@ upscale-count, Wayland-renderer, enhanced-export frame-count, video-only
 playback, deletion responsiveness, FPS-count, and post-export action tickets.
 CHG-010 added the general resumable-export session/checkpoint,
 recovery-control, and CLI-parity tickets without changing the first-horizon
-scope; all four are now delivered.
+scope; all four are now delivered. CHG-011 reopened PHASE-001/FEAT-002,
+PHASE-004/FEAT-011, and PHASE-008/FEAT-028/FEAT-029 for approved follow-up
+work tracked by TICKET-029 and TICKET-105 through TICKET-107.
 The PHASE-009 section adds the active benchmark and implementation tickets for
 conditional export batching, boundary-safe enhancement ordering, and
 resumable artifact reuse without changing the fixed delivery contract.
@@ -72,7 +74,9 @@ target-specific checks remain recorded as accepted warnings. TICKET-061 through 
 evidence after the user's explicit manual-validation and closeout decision on
 2026-08-28. TICKET-083 through TICKET-101 are complete and closed after the
 user's 2026-09-07 validation, focused functionality evidence, repository
-gates, and review evidence.
+gates, and review evidence. TICKET-029 and TICKET-105 through TICKET-107 are
+open in `verifying` under CHG-011; TICKET-104 is also verifying its export
+integrity and resume scope.
 
 | Sequence | ID | Status | Parent feature | Phase | Current path |
 |---:|---|---|---|---|---|
@@ -88,7 +92,7 @@ gates, and review evidence.
 | 10 | TICKET-010 | complete | FEAT-005 | PHASE-002 | `tickets/closed/TICKET-010-export-plan-selection.md` |
 | 11 | TICKET-011 | complete | FEAT-005 | PHASE-002 | `tickets/closed/TICKET-011-verified-safe-export.md` |
 | 28 | TICKET-028 | complete | FEAT-004 | PHASE-002 | `tickets/closed/TICKET-028-restore-one-source-block-movement.md` |
-| 29 | TICKET-029 | complete | FEAT-002 | PHASE-001 | `tickets/closed/TICKET-029-restore-space-playback-toggle.md` |
+| 29 | TICKET-029 | verifying | FEAT-002 | PHASE-001 | `tickets/open/TICKET-029-restore-space-playback-toggle.md` |
 | 59 | TICKET-059 | complete | FEAT-004 | PHASE-002 | `tickets/closed/TICKET-059-restore-b-key-timeline-splitting.md` |
 | 12 | TICKET-012 | complete | FEAT-007 | PHASE-003 | `tickets/closed/TICKET-012-select-deterministic-cli-contract-and-inspection-schema.md` |
 | 13 | TICKET-013 | complete | FEAT-007 | PHASE-003 | `tickets/closed/TICKET-013-implement-deterministic-project-inspection.md` |
@@ -179,7 +183,10 @@ gates, and review evidence.
 | 101 | TICKET-101 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
 | 102 | TICKET-102 | active | FEAT-030 | PHASE-009 | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
 | 103 | TICKET-103 | active | FEAT-031 | PHASE-009 | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
-| 104 | TICKET-104 | active | FEAT-031 | PHASE-009 | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
+| 104 | TICKET-104 | verifying | FEAT-031 | PHASE-009 | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
+| 105 | TICKET-105 | verifying | FEAT-011 | PHASE-004 | `tickets/open/TICKET-105-randomize-multi-clip-add-order.md` |
+| 106 | TICKET-106 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
+| 107 | TICKET-107 | verifying | FEAT-028 | PHASE-008 | `tickets/open/TICKET-107-fit-preserve-resolution-content-to-canvas.md` |
 
 ## Ticket summary
 
@@ -438,13 +445,13 @@ without silently changing those behaviors.
 **Scope:** SCOPE-001
 **Phase:** PHASE-004
 **Features:** FEAT-010, FEAT-011, FEAT-012
-**Status:** complete
+**Status:** active
 **Approval:** user-approved on 2026-08-22 for closure after successful
 implementation and validation; CHG-001's atomic block clarification and
 CHG-002's fixed 1080p render-profile decision are included; remote checks
 remain unavailable and are recorded as an accepted warning
 **Owner:** repository planning; maintainer identity is not recorded
-**Last updated:** 2026-08-22
+**Last updated:** 2026-09-09
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/planning/phases.md`,
 `docs/planning/phases/open/PHASE-004-combining-mixed-source-footage.md`,
@@ -472,6 +479,7 @@ enhancement.
 | 25 | TICKET-025 | Implement composed mixed-source preview | FEAT-012 | TICKET-019, TICKET-020, TICKET-024 | complete | `tickets/closed/TICKET-025-implement-composed-mixed-source-preview.md` |
 | 26 | TICKET-026 | Implement verified mixed-source export | FEAT-012 | TICKET-024; mixed-source timeline | complete | `tickets/closed/TICKET-026-implement-verified-mixed-source-export.md` |
 | 27 | TICKET-027 | Verify mixed-source round trips and source preservation | FEAT-012 | TICKET-023, TICKET-025, TICKET-026 | complete | `tickets/closed/TICKET-027-verifying-mixed-source-round-trips-and-source-preservation.md` |
+| 105 | TICKET-105 | Randomize multi-clip add order | FEAT-011 | mixed-source timeline and append semantics | verifying | `tickets/open/TICKET-105-randomize-multi-clip-add-order.md` |
 
 ### Dependency order
 
@@ -492,7 +500,7 @@ with revised output evidence.
 | Feature outcome | Ticket coverage | Coverage status |
 |---|---|---|
 | Import and retain mixed-source project identity | TICKET-018, TICKET-019 | covered |
-| Arrange and edit a mixed-source timeline | TICKET-020 through TICKET-023 | covered |
+| Arrange and edit a mixed-source timeline | TICKET-020 through TICKET-023, TICKET-105 | covered |
 | Preview and export mixed-source edits | TICKET-024 through TICKET-027 | covered |
 | CAP-002 - Playing and navigating an edit timeline | TICKET-020, TICKET-025, TICKET-027 | covered |
 | CAP-003 - Editing segments non-destructively | TICKET-021, TICKET-022, TICKET-027 | covered |
@@ -502,8 +510,9 @@ with revised output evidence.
 
 ### Readiness and gates
 
-- PHASE-004 and FEAT-010 through FEAT-012 are complete and closed by the
-  user's 2026-08-22 approval.
+- PHASE-004 and FEAT-010 through FEAT-012 were complete and closed by the
+  user's 2026-08-22 approval; PHASE-004 and FEAT-011 were reopened under
+  CHG-011 for TICKET-105.
 - All Phase 4 implementation tickets completed their local preimplementation,
   implementation, verification, and target-workstation validation gates.
 - Each ticket has baseline, applicable real-media, local quality, evidence,
@@ -941,7 +950,7 @@ protected throughout PHASE-007.
 **Scope:** SCOPE-001
 **Phase:** PHASE-008
 **Features:** FEAT-024, FEAT-025, FEAT-026, FEAT-027, FEAT-028, FEAT-029
-**Status:** complete
+**Status:** active
 **Approval:** user-authorized on 2026-08-26 to create the PHASE-008 feature
 and ticket breakdown; the PHASE-008/FEAT-024 follow-up was authorized by the
 2026-08-28 request to create, implement, review, and measure the import
@@ -950,16 +959,16 @@ authorized by follow-up requests to create, implement, test, and review the
 focused improvements without waiting for separate ticket approval. CHG-010 and TICKET-098 through TICKET-101 were authorized on 2026-09-06;
 their implementation, validation, review, and delivery evidence is complete.
 **Owner:** repository planning; maintainer identity is not recorded
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-09
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/capability-map.md`, `docs/specs/future-product-direction.md`,
-`docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
+`docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
 `docs/planning/features/closed/FEAT-024-optimizing-cursor-driven-preview.md`,
 `docs/planning/features/closed/FEAT-025-streamlining-segment-focus-modifications.md`,
 `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
 `docs/planning/features/closed/FEAT-027-researching-video-restoration-and-upscaling.md`,
-`docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`,
-`docs/planning/features/closed/FEAT-029-strengthening-editor-recovery-and-export-observability.md`,
+`docs/planning/features/open/FEAT-028-adding-optional-upscale-enhancement.md`,
+`docs/planning/features/open/FEAT-029-strengthening-editor-recovery-and-export-observability.md`,
 `docs/planning/tickets/closed/TICKET-091-report-upscale-count-and-preserve-render-route.md`,
 `evidence/ticket-091-report-upscale-count-and-preserve-render-route.md`,
 `docs/planning/tickets/closed/TICKET-092-avoid-wayland-vulkan-swapchain-warning.md`,
@@ -1029,7 +1038,9 @@ cancellation or failure.
 | 101 | TICKET-101 | Preserve the CLI export resume contract | FEAT-029 | TICKET-098, TICKET-099, TICKET-088; CLI JSON Lines | complete | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
 | 102 | TICKET-102 | Benchmark efficient export pipeline candidates | FEAT-030 | protected export baseline; representative media; target workstation | active | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
 | 103 | TICKET-103 | Implement the conditional grouped export route | FEAT-031 | TICKET-102; enhanced export/cache/session contracts | active | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
-| 104 | TICKET-104 | Verify export pipeline integrity and resume | FEAT-031 | TICKET-103; output verification and user-validation gates | active | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
+| 104 | TICKET-104 | Verify export pipeline integrity and resume | FEAT-031 | TICKET-103; output verification and user-validation gates | verifying | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
+| 106 | TICKET-106 | Set practical timeline wheel seek pacing | FEAT-029 | timeline seek contract; scroll gesture routing | verifying | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
+| 107 | TICKET-107 | Fit preserved-resolution content to the output canvas | FEAT-028 | fixed 1920x1080 canvas; composition filter contract | verifying | `tickets/open/TICKET-107-fit-preserve-resolution-content-to-canvas.md` |
 
 ### Dependency order
 

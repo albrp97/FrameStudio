@@ -1,0 +1,17 @@
+name: Protected Main Validation
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install project dependencies
+        run: echo "Replace with the repo's real install command"
+      - name: Re-run required protected-branch checks
+        run: echo "Replace with the repo's real validation commands"

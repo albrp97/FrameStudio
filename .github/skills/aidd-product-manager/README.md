@@ -16,7 +16,8 @@ Invoke `/aidd-product-manager` to plan features or conduct discovery. Commands:
 `/research`, `/setup`, `/generate [type]`, `/feature`, `/save`, `/cancel [step]`
 
 Artifacts are saved to `plan/story-map/` as YAML files (story map, user
-journeys, personas).
+journeys, personas) only when `/save` performs and verifies the repository file
+operation. A response containing YAML is not evidence that it was saved.
 
 Discovery hands an approved delivery contract, including scope, non-goals,
 risks, protected behavior, and verification intent, to

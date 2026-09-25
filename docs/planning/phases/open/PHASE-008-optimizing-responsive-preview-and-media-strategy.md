@@ -5,7 +5,7 @@
 **Capability links:** CAP-002, CAP-003, CAP-004, CAP-005, CAP-006, CAP-009,
 CAP-011, CAP-012
 **Sequence:** 8
-**Status:** complete
+**Status:** active
 **Progress:** FEAT-024 through FEAT-029 and TICKET-061 through TICKET-101 are
 complete and closed. The delivered work covers responsive source attachment,
 editor recovery, scalable timeline control, composition-position preservation,
@@ -56,7 +56,11 @@ optional upscale enhancement, documentation, tests, and evidence
 -> moved to
 `phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`
 on 2026-09-07 after all linked features, tickets, review gates, and user
-validation completed.
+validation completed
+-> reopened under CHG-011 at
+`phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`
+to track timeline wheel seek pacing and fixed-canvas preserve-resolution
+composition corrections.
 
 ## Outcome
 
@@ -245,3 +249,11 @@ this change.
 
 Unavailable runtimes, remote checks, target-specific limitations, and
 benchmark confidence boundaries remain preserved in the evidence records.
+
+PHASE-008 was reopened again under CHG-011 on 2026-09-09 to include two
+bounded corrections in previously delivered editor behavior: practical
+30-second timeline wheel seeking under FEAT-029 and safe fitting of oversized
+preserve-resolution content to the established output canvas under FEAT-028.
+Restoration/upscale intermediate resolution and the fixed output profile
+remain protected. TICKET-106 and TICKET-107 provide independent verification
+and user-validation paths.

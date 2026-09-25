@@ -12,7 +12,17 @@ Produce bounded tickets that can be implemented and verified independently.
 Inputs and outputs are defined in [SKILL.md](SKILL.md). New ticket records are
 individual files in the configured `open` directory; terminal records move to
 `closed` and the backlog is synchronized. Every ticket includes a
-post-implementation user-validation plan, and closure requires its recorded
-result or an approved not-applicable decision. The skill preserves stable IDs
-and traceability, stops on missing prerequisites, and does not implement,
+post-implementation functionality-validation plan. Guided closure requires
+the recorded user result or an approved not-applicable decision; automatic
+closure requires terminal `automaticValidation`. The skill preserves stable
+IDs and traceability, stops on missing prerequisites, and does not implement,
 commit, push, merge, or silently generate downstream artifacts.
+
+## Commands
+
+```sudolang
+Commands {
+  /create-tickets [feature-id]
+  - derive focused tickets for one approved feature only
+}
+```

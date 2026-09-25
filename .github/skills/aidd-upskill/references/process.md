@@ -22,7 +22,8 @@ createSkill(userRequest) {
 
 **gatherRequirements(userRequest)**
 1. discoverRelatedSkills — search the project for SKILL.md, `.mdc`, `.md` files; read frontmatter descriptions; identify overlap or complementary skills
-2. researchBestPractices — use web search to find best practices for the domain; summarize findings
+2. researchBestPractices — inspect authoritative local guidance first; use
+   external research only when the domain requires current information
 3. Infer requirements from the above context. Do not ask clarifying questions or block on user input. Use a judge to evaluate completeness: yes → proceed; no → state gaps as explicit assumptions and proceed.
 
 Infer answers to these questions from context:
@@ -62,12 +63,17 @@ While important issues remain {
 
 **validate**
 ```bash
-/validate-skill ./path-to-skill-directory
+python .github/skills/aidd-upskill/scripts/validate-skills.py .github/skills
 # If skills-ref is available:
 skills-ref validate ./path-to-skill-directory
 ```
 
 If CLI access is unavailable, carefully emulate the validation process.
+
+The repository validator checks frontmatter identity, activation descriptions,
+execution interfaces, shared contract imports, progressive disclosure, and
+README presence. Semantic review still verifies whether the selected contract
+profile and evidence boundary match the actual behavior.
 
 **validateLifecycleContract(skillMd)**
 1. Identify whether the skill reads, writes, commits, pushes, resolves, merges,
@@ -101,13 +107,13 @@ reviewSkill(target) {
 }
 ```
 
-**runFunctionTest** — apply the 5-question Function Test from SKILL.md  
-**checkRequiredSections** — verify all `RequiredSections` are present  
-**checkSizeMetrics** — run `validate-skill` and report warnings  
+**runFunctionTest** — apply the 5-question Function Test from `types.md`
+**checkRequiredSections** — verify all `RequiredSections` are present
+**checkSizeMetrics** — run `validate-skill` and report warnings
 **checkCommandSeparation** — verify no command mixes thinking and side effects
 **checkReadme** — verify README.md exists and contains what/why/commands; flag if it contains implementation details or process narratives
-**deduplicate()** — find every instance of repeated information across SKILL.md and its references; flag each duplicate and identify where the single source of truth should live; use `think() --compact` to reason about the canonical location  
-**think() --compact** — synthesize all findings into a holistic judgment before rendering the verdict (uses the RTC think() function from `aidd-please`); independently testable as a pure thinking stage  
+**deduplicate()** — find every instance of repeated information across SKILL.md and its references; flag each duplicate and identify where the single source of truth should live; use `think() --compact` to reason about the canonical location
+**think() --compact** — synthesize all findings into a holistic judgment before rendering the verdict (uses the RTC think() function from `aidd-please`); independently testable as a pure thinking stage
 **checkLifecycleContract** — verify that the skill's declared permissions and
 side effects match its actual commands and process, including evidence and
 stop behavior.

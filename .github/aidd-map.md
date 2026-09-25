@@ -1,15 +1,41 @@
-# `.github` AIDD Map
+# `.github` Harmonic Coding Workflow Map
 
-> **Status:** Inventory and descriptions updated after HarmonicCoding planning
+> **Status:** Merged Harmonic Coding workflow inventory and repository-specific workflow
+> extensions for Harmonic Coding.
 > and deterministic review improvements.
 >
 > **Scope:** All files currently under this `.github` directory.
 >
 > **Authoring model used:** GPT-5.6 Luna with high reasoning.
 >
-> **Mapped inventory:** 161 files under `.github`. Five lifecycle evals and
-> fifteen planning evals are maintained outside this map at
+> **Mapped modified workflow:** 194 files under `.github`. Harmonic Coding retains
+> additional repository-specific instructions and workflow templates, for 219
+> total `.github` files after the merge. Six lifecycle evals and
+> twenty-six planning evals are maintained outside this map at
 > `../ai-evals/aidd-lifecycle/` and `../ai-evals/aidd-planning/`.
+>
+> **Validation ownership:** Agent-owned technical checks (including smoke,
+> regression, contract, fixture, acquisition, static-analysis, security, and
+> quality checks) must be terminal before mode-appropriate functionality
+> closure. Every acceptance outcome must also have an executable,
+> machine-checked functionality test and terminal
+> `automatedFunctionality` evidence before guided user validation or automatic
+> validation, review, or delivery readiness.
+>
+> In automatic mode, every validation decision uses the configured
+> `rubber-duck` profile (`gpt-5.6-luna`, high reasoning, `all-validation` scope);
+> deterministic tools remain the source of raw results and profile mismatches
+> block readiness. Runtimes merge `delivery.mode_overrides.<mode>` over the
+> base approval, version-control, gate, and static-analysis settings; profile
+> availability must be confirmed by the runtime rather than inferred from
+> configuration.
+> Explicit user commit and push directives override incomplete workflow gates
+> after one warning and confirmation; bypassed gates are recorded as
+> `userDirectiveOverride`, never as passed. Secrets, unrequested destructive
+> operations, missing credentials or remotes, provider rejection, and
+> impossible Git states remain actual constraints.
+> The dedicated behavioral check is
+> `../ai-evals/aidd-planning/automatic-validation-profile.sudo`.
 >
 > All paths below are relative to `.github/`.
 
@@ -44,7 +70,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** A workflow skill for diagnosing bugs and implementing code-review fixes with a disciplined test-first process.
 - **When to use or read it:** When a bug is reported, a test fails, or review feedback requires a code change.
-- **How to use it:** Invoke `/aidd-fix`, establish the delivery context and protected baseline, reproduce the defect, implement the smallest scoped correction, run configured gates, present the required user-validation handoff, record the user's result, and route review/commit only when readiness criteria are met.
+- **How to use it:** Invoke `/aidd-fix`, establish the delivery context and protected baseline, reproduce the defect, implement the smallest scoped correction, run configured gates and an executable automated functionality test for each affected acceptance outcome, then use the mode-appropriate validation path (guided user handoff or automatic Rubber Duck validation), run review, and route commit only when readiness criteria are met.
 - **Inputs and outputs:** Takes a bug report or review feedback plus repository context; produces a scoped, tested fix with evidence, blockers, and readiness state.
 - **Relationships:** `prompts/aidd-fix.prompt.md`, `skills/aidd-tdd/SKILL.md`, `skills/aidd-evidence/SKILL.md`, and `skills/aidd-review/SKILL.md`.
 - **Constraints and cautions:** Requires scope preservation, baseline separation, explicit failure handling, and repository-specific gates; commit or push behavior is configuration- and approval-driven.
@@ -70,25 +96,30 @@ The following illustrative entry shows the level of detail used. It is separate 
   phase-first delivery, evidence, and safe lifecycle execution.
 - **When to use or read it:** Read at conversation start and before discovery,
   planning, mutation, verification, review, commit, or PR operations.
-- **How to use it:** Follow the boot sequence, select planning depth, use
+- **How to use it:** Follow the boot sequence, resolve the selected guided or
+  automatic development mode, select planning depth, use
   objective -> scope -> capability -> phase -> feature -> ticket for
   non-trivial work, load the lifecycle and relevant domain skills by workflow
-  stage, run deterministic static analysis as part of review, use the
-  configured commands, and end every response with one context-aware next-step
-  and skill handoff. After validation and review/remediation, use the ordered
-  `/commit` -> `/push` -> `/aidd-pr` delivery loop when policy requires each
-  operation.
+  stage, require agent-owned technical checks and an executable automated
+  functionality test per ticket before mode-appropriate validation, run deterministic
+  static analysis as an agent-only final-diff gate during review, use the
+  configured commands, and end every response with one context-aware
+  next-step and skill handoff. After validation and review/remediation, use the
+  ordered `/commit` -> `/push` -> `/aidd-pr` delivery loop when policy requires
+  each operation.
 - **Inputs and outputs:** Input is repository context and a user request; output
   is scoped agent behavior, durable planning guidance, and evidence-backed
   delivery decisions.
-- **Relationships:** Points to `aidd-config.yml`, the root `README.md`, the
+- **Relationships:** Points to `aidd-config.yml`, `.github/README.md`, the
   planning skills/prompts, repository manifests, CI, and existing project
   documentation.
 - **Constraints and cautions:** Do not assume paths, commands, providers, or
   test frameworks; do not duplicate an existing planning source of truth; do
-  not claim readiness without terminal evidence or required user-validation
-  confirmation; always recommend one next permitted action and its owning
-  skill instead of inventing or listing competing work.
+  not claim readiness without terminal automated functionality evidence and
+  mode-appropriate validation; automatic mode must not bypass blockers or
+  record agent evidence as user confirmation; always recommend one next
+  permitted action and its owning skill instead of inventing or listing
+  competing work.
 - **Source basis:** `copilot-instructions.md:1-end`.
 - **Status:** Workflow updated
 
@@ -100,7 +131,8 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Read when installing this `.github` bundle or
   onboarding someone to its planning commands.
 - **How to use it:** Use the command sequence and artifact layout as defaults,
-  then adapt them to the target repository's existing conventions. Finish each
+  resolve the guided or automatic mode selected during bootstrap, then adapt
+  them to the target repository's existing conventions. Finish each
   workflow response with exactly `Next step`, `Skill`, and `Why` lines naming
   the next concrete step, one skill/command, and the reason it follows from the
   current state.
@@ -110,8 +142,10 @@ The following illustrative entry shows the level of detail used. It is separate 
   and `aidd-map.md`.
 - **Constraints and cautions:** It is documentation, not an executable
   workflow; existing repository sources of truth take precedence. Technical
-  tests alone do not close a ticket when user validation is required, and
-  recommendations must remain context-aware rather than generic.
+  checks are agent-owned, while guided user validation confirms only delivered
+  functionality and automatic mode records `automaticValidation` for the same
+  charter. Technical tests alone do not close a ticket, and recommendations
+  must remain context-aware rather than generic.
 - **Source basis:** `README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -119,9 +153,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** The optional repository-specific delivery and planning
   configuration for canonical artifact paths, adaptive depth, stable ID
-  prefixes, parent approval, branch/provider policy, quality commands, gates,
-  evidence retention, UI artifacts, delegation, pull-request behavior, and
-  deterministic static-analysis policy.
+  prefixes, parent approval, branch/provider policy, quality commands including
+  agent-owned smoke and other technical checks, gates, evidence retention, UI
+  artifacts, delegation, pull-request behavior, and deterministic
+  static-analysis policy.
 - **When to use or read it:** Read it before planning, mutation, verification,
   commit, cleanup, delegation, or PR operations. A repository-specific value
   overrides a generic skill default.
@@ -129,10 +164,11 @@ The following illustrative entry shows the level of detail used. It is separate 
   when known; leave them empty to require discovery. Configure planning depth,
   artifact locations, statuses, ID prefixes, approval, gates, evidence, UI,
   provider, delegation behavior, agent-instructions path, project README path,
-  open/closed planning-record directories, the user-validation closure gate,
-  and static-analysis modes, reports, baseline, parity, tools, and
-  remediation. Configure version-control commit/push policy and whether a pull
-  request is required without storing credentials.
+  open/closed planning-record directories, automated functionality and
+  user-validation closure gates, automatic-validation behavior, and
+  static-analysis modes, reports, baseline, parity, tools, and remediation.
+  Configure version-control commit/push policy
+  and whether a pull request is required without storing credentials.
 - **Inputs and outputs:** Input is repository policy and team preference;
   output is a shared `delivery` context consumed by lifecycle skills.
 - **Relationships:** Read by `copilot-instructions.md`, `aidd-please`,
@@ -143,8 +179,9 @@ The following illustrative entry shows the level of detail used. It is separate 
   require repository discovery or explicit configuration. Do not create
   duplicate planning sources when a repository already has equivalent records.
   Phase, feature, and ticket status directories must remain consistent with
-  configured open/closed status lists. Required user validation must be
-  recorded before closure.
+  configured open/closed status lists. Required automated functionality and
+  mode-appropriate validation must be recorded before closure. The canonical
+  development mode is `delivery.development.mode`, defaulting to `guided`.
 - **Source basis:** `aidd-config.yml:1-end`.
 - **Status:** Workflow updated
 
@@ -163,10 +200,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** A slash-command wrapper for scoped bug-fix and review-feedback work with baseline, regression, evidence, and configured delivery gates.
 - **When to use or read it:** When a bug, failing test, or actionable review comment needs a code or non-code change.
-- **How to use it:** Invoke `/aidd-fix`; establish the protected baseline, choose regression or non-code evidence, implement one scoped fix, verify it, present exact user-validation steps, wait for the terminal user result, and record it.
+- **How to use it:** Invoke `/aidd-fix`; establish the protected baseline, choose regression or non-code evidence, implement one scoped fix, run applicable agent-owned technical checks and an executable automated functionality test for each affected acceptance outcome, then use guided user validation or automatic `automaticValidation` according to `delivery.development.mode`.
 - **Inputs and outputs:** Input is a bug report or review feedback; output is a verified, evidence-backed fix or an explicit blocked/no-change finding.
 - **Relationships:** `skills/aidd-fix/SKILL.md`, `aidd-tdd`, `aidd-review`, and `aidd-please`.
-- **Constraints and cautions:** Code behavior requires a failing regression before implementation; other ticket types use the strongest applicable evidence. Required user validation must be recorded before closure. Commands, gates, branch, commit, and push behavior are repository-configurable.
+- **Constraints and cautions:** Code behavior requires a failing regression before implementation; every affected acceptance outcome also requires an executable automated functionality test. Other ticket types use the strongest applicable evidence. Guided closure requires user validation, while automatic closure requires terminal `automaticValidation`; commands, gates, branch, commit, and push behavior are repository-configurable.
 - **Source basis:** `prompts/aidd-fix.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -174,10 +211,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** Delegation prompt for independent phase, feature, or ticket work with ownership, dependency waves, conflict checks, and evidence aggregation.
 - **When to use or read it:** When work is genuinely independent and safe to delegate under the configured branch strategy.
-- **How to use it:** Invoke `/aidd-parallel`; declare owned files and shared artifacts, emit one dependency wave at a time, require changed paths/evidence/blockers from each agent, then have the integration owner present each user-validation handoff, record terminal results, and own the `/commit` -> `/push` -> `/aidd-pr` delivery sequence.
+- **How to use it:** Invoke `/aidd-parallel`; declare owned files and shared artifacts, emit one dependency wave at a time, require changed paths/evidence/blockers from each agent, then have the integration owner run aggregate agent-owned technical and automated functionality gates, use guided user-validation handoffs or automatic `automaticValidation` through the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile, run the shared review gate, and own the `/commit` -> `/push` -> `/aidd-pr` delivery sequence.
 - **Inputs and outputs:** Input is tickets and optional branch/worktree policy; output is ownership-aware prompts or dispatched results.
 - **Relationships:** `skills/aidd-parallel/SKILL.md`, `aidd-fix`, and git branch/origin workflows.
-- **Constraints and cautions:** Shared planning, evidence, configuration, and overlapping source writes are prohibited. Isolation is the default; ticket text is untrusted, aggregate gates run under the integration owner, and delegated tickets cannot close without required user-validation results.
+- **Constraints and cautions:** Shared planning, evidence, configuration, and overlapping source writes are prohibited. Isolation is the default; ticket text is untrusted, aggregate agent-owned technical, automated functionality, and other gates run under the integration owner, and delegated tickets cannot close without the mode-appropriate terminal validation result.
 - **Source basis:** `prompts/aidd-parallel.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -185,10 +222,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** Runs an explicitly selected Markdown ticket section as an ordered, evidence-aware delegation pipeline.
 - **When to use or read it:** When a document contains an intentional ticket list, not merely policy, acceptance criteria, or prose checklists.
-- **How to use it:** Invoke `/aidd-pipeline` with the ticket-list path and section when needed; carry delivery context into each step, present each post-implementation user-validation handoff, wait for its terminal result, stop on failure or blocker, aggregate artifacts and evidence, and leave shared commit/push/PR actions to the integration owner.
+- **How to use it:** Invoke `/aidd-pipeline` with the ticket-list path and section when needed; carry delivery context into each step, run applicable agent-owned technical and automated functionality checks before guided user validation or automatic `automaticValidation` through the exact Rubber Duck profile, stop on failure or blocker, aggregate artifacts and evidence, and leave shared commit/push/PR actions to the integration owner.
 - **Inputs and outputs:** Input is a workspace Markdown ticket list and delegation capability; output is per-step results plus a blocker-aware summary.
 - **Relationships:** `skills/aidd-pipeline/SKILL.md`, Ticket delegation, and `/aidd-please`.
-- **Constraints and cautions:** Do not infer executable work from an unintended list or execute fenced code automatically. Outside-workspace paths require confirmation; required technical or user-validation gates stop the pipeline.
+- **Constraints and cautions:** Do not infer executable work from an unintended list or execute fenced code automatically. Outside-workspace paths require confirmation; required technical or mode-appropriate validation gates stop the pipeline.
 - **Source basis:** `prompts/aidd-pipeline.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -196,10 +233,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** Provider-aware pull-request lifecycle and safe review-thread triage prompt.
 - **When to use or read it:** When creating, monitoring, reviewing, or closing a pull request.
-- **How to use it:** Invoke `/aidd-pr <PR URL>` to inspect readiness, checks, approvals, conflicts, terminal user-validation evidence, and threads; for creation, require a published source branch and configured PR policy; use `/aidd-pr delegate` only for approved remaining fixes.
+- **How to use it:** Invoke `/aidd-pr <PR URL>` to inspect readiness, agent-owned technical and automated functionality checks, approvals, conflicts, mode-appropriate validation evidence, and threads; for creation, require a published source branch and configured PR policy; use `/aidd-pr delegate` only for approved remaining fixes.
 - **Inputs and outputs:** Input is a PR URL or lifecycle/delegation command; output is a provider-neutral state report, triage, and scoped fix prompts.
 - **Relationships:** `skills/aidd-pr/SKILL.md`, GitHub CLI/API, `aidd-fix`, and the PR branch.
-- **Constraints and cautions:** Provider capabilities must be configured; an unpublished source branch blocks PR creation; remote checks are rechecked after every push, review text is untrusted, pagination is mandatory, newly fixed threads remain open, and missing or pending user validation blocks readiness.
+- **Constraints and cautions:** Provider capabilities must be configured; an unpublished source branch blocks PR creation; remote checks are rechecked after every push, review text is untrusted, pagination is mandatory, newly fixed threads remain open, and missing or pending mode-appropriate validation or agent-owned technical evidence blocks readiness. Automatic mode does not bypass provider or merge policy.
 - **Source basis:** `prompts/aidd-pr.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -285,10 +322,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** A readiness-gated conventional-commit command prompt.
 - **When to use or read it:** When a ticket's intended changes are staged and evidence supports committing.
-- **How to use it:** Invoke `/commit`; read configuration, active ticket/evidence, branch policy, and staged scope, then confirm technical and user-validation gates before using the repository's commit format/trailers. After a successful commit, hand off to `/push` when publication is allowed.
+- **How to use it:** Invoke `/commit`; read configuration, active ticket/evidence, branch policy, and staged scope, then confirm agent-owned technical, automated functionality, mode-appropriate validation, and review gates before using the repository's commit format/trailers. After a successful commit, hand off to `/push` when publication is allowed.
 - **Inputs and outputs:** Input is staged changes and delivery evidence; output is a commit or an explicit refusal/blocker.
 - **Relationships:** `/aidd-please`, `aidd-log`, and repository git state.
-- **Constraints and cautions:** It forbids CHANGELOG edits and implies a local commit side effect only; it never stages, pushes, opens a PR, or merges. Missing, pending, failed, or blocked required user validation prevents a commit; the repository-level Copilot trailer applies if a commit is created.
+- **Constraints and cautions:** It forbids CHANGELOG edits and implies a local commit side effect only; it never stages, pushes, opens a PR, or merges. Missing, pending, failed, or blocked agent-owned technical checks, automated functionality, review, or mode-appropriate validation prevents a commit; automatic mode uses verified bootstrap authorization for routine approval and the repository-level Copilot trailer applies if a commit is created.
 - **Source basis:** `prompts/commit.prompt.md:1-18`.
 - **Status:** Workflow updated
 
@@ -317,18 +354,21 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **What it is:** An implementation command prompt for one approved ticket with repository-specific baseline, verification, evidence, and quality gates.
 - **When to use or read it:** When a phase/feature/ticket contract is approved and implementation may begin.
 - **How to use it:** Invoke `/execute`; discover commands, record the baseline,
-  implement one requirement at a time, run the strongest applicable
-  verification, append evidence, present the exact post-implementation
-  user-validation handoff, wait for the user's result, then route through
-  review and configured commit/push/PR or local-delivery closeout before
-  moving the same ticket record from open to closed and synchronizing indexes.
+  implement one requirement at a time, run all applicable agent-owned technical
+  verification plus an executable automated functionality test for every
+  acceptance outcome, append separate evidence, then use guided
+  functionality-only user validation or automatic `automaticValidation`
+  according to the configured mode before routing through review and
+  configured commit/push/PR or local-delivery closeout.
 - **Inputs and outputs:** Input is an approved phase/feature/ticket contract; output is scoped implementation progress and evidence-backed gate state.
 - **Relationships:** `aidd-ticket-creator`, `aidd-tdd`, and `/review`.
 - **Constraints and cautions:** Requires configured approval and baseline gates.
   Code behavior cannot implement before its failing regression; non-code
-  tickets use explicit alternative evidence. User validation and configured
-  delivery closeout are closure gates; reopening moves the ticket back to open
-  before implementation resumes.
+  tickets use explicit alternative evidence. Technical checks are agent-owned
+  and must be terminal before mode-appropriate validation. Guided user
+  validation or automatic `automaticValidation`, plus configured delivery
+  closeout, are closure gates; reopening moves the ticket back to open before
+  implementation resumes.
 - **Source basis:** `prompts/execute.prompt.md:1-14`.
 - **Status:** Workflow updated
 
@@ -386,10 +426,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** A guarded branch-publication prompt for pushing an approved local commit to its configured remote.
 - **When to use or read it:** After `/commit` creates or identifies an unpublished/ahead commit and local push policy permits publication.
-- **How to use it:** Invoke `/push`; verify branch/upstream/remote safety and commit evidence, publish without staging or rewriting history, append push evidence, and route to `/aidd-pr` or configured local closeout.
+- **How to use it:** Invoke `/push`; verify branch/upstream/remote safety, agent-owned technical and automated functionality evidence, mode-appropriate validation, and commit evidence, publish without staging or rewriting history, append push evidence, and route to `/aidd-pr` or configured local closeout.
 - **Inputs and outputs:** Input is a committed local branch plus push policy and repository/provider context; output is a push result, evidence, and the next delivery handoff.
 - **Relationships:** `skills/aidd-push/SKILL.md`, `aidd-commit`, `aidd-evidence`, `aidd-pr`, and repository remote state.
-- **Constraints and cautions:** It never stages, commits, resets, stashes, force-pushes, creates a PR, or merges. Missing approval, upstream, remote capability, or required evidence blocks publication.
+- **Constraints and cautions:** It never stages, commits, resets, stashes, force-pushes, creates a PR, or merges. Missing approval, upstream, remote capability, agent-owned technical evidence, automated functionality, review, or mode-appropriate validation evidence blocks publication; automatic mode does not bypass provider, credential, branch, or remote-check blockers.
 - **Source basis:** `prompts/push.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -426,10 +466,11 @@ The following illustrative entry shows the level of detail used. It is separate 
   analysis first, checks PR parity, and coordinates approved remediation.
 - **When to use or read it:** After implementation or before a PR when scope, requirements, evidence, gates, and delivery readiness need review.
 - **How to use it:** Invoke `/review`; run `/aidd-static-analysis` through the
-  review workflow, inspect the ticket contract, diff, baseline/post-change
-  evidence, functionality flows, quality gates, security, UI/accessibility,
-  documentation, and scope, then route actionable findings through scoped
-  `aidd-fix` remediation.
+  review workflow as an agent-only final-diff gate, verify terminal agent-owned
+  technical and automated functionality evidence for every acceptance outcome,
+  inspect the ticket contract, diff, baseline/post-change evidence, quality
+  gates, security, UI/accessibility, documentation, and scope, then route
+  actionable findings through scoped `aidd-fix` remediation.
 - **Inputs and outputs:** Input is code changes and delivery context; output is
   normalized findings, parity status, remediation results, readiness
   classification, or explicit blockers.
@@ -438,18 +479,20 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Constraints and cautions:** The review never edits source files directly;
   it does not invent findings, hide baseline debt, or claim PR equivalence
   after a mismatch. Churn is a configurable risk signal and required
-  evidence cannot be inferred.
+  evidence cannot be inferred. Technical checks remain agent-owned; the
+  functionality-only user handoff must not contain analyzer commands or
+  diagnostics.
 - **Source basis:** `prompts/review.prompt.md:1-15`.
 - **Status:** Workflow updated
 
 ### `prompts/run-test.prompt.md`
 
-- **What it is:** A configured functionality-charter execution prompt for real browser or integration validation.
-- **When to use or read it:** When a user-facing, API, persistence, worker, or integration flow requires real-system verification.
-- **How to use it:** Invoke `/run-test`; verify required services, execute repeatable setup/steps, validate visible and persisted/external effects, capture configured artifacts, and classify each flow.
-- **Inputs and outputs:** Input is a functionality or regression charter; output is evidence-backed flow results with artifacts, failures, blockers, coverage gaps, and a user-confirmation handoff.
+- **What it is:** A configured agent-owned technical-verification and automated functionality execution prompt for real browser or integration validation.
+- **When to use or read it:** When a user-facing, API, persistence, worker, or integration flow requires real-system verification before user confirmation.
+- **How to use it:** Invoke `/run-test`; discover and execute applicable smoke, regression, contract, fixture, acquisition, security, static-analysis, and quality checks as the agent, then execute the repository's automated functionality command or script, validate machine-checked visible and persisted/external effects, capture configured artifacts, and classify each result. In automatic mode, use the resulting functionality charter for `automaticValidation`; in guided mode, prepare the user-only handoff.
+- **Inputs and outputs:** Input is an automated functionality or technical-verification charter; output is evidence-backed agent results with artifacts, failures, blockers, coverage gaps, and either a guided functionality-only user handoff or an automatic-validation result.
 - **Relationships:** `aidd-user-testing`, `/user-test`, and real browser tooling.
-- **Constraints and cautions:** Browser/service capability is required only when the charter needs it; unavailable coverage is blocked or skipped with reason, never passed.
+- **Constraints and cautions:** A unit test, human script, or agent narration is not a substitute. Technical scripts are never handed to the user. Browser/service capability is required only when the charter needs it; unavailable coverage is blocked or skipped with reason, never passed. Automatic validation is agent-owned, cannot be recorded as `userValidation`, and must use the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile.
 - **Source basis:** `prompts/run-test.prompt.md:1-15`.
 - **Status:** Workflow updated
 
@@ -462,8 +505,9 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **How to use it:** Invoke `/ticket` with the requested operation; verify
   parent status, create records in open, move terminal records to closed or
   reopened records back to open, define boundaries and metadata, synchronize
-  indexes/backlog, run scope-to-ticket coverage, and obtain configured approval
-  before execution.
+  indexes/backlog, include one executable automated functionality test per
+  acceptance outcome, run scope-to-ticket coverage, and obtain configured
+  approval before execution.
 - **Inputs and outputs:** Input is a planning operation and request; output is a
   phase-aware record, focused ticket set, backlog update, or review result.
 - **Relationships:** `aidd-ticket-creator`, `aidd-requirements`, the new
@@ -479,12 +523,12 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 ### `prompts/user-test.prompt.md`
 
-- **What it is:** A command prompt that generates human and agent scripts from a journey, with baseline/regression and functionality evidence metadata.
-- **When to use or read it:** When validating a user journey, creating repeatable flow charters, or preparing browser evidence.
-- **How to use it:** Invoke `/user-test`; classify the purpose, include setup/data/steps/expected visible and persisted effects/cleanup/failure paths, and apply configured UI evidence rules.
-- **Inputs and outputs:** Input is a journey and delivery context; output is human and agent scripts plus a copy/paste-ready post-implementation validation handoff suitable for repeatable evidence collection.
+- **What it is:** A command prompt that generates a guided functionality-only post-implementation handoff from a journey while requiring the agent to complete technical verification separately, or supports the automatic-mode functionality charter.
+- **When to use or read it:** When the technical checks are terminal and the user needs exact functional actions and expected outcomes for closure validation.
+- **How to use it:** Invoke `/user-test`; confirm agent-owned smoke, regression, contract, fixture, acquisition, security, static-analysis, and quality checks are recorded, define one executable automated functionality test per acceptance outcome, and in guided mode produce only setup/data/actions/expected visible and persisted effects/cleanup/user-observable failure behavior for the user. In automatic mode execute that charter and record `automaticValidation`.
+- **Inputs and outputs:** Input is a journey and delivery context; output is a copy/paste-ready guided functionality-only handoff or an automatic-validation result, plus evidence-ready result criteria.
 - **Relationships:** `aidd-user-testing`, `aidd-product-manager`, and `/run-test`.
-- **Constraints and cautions:** Human usability studies and required functionality tests remain distinct; browser/integration gaps are explicit, screenshots are required only for configured UI changes, and agent results do not replace required user confirmation.
+- **Constraints and cautions:** Human usability studies and required automated functionality tests remain distinct; technical checks are agent-owned and never user instructions; browser/integration gaps are explicit, screenshots are required only for configured UI changes, automatic validation never impersonates human confirmation, and guided agent results do not replace required user confirmation. Automatic validation uses the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile.
 - **Source basis:** `prompts/user-test.prompt.md:1-14`.
 - **Status:** Workflow updated
 
@@ -492,11 +536,12 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** Overview documentation for the `aidd-agent-orchestrator` skill. It describes an orchestrator that routes software-development work to specialized agents by domain rather than using one generalist prompt.
 - **When to use or read it:** Use this overview when a request spans multiple domains, needs specialist selection, or calls for coordinated multi-agent execution. It specifically identifies `/aidd-agent-orchestrator` as the entry point for those situations.
-- **How to use it:** Invoke `/aidd-agent-orchestrator`; infer applicable
-  domains, select the appropriate agent or agents, coordinate their execution,
-  run static analysis before contextual review, preserve the user-validation
-  and delivery closeout gates, and end with one state-aware `Next step`,
-  `Skill`, and `Why` handoff.
+- **How to use it:** Invoke `/aidd-agent-orchestrator`; resolve
+  `delivery.development.mode`, infer applicable domains, select the appropriate
+  agent or agents, coordinate their execution, run static analysis before
+  contextual review, preserve guided user validation or automatic
+  `automaticValidation`, and end with one state-aware `Next step`, `Skill`,
+  and `Why` handoff.
 - **Inputs and outputs:** Input is a multi-domain software ticket or a request
   for specialist routing. Outputs are selected specialist agent(s),
   coordinated execution, and a next-action recommendation based on the first
@@ -504,9 +549,9 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Relationships:** It is the user-facing overview for `aidd-agent-orchestrator/SKILL.md`, whose instructions enumerate agent roles and dispatch logic. It refers generally to specialized skills, but names no specific files, external links, tests, or reference documents.
 - **Constraints and cautions:** The README gives high-level guidance only;
   detailed safeguards for conflicting instructions, failed agents, permissions,
-  side effects, required user validation, and ordered commit/push/PR ownership
-  are defined in `SKILL.md`. The handoff is guidance rather than implicit
-  authorization; no required tools or external links are given.
+  side effects, mode-specific validation, and ordered commit/push/PR ownership
+  are defined in `SKILL.md`. Automatic mode is not permission to bypass
+  blockers; the handoff is guidance rather than implicit authorization.
 - **Source basis:** `aidd-agent-orchestrator/README.md:1-4` (skill identity and routing purpose); `:6-10` (multi-domain rationale); `:12-16` (invocation and inferred coordination workflow); `:18-22` (when-to-use cases).
 - **Status:** Filled
 
@@ -535,11 +580,11 @@ The following illustrative entry shows the level of detail used. It is separate 
 ### `skills/aidd-commit/README.md`
 
 - **What it is:** A concise overview of the guarded local-commit workflow.
-- **When to use or read it:** Use after implementation, terminal user validation, and review when the staged scope is ready for a local commit.
+- **When to use or read it:** Use after implementation, terminal mode-appropriate validation, and review when the staged scope is ready for a local commit.
 - **How to use it:** Invoke `/commit`; verify staged scope, evidence, branch policy, and configured commit format, then create only the local commit and route to `/push` when publication is allowed.
 - **Inputs and outputs:** Inputs are staged changes, ticket/evidence context, and repository policy. Output is a commit result or a blocker with the next delivery handoff.
 - **Relationships:** Summarizes `aidd-commit/SKILL.md` and connects to `aidd-evidence`, `aidd-review`, `/push`, and `/aidd-pr`.
-- **Constraints and cautions:** It never stages, pushes, opens a PR, or merges; missing technical or required user-validation evidence blocks the commit.
+- **Constraints and cautions:** It never stages, pushes, opens a PR, or merges; missing technical or mode-appropriate validation evidence blocks the commit, and automatic validation must carry the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile.
 - **Source basis:** `skills/aidd-commit/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -573,17 +618,17 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs are JavaScript/TypeScript error metadata (`name`, `message`, `code`, and possibly `cause`), custom context, and an `errorCauses` definition map such as `NotFound` and `Unauthorized`. Outputs are structured errors from `createError`, plus an error-definition collection and name-based handler returned by `errorCauses`. The README does not specify package versions, handler signatures beyond the example, or serialization behavior.
 - **Relationships:** This README documents the same policy implemented in `aidd-error-causes/SKILL.md`; `SKILL.md` is the authoritative detailed instruction set, including validation, wrapping, testing, and routing patterns. It depends on the external `error-causes` package but contains no repository-local references, tests, or linked documentation.
 - **Constraints and cautions:** The “always use `createError`” rule replaces ordinary `new Error()` for thrown errors and assumes the package is installed and its API matches the examples; package setup and failure behavior are not documented. The cross-realm and automatic-routing benefits are stated claims, not verified by repository tests. No branch, repository, network, or other side effects are described. `cause` preservation should avoid losing the original error, while callers still need to decide whether exposing custom context or messages is safe.
-- **Source basis:** - `github 1/.github/skills/aidd-error-causes/README.md:1-4` — skill identity and structured-error purpose. - `github 1/.github/skills/aidd-error-causes/README.md:6-10` — stated benefits. - `github 1/.github/skills/aidd-error-causes/README.md:12-32` — imports, structured throw, grouped error definitions, and `cause` guidance. - `github 1/.github/skills/aidd-error-causes/README.md:34-38` — applicability.
+- **Source basis:** - `.github/skills/aidd-error-causes/README.md:1-4` — skill identity and structured-error purpose. - `.github/skills/aidd-error-causes/README.md:6-10` — stated benefits. - `.github/skills/aidd-error-causes/README.md:12-32` — imports, structured throw, grouped error definitions, and `cause` guidance. - `.github/skills/aidd-error-causes/README.md:34-38` — applicability.
 - **Status:** Filled
 
 ### `skills/aidd-fix/README.md`
 
 - **What it is:** An overview of the `aidd-fix` skill: it applies a six-stage, test-driven process to bug reports, failing tests, and code-review changes, emphasizing root-cause confirmation, a failing regression test, and a minimal fix without scope creep.
 - **When to use or read it:** Use it when deciding whether `/aidd-fix` fits a reported bug, an unexplained failing test, or review feedback that requires code changes. Read it for the skill’s purpose, high-level sequence, and the rule that a test must fail before implementation.
-- **How to use it:** Invoke `/aidd-fix` with the bug report or review feedback. The documented workflow is: gain context, record the requirement in the feature, write a failing test, implement the smallest passing change, self-review, present the user-validation handoff, record the terminal user result, and commit only when ready.
+- **How to use it:** Invoke `/aidd-fix` with the bug report or review feedback. The documented workflow is: gain context, record the requirement in the feature, write a failing test, implement the smallest passing change, run local gates and executable automated functionality tests, use guided user validation or automatic Rubber Duck validation according to the selected mode, run review, and commit only when ready.
 - **Inputs and outputs:** Input is a bug report or code-review feedback; a failing test can also be the starting investigation. The expected output is a confirmed issue or a stopped investigation, followed by a documented requirement, failing regression test, minimal implementation, reviewed fix, user-validation evidence, and readiness result.
 - **Relationships:** This README summarizes the detailed instructions in `aidd-fix/SKILL.md`; both describe the `/aidd-fix` command. It references no source files, ticket files, external links, or required tools by name.
-- **Constraints and cautions:** The failing test is mandatory and must fail before implementation; if it passes first, reassess whether the bug exists or the test is incorrect. Required user validation must be recorded before closure. Lint, end-to-end testing, commit message, branch, push, and repository-state details come from `SKILL.md` or project policy.
+- **Constraints and cautions:** The failing test is mandatory and must fail before implementation; if it passes first, reassess whether the bug exists or the test is incorrect. Guided closure requires user validation; automatic closure requires terminal `automaticValidation` with the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile. Lint, end-to-end testing, commit message, branch, push, and repository-state details come from `SKILL.md` or project policy.
 - **Source basis:** Purpose and scope: lines 1–10. Usage and six-step summary: lines 12–19. Applicable situations: lines 21–25.
 - **Status:** Filled
 
@@ -595,7 +640,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** The example’s `call` input is the `fetchUser` function and string ID `"42"`; its yielded output is a plain effect description. The returned user is fed into the generator as the next-step value, and `put(userLoaded(user))` yields a dispatch description. The README does not define the exact object shapes for those descriptions or the action schema; `SKILL.md` does.
 - **Relationships:** This README summarizes and points conceptually to the companion `aidd-javascript-io-effects/SKILL.md`, which supplies the detailed rules. The example assumes `call`, `put`, `fetchUser`, and `userLoaded` exist in the surrounding saga application, but does not define or import them.
 - **Constraints and cautions:** The README names no saga implementation, imports, runtime, test framework, error path, or dependency installation instructions, so the host repository must provide them. “Without mocking” means the generator can be tested through yielded descriptions; it does not remove the need to test the actual effect functions separately. No external links, missing file references, security-sensitive guidance, or branch/repository side effects are present. Required tooling is a saga-compatible JavaScript environment and a generator-aware test/assertion setup.
-- **Source basis:** `github 1/.github/skills/aidd-javascript-io-effects/README.md:1-4` (skill title and purpose); `:6-11` (deterministic effect rationale); `:13-25` (usage example and generator testing); `:27-31` (use cases).
+- **Source basis:** `.github/skills/aidd-javascript-io-effects/README.md:1-4` (skill title and purpose); `:6-11` (deterministic effect rationale); `:13-25` (usage example and generator testing); `:27-31` (use cases).
 - **Status:** Filled
 
 ### `skills/aidd-javascript/README.md`
@@ -617,7 +662,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Input is authentication-related code or a JWT-related implementation under review. Output is a security review focused on critical patterns such as browser storage, unsigned-token acceptance, `jwt.decode` without `jwt.verify`, symmetric algorithms, missing `iss`/`aud`/`exp` checks, and access tokens longer than 15 minutes.
 - **Relationships:** This README describes the purpose and invocation of the adjacent `SKILL.md`, whose pattern table supplies the detailed findings and severities. It does not name any additional repository files, external links, or implementation dependencies.
 - **Constraints and cautions:** The guidance is security-sensitive: it treats JWT avoidance, httpOnly cookies, signature verification, asymmetric algorithms, claims validation, and short lifetimes as safer defaults. The recommendation is intentionally conservative and does not define application-specific issuer, audience, key-management, cookie, or session configuration; no branch or repository side effects are specified.
-- **Source basis:** `github 1/.github/skills/aidd-jwt-security/README.md:1-24` — title, JWT-avoidance rationale, invocation behavior, checked examples, and usage scope.
+- **Source basis:** `.github/skills/aidd-jwt-security/README.md:1-24` — title, JWT-avoidance rationale, invocation behavior, checked examples, and usage scope.
 - **Status:** Filled
 
 ### `skills/aidd-layout/README.md`
@@ -650,7 +695,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs are a completed significant feature or an explicit changelog-update request, its date, a feature name, an appropriate emoji category, and a description shorter than 50 characters. The output is a structured changelog entry; the README does not name a changelog file or prescribe any command for writing it.
 - **Relationships:** This is the human-facing overview for `aidd-log/SKILL.md`, which supplies the detailed logging rules and workflow. Its usage and format summarize the skill metadata and template in that file.
 - **Constraints and cautions:** Only completed features should normally be recorded; config changes, file moves, minor fixes, and internal refactoring are omitted. No external links, required tools, branch effects, or repository-side-effect commands are specified in this README, and it does not identify a source changelog path.
-- **Source basis:** `github 1/.github/skills/aidd-log/README.md:1-3` (identity and purpose); `:5-9` (rationale); `:11-23` (format, invocation, and exclusions); `:25-28` (use cases).
+- **Source basis:** `.github/skills/aidd-log/README.md:1-3` (identity and purpose); `:5-9` (rationale); `:11-23` (format, invocation, and exclusions); `:25-28` (use cases).
 - **Status:** Filled
 
 ### `skills/aidd-namespace/README.md`
@@ -661,7 +706,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Input: a source file containing a type and associated functions, or a type/schema/import organization ticket. Output: a namespace folder containing the type entry, `public.ts`, and separate modules for associated functions. The README does not specify command arguments, implementation tooling, or generated test files.
 - **Relationships:** The overview introduces the companion `SKILL.md`, which supplies the canonical rules. It describes the `src/types` namespace layout but does not link to other files or external resources. No branch, repository, or deployment side effects are described.
 - **Constraints and cautions:** The stated benefits—autocomplete discoverability and tree-shaking—are design goals, not guarantees verified by this README. The example uses TypeScript paths and names but does not define export syntax, consumer import restrictions, schema handling, or test requirements; consult `SKILL.md` for those details. No security-sensitive guidance or questionable external instructions are present.
-- **Source basis:** `github 1/.github/skills/aidd-namespace/README.md:1-10` identifies the skill and rationale; `:12-22` gives the invocation and resulting layout; `:24-28` lists use cases.
+- **Source basis:** `.github/skills/aidd-namespace/README.md:1-10` identifies the skill and rationale; `:12-22` gives the invocation and resulting layout; `:24-28` lists use cases.
 - **Status:** Filled
 
 ### `skills/aidd-observe/README.md`
@@ -679,11 +724,11 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** The user-facing overview of `/aidd-parallel`. It explains that the skill turns a list of tickets into focused `/aidd-fix` delegation prompts and can dispatch them according to dependencies with integration-owner user-validation collection.
 - **When to use or read it:** Read it when deciding whether parallel delegation fits a PR review, a feature broken into independent tickets, or another workflow requiring multiple `/aidd-fix` agents. Use it as the concise orientation and command reference; the detailed operational rules remain in `SKILL.md`.
-- **How to use it:** Select the base command to generate one prompt per supplied ticket, or select `delegate` to build a file/dependency graph, sequence work, dispatch sub-agents, have the integration owner collect terminal user-validation results, and reserve shared `/commit`, `/push`, and `/aidd-pr` operations for that owner. Supply `--branch <branch>` when the work should target a named branch; otherwise the command’s detailed specification determines branch resolution.
+- **How to use it:** Select the base command to generate one prompt per supplied ticket, or select `delegate` to build a file/dependency graph, sequence work, dispatch sub-agents, have the integration owner collect the mode-appropriate terminal validation results, and reserve shared `/commit`, `/push`, and `/aidd-pr` operations for that owner. Automatic validation uses the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile. Supply `--branch <branch>` when the work should target a named branch; otherwise the command’s detailed specification determines branch resolution.
 - **Inputs and outputs:** Inputs are a ticket list and, optionally, a branch name plus the `delegate` mode keyword. The documented outputs are one `/aidd-fix` prompt per ticket in base mode, or dependency-aware sequencing and dispatch in delegate mode. The README does not define ticket schema, prompt contents, graph syntax, dispatch API, or callback results.
 - **Relationships:** It summarizes the corresponding `aidd-parallel/SKILL.md` and refers to `/aidd-fix` sub-agents. There are no external links in this file. The referenced `/aidd-fix` definition and any delegation implementation are not included in this directory, so this README cannot establish their exact behavior.
-- **Constraints and cautions:** The examples imply parallel work is appropriate only where ticket independence permits it; delegated tickets cannot close without required user-validation results. Delegated agents do not perform shared commit, push, PR, or merge operations unless explicitly assigned integration ownership. The README does not repeat the shared-branch pull/rebase, untrusted-input, or ephemeral-graph safeguards defined by `SKILL.md`; consult that file before dispatching.
-- **Source basis:** `github 1/.github/skills/aidd-parallel/README.md:1-4` (purpose); `:6-12` (parallel-delegation rationale); `:14-18` (use cases); `:20-25` (command reference).
+- **Constraints and cautions:** The examples imply parallel work is appropriate only where ticket independence permits it; delegated tickets cannot close without the mode-appropriate terminal validation result. Delegated agents do not perform shared commit, push, PR, or merge operations unless explicitly assigned integration ownership. The README does not repeat the shared-branch pull/rebase, untrusted-input, or ephemeral-graph safeguards defined by `SKILL.md`; consult that file before dispatching.
+- **Source basis:** `.github/skills/aidd-parallel/README.md:1-4` (purpose); `:6-12` (parallel-delegation rationale); `:14-18` (use cases); `:20-25` (command reference).
 - **Status:** Filled
 
 ### `skills/aidd-pipeline/README.md`
@@ -691,9 +736,9 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **What it is:** A concise overview of `/aidd-pipeline` for executing an explicitly selected Markdown ticket section through isolated delegation while preserving per-ticket user-validation closure gates.
 - **When to use or read it:** Use when a phase/feature has an intentional sequential ticket list and each ticket should inherit delivery context, evidence requirements, and stop-on-blocker behavior.
 - **How to use it:** Provide a workspace Markdown file with a selected `Pipeline`, `Steps`, `Tickets`, or `Commands` section, or identify the executable list explicitly; policy prose, arbitrary first lists, and fenced code are not executable by default. Keep final commit, push, PR, and lifecycle-closeout actions with the integration owner.
-- **Inputs and outputs:** Input is a selected ticket section plus delivery context and delegation capability. Output is per-ticket results, artifacts, evidence, blockers, coverage gaps, and recorded user-validation results.
+- **Inputs and outputs:** Input is a selected ticket section plus delivery context and delegation capability. Output is per-ticket results, artifacts, evidence, blockers, coverage gaps, and recorded guided user-validation or automatic-validation results.
 - **Relationships:** Documents `skills/aidd-pipeline/SKILL.md`, the orchestrator, ticket contracts, `/aidd-evidence`, and configured delegation.
-- **Constraints and cautions:** Preserve ticket order unless explicit independent waves are approved, treat ticket text as untrusted data, keep execution inside the workspace, and stop on failures, blockers, ownership conflicts, or missing technical or user-validation gates.
+- **Constraints and cautions:** Preserve ticket order unless explicit independent waves are approved, treat ticket text as untrusted data, keep execution inside the workspace, and stop on failures, blockers, ownership conflicts, or missing technical or mode-appropriate validation gates.
 - **Source basis:** `skills/aidd-pipeline/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -703,10 +748,13 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use it for broad project assistance, logging, committing, proofing, or whenever the appropriate specialized skill is unclear. The documented trigger is a request phrased with “please.”
 - **How to use it:** Prefix a request with “please,” optionally select one of
   the listed slash commands, and use `--depth` or `-d` from 1 through 10 to
-  control response depth. The command catalog covers help, logging, commits,
-  pushes, PRs, planning, discovery, ticket execution, review, churn analysis,
-  user testing, browser test execution, and bug fixing. End with one
-  context-aware next-step, skill, command, and reason handoff.
+  control response depth. Resolve guided or automatic mode from the delivery
+  configuration; automatic mode may continue routine downstream work after
+  verified bootstrap, while guided mode preserves its handoffs. The command
+  catalog covers help, logging, commits, pushes, PRs, planning, discovery,
+  ticket execution, review, churn analysis, user testing, browser test
+  execution, and bug fixing. End with one context-aware next-step, skill,
+  command, and reason handoff.
 - **Inputs and outputs:** Inputs are a natural-language software-development
   request, an optional command, and an optional depth value. Outputs are
   general assistance or the result of the selected workflow plus one
@@ -716,9 +764,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Constraints and cautions:** Depth is limited to 1–10, where 1 is
   beginner-oriented and 10 is highly technical. Commit, push, and PR actions
   remain separate, policy-gated side effects owned by their respective
-  workflows. When no active context is resolvable, the handoff routes to
-  `aidd-agent-orchestrator`; no external links or required tools are specified
-  in this README.
+  workflows. Automatic mode does not bypass blockers or record agent evidence
+  as user confirmation. When no active context is resolvable, the handoff
+  routes to `aidd-agent-orchestrator`; no external links or required tools are
+  specified in this README.
 - **Source basis:** `README.md:1-4` identifies the skill and assistant roles; `README.md:6-10` explains its fallback and delegation purpose; `README.md:12-20` defines request syntax, commands, and depth; `README.md:22-26` lists use cases.
 - **Status:** Filled
 
@@ -726,10 +775,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** Provides the user-facing overview of the `aidd-product-manager` skill. It explains that the skill turns feature requests into research-grounded planning artifacts by structuring personas, pain points, and journey maps, and summarizes its purpose, invocation, commands, output directory, and applicable scenarios.
 - **When to use or read it:** Read it when selecting or quickly orienting to this skill for feature planning, product discovery, user stories, user journeys, specifications, journey maps, story maps, or personas. Invoke `/aidd-product-manager` for those activities, then use the listed subcommands for the workflow.
-- **How to use it:** Use the overview to choose the skill and its six documented commands: `/research` for discovery, `/setup` for project setup, `/generate [type]` for populating planning lists, `/feature` for feature planning, `/save` for export, and `/cancel [step]` for cancellation. Expect planning artifacts in `plan/story-map/`, including a story map, user journeys, and personas; after discovery, hand the approved context to `aidd-ticket-creator` for phase -> feature -> ticket planning. The README does not define the YAML fields or serialization details.
+- **How to use it:** Use the overview to choose the skill and its six documented commands: `/research` for discovery, `/setup` for project setup, `/generate [type]` for populating planning lists, `/feature` for feature planning, `/save` for export, and `/cancel [step]` for cancellation. Expect planning artifacts in `plan/story-map/`, including a story map, user journeys, and personas; after discovery, hand the approved context to `aidd-ticket-creator` for phase -> feature -> ticket planning. `/save` must perform and verify the repository file operation; response-only YAML is not a saved artifact. The README does not define the YAML fields or serialization details.
 - **Inputs and outputs:** The README identifies feature requests or discovery/planning needs as inputs and the command selection as the interaction input. It promises YAML artifacts in `plan/story-map/`—a story map, journeys, and personas—as outputs, but does not specify exact filenames, schemas, PRD contents, validation, or tool dependencies.
 - **Relationships:** This README is the concise entry point for the detailed `aidd-product-manager/SKILL.md`; its command list and artifact directory correspond to the interface and file-location definitions there. No tests, reference documents, external links, or other files are referenced by the README.
-- **Constraints and cautions:** The rationale says impact and frequency scoring creates a prioritized backlog, but it does not define the score range or formula; those details exist only in `SKILL.md`. It does not document security, sensitive-research handling, required tools, branch behavior, commit behavior, error handling, or missing-file behavior. Saving is described as a filesystem artifact operation only; no repository automation is promised.
+- **Constraints and cautions:** The rationale says impact and frequency scoring creates a prioritized backlog, but it does not define the score range or formula; those details exist only in `SKILL.md`. It does not document security, sensitive-research handling, required tools, branch behavior, commit behavior, error handling, or missing-file behavior. Saving requires an actual repository file operation and post-write verification; failed or unavailable writes are blockers.
 - **Source basis:** Title and overview: lines 1–4. Rationale and prioritization approach: lines 6–10. Invocation and command list: lines 12–16. Artifact location and planning handoff: lines 18–24. Use cases: lines 26–30.
 - **Status:** Filled
 
@@ -740,7 +789,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **How to use it:** Invoke `/aidd-pr [PR URL]` to create or inspect a PR, verify the source branch is published, check terminal user-validation evidence and remote readiness, inspect cited source locations, classify concerns, request approval for addressed threads, and generate one `/aidd-fix` prompt per remaining issue. Invoke `/aidd-pr delegate` to dispatch generated prompts to sub-agents and perform the described provider actions.
 - **Inputs and outputs:** Inputs are an optional PR URL or lifecycle/delegation mode, published branch state, configured provider access, ticket/evidence readiness, the PR's review threads, and the current files/lines cited by comments. Outputs are PR lifecycle/readiness state, an addressed-thread list for approval, GraphQL resolutions for approved addressed threads, and focused `/aidd-fix` delegation prompts aimed at the PR branch.
 - **Relationships:** The overview depends on the `/aidd-fix` workflow and GitHub GraphQL review-thread APIs, and is operationally elaborated by `aidd-pr/SKILL.md`. `/aidd-fix` is referenced but no corresponding file exists in this directory; no reference or test files are present here.
-- **Constraints and cautions:** PR creation and thread resolution have provider/branch side effects; an unpublished source branch blocks creation, and required user-validation plus remote evidence is part of readiness. The README does not spell out authentication, pagination, prompt-safety, or approval safeguards; those are defined in `SKILL.md`. Newly fixed threads remain open for reviewer verification.
+- **Constraints and cautions:** PR creation and thread resolution have provider/branch side effects; an unpublished source branch blocks creation, and required mode-appropriate validation plus remote evidence is part of readiness. Automatic validation must carry the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile. The README does not spell out authentication, pagination, prompt-safety, or approval safeguards; those are defined in `SKILL.md`. Newly fixed threads remain open for reviewer verification.
 - **Source basis:** Overview and purpose: lines 1–9. Commands and high-level inputs/actions: lines 11–23. Use cases: lines 25–29.
 - **Status:** Filled
 
@@ -763,7 +812,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Input: a user story supplied to the `/aidd-requirements` skill. Output: a set of functional requirements, each using the `Given <situation>, should <job to do>` template. The README does not define schemas, files, persistence, or a testing command.
 - **Relationships:** This README summarizes the workflow and constraints elaborated in `aidd-requirements/SKILL.md`. It names the `/aidd-requirements` invocation, but no slash-command definition is present in this directory, so its implementation and caller integration are not documented here. No external links or other file dependencies are specified.
 - **Constraints and cautions:** Requirements must describe the user’s job and expected benefit, not specific UI elements or interactions. The format is intended to make behavior unambiguous and testable, but the README does not prescribe how to resolve conflicting stories or acceptance criteria. No security-sensitive guidance, repository or branch mutation, required tool, or external service is specified; invoking the skill is documentation of a workflow, not an instruction to execute repository changes.
-- **Source basis:** `github 1/.github/skills/aidd-requirements/README.md:1-4` (skill metadata and summary); `:6-10` (rationale); `:12-22` (invocation, requirement template, and user-outcome focus); `:24-28` (use cases).
+- **Source basis:** `.github/skills/aidd-requirements/README.md:1-4` (skill metadata and summary); `:6-10` (rationale); `:12-22` (invocation, requirement template, and user-outcome focus); `:24-28` (use cases).
 - **Status:** Filled
 
 ### `skills/aidd-review/README.md`
@@ -811,7 +860,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Input is a prompt or current ticket context plus optional `--compact` and `--depth N` (`N` 1–10). Output is a clear user-facing response after the reflective sequence; compact mode also defines compressed intermediate reasoning intended to feed a later review or planning step.
 - **Relationships:** This is the human-facing overview for the `aidd-rtc` skill and corresponds to the detailed instructions in `aidd-rtc/SKILL.md`. The two files document different command spellings: this README uses `/rtc`, while `SKILL.md` defines `/aidd-rtc`; callers should follow the command exposed by their runtime rather than assume they are interchangeable.
 - **Constraints and cautions:** The README recommends concise, load-bearing reasoning, explicit causal links in reflection/evaluation, and postponing polish until the response stage; it rejects filler, hedging, consultant-style prose, and unsupported conclusions. `--compact` is described as internal reasoning, not direct user output; treat that as process guidance and do not disclose hidden chain-of-thought or sensitive ticket data. No external links, referenced files, required tools beyond a slash-command-capable agent, branch changes, repository writes, or other side effects are specified. No missing referenced files are identified.
-- **Source basis:** `github 1/.github/skills/aidd-rtc/README.md:1-38` (overview, rationale, commands, options, mode selection, and pass/fail guidance).
+- **Source basis:** `.github/skills/aidd-rtc/README.md:1-38` (overview, rationale, commands, options, mode selection, and pass/fail guidance).
 - **Status:** Filled
 
 ### `skills/aidd-service/README.md`
@@ -833,7 +882,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs are a full-stack feature request and the project’s stack context. Outputs are stack and architecture-selection guidance; it does not specify generated files, commands, APIs, or runtime data.
 - **Relationships:** It summarizes the detailed rules in `aidd-stack/SKILL.md` and references `/aidd-tdd` for the testing workflow. It names Next.js, React, Redux, Autodux, Redux Saga, Shadcn UI, and Vercel as the surrounding technologies.
 - **Constraints and cautions:** The README requires TDD for implementation but does not define `/aidd-tdd`; no corresponding file is present in this inspected directory. It contains no external URLs, security controls, credential guidance, branch operations, repository mutations, or deployment procedure. “Full-stack” and “deployed on Vercel” describe scope and target, not proof that those services are configured.
-- **Source basis:** `github 1/.github/skills/aidd-stack/README.md:1-4` identifies the skill and stack; `:6-10` gives its rationale and conventions; `:12-17` defines usage and related technologies; `:19-22` lists use cases.
+- **Source basis:** `.github/skills/aidd-stack/README.md:1-4` identifies the skill and stack; `:6-10` gives its rationale and conventions; `:12-17` defines usage and related technologies; `:19-22` lists use cases.
 - **Status:** Filled
 
 ### `skills/aidd-static-analysis/README.md`
@@ -882,21 +931,21 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** A concise overview of phase/feature/ticket planning with scope, dependencies, risks, verification mappings, evidence, exit gates, and approval checkpoints.
 - **When to use or read it:** Use it when planning a phase, defining a feature, creating focused tickets, or checking delivery readiness.
-- **How to use it:** Start with `/ticket` inside an approved phase, define the feature and sequential tickets including their user-validation plans, use `/execute` for one approved ticket, present and record the post-implementation validation result, then use `/review` and `/evidence`, route through configured `/commit` -> `/push` -> `/aidd-pr` or local closeout, and update statuses as work completes.
+- **How to use it:** Start with `/ticket` inside an approved phase, define the feature and sequential tickets including their functionality-validation plans, use `/execute` for one approved ticket, record guided user validation or automatic `automaticValidation`, then use `/review` and `/evidence`, route through configured `/commit` -> `/push` -> `/aidd-pr` or local closeout, and update statuses as work completes.
 - **Inputs and outputs:** Inputs are a request, planning context, repository configuration, and approval mode. Outputs are phase-aware feature/ticket contracts with user-validation plans, readiness state, evidence links, and synchronized open/closed completion moves.
 - **Relationships:** Summarizes `aidd-ticket-creator/SKILL.md` and integrates with requirements, plan, execute, review, evidence, commit, push, PR, and the orchestrator.
-- **Constraints and cautions:** Parent artifacts must be approved before child planning; tickets remain focused and independently verifiable, while documentation/infrastructure/migration work may use non-code evidence. Required user validation and configured delivery closeout or an approved not-applicable decision are needed before ticket closure.
+- **Constraints and cautions:** Parent artifacts must be approved before child planning; tickets remain focused and independently verifiable, while documentation/infrastructure/migration work may use non-code evidence. Guided user validation or automatic `automaticValidation`, plus configured delivery closeout or an approved not-applicable decision, are needed before ticket closure.
 - **Source basis:** `skills/aidd-ticket-creator/README.md:1-end`.
 - **Status:** Workflow updated
 
 ### `skills/aidd-tdd/README.md`
 
-- **What it is:** A concise overview of repository-appropriate TDD and verification, including protected baselines, regression evidence, real-system checks, and non-code evidence methods.
+- **What it is:** A concise overview of repository-appropriate TDD and verification, including protected baselines, agent-owned technical checks, real-system checks, and non-code evidence methods.
 - **When to use or read it:** Read when implementation or verification work needs a test/evidence strategy.
-- **How to use it:** Discover the repository's framework and commands, record the baseline, use failing-first TDD for code behavior, choose the strongest alternative evidence for non-code work, and record all results.
-- **Inputs and outputs:** Inputs are a ticket contract, repository stack, commands, protected flows, and evidence policy. Outputs are a test/evidence plan, implementation verification, a copy/paste-ready user-validation handoff, coverage-gap records, and delivery-gate context for review/commit/push/PR routing.
+- **How to use it:** Discover the repository's framework and commands, record the baseline, identify agent-owned technical checks, use failing-first TDD for code behavior, choose the strongest alternative evidence for non-code work, run technical checks and automated functionality before guided user validation or automatic `automaticValidation` through the exact Rubber Duck profile, and record all results.
+- **Inputs and outputs:** Inputs are a ticket contract, repository stack, commands, protected flows, and evidence policy. Outputs are a test/evidence plan, implementation verification, a guided functionality-only handoff or automatic-validation result, coverage-gap records, and delivery-gate context for review/commit/push/PR routing.
 - **Relationships:** Summarizes `aidd-tdd/SKILL.md` and integrates with `/execute`, `/aidd-fix`, `/user-test`, `/run-test`, and `/evidence`.
-- **Constraints and cautions:** Do not assume npm, Vitest, Riteway, Playwright, pytest, or any runner; unavailable required capabilities are blocked or skipped with reason, never passed. Technical tests alone do not close a ticket; required user validation and configured delivery closeout must be recorded.
+- **Constraints and cautions:** Do not assume npm, Vitest, Riteway, Playwright, pytest, or any runner; unavailable required capabilities are blocked or skipped with reason, never passed. Technical checks are agent-owned and never delegated to the user. Technical tests alone do not close a ticket; guided functionality validation or automatic `automaticValidation` through the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile, plus configured delivery closeout, must be recorded.
 - **Source basis:** `skills/aidd-tdd/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -933,14 +982,56 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Source basis:** `README.md:1-34`.
 - **Status:** Filled
 
+### `skills/aidd-upskill/scripts/validate-skills.py`
+
+- **What it is:** The deterministic whole-library structural validator for
+  skill identity, activation metadata, execution interfaces, shared contracts,
+  size, README coverage, and local links.
+- **When to use or read it:** Run after creating, refactoring, or extracting
+  references from any skill.
+- **How to use it:** Run
+  `python .github/skills/aidd-upskill/scripts/validate-skills.py .github/skills`.
+- **Inputs and outputs:** Input is a skill file or the complete skills
+  directory; output is a list of actionable findings and a non-zero exit code
+  when structural validation fails.
+- **Relationships:** Implements the deterministic checks described by
+  `aidd-upskill/SKILL.md` and `references/process.md`.
+- **Constraints and cautions:** Structural success does not replace semantic
+  review of whether a selected profile matches the skill's actual effects.
+- **Source basis:** `skills/aidd-upskill/scripts/validate-skills.py:1-end`.
+- **Status:** Workflow updated
+
+### Progressive-disclosure reference sets
+
+- **What it is:** Indexed detailed contracts extracted from the largest skills:
+  orchestrator control flow and state, project-bootstrap details, ticket
+  execution/templates, user-testing types and closure, review stages, static
+  analysis policy, TDD verification methods, evidence schema, ECS property
+  details, SudoLang syntax, and general lifecycle routing.
+- **When to use or read it:** Load only the reference named by the active
+  `SKILL.md` section; do not preload all reference sets.
+- **How to use it:** Follow each skill's explicit Markdown link and its local
+  `references/index.md`.
+- **Inputs and outputs:** Inputs are stage-specific details omitted from the
+  activation-critical skill body; outputs are the same behavior with less
+  initial context usage.
+- **Relationships:** Reference directories belong to `aidd-agent-orchestrator`,
+  `aidd-ecs`, `aidd-evidence`, `aidd-please`, `aidd-project-bootstrap`,
+  `aidd-review`, `aidd-static-analysis`, `aidd-sudolang-syntax`, `aidd-tdd`,
+  `aidd-ticket-creator`, and `aidd-user-testing`.
+- **Constraints and cautions:** Extracted content remains normative and must
+  stay linked from its owning skill and indexed locally.
+- **Source basis:** The listed skills' `references/index.md` files.
+- **Status:** Workflow updated
+
 ### `skills/aidd-user-testing/README.md`
 
-- **What it is:** An overview of user-journey, functionality, baseline, and regression script generation with evidence metadata.
-- **When to use or read it:** Read it when creating repeatable flow charters, usability studies, browser tests, or comparable UI evidence.
-- **How to use it:** Use `/user-test` to generate human and agent scripts with setup, data, steps, expected visible/persisted effects, cleanup, failure paths, and configured artifact rules; use `/run-test` to execute the supported real system and prepare the user's closure validation.
-- **Inputs and outputs:** Input is a journey and delivery context. Outputs are paired scripts, a post-implementation user-validation handoff, and evidence-ready reports, screenshots, responses, logs, blockers, and coverage gaps when executed.
+- **What it is:** An overview of agent-owned technical verification and functionality-only user handoff generation from a user journey.
+- **When to use or read it:** Read it when creating repeatable functionality handoffs, usability studies, browser tests, or comparable UI evidence.
+- **How to use it:** Use `/user-test` in guided mode to generate exact user actions and expected functionality outcomes; use `/run-test` to execute the supported real system plus applicable technical checks as the agent. In automatic mode, execute the same functionality charter and record `automaticValidation` instead of waiting for a user.
+- **Inputs and outputs:** Input is a journey and delivery context. Outputs are a guided functionality-only post-implementation handoff or automatic-validation result plus evidence-ready technical/functionality reports, screenshots, responses, logs, blockers, and coverage gaps when executed.
 - **Relationships:** It summarizes the more detailed workflow and templates in `aidd-user-testing/SKILL.md`, including the `/user-test` and `/run-test` interfaces. It depends conceptually on journey data under `plan/story-map/`; that directory is absent in the inspected repository, so the documented input location is not currently present.
-- **Constraints and cautions:** Usability studies and required functionality tests are distinct; unavailable browser/integration capabilities are explicit gaps, screenshots are required only for configured UI changes, and a ticket remains open until required user validation is confirmed.
+- **Constraints and cautions:** Usability studies and required functionality tests are distinct; smoke, regression, contract, fixture, acquisition, security, static-analysis, and quality checks are agent-owned and never user instructions; unavailable browser/integration capabilities are explicit gaps, screenshots are required only for configured UI changes, and a ticket remains open until the mode-appropriate terminal validation is confirmed.
 - **Source basis:** `skills/aidd-user-testing/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -959,7 +1050,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** A concise overview of the skill: its purpose is to generate a repository-root `vision.md` from codebase discovery and five targeted questions. It explains why a vision document is a source of direction and lists the sections the generated document contains.
 - **When to use or read it:** Read for a quick orientation before invoking the skill, to understand what `/create-vision` produces, or to locate the template. It is an overview rather than the detailed operating procedure; use `SKILL.md` for discovery order, interview rules, drafting logic, review gates, and write constraints.
-- **How to use it:** Invoke `/create-vision`; the documented behavior is to inspect the codebase, ask five targeted questions, and populate a root `vision.md`. Use the listed output sections—Overview, Goals, Non-Goals, Key Constraints, Architectural Decisions, UX/DX Principles, and Success Criteria—to understand the expected artifact. Follow the link-like relative reference to `references/vision_template.md` when the scaffold is needed.
+- **How to use it:** Invoke `/create-vision`; the documented behavior is to inspect the codebase, ask five targeted questions, and populate a root `vision.md`. Use `/create-vision draft` for a read-only proposal and `/create-vision write` to persist a previously approved draft, including post-write verification. Use the listed output sections—Overview, Goals, Non-Goals, Key Constraints, Architectural Decisions, UX/DX Principles, and Success Criteria—to understand the expected artifact. Follow the link-like relative reference to `references/vision_template.md` when the scaffold is needed.
 - **Inputs and outputs:** The stated inputs are the repository codebase and five targeted questions. The output is a repository-root `vision.md` containing the seven listed direction-setting sections. The README does not define question text, inference handling, review timing, or overwrite behavior; those details are supplied by `SKILL.md`.
 - **Relationships:** It summarizes `create-vision/SKILL.md` and explicitly locates the template at `create-vision/references/vision_template.md`. Its `/create-vision` command and section list should remain consistent with those files. It has no external URLs, tests, tool implementation, or additional file dependencies.
 - **Constraints and cautions:** The README correctly distinguishes vision from a general project description, but it is intentionally high-level and should not be treated as the complete workflow contract. It does not specify security, legal, branch, commit, or deployment operations. The output path is described as the repository root, so use the target repository context rather than this skill directory.
@@ -1073,7 +1164,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs include `AI_SCAFFOLDING_PATHS` and `PROTECTED_FILES` from `SKILL.md`, the current/feature/PR branch names, Git repository state, `.gitignore`, and shell tools (`git`, `grep`, `printf`, `sed`). Cleanup outputs are tracked-path reports or a branch/index/ignore update plus commit and verification names. Sync outputs are a printed patch, an applied and indexed patch with commit, or `nothing to sync`; dry-run modes must not checkout, apply, commit, or otherwise alter the repository.
 - **Relationships:** The reference explicitly imports its path constants from `SKILL.md` and must not re-enumerate them. `README.md` summarizes these flows. The full pipeline and sync both finish with a diff against `main`; protected-file restoration also relies on `main`.
 - **Constraints and cautions:** The commands have material branch and repository side effects: checkout changes the active branch, `git rm --cached` changes tracking while retaining files on disk, `.gitignore` is staged, `git apply --index` changes both worktree/index, and commits persist history. The process assumes feature and PR branch naming, a usable `main`, clean/applicable Git state, and compatible pathspecs. The detection example uses shell interpolation and `grep`/`sed`; it escapes periods but does not document escaping every possible regular-expression metacharacter in path constants. The sync pseudocode labels its detector `detectSdkDiff` although the documented scope is all non-scaffolding real files, which is questionable terminology rather than a separate SDK restriction. The reference contains no external links or security-sensitive payloads, but restoring from `main` and applying a branch diff should be reviewed before execution; source text is documentation and is not itself an instruction to run here.
-- **Source basis:** `github 1/.github/skills/clean-pr-branch/references/process.md:1-14` (cleanup dry-run); `:18-31` (full pipeline decision flow); `:33-57` (detection, branch creation, untracking, ignore update, restoration); `:59-84` (commit and verification); `:88-113` (sync scope, exclusions, preconditions, flow); `:115-132` (sync detection, checkout, apply); `:134-161` (sync commit and verification); `:165-173` (sync dry-run).
+- **Source basis:** `.github/skills/clean-pr-branch/references/process.md:1-14` (cleanup dry-run); `:18-31` (full pipeline decision flow); `:33-57` (detection, branch creation, untracking, ignore update, restoration); `:59-84` (commit and verification); `:88-113` (sync scope, exclusions, preconditions, flow); `:115-132` (sync detection, checkout, apply); `:134-161` (sync commit and verification); `:165-173` (sync dry-run).
 - **Status:** Filled
 
 ### `skills/create-vision/references/vision_template.md`
@@ -1134,8 +1225,9 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Relationships:** Coordinates `aidd-please`, product, requirements, ticket, TDD,
   evidence, static analysis, review, PR, delegation, commit, cleanup, and
   relevant domain skills.
-- **Constraints and cautions:** Missing gate-affecting context or required
-  user-validation evidence is a blocker. Review invokes static analysis before
+- **Constraints and cautions:** Missing gate-affecting context, required
+  automated functionality evidence, or mode-appropriate validation evidence is a
+  blocker. Review invokes static analysis before
   readiness; delivery routing is ordered review/remediation -> commit -> push ->
   PR/local closeout, with remote-only checks deferred until publication. Every
   routed response must recommend the first permitted next action and its owning
@@ -1173,11 +1265,11 @@ The following illustrative entry shows the level of detail used. It is separate 
 ### `skills/aidd-commit/SKILL.md`
 
 - **What it is:** The authoritative local-commit workflow for reviewed, validated, staged ticket scope.
-- **When to use or read it:** Use after technical checks, required user validation, and review are terminal, before publishing or opening a PR.
+- **When to use or read it:** Use after technical checks, mode-appropriate validation, and review are terminal, before publishing or opening a PR.
 - **How to use it:** Resolve configuration, active ticket, evidence, branch policy, and staged scope; refuse unstaged or mixed scope; apply the configured commit format and trailers; append commit evidence; and return the next push/PR/local-closeout handoff.
 - **Inputs and outputs:** Inputs are staged Git changes, delivery evidence, branch state, approval, and commit policy. Outputs are a local commit or an explicit blocker with evidence and `NextAction`.
 - **Relationships:** Coordinates `aidd-evidence`, `aidd-review`, `aidd-push`, `aidd-pr`, and the orchestrator; `/commit` is its entrypoint.
-- **Constraints and cautions:** It never stages, pushes, creates a PR, merges, resets, or rewrites history. Required user validation, technical evidence, review, clean scope, and configured approval must be present before committing.
+- **Constraints and cautions:** It never stages, pushes, creates a PR, merges, resets, or rewrites history. Guided user validation or automatic `automaticValidation`, technical evidence, review, clean scope, and configured approval must be present before committing; automatic mode does not bypass provider or branch policy.
 - **Source basis:** `skills/aidd-commit/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1185,10 +1277,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** The authoritative branch-publication workflow for pushing an approved local commit to a configured remote.
 - **When to use or read it:** Use after `/commit` when the branch has an unpublished or upstream-ahead local commit and policy allows publication.
-- **How to use it:** Resolve branch/upstream/remote/provider policy, verify commit and evidence state, refuse unsafe or rewritten history, push only the approved ref, append push evidence, verify remote state, and route to PR or configured local closeout.
+- **How to use it:** Resolve branch/upstream/remote/provider policy, verify commit, automated functionality, mode-appropriate validation, and evidence state, refuse unsafe or rewritten history, push only the approved ref, append push evidence, verify remote state, and route to PR or configured local closeout.
 - **Inputs and outputs:** Inputs are a committed local branch, upstream/remote state, delivery evidence, approval, and provider capability. Outputs are a push result, remote evidence, or an explicit blocker with `NextAction`.
 - **Relationships:** Coordinates `aidd-commit`, `aidd-evidence`, `aidd-pr`, provider adapters, and the orchestrator; `/push` is its entrypoint.
-- **Constraints and cautions:** It never stages, commits, resets, stashes, force-pushes, creates a PR, or merges. Missing upstream, remote capability, approval, evidence, or safe branch state blocks publication.
+- **Constraints and cautions:** It never stages, commits, resets, stashes, force-pushes, creates a PR, or merges. Missing upstream, remote capability, approval, automated functionality evidence, mode-appropriate validation, or safe branch state blocks publication; automatic mode does not bypass provider or remote checks.
 - **Source basis:** `skills/aidd-push/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1211,17 +1303,17 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs include the `error-causes` package, error metadata, caught exceptions, factory arguments such as `requiredParam`, API error-definition maps, and handler callbacks. Outputs include structured errors carrying `name`, `message`, optional `code`, `cause`, and custom context; factory functions that either throw validation errors or return middleware; and routed handler execution based on error names. The test example assumes an `assert` helper and a throwing `functionThatThrows`, neither of which is defined here.
 - **Relationships:** This is the detailed counterpart to `aidd-error-causes/README.md`, expanding its brief examples into implementation and test rules. It references only the external `error-causes` import and illustrative `assert`, `someOperation`, `functionThatThrows`, `someAsyncCall`, and `redirect` symbols; no local source, reference, or test files are supplied in this directory.
 - **Constraints and cautions:** The document is guidance to apply to source code, not a command script; its examples must be adapted to the project’s runtime and error-handler API. It presents `code` as optional generally but expects stable codes where callers branch programmatically. The test assertions are internally assumption-heavy: they require the thrown value to be a wrapper whose `cause` itself has the expected `name` and `code`, and the first assertion still uses `instanceof Error` despite the skill’s cross-realm rationale against relying on `instanceof` for matching. The examples do not test message, custom properties, routing fallbacks, non-`Error` causes, async rejection handling, or factory behavior. The stated `errorCauses` callback map includes `redirect('/login')`, which may have application-specific security/navigation implications and is not defined here. No branch or repository mutations are instructed, and no security-sensitive implementation details or external links are provided; installing or upgrading the external package would be a dependency change outside this file.
-- **Source basis:** - `github 1/.github/skills/aidd-error-causes/SKILL.md:1-8` — metadata and overall mandate. - `github 1/.github/skills/aidd-error-causes/SKILL.md:10-22` — rationale and import. - `github 1/.github/skills/aidd-error-causes/SKILL.md:24-52` — plain-error replacement and metadata rules. - `github 1/.github/skills/aidd-error-causes/SKILL.md:54-89` — cause wrapping and factory validation. - `github 1/.github/skills/aidd-error-causes/SKILL.md:91-123` — test assertions and their assumed helpers/shape. - `github 1/.github/skills/aidd-error-causes/SKILL.md:125-160` — multi-error definition and routed-handler pattern. - `github 1/.github/skills/aidd-error-causes/SKILL.md:162-170` — summarized rules.
+- **Source basis:** - `.github/skills/aidd-error-causes/SKILL.md:1-8` — metadata and overall mandate. - `.github/skills/aidd-error-causes/SKILL.md:10-22` — rationale and import. - `.github/skills/aidd-error-causes/SKILL.md:24-52` — plain-error replacement and metadata rules. - `.github/skills/aidd-error-causes/SKILL.md:54-89` — cause wrapping and factory validation. - `.github/skills/aidd-error-causes/SKILL.md:91-123` — test assertions and their assumed helpers/shape. - `.github/skills/aidd-error-causes/SKILL.md:125-160` — multi-error definition and routed-handler pattern. - `.github/skills/aidd-error-causes/SKILL.md:162-170` — summarized rules.
 - **Status:** Filled
 
 ### `skills/aidd-fix/SKILL.md`
 
 - **What it is:** The scoped bug-fix and review-feedback workflow with baseline, regression/non-code evidence, verification, review, and configured delivery gates.
 - **When to use or read it:** Use it for a reported bug, failing test, or review finding that requires a controlled change.
-- **How to use it:** Read the active contract and configuration, establish the protected baseline, document the requirement, choose the strongest evidence method, implement within scope, verify, review, present the user-validation handoff, record the terminal user result, and append evidence.
+- **How to use it:** Read the active contract and configuration, establish the protected baseline, document the requirement, choose the strongest evidence method, implement within scope, verify with executable automated functionality tests, use guided user validation or automatic Rubber Duck validation according to the selected mode, review, and append evidence.
 - **Inputs and outputs:** Inputs are a bug report/review finding, active phase/feature/ticket, repository commands, and gate policy. Outputs are a verified fix, evidence record, blockers, or an explicit no-change finding.
 - **Relationships:** Coordinates `aidd-tdd`, `/execute`, `/review`, `/evidence`, `/commit`, and repository/provider policy.
-- **Constraints and cautions:** Code behavior requires a failing regression before implementation; required user validation must be terminal before closure; commands, gates, commit, push, and branch behavior are configurable. Unrelated failures become follow-up work.
+- **Constraints and cautions:** Code behavior requires a failing regression before implementation; every affected acceptance outcome also requires executable automated functionality evidence; guided closure requires terminal user validation while automatic closure requires terminal `automaticValidation` with the exact Rubber Duck `gpt-5.6-luna` high-reasoning `all-validation` profile; commands, gates, commit, push, and branch behavior are configurable. Unrelated failures become follow-up work.
 - **Source basis:** `skills/aidd-fix/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1233,7 +1325,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** `call` accepts a function reference and variadic arguments and describes them as `{ CALL: { fn, args } }`; the saga receives the eventual result or error from the runtime. `put` accepts an action and describes `{ PUT: Action }`; the runtime dispatches it. A saga test supplies optional values to `iterator.next(value)` and observes yielded effect objects plus the final `done` boolean. The example uses `fetchUser`, ID `"42"`, a fake user, and `userLoaded(fakeUser)`.
 - **Relationships:** The saga driver consumes the plain descriptions emitted by `call` and `put`, executes side effects, returns outcomes to the generator, and dispatches `put` actions. Actions are the interface between saga workflows and a Redux-like central store. The example depends on saga functions/effect helpers such as `signInUser`, `fetchUser`, `userLoaded`, and `call`/`put`, but none are defined in this file.
 - **Constraints and cautions:** The file does not specify imports, a concrete saga library, runtime configuration, error-handling syntax, or a test framework, so those must be supplied by the host project. Its statement that the saga “never calls” the effect function is a design description for yielded effects, not a complete implementation contract for every saga library. The sample tests only the happy path despite mentioning error branches, and its `describe` callback/assert API is framework-specific and potentially nonstandard. No external links, missing file references, security-sensitive guidance, or branch/repository side effects are present; treat the prose and sample as documentation rather than commands to execute. Required tooling is a saga-compatible runtime and a JavaScript test runner capable of stepping generators.
-- **Source basis:** `github 1/.github/skills/aidd-javascript-io-effects/SKILL.md:1-8` (skill metadata and role); `:10-19` (`call` and effect isolation); `:21-28` (`put` and action shape); `:31-33` (runtime); `:35-68` (generator testing example).
+- **Source basis:** `.github/skills/aidd-javascript-io-effects/SKILL.md:1-8` (skill metadata and role); `:10-19` (`call` and effect isolation); `:21-28` (`put` and action shape); `:31-33` (runtime); `:35-68` (generator testing example).
 - **Status:** Filled
 
 ### `skills/aidd-javascript/SKILL.md`
@@ -1255,7 +1347,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Input is source code or configuration containing JWT issuance, storage, transport, verification, key retrieval, claims, authorization, cookie, or lifetime behavior. Output is a set of severity-tagged review findings and recommended mitigations; it does not modify code, rotate keys, configure infrastructure, or execute tests.
 - **Relationships:** The front matter names the `aidd-jwt-security` skill and its review scope. The README provides the invocation and high-level rationale; this file contains the detailed rules it summarizes. No referenced local files or external links are present, and no branch or repository workflow is defined.
 - **Constraints and cautions:** These are prescriptive security heuristics, not a complete JWT standard or application policy. The blanket preference for asymmetric algorithms and the 15-minute maximum are stated defaults that require compatibility review; issuer, audience, key, clock-skew, CSRF, cookie, and session requirements must be adapted to the deployment without weakening fail-closed behavior. Key-source and token-processing guidance is security-sensitive, including SSRF/key-injection, confused-deputy, token-reuse, XSS, CSRF, and subdomain-hijacking risks. The file assumes a reviewer can inspect JWT libraries and configuration but names no required tool.
-- **Source basis:** `github 1/.github/skills/aidd-jwt-security/SKILL.md:1-8` — skill metadata and JWT/opaque-session recommendation. `github 1/.github/skills/aidd-jwt-security/SKILL.md:10-20` — stateful-session, storage, transport, logging, and CSRF patterns. `github 1/.github/skills/aidd-jwt-security/SKILL.md:22-35` — algorithm, signature, failure handling, and token-purpose rules. `github 1/.github/skills/aidd-jwt-security/SKILL.md:37-52` — key handling, issuer isolation, claims, and authorization rules. `github 1/.github/skills/aidd-jwt-security/SKILL.md:54-60` — cookie hardening and access-token lifetime rules.
+- **Source basis:** `.github/skills/aidd-jwt-security/SKILL.md:1-8` — skill metadata and JWT/opaque-session recommendation. `.github/skills/aidd-jwt-security/SKILL.md:10-20` — stateful-session, storage, transport, logging, and CSRF patterns. `.github/skills/aidd-jwt-security/SKILL.md:22-35` — algorithm, signature, failure handling, and token-purpose rules. `.github/skills/aidd-jwt-security/SKILL.md:37-52` — key handling, issuer isolation, claims, and authorization rules. `.github/skills/aidd-jwt-security/SKILL.md:54-60` — cookie hardening and access-token lifetime rules.
 - **Status:** Filled
 
 ### `skills/aidd-layout/SKILL.md`
@@ -1299,7 +1391,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs include a type definition, its functions/constants, optional schema, current consumers, and existing tests. Expected outputs are a namespace directory with `<type-name>.ts`, `public.ts`, eponymous child modules, compliant consumer imports, schema/type synchronization where applicable, and `<same-name>.test.ts` coverage for each function file. The examples require TypeScript module syntax, `.js` import specifiers, and the packages `@adobe/data/schema` and (for Option B) `@adobe/data/types`; the source does not provide package installation or test-run commands.
 - **Relationships:** It references the missing/not-present relative skill file `../aidd-structure/SKILL.md` for the broader `types/` layer structure; this directory contains no such file, so that relationship cannot be verified here. The README in the same directory summarizes the pattern and example layout. The schema examples depend on `@adobe/data/schema` and `@adobe/data/types`, and the instructions assume consumers and tests exist elsewhere in the repository. No external URLs are included.
 - **Constraints and cautions:** The type entry is the only public import surface: external code must not import `public.js` or child files such as `schema.js` or `length.js`; filenames must match their sole exported function/constant and must not use `<type-name>-<exported-name>`. `public.ts` must re-export every public constant file, while private items remain file-local and internal exports stay out of the barrel. Schema derivation is explicitly limited to schema-source-of-truth types; hand-written aliases must compile-time-match the schema. The prose uses `.ts` in layout rules but `.js` in emitted import specifiers, so preserve the project’s module-resolution convention. The “tree-shakeable” claim is an intended benefit, not a tested guarantee. The skill can require broad consumer edits and test splitting, but it specifies no branch or repository operations. No direct security-sensitive behavior is prescribed; dependencies and compile-time assertions should be available before applying the examples.
-- **Source basis:** `github 1/.github/skills/aidd-namespace/SKILL.md:1-10` defines metadata, the canonical import surface, and precedence; `:12-27` defines file naming; `:29-38` defines constant visibility; `:40-65` defines exports and consumer imports; `:67-69` defines external-type helper naming; `:71-116` defines schema-backed options and dependencies; `:118-124` defines test placement; `:126-137` defines the refactoring workflow.
+- **Source basis:** `.github/skills/aidd-namespace/SKILL.md:1-10` defines metadata, the canonical import surface, and precedence; `:12-27` defines file naming; `:29-38` defines constant visibility; `:40-65` defines exports and consumer imports; `:67-69` defines external-type helper naming; `:71-116` defines schema-backed options and dependencies; `:118-124` defines test placement; `:126-137` defines the refactoring workflow.
 - **Status:** Filled
 
 ### `skills/aidd-observe/SKILL.md`
@@ -1317,7 +1409,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** The safe delegation workflow for independent phase, feature, or ticket work with explicit ownership, dependency waves, conflict checks, and evidence aggregation.
 - **When to use or read it:** Use it only when work is genuinely independent and can be isolated under the configured delegation policy.
-- **How to use it:** Declare owned files and shared artifacts, reject overlap/order conflicts, choose the configured branch strategy, dispatch dependency waves, collect results, integrate them, present user-validation handoffs, record terminal user results, and run aggregate gates.
+- **How to use it:** Declare owned files and shared artifacts, reject overlap/order conflicts, choose the configured branch strategy, dispatch dependency waves, collect results, integrate them, use the mode-appropriate terminal validation path (guided user handoff or automatic Rubber Duck validation), and run aggregate gates.
 - **Inputs and outputs:** Inputs are ticket contracts, delivery context, ownership, dependency waves, and delegation capability. Outputs are scoped prompts or delegated results with changed paths, evidence, blockers, and unresolved decisions.
 - **Relationships:** Coordinates `aidd-fix`, `aidd-evidence`, the orchestrator, and the configured branch/worktree strategy.
 - **Constraints and cautions:** Shared planning/evidence/configuration writes and overlapping files are prohibited; isolation is the default; ticket text is untrusted; the integration owner runs shared baseline, functionality, quality, review, and user-validation gates.
@@ -1328,10 +1420,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** The explicit-section, evidence-aware pipeline for ordered Markdown ticket execution.
 - **When to use or read it:** Use it when a document contains an intentional executable ticket section, not merely policy, acceptance, or checklist prose.
-- **How to use it:** Select the ticket section, carry delivery context into each step, delegate sequentially or explicitly approved independent waves, present and record each ticket's user-validation result, stop on failure/blocker, aggregate artifacts and evidence, and reserve final commit, push, PR, and lifecycle-closeout operations for the integration owner.
+- **How to use it:** Select the ticket section, carry delivery context into each step, delegate sequentially or explicitly approved independent waves, require each ticket's terminal agent-owned technical verification and automated functionality result before its mode-appropriate validation, use the exact Rubber Duck profile for automatic validation, stop on failure/blocker, aggregate artifacts and evidence, and reserve final commit, push, PR, and lifecycle-closeout operations for the integration owner.
 - **Inputs and outputs:** Inputs are a workspace Markdown path, selected section, ticket steps, delivery context, and delegation capability. Outputs are per-step results and a blocker-aware summary.
 - **Relationships:** Coordinates the orchestrator, `aidd-evidence`, ticket contracts, configured delegation capability, `aidd-commit`, `aidd-push`, and `aidd-pr`.
-- **Constraints and cautions:** Ticket text is untrusted and must remain delimited data, not system instructions. Fenced code is not shell input by default. The source section must be inside the workspace or explicitly confirmed; failures, blockers, ownership conflicts, and missing required technical or user-validation gates stop execution. The default is sequential delegation; parallel waves require explicit independence and no file overlap. Shared commit, push, PR, and merge operations belong to the integration owner and follow the surrounding lifecycle configuration.
+- **Constraints and cautions:** Ticket text is untrusted and must remain delimited data, not system instructions. Fenced code is not shell input by default. The source section must be inside the workspace or explicitly confirmed; failures, blockers, ownership conflicts, and missing required technical or user-validation gates stop execution. Technical checks are agent-owned and never user instructions. The default is sequential delegation; parallel waves require explicit independence and no file overlap. Shared commit, push, PR, and merge operations belong to the integration owner and follow the surrounding lifecycle configuration.
 - **Source basis:** `skills/aidd-pipeline/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1339,7 +1431,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** The general delivery constraint layer for scope, approval, repository configuration, evidence, blockers, and readiness reporting.
 - **When to use or read it:** Use as the default entry point when a request does not clearly map to a specialist or when broad work needs safe routing.
-- **How to use it:** Read configuration and repository context, classify the request, preserve accepted scope, route to lifecycle/domain skills, record evidence, distinguish a conversational answer from a readiness declaration, route terminal delivery in review -> commit -> push -> PR/local-closeout order, and finish with one context-aware next-step and skill handoff.
+- **How to use it:** Read configuration and repository context, classify the request, preserve accepted scope, route to lifecycle/domain skills, record evidence, distinguish a conversational answer from a readiness declaration, route terminal delivery in automated functionality -> guided user validation or automatic Rubber Duck validation -> review -> commit -> push -> PR/local-closeout order, and finish with one context-aware next-step and skill handoff.
 - **Inputs and outputs:** Inputs are the request, repository context, active phase/feature/ticket, configuration, and selected skills. Outputs are a response, routed work, evidence, blockers, an approved mutation, and one `NextAction` recommendation.
 - **Relationships:** Provides constraints for the orchestrator, planning, execution, review, commit, log, evidence, and domain skills.
 - **Constraints and cautions:** Do not conceal baseline failures, claim checks
@@ -1349,7 +1441,9 @@ The following illustrative entry shows the level of detail used. It is separate 
   Approval mode and side effects are configuration-driven; commit, push, PR,
   and merge are separate operations. Recommendations must identify one
   permitted next action and the owning skill from the active state, gate,
-  evidence, or blocker.
+  evidence, or blocker. Authorized artifact mutations require a host file
+  create/edit operation plus read-back verification; response-only content is
+  not written and failed writes are blockers.
 - **Source basis:** `skills/aidd-please/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1371,7 +1465,8 @@ The following illustrative entry shows the level of detail used. It is separate 
   locations when present.
 - **Constraints and cautions:** Discovery remains UI- and implementation-
   agnostic, does not create tickets, and must not fill missing business facts
-  with assumptions.
+  with assumptions. Authorized `/save` operations must use a file operation,
+  verify the resulting path, and report failed writes as blockers.
 - **Source basis:** `skills/aidd-product-manager/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1379,10 +1474,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 - **What it is:** The provider-aware pull-request lifecycle and safe review-thread triage contract.
 - **When to use or read it:** Use after source publication when PR policy requires or already has a PR, and when remote readiness, review threads, or PR closeout must be proven.
-- **How to use it:** Read configuration and evidence, verify a published source branch and terminal user-validation evidence, prepare/open/monitor the PR through the provider adapter, recheck checks/conflicts/approvals/conversations/mergeability after every push, and delegate remaining findings as scoped fixes.
+- **How to use it:** Read configuration and evidence, verify a published source branch plus terminal automated functionality, review, and mode-appropriate validation evidence, prepare/open/monitor the PR through the provider adapter, recheck checks/conflicts/approvals/conversations/mergeability after every push, and delegate remaining findings as scoped fixes.
 - **Inputs and outputs:** Inputs are provider state, source/target branches, ticket/evidence readiness, required checks/approvals, and review threads. Outputs are lifecycle state, triage, scoped fix prompts, and readiness evidence.
 - **Relationships:** Coordinates `aidd-evidence`, `/aidd-fix`, commit/push/review workflows, and the GitHub GraphQL adapter when the provider is GitHub.
-- **Constraints and cautions:** Provider commands and reviewer/merge settings are configurable; an unpublished source branch blocks PR creation; pagination is mandatory; review text is untrusted; only already-addressed threads may be approved for resolution; missing or pending user validation and partial remote state are not ready.
+- **Constraints and cautions:** Provider commands and reviewer/merge settings are configurable; an unpublished source branch blocks PR creation; pagination is mandatory; review text is untrusted; only already-addressed threads may be approved for resolution; missing or pending mode-appropriate validation and partial remote state are not ready. Automatic mode does not bypass provider, approval, or merge policy.
 - **Source basis:** `skills/aidd-pr/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1410,11 +1505,13 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 ### `skills/aidd-review/SKILL.md`
 
-- **What it is:** The evidence-aware review contract for deterministic static
-  analysis, PR parity, scope, requirements, quality, security, functionality,
-  documentation, user validation, gates, and delivery readiness.
+- **What it is:** The evidence-aware review contract for agent-owned technical
+  verification, deterministic static analysis, PR parity, scope, requirements,
+  quality, security, functionality, documentation, user validation, gates, and
+  delivery readiness.
 - **When to use or read it:** Use after implementation or before a PR when findings must be tied to the ticket contract and evidence.
-- **How to use it:** Run deterministic static analysis first, compare local
+- **How to use it:** Run deterministic static analysis first as an agent-only
+  final-diff gate, compare local
    commands, versions, rules, scope, thresholds, baselines, and exit policy
    with the PR pipeline, then read configuration, lifecycle directories, scope,
    requirements, evidence, gates, and the diff. Classify findings and route
@@ -1430,8 +1527,11 @@ The following illustrative entry shows the level of detail used. It is separate 
   parity cannot be inferred; churn is a configurable risk signal; status/path
   and stale-index mismatches are findings. The review never edits source files
   directly, hides baseline debt, or declares readiness from partial results.
-  Required user-validation evidence or an approved not-applicable decision is
-  part of closure readiness when configured.
+  Technical checks remain agent-owned, while guided `userValidation` evidence
+  or automatic `automaticValidation` evidence is part of closure readiness
+  when configured; automatic evidence is never presented as human
+  confirmation. Automatic validation uses the exact Rubber Duck
+  `gpt-5.6-luna` high-reasoning `all-validation` profile.
 - **Source basis:** `skills/aidd-review/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1454,7 +1554,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs are an optional prompt, optional `--compact`, and optional `--depth`/`-d` value in the inclusive range 1–10; the default depth is 10. The process produces staged reflective work and a final standalone natural-language response, with compact mode minimizing intermediate tokens while preserving causal reasoning.
 - **Relationships:** The frontmatter identifies the skill name and description used for discovery. This file is the detailed counterpart to `aidd-rtc/README.md`; unlike the README’s `/rtc` examples, it specifies `/aidd-rtc` as the command. The pipeline notation is an instruction model, not an implementation or test harness.
 - **Constraints and cautions:** The file requires every compact token to be meaningful (“remove any word → lose meaning”), requires reflection and scoring to show causal chains rather than only conclusions, and labels consultant prose, hedging, filler, and premature polishing as failures. Its request to “show work” and to compress internal thinking is questionable if interpreted as disclosure of private chain-of-thought; apply the workflow without exposing hidden reasoning or sensitive information. No external links, missing referenced files, tool dependencies, branch operations, repository mutations, or runtime side effects are specified.
-- **Source basis:** `github 1/.github/skills/aidd-rtc/SKILL.md:1-6` (metadata and purpose); `:8-15` (pipeline); `:18-24` (command and options); `:27-35` (option selection and compact-mode behavior); `:37-38` (quality criteria).
+- **Source basis:** `.github/skills/aidd-rtc/SKILL.md:1-6` (metadata and purpose); `:8-15` (pipeline); `:18-24` (command and options); `:27-35` (option selection and compact-mode behavior); `:37-38` (quality criteria).
 - **Status:** Filled
 
 ### `skills/aidd-service/SKILL.md`
@@ -1476,7 +1576,7 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs are the feature requirements, approval/tests status, chosen stack technologies, persisted-state needs, and Redux slice name. Outputs are a best-practices checklist, separated modules and container/presentation architecture, Redux Saga side-effect wiring, and the two named Autodux source/build artifacts. The file does not specify the transpiler, command, module format, or test runner.
 - **Relationships:** The README at `aidd-stack/README.md` summarizes these conventions. `/aidd-tdd` is an external skill reference for the required TDD process but is not included in this directory. The instructions depend conceptually on React, `react-redux`’s `connect`, Redux Saga, `frameworks/redux/autodux`, Next.js, Shadcn UI, and Vercel.
 - **Constraints and cautions:** The `${slice name}-dux.sudo` extension and its transpilation step are prescribed, but the format, tooling, and generated-file lifecycle are unspecified and should not be inferred. The container rule applies when state is persisted; containers must not own markup or business logic. No authentication, authorization, secrets, input validation, or other security guidance is provided. The Vercel target is deployment context only. The file specifies no Git branch, commit, repository, or other external side effects.
-- **Source basis:** `github 1/.github/skills/aidd-stack/SKILL.md:1-4` contains front matter; `:6-12` defines role, preliminary best-practices step, and stack; `:14-20` defines JavaScript and module-separation rules; `:22-28` defines React constraints; `:30-35` defines Redux/Autodux artifacts; `:37-40` defines TDD, requirements, testing, and approval constraints.
+- **Source basis:** `.github/skills/aidd-stack/SKILL.md:1-4` contains front matter; `:6-12` defines role, preliminary best-practices step, and stack; `:14-20` defines JavaScript and module-separation rules; `:22-28` defines React constraints; `:30-35` defines Redux/Autodux artifacts; `:37-40` defines TDD, requirements, testing, and approval constraints.
 - **Status:** Filled
 
 ### `skills/aidd-static-analysis/SKILL.md`
@@ -1536,8 +1636,9 @@ The following illustrative entry shows the level of detail used. It is separate 
   grooming, execution of an approved ticket, and lifecycle closeout.
 - **How to use it:** Resolve configured artifacts and both open/closed record
   directories, select planning depth, approve each parent before child
-  planning, map scope/capabilities/requirements/evidence, maintain current
-  index paths, and execute one ticket at a time.
+  planning, map scope/capabilities/requirements/evidence, require an
+  executable automated functionality test per acceptance outcome, maintain
+  current index paths, and execute one ticket at a time.
 - **Inputs and outputs:** Inputs include the delivery contract, planning
   artifacts, requirements, risks, dependencies, commands, user-validation
   plans, and approval mode. Outputs include stable-ID records, coverage links,
@@ -1547,25 +1648,29 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Constraints and cautions:** Missing, blocked, or closed parents stop child
   planning; tickets are focused by observable scope rather than line count; no
   silent scope expansion, stale indexes, duplicate records, skipped gates,
-  invented commands, or ticket closure without user-validation evidence.
+  invented commands, or ticket closure without mode-appropriate validation
+  evidence. Automatic validation must use the exact Rubber Duck
+  `gpt-5.6-luna` high-reasoning `all-validation` profile.
 - **Source basis:** `skills/aidd-ticket-creator/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
 ### `skills/aidd-tdd/SKILL.md`
 
-- **What it is:** The authoritative repository-appropriate test and verification process for approved tickets, covering baseline, code TDD, real-system flows, local gates, evidence, and coverage gaps.
+- **What it is:** The authoritative repository-appropriate test and verification process for approved tickets, covering baseline, agent-owned technical checks, code TDD, real-system flows, local gates, evidence, and coverage gaps.
 - **When to use or read it:** Use for implementation, test writing, bug fixes, functionality validation, and any ticket that needs a defensible verification method.
-- **How to use it:** Discover commands from configuration, manifests, CI, and guidance; classify the ticket method; record protected baseline; run failing-first tests for code behavior or the strongest non-code evidence; rerun regressions and configured gates; return exact user-validation steps and wait for the user's result; then hand off to review and the configured commit/push/PR or local-delivery closeout.
+- **How to use it:** Discover commands from configuration, manifests, CI, and guidance; classify the ticket method; record protected baseline; identify and run agent-owned technical checks; define and run an executable automated functionality test for every acceptance outcome; run failing-first tests for code behavior or the strongest non-code evidence; rerun regressions and configured gates; use guided functionality-only user validation or automatic Rubber Duck validation according to mode; then hand off to review and the configured commit/push/PR or local-delivery closeout.
 - **Inputs and outputs:** Inputs are requirements, protected flows, repository tooling, local stack, commands, and gate policy. Outputs are a `TestPlan`, recorded results, implementation verification, and explicit blockers or coverage gaps.
 - **Relationships:** Integrates with `aidd-evidence`, `/execute`,
   `/run-preimplementation-checklist`, `/aidd-fix`, user testing, review, and
   domain workflow interfaces.
 - **Constraints and cautions:** Never assume a framework or command, hide a
   baseline failure, claim an unrun result, or treat unavailable
-  browser/service/integration capability as passed. Code TDD still requires a
-  failing regression before implementation; the post-implementation handoff,
-  user result, review, and configured delivery closeout are required before
-  closure.
+  browser/service/integration capability as passed. Technical checks are
+  agent-owned and never user instructions. Code TDD still requires a failing
+  regression before implementation; the post-implementation mode-appropriate
+  validation result, review, and configured delivery closeout are required
+  before closure. Automatic validation uses the exact Rubber Duck
+  `gpt-5.6-luna` high-reasoning `all-validation` profile.
 - **Source basis:** `skills/aidd-tdd/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1604,12 +1709,12 @@ The following illustrative entry shows the level of detail used. It is separate 
 
 ### `skills/aidd-user-testing/SKILL.md`
 
-- **What it is:** The user-journey testing and functionality-evidence contract for human studies, browser-agent flows, baselines, regressions, screenshots, artifacts, and blockers.
-- **When to use or read it:** Use when a journey needs usability research, repeatable functionality validation, baseline/regression coverage, or real-browser evidence.
-- **How to use it:** Classify the purpose, build a charter with setup/data/steps/expected visible and persisted effects/cleanup/failure paths, generate paired scripts, execute only with supported capabilities, return the post-implementation user-validation handoff, and record each flow outcome.
+- **What it is:** The contract for separating agent-owned technical verification from functionality-only user validation, with optional usability studies, browser-agent flows, screenshots, artifacts, and blockers.
+- **When to use or read it:** Use when a journey needs a functionality-only closure handoff, usability research, repeatable automated verification, or real-browser evidence.
+- **How to use it:** Classify user purpose, define agent-owned technical checks, build a functionality handoff with setup/data/actions/expected visible and persisted effects/cleanup/user-observable failure behavior, define and execute the required automated functionality test for each acceptance outcome, execute only with supported capabilities, record separate technical and user evidence, and route terminal user functionality validation to review.
 - **Inputs and outputs:** Inputs are a journey/persona, ticket requirements, protected flows, repository stack, and UI evidence policy. Outputs are human/agent scripts, user-validation handoffs, reports, artifacts, statuses, and coverage gaps.
 - **Relationships:** It explicitly depends on `UserJourney`/`Persona` from `/aidd-product-manager` and on journey YAML at `$projectRoot/plan/story-map/${journey-name}.yaml`; the referenced story-map directory is missing in the inspected repository, while the `aidd-product-manager` skill directory exists. Its commands are also expected by `user-testing.test.js` as `.github/commands/user-test.md` and `.github/commands/run-test.md`, but those files are missing here.
-- **Constraints and cautions:** Usability and required functionality tests are distinct; unavailable browser/integration capability is blocked or skipped with reason, not passed; secrets and destructive test-state cleanup require explicit handling; tickets remain open until required user validation is confirmed.
+- **Constraints and cautions:** Usability and required functionality tests are distinct; smoke, regression, contract, fixture, acquisition, security, static-analysis, and quality checks are agent-owned and never user instructions; unavailable browser/integration capability is blocked or skipped with reason, not passed; secrets and destructive test-state cleanup require explicit handling; guided tickets remain open until required user functionality validation is confirmed, while automatic tickets require terminal `automaticValidation` with the exact Rubber Duck profile.
 - **Source basis:** `skills/aidd-user-testing/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1632,17 +1737,17 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Inputs and outputs:** Inputs are the current branch, configuration, evidence, provider/base policy, path constants, and mode. Outputs are a report or a cleanup/sync commit; source and evidence files remain on disk.
 - **Relationships:** `references/process.md` supplies the concrete detection, branch, untracking, ignore-file, restoration, commit, verification, and sync procedures. `README.md` is the user-facing overview and links back to this file for the single source of truth. The protected `cdaas_manifest.json` is specifically preserved even though broad path handling otherwise defaults to treating non-scaffold paths as real code.
 - **Constraints and cautions:** Scaffolding is never deleted from disk: tracked paths are removed only from Git with `git rm --cached`; already-untracked or already-ignored paths are skipped without duplicate work. A protected file caught by removal is restored from `main` with a warning, which assumes that branch exists and may replace the working copy with the version from `main`. A no-op cleanup must not create a branch, and a no-op sync reports `nothing to sync`; sync also requires an existing PR branch. Branch checkout, index changes, commits, and later verification affect repository state. No external links or security-specific instructions are present, but the workflow has consequential Git side effects and treats every new non-scaffold top-level path as code by default.
-- **Source basis:** `github 1/.github/skills/clean-pr-branch/SKILL.md:1-8` (metadata and purpose); `:10-35` (scaffold/protected constants and default path policy); `:37-50` (commands and process reference); `:52-67` (constraints).
+- **Source basis:** `.github/skills/clean-pr-branch/SKILL.md:1-8` (metadata and purpose); `:10-35` (scaffold/protected constants and default path policy); `:37-50` (commands and process reference); `:52-67` (constraints).
 - **Status:** Workflow updated
 
 ### `skills/create-vision/SKILL.md`
 
 - **What it is:** The executable specification for the `create-vision` skill. It defines a repository-discovery, user-interview, drafting, review, and write pipeline for producing `vision.md` as a constraint document and source of truth, rather than as a descriptive README.
 - **When to use or read it:** Use when starting a project, onboarding a repository into the AIDD workflow, or creating a missing `vision.md`. Use `/create-vision` for the complete pipeline or `/create-vision draft` for independently testable thinking that only populates the template and does not perform the final write.
-- **How to use it:** Run repository discovery, ask or infer the five core questions, optionally capture durable delivery constraints, quality gates, supported environments, evidence expectations, and operational-readiness rules, populate the template, present inferred/TBD sections for confirmation, and write only after approval.
+- **How to use it:** Run repository discovery, ask or infer the five core questions, optionally capture durable delivery constraints, quality gates, supported environments, evidence expectations, and operational-readiness rules, populate the template, present inferred/TBD sections for confirmation, and write only after approval. Use the repository file operation and re-read `vision.md` to verify the write; response-only Markdown remains a draft. Use `/create-vision write` for a previously approved draft.
 - **Inputs and outputs:** Inputs are repository files and structure, any existing vision or architecture material, and user answers to the five interview questions. Discovery facts can pre-fill sections and suppress redundant questions. The full command outputs `vision.md` at the target repository root; draft mode produces only a thinking-stage template population. The write step can modify the repository by creating or updating that root file.
 - **Relationships:** It imports `references/vision_template.md` (line 20) and uses that file’s sections and preamble. `README.md` provides a shorter user-facing overview of the same command and output. The workflow expects an interactive question capability (`vscode_askQuestions` or equivalent), but no implementation of that tool is included here. The discovery list names conditional target-repository inputs; they are not bundled with this skill. No external links are present.
-- **Constraints and cautions:** The resulting document must govern future work and must not merely describe the current system. Existing `vision.md` requires user approval before overwrite; contradictions between discovery and interview must be surfaced for user resolution; skipped answers become explicit TBD content; no section may be silently empty; and architectural rows without rationales are omitted rather than invented. Inferred sections require confirmation during review. The discovery mentions GDPR, security, and compliance signals, but this is an extraction prompt, not a compliance or security assessment. The only stated repository side effect is writing the root `vision.md`; no branch, commit, push, or deployment behavior is specified.
+- **Constraints and cautions:** The resulting document must govern future work and must not merely describe the current system. Existing `vision.md` requires user approval before overwrite; contradictions between discovery and interview must be surfaced for user resolution; skipped answers become explicit TBD content; no section may be silently empty; and architectural rows without rationales are omitted rather than invented. Inferred sections require confirmation during review. The discovery mentions GDPR, security, and compliance signals, but this is an extraction prompt, not a compliance or security assessment. The root `vision.md` write must be performed and verified; no branch, commit, push, or deployment behavior is specified.
 - **Source basis:** Metadata and vision framing: lines 1–20. Commands and pipeline: lines 22–41. Discovery inputs and extracted facts: lines 43–61. Interview questions and tool behavior: lines 63–82. Draft rules and constraint test: lines 84–105. Review and write behavior: lines 106–117. Safety and completeness constraints: lines 119–128.
 - **Status:** Workflow updated
 
@@ -1655,19 +1760,22 @@ The following illustrative entry shows the level of detail used. It is separate 
   uncertain results need explicit classification, or a review/PR needs a
   readiness decision.
 - **How to use it:** Use `/evidence` or the detailed skill to create one record
-  per ticket, append execution, verification, and `userValidation` results, and
-  summarize whether the ticket is ready, blocked, or complete with concerns.
+  per ticket, append agent-owned technical and automated-functionality results
+  separately from guided `userValidation` or automatic `automaticValidation`,
+  and summarize whether the ticket is ready, blocked, or complete with
+  concerns.
 - **Inputs and outputs:** Inputs are the ticket contract, requirements,
-  commands, results, artifacts, blockers, warnings, and the user's terminal
-  validation result. Output is `evidence/{ticket-slug}.md` or the configured
-  evidence path.
+  commands, results, artifacts, blockers, warnings, and the mode-appropriate
+  terminal validation result. Output is `evidence/{ticket-slug}.md` or the
+  configured evidence path.
 - **Relationships:** Summarizes `skills/aidd-evidence/SKILL.md` and
   `prompts/evidence.prompt.md`; it is consumed by planning, execution, review,
   PR, testing, and cleanup workflows.
 - **Constraints and cautions:** Records are append-only, required gates cannot
   be silently skipped, sensitive data must be redacted, unavailable evidence is
-  not a success result, and required user validation is part of closure
-  readiness.
+  not a success result, technical categories are agent-owned,
+  `automaticValidation` is agent-owned, and `userValidation` records only
+  user-confirmed functionality in guided mode.
 - **Source basis:** `skills/aidd-evidence/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1679,9 +1787,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Load it for any implementation, test, review,
   bug fix, PR, delegation, or closeout that must prove what happened.
 - **How to use it:** Initialize or locate the ticket record, preserve the
-  baseline, append each check with command/result/artifact details, map
-  requirements and flows to evidence, append user-validation, review, commit,
-  push, and PR results, classify missing or failed proof, and produce a
+  baseline, append each agent-owned technical check with
+  command/result/artifact details, map requirements and flows to evidence,
+  append automated functionality, functionality-only user-validation, review,
+  commit, push, and PR results, classify missing or failed proof, and produce a
   readiness summary.
 - **Inputs and outputs:** Inputs are delivery context, ticket requirements,
   verification steps, command results, UI artifacts, remote states, and
@@ -1694,8 +1803,10 @@ The following illustrative entry shows the level of detail used. It is separate 
   `passed`, `passedWithConcerns`, `failed`, `blocked`, and
   `skippedWithReason`; never infer a required gate from another check or claim
   readiness without evidence. Review and configured commit/push/PR evidence
-  are separate delivery gates, and required user-validation evidence is part
-  of closure readiness when configured.
+  are separate delivery gates, technical checks remain agent-owned, and
+  mode-appropriate terminal validation is part of closure readiness. Automatic
+  validation entries and decisions must use the exact Rubber Duck
+  `gpt-5.6-luna` high-reasoning `all-validation` profile.
 - **Source basis:** `skills/aidd-evidence/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1742,6 +1853,67 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **Source basis:** `skills/workflow-interface.md:1-end`.
 - **Status:** Workflow updated
 
+### `skills/lifecycle-interface.md`
+
+- **What it is:** The shared complete lifecycle contract and reusable profiles
+  for analysis, planning, implementation, evidence, verification, review,
+  delivery, provider, cleanup, bootstrap, and orchestration skills.
+- **When to use or read it:** Import it from every lifecycle or mutating skill.
+- **How to use it:** Select one profile through a local `Lifecycle` declaration
+  and override only skill-specific fields or permissions.
+- **Inputs and outputs:** Resolves all required lifecycle fields without
+  duplicating the complete schema in every skill.
+- **Relationships:** Used directly by lifecycle skills and indirectly through
+  `planning-skill-interface.md`.
+- **Constraints and cautions:** Profiles define permission boundaries, not
+  automatic authorization; local behavior must not exceed the resolved
+  profile.
+- **Source basis:** `skills/lifecycle-interface.md:1-end`.
+- **Status:** Workflow updated
+
+### `skills/planning-skill-interface.md`
+
+- **What it is:** Shared planning ownership, mutation, traceability, and
+  lifecycle behavior for objective-through-ticket planning skills.
+- **When to use or read it:** Import it when a skill owns or inspects one
+  planning layer.
+- **How to use it:** Declare the owned layer, parent and child layers,
+  writable artifacts, mode, and lifecycle profile.
+- **Inputs and outputs:** Resolves common planning behavior while leaving
+  layer-specific inputs, outputs, process, and constraints local.
+- **Relationships:** Imports `lifecycle-interface.md` and
+  `planning-artifact-lifecycle.md`.
+- **Constraints and cautions:** Read-only planning review uses
+  `readOnlyAnalysis`; mutation requires `planningMutation`.
+- **Source basis:** `skills/planning-skill-interface.md:1-end`.
+- **Status:** Workflow updated
+
+### `skills/development-mode.md`
+
+- **What it is:** The shared contract for guided and automatic development
+  behavior across bootstrap, planning, implementation, validation, review,
+  delivery, and phase closeout.
+- **When to use or read it:** Read whenever a lifecycle skill must decide
+  whether to preserve a user handoff or continue internally after project
+  bootstrap.
+- **How to use it:** Resolve `delivery.development.mode` from
+  `.github/aidd-config.yml`, default missing values to `guided`, require a
+  verified foundational bootstrap before automatic continuation, and use
+  `automaticValidation` for agent-run functionality closure.
+- **Inputs and outputs:** Input is delivery configuration, bootstrap
+  authorization, lifecycle state, and evidence. Output is a mode-aware
+  approval, validation, continuation, and blocker decision.
+- **Relationships:** Consumed by `aidd-project-bootstrap`,
+  `aidd-agent-orchestrator`, `aidd-please`, planning, TDD, user-testing,
+  review, fix, parallel, pipeline, commit, push, PR, and phase-feedback
+  workflows.
+- **Constraints and cautions:** Automatic mode does not bypass missing
+  prerequisites, unavailable capabilities, contradictory requirements,
+  provider or branch policy, required remote checks, or merge gates. Agent
+  validation must never be recorded as `userValidation`.
+- **Source basis:** `skills/development-mode.md:1-end`.
+- **Status:** Workflow updated
+
 ### `skills/planning-artifact-lifecycle.md`
 
 - **What it is:** The shared storage and transition contract for individual
@@ -1773,13 +1945,17 @@ The following illustrative entry shows the level of detail used. It is separate 
   missing, stale, or inconsistent planning artifacts.
 - **How to use it:** Invoke `/planning-bootstrap`, resolve configured paths and
   IDs, inspect both open and closed records and their current paths, and report
-  the next approval or blocker.
+  the next approval or blocker. Use `status` or `draft` for read-only work;
+  after approval use `write`, perform the file operation, re-read each path,
+  and report the verified result.
 - **Inputs and outputs:** Input is a repository request and existing context;
-  output is a planning-context report or authorized bootstrap artifact.
+  output is a planning-context report or, in authorized `write` mode, a
+  verified bootstrap artifact update.
 - **Relationships:** `skills/aidd-planning-bootstrap/SKILL.md`,
   `aidd-config.yml`, and repository-map/capability planning.
-- **Constraints and cautions:** It is not an implementation command and must
-  not silently create phases, features, or tickets.
+- **Constraints and cautions:** It is not an implementation command, must not
+  treat response-only content as written, and must not silently create phases,
+  features, or tickets.
 - **Source basis:** `prompts/planning-bootstrap.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1790,13 +1966,16 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use before capability or feature planning when
   repository structure is unknown or stale.
 - **How to use it:** Invoke the prompt, inspect the repository evidence, group
-  paths by role, and record unknown or unverified areas rather than guessing.
+  paths by role, record unknown or unverified areas rather than guessing, and
+  after authorization write and verify the configured map path.
 - **Inputs and outputs:** Input is the repository and configured map path;
-  output is a durable map or a read-only coverage report.
+  output is a map proposal, a verified durable map after authorized write, or
+  a read-only coverage report.
 - **Relationships:** `skills/aidd-create-repository-map/SKILL.md`,
   `aidd-planning-bootstrap`, and the discovery contract.
 - **Constraints and cautions:** It must not infer architecture from filenames
-  alone or modify source code.
+  alone or modify source code. Response-only map content is not a completed
+  write, and failed or unverified writes are blockers.
 - **Source basis:** `prompts/create-repository-map.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1807,13 +1986,16 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use after objective and scope approval and before
   creating phases or features.
 - **How to use it:** Invoke the prompt, assign stable capability IDs, link each
-  ability to scope and evidence, and run the coverage check.
+  ability to scope and evidence, run the coverage check, then use authorized
+  write mode to persist and verify the configured capability-map path.
 - **Inputs and outputs:** Input is approved objective/scope and repository map;
-  output is a capability map and approval/blocker report.
+  output is a capability-map proposal or a verified persisted map plus an
+  approval/blocker report.
 - **Relationships:** `skills/aidd-create-capability-map/SKILL.md`,
   `aidd-requirements`, and `/create-phases`.
 - **Constraints and cautions:** Describe abilities, not technical buckets;
-  do not create phase, feature, or ticket children.
+  response-only content is not a saved map; failed writes are blockers; and do
+  not create phase, feature, or ticket children.
 - **Source basis:** `prompts/create-capability-map.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1975,13 +2157,15 @@ The following illustrative entry shows the level of detail used. It is separate 
   deciding how to start a new project.
 - **How to use it:** Follow the adaptive-depth and artifact-reconciliation
   flow described by the detailed skill, including both open and closed
-  planning-record directories.
+  planning-record directories. Use the explicit write mode for approved
+  bootstrap updates, then verify each resulting path.
 - **Inputs and outputs:** Input is repository context; output is a planning
-  context and explicit next-layer decision.
+  context, explicit next-layer decision, or a verified authorized bootstrap
+  update.
 - **Relationships:** Summarizes `skills/aidd-planning-bootstrap/SKILL.md` and
   `/planning-bootstrap`.
 - **Constraints and cautions:** It does not authorize downstream generation
-  or implementation by itself.
+  or implementation by itself; response-only planning content is not a write.
 - **Source basis:** `skills/aidd-planning-bootstrap/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -1991,12 +2175,14 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use before capability planning when repository
   structure or tooling is not yet durable.
 - **How to use it:** Inspect real paths and record source, test, docs,
-  automation, infrastructure, ownership, and unknowns.
-- **Inputs and outputs:** Input is a repository; output is a map or coverage
-  report.
+  automation, infrastructure, ownership, and unknowns; after approval, write
+  and verify the configured repository-map path.
+- **Inputs and outputs:** Input is a repository and configured map path; output
+  is a map proposal, verified map, or coverage report.
 - **Relationships:** Summarizes the colocated skill and `/create-repository-map`.
 - **Constraints and cautions:** The map is evidence-backed documentation, not
-  an implementation plan.
+  an implementation plan. Response-only map content is not saved, and failed
+  writes are blockers.
 - **Source basis:** `skills/aidd-create-repository-map/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2005,12 +2191,15 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **What it is:** Overview of capability mapping from approved scope.
 - **When to use or read it:** Use before phase and feature decomposition.
 - **How to use it:** Link stable capabilities to outcomes, scope, evidence,
-  prerequisites, and coverage.
+  prerequisites, and coverage; after approval, persist and verify the
+  configured capability-map path.
 - **Inputs and outputs:** Input is approved objective/scope and a repository
-  map; output is a capability map and approval report.
+  map; output is a capability-map proposal or verified map and approval
+  report.
 - **Relationships:** Summarizes the colocated skill and `/create-capability-map`.
 - **Constraints and cautions:** Capabilities describe abilities, not technical
-  implementation buckets.
+  implementation buckets. Response-only content is not a saved artifact and
+  failed writes are blockers.
 - **Source basis:** `skills/aidd-create-capability-map/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2152,13 +2341,16 @@ The following illustrative entry shows the level of detail used. It is separate 
   planning artifacts.
 - **How to use it:** Inspect configured artifacts in both open and closed
   directories, classify depth, validate hierarchy/status/path consistency, and
-  report the next approval or exact blocker.
+  report the next approval or exact blocker. In authorized write mode, persist
+  only named bootstrap updates and verify each path.
 - **Inputs and outputs:** Input is repository context and request; output is a
-  planning context, authorized bootstrap artifact, or blocker report.
+  planning context, a verified authorized bootstrap artifact update, or a
+  blocker report.
 - **Relationships:** Coordinates repository mapping, discovery, configuration,
   and all child planning skills.
-- **Constraints and cautions:** It is read-only unless authorized and never
-  implements, commits, pushes, merges, or silently creates children.
+- **Constraints and cautions:** It is read-only unless authorized in `write`
+  mode, treats response-only content as unwritten, and never implements,
+  commits, pushes, merges, or silently creates children.
 - **Source basis:** `skills/aidd-planning-bootstrap/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2169,13 +2361,15 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use during onboarding or when architecture,
   tooling, ownership, or affected surfaces are unclear.
 - **How to use it:** Inspect real paths, manifests, tests, CI, docs, and
-  infrastructure, classify their roles, and record unknowns.
+  infrastructure, classify their roles, and record unknowns. After approval,
+  persist and verify the configured repository map.
 - **Inputs and outputs:** Input is a repository and configured map path; output
-  is a durable repository map or coverage report.
+  is a map proposal, a verified durable repository map, or a coverage report.
 - **Relationships:** Feeds bootstrap, discovery, capabilities, requirements,
   and domain-skill selection.
 - **Constraints and cautions:** Do not infer behavior from names alone or
-  modify source code; path and secret handling remain explicit.
+  modify source code; path and secret handling remain explicit. Response-only
+  content is not a saved map, and failed writes are blockers.
 - **Source basis:** `skills/aidd-create-repository-map/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2186,13 +2380,16 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use after objective/scope approval and before
   phase or feature planning.
 - **How to use it:** Create stable CAP IDs, describe abilities independent of
-  implementation, link evidence/prerequisites, and run scope coverage.
+  implementation, link evidence/prerequisites, run scope coverage, and after
+  approval persist and verify the configured capability map.
 - **Inputs and outputs:** Input is approved objective/scope and repository map;
-  output is a capability map and approval/blocker report.
+  output is a capability-map proposal or verified map and approval/blocker
+  report.
 - **Relationships:** Connects product discovery, requirements, phases, and
   feature planning.
 - **Constraints and cautions:** Do not create children or infer unsupported
-  capabilities; missing evidence remains a gap.
+  capabilities; missing evidence remains a gap; response-only content is not
+  a saved artifact; and failed writes are blockers.
 - **Source basis:** `skills/aidd-create-capability-map/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2239,17 +2436,17 @@ The following illustrative entry shows the level of detail used. It is separate 
   executable work.
 - **How to use it:** Derive one coherent outcome per ticket, create records in
   open, link ancestry and requirements, define boundaries/dependencies/
-  validation/user-validation/gates, move terminal records to closed, and reject
-  oversized or cross-feature work.
+  validation/functionality-validation/gates, move terminal records to closed,
+  and reject oversized or cross-feature work.
 - **Inputs and outputs:** Input is one approved feature and its ancestry; output
-  is ticket records, current-path backlog entries, user-validation plans, and
-  readiness decisions.
+  is ticket records, current-path backlog entries, functionality-validation
+  plans, and readiness decisions.
 - **Relationships:** Connects requirements, ticket creator, execute, TDD,
   evidence, review, and grooming.
 - **Constraints and cautions:** Do not generate children under blocked or
-  unapproved parents or claim readiness without terminal evidence; do not close
-  a ticket while required user-validation evidence is missing, failed, or
-  blocked.
+  unapproved parents or claim readiness without terminal evidence; guided
+  closure requires user-validation evidence, while automatic closure requires
+  terminal `automaticValidation`.
 - **Source basis:** `skills/aidd-create-tickets/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2338,15 +2535,17 @@ The following illustrative entry shows the level of detail used. It is separate 
   planning ancestry.
 - **How to use it:** Verify objective-to-ticket links, open lifecycle paths,
   statuses, approvals, scope, dependencies, baseline, commands, gates,
-  ownership, user-validation plan, and evidence.
+  ownership, functionality-validation plan, and evidence. In automatic mode,
+  a ready result records bootstrap-authorized execution approval.
 - **Inputs and outputs:** Input is a ticket and all required planning records;
   output is a ready/not-ready decision with exact blockers.
 - **Relationships:** Gates execution, TDD, evidence, review, and the
   orchestrator's `implementationReady` state.
 - **Constraints and cautions:** Missing, blocked, unapproved, closed, or
-  non-terminal prerequisites keep readiness false; a missing user-validation
-  plan is also a blocker when the closure gate is enabled; it never edits source
-  or moves records.
+  non-terminal prerequisites keep readiness false; a missing
+  functionality-validation plan is also a blocker when the closure gate is
+  enabled; automatic mode does not bypass a prerequisite, and the skill never
+  edits source or moves records.
 - **Source basis:** `skills/aidd-preimplementation-checklist/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2357,8 +2556,10 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use when a repository needs a vision, project
   agent guidance, repository map, scope handoff, or delivery configuration.
 - **How to use it:** Invoke the prompt, answer one focused question at a time,
-  review the complete file-by-file draft, and explicitly approve before any
-  foundational artifact is written.
+  select `guided` or `automatic`, review the complete file-by-file draft,
+  explicitly approve before any foundational artifact is written, then require
+  actual file operations and post-write verification for every approved path.
+  Automatic mode continues to the orchestrator only after those writes verify.
 - **Inputs and outputs:** Input is repository evidence, existing sources of
   truth, and user intent; output is an approved or blocked bootstrap proposal
   covering `vision.md`, `AGENTS.md`, mapping, scope, configuration, and an
@@ -2367,8 +2568,10 @@ The following illustrative entry shows the level of detail used. It is separate 
   `aidd-product-manager`, `aidd-create-repository-map`, and
   `aidd-planning-bootstrap`.
 - **Constraints and cautions:** It preserves existing files and planning
-  sources, does not invent project facts, and never creates capabilities,
-  phases, features, or tickets as a side effect.
+  sources, does not invent project facts, treats response-only contents as
+  unwritten, requires verified writes after approval, persists the canonical
+  development mode, and never creates capabilities, phases, features, or
+  tickets during foundational bootstrap.
 - **Source basis:** `prompts/project-bootstrap.prompt.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2386,7 +2589,9 @@ The following illustrative entry shows the level of detail used. It is separate 
   `create-vision`, product discovery, repository mapping, and planning
   bootstrap.
 - **Constraints and cautions:** It does not silently overwrite existing
-  instructions, generate downstream planning layers, or implement code.
+  instructions, generate downstream planning layers, or implement code during
+  foundational bootstrap; automatic mode only authorizes the later orchestrator
+  loop after verified bootstrap writes.
 - **Source basis:** `skills/aidd-project-bootstrap/README.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2398,9 +2603,11 @@ The following illustrative entry shows the level of detail used. It is separate 
 - **When to use or read it:** Use for new-project onboarding or when
   foundational context is missing, stale, or contradictory.
 - **How to use it:** Inspect existing sources, interview the user one question
-  at a time, draft all proposed files with source basis and confidence, obtain
-  explicit approval, write only approved artifacts, and hand off to planning
-  bootstrap.
+  at a time, select `guided` or `automatic`, draft all proposed files with
+  source basis and confidence, obtain explicit approval, use repository file
+  operations for approved artifacts, verify each path, persist the mode, and
+  hand off to planning bootstrap. Automatic mode continues internally only
+  after the foundational writes verify.
 - **Inputs and outputs:** Inputs are repository evidence, configured artifact
   paths, existing instructions, and user intent. Outputs are a bootstrap
   report, approved durable artifacts, unresolved decisions, blockers, and the
@@ -2410,8 +2617,10 @@ The following illustrative entry shows the level of detail used. It is separate 
   phase, feature, and ticket planning.
 - **Constraints and cautions:** Existing `vision.md`, `AGENTS.md`, README,
   configuration, and planning sources require explicit approval before
-  replacement. The skill never creates downstream planning children, source
-  code, branches, commits, pushes, or merges.
+  replacement. Response-only contents are not writes; each authorized path
+  must be verified. The skill never creates downstream planning children
+  during foundational bootstrap, and automatic mode never bypasses later
+  blockers or provider/branch policy.
 - **Source basis:** `skills/aidd-project-bootstrap/SKILL.md:1-end`.
 - **Status:** Workflow updated
 
@@ -2458,11 +2667,14 @@ validation, scope boundaries, or evidence.
   planning artifacts.
 - Run `/project-bootstrap` when `vision.md`, `AGENTS.md`, repository mapping,
   scope, or delivery configuration is missing or inconsistent. It drafts the
-  foundational context and waits for explicit approval before writing.
+  foundational context and waits for explicit approval before using file
+  operations to write and verify each approved path.
 - Run `/planning-bootstrap` to reconcile the repository context and select
-  adaptive planning depth.
+  adaptive planning depth. Use its write mode only for explicitly approved
+  bootstrap artifacts or index updates, then verify each path.
 - Run `/create-repository-map` when important source, test, documentation,
-  automation, infrastructure, ownership, or tooling surfaces are unknown.
+  automation, infrastructure, ownership, or tooling surfaces are unknown; its
+  approved map must be written and verified at the configured path.
 - Preserve an existing authoritative planning system instead of creating
   duplicate `docs/` or `plan/` trees.
 
@@ -2483,6 +2695,8 @@ validation, scope boundaries, or evidence.
   broad initiative.
 - Assign stable capability IDs and link each ability to objective, scope,
   outcomes, prerequisites, risks, affected surfaces, and evidence.
+- Persist the approved capability map at the configured path and verify it
+  before treating capability coverage as durable.
 - Run `/aidd-requirements` when behavior needs `Given X, should Y` requirements
   and verification mappings.
 - Review capability coverage before creating phases; missing or contradictory
@@ -2633,9 +2847,10 @@ pass.
 | Repository bootstrap | `aidd-planning-bootstrap` and `aidd-create-repository-map` reconcile planning context, inspect repository surfaces, detect existing planning systems, and identify missing setup before downstream planning. |
 | Discovery and scope | `aidd-product-manager` and `/discover` produce a durable objective/scope handoff with outcomes, non-goals, dependencies, risks, confidence, open questions, and verification intent. |
 | Capability coverage | `aidd-create-capability-map` and `aidd-requirements` define system abilities, link them to scope and outcomes, and expose uncovered or contradictory planning inputs. |
+| Bootstrap artifact persistence | Bootstrap, mapping, vision, and discovery writes use explicit `draft`/`status`/`write` modes, perform real repository file operations only after authorization, verify every resulting path, and report response-only or failed writes as not written/blockers. |
 | Phase-first delivery | `aidd-create-phases` defines meaningful ordered stages with boundaries, entry/exit conditions, dependencies, risks, and validation focus. |
 | Outcome-based features | `aidd-create-features` groups capabilities into outcomes within exactly one approved phase instead of technical or calendar buckets. |
-| Focused tickets | `aidd-create-tickets` and `aidd-ticket-creator` create stable, traceable, independently verifiable tickets with scope, non-goals, dependencies, priority, risks, acceptance, validation, user-validation handoff, evidence, and definition of done. |
+| Focused tickets | `aidd-create-tickets` and `aidd-ticket-creator` create stable, traceable, independently verifiable tickets with scope, non-goals, dependencies, priority, risks, acceptance, validation, mode-appropriate user/automatic handoff, evidence, and definition of done. |
 | Planning record lifecycle | `planning-artifact-lifecycle.md`, configuration, creation skills, execution, grooming, feedback, review, checklist, and change control keep phase/feature/ticket files in `open` or `closed`, move the same stable-ID record on authorized status changes, and synchronize indexes and path history. |
 | Planning-layer approvals | `aidd-planning-layer-review` reviews each artifact against its ancestors, children, coverage, status, and evidence before downstream generation. |
 | Backlog grooming | `aidd-groom-backlog` handles routine clarification, deduplication, sequencing, and priority hygiene; it cannot silently change scope or make an unready ticket ready. |
@@ -2643,9 +2858,9 @@ pass.
 | Pre-implementation readiness | `aidd-preimplementation-checklist` blocks implementation when ancestry, approvals, dependencies, scope, commands, gates, acceptance, validation, or evidence paths are incomplete. |
 | Delivery context | `aidd-config.yml` centralizes approvals, commands, gates, providers, branches, evidence, UI artifacts, security, and delegation policy. |
 | Evidence and gates | `aidd-evidence` and `/evidence` maintain append-only requirement/flow traces, baselines, results, user-validation responses, artifacts, blockers, warnings, and readiness classifications; missing capability never passes. |
-| Execution and review | `execute`, `tdd`, `review`, `aidd-fix`, and `aidd-pr` preserve baselines, implement one ticket at a time, run applicable checks, present the user-validation handoff, and keep remote lifecycle state current. |
+| Execution and review | `execute`, `tdd`, `review`, `aidd-fix`, and `aidd-pr` preserve baselines, run executable automated functionality tests, implement one ticket at a time, use guided user validation or automatic Rubber Duck validation, review terminal results, and keep remote lifecycle state current. |
 | Phase feedback | `aidd-phase-feedback` compares planned and delivered outcomes, records lessons and residual risk, and feeds material learning through change control. |
 | Delegation | Parallel and pipeline work declare ownership and dependency waves, default to isolation, stop on blockers, and return evidence rather than unsupported success claims. |
 | Cleanup | `clean-pr-branch` previews by default, requires explicit `--apply` to mutate, preserves evidence, and never deletes source files from disk. |
 | Lifecycle and domain boundaries | Lifecycle skills own delivery state; domain skills consume `workflow-interface.md` and return scoped guidance/evidence without owning branches, PRs, planning, or readiness. |
-| Behavioral evaluation | `../ai-evals/aidd-lifecycle/` and `../ai-evals/aidd-planning/` cover missing baselines/evidence, failed gates, scope preservation, parent blockers, traceability, adaptive depth, grooming, change control, and readiness. |
+| Behavioral evaluation | `../ai-evals/aidd-lifecycle/` and `../ai-evals/aidd-planning/` cover missing baselines/evidence, failed gates, scope preservation, parent blockers, traceability, adaptive depth, grooming, change control, readiness, bootstrap persistence, guided/automatic mode selection, automatic continuation, automatic validation evidence, delivery closeout, and blocker handling. |

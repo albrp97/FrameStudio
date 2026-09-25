@@ -60,6 +60,33 @@ class ExportConsoleTests(unittest.TestCase):
 
         self.assertEqual(output.getvalue(), "")
 
+    def test_reporter_emits_heartbeat_when_progress_has_not_advanced(self):
+        output = io.StringIO()
+        clock_values = iter((0.0, 5.0))
+        reporter = ConsoleProgressReporter(
+            stream=output,
+            force=True,
+            clock=lambda: next(clock_values),
+        )
+
+        for elapsed, frame in ((0.0, 100), (5.0, 200)):
+            reporter(
+                ExportProgress(
+                    stage="normalizing source run",
+                    percent=0.2,
+                    frame=frame,
+                    total_frames=87037,
+                    fps=1.0,
+                    elapsed_seconds=elapsed,
+                    eta_seconds=None,
+                )
+            )
+
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn("frame 200/87037", lines[-1])
+        self.assertIn("elapsed 00:05", lines[-1])
+
     def test_intermediate_publication_stays_in_rendering_stage(self):
         output = io.StringIO()
         reporter = ConsoleProgressReporter(stream=output, force=True)

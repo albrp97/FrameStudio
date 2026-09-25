@@ -80,8 +80,8 @@ class EditorUiHelperTests(unittest.TestCase):
             )
 
     def test_timeline_scroll_moves_the_playhead_in_both_directions(self):
-        self.assertEqual(timeline_scroll_position(10.0, -1.0, 60.0), 11.0)
-        self.assertEqual(timeline_scroll_position(10.0, 1.0, 60.0), 9.0)
+        self.assertEqual(timeline_scroll_position(10.0, -1.0, 120.0), 40.0)
+        self.assertEqual(timeline_scroll_position(40.0, 1.0, 120.0), 10.0)
 
     def test_timeline_scroll_stays_within_the_duration(self):
         self.assertEqual(timeline_scroll_position(0.0, 1.0, 60.0), 0.0)

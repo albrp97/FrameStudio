@@ -163,6 +163,12 @@ def segment_video_filters(
         content_width is None or content_height is None or content_width <= 0 or content_height <= 0
     ):
         raise ValueError("Preserve-resolution rendering requires positive content dimensions")
+    preserve_source_resolution = preserve_resolution and not (
+        content_width is not None
+        and content_height is not None
+        and content_width > width
+        and content_height > height
+    )
     start = f"{start_value:.6f}"
     duration = f"{duration_value:.6f}"
     trim = f"{input_label}trim=start={start}:duration={duration},setpts=PTS-STARTPTS"
@@ -183,7 +189,7 @@ def segment_video_filters(
                     transform,
                     width,
                     height,
-                    preserve_resolution=preserve_resolution,
+                    preserve_resolution=preserve_source_resolution,
                     content_width=content_width,
                     content_height=content_height,
                 )
@@ -201,7 +207,7 @@ def segment_video_filters(
         segment.visual_transform,
         width,
         height,
-        preserve_resolution=preserve_resolution,
+        preserve_resolution=preserve_source_resolution,
         content_width=content_width,
         content_height=content_height,
     )
