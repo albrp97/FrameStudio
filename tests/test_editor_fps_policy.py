@@ -71,6 +71,27 @@ class EditorFpsPolicyTests(unittest.TestCase):
         self.assertEqual(resolved.decisions[2].action, "convert-down")
         self.assertIn("above", resolved.decisions[2].reason.lower())
 
+    def test_enhancement_only_interpolates_sources_below_fifty_fps(self):
+        resolved = resolve_frame_rate_policy(
+            (
+                source("low", "30000/1001"),
+                source("boundary", "50/1"),
+                source("near-target", "60000/1001"),
+            ),
+            choice="60",
+            enhancement_enabled=True,
+        )
+
+        self.assertEqual(
+            [(item.action, item.eligible) for item in resolved.decisions],
+            [
+                ("interpolate", True),
+                ("convert", False),
+                ("convert", False),
+            ],
+        )
+        self.assertEqual(resolved.eligible_source_ids, ("low",))
+
     def test_rve_rejects_vfr_but_uses_gpu_oversampling_for_fractional_rate(self):
         fractional = resolve_frame_rate_policy(
             (source("source", "24/1"),),

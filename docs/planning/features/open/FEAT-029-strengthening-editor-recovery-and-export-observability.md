@@ -46,7 +46,7 @@ CLI and GUI progress reporting, tests, evidence, and documentation
 **Planned tickets:** TICKET-084, TICKET-085, TICKET-086, TICKET-087, TICKET-088,
 TICKET-089, TICKET-090, TICKET-091, TICKET-092, TICKET-093, TICKET-094,
 TICKET-095, TICKET-096, TICKET-097, TICKET-098, TICKET-099, TICKET-100,
-TICKET-101, TICKET-106
+TICKET-101, TICKET-106, TICKET-108
 **Evidence paths:** `evidence/ticket-084-editor-autosave.md`,
 `evidence/ticket-085-timeline-fit-and-unlimited-zoom.md`,
 `evidence/ticket-086-triplicate-playhead-preservation.md`,
@@ -65,7 +65,8 @@ TICKET-101, TICKET-106
 `evidence/ticket-099-resumable-export-execution.md`,
 `evidence/ticket-100-export-resume-controls.md`,
 `evidence/ticket-101-cli-export-resume-contract.md`,
-`evidence/ticket-106-timeline-wheel-seek-pacing.md`
+`evidence/ticket-106-timeline-wheel-seek-pacing.md`,
+`evidence/ticket-108-fps-enhancement-cutoff.md`
 **Path history:** created at
 `features/open/FEAT-029-strengthening-editor-recovery-and-export-observability.md`
 -> moved to
@@ -153,6 +154,8 @@ failure, application restart, or project reopen.
 - Given normal vertical wheel input on the timeline, the playhead should move
   30 seconds per unit and stay within the project duration; other scroll
   gestures retain their established behavior.
+- Given mixed approximately 59.94 FPS and 29.97 FPS sources targeting 60 FPS,
+  only the source below 50 FPS should be counted and routed for enhancement.
 - Given an enhanced mixed export with fractional segment durations, final
   composition should preserve the exact target frame count and reuse valid
   retained intermediates on retry.
