@@ -13,6 +13,7 @@ DEFAULT_ENHANCEMENT_SCOPE = "source"
 DEFAULT_FPS_BACKEND = "rve-4.26"
 DEFAULT_FPS_FALLBACK_BACKEND = "ffmpeg-minterpolate"
 FPS_CHOICES = ("lowest", "highest", "custom", "60")
+FPS_ENHANCEMENT_SOURCE_RATE_LIMIT = Fraction(50, 1)
 
 
 class FrameRatePolicyError(ValueError):
@@ -399,6 +400,18 @@ def resolve_frame_rate_policy(
                     "convert",
                     False,
                     "enhancement is disabled; use the ordinary conversion route",
+                )
+            )
+            continue
+        if source_rate >= FPS_ENHANCEMENT_SOURCE_RATE_LIMIT:
+            decisions.append(
+                SourceRateDecision(
+                    source_id,
+                    source_rate,
+                    target_rate,
+                    "convert",
+                    False,
+                    "source is at or above 50 FPS; use the ordinary conversion route",
                 )
             )
             continue

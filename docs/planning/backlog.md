@@ -58,7 +58,7 @@ CHG-010 added the general resumable-export session/checkpoint,
 recovery-control, and CLI-parity tickets without changing the first-horizon
 scope; all four are now delivered. CHG-011 reopened PHASE-001/FEAT-002,
 PHASE-004/FEAT-011, and PHASE-008/FEAT-028/FEAT-029 for approved follow-up
-work tracked by TICKET-029 and TICKET-105 through TICKET-107.
+work tracked by TICKET-029 and TICKET-105 through TICKET-108.
 The PHASE-009 section adds the active benchmark and implementation tickets for
 conditional export batching, boundary-safe enhancement ordering, and
 resumable artifact reuse without changing the fixed delivery contract.
@@ -75,8 +75,9 @@ evidence after the user's explicit manual-validation and closeout decision on
 2026-08-28. TICKET-083 through TICKET-101 are complete and closed after the
 user's 2026-09-07 validation, focused functionality evidence, repository
 gates, and review evidence. TICKET-029 and TICKET-105 through TICKET-107 are
-open in `verifying` under CHG-011; TICKET-104 is also verifying its export
-integrity and resume scope.
+open in `verifying` under CHG-011; TICKET-108 is verifying under the user's
+2026-10-05 FPS-cutoff fix authorization. TICKET-104 is also verifying its
+export integrity and resume scope.
 
 | Sequence | ID | Status | Parent feature | Phase | Current path |
 |---:|---|---|---|---|---|
@@ -187,6 +188,7 @@ integrity and resume scope.
 | 105 | TICKET-105 | verifying | FEAT-011 | PHASE-004 | `tickets/open/TICKET-105-randomize-multi-clip-add-order.md` |
 | 106 | TICKET-106 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
 | 107 | TICKET-107 | verifying | FEAT-028 | PHASE-008 | `tickets/open/TICKET-107-fit-preserve-resolution-content-to-canvas.md` |
+| 108 | TICKET-108 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-108-limit-fps-enhancement-to-low-frame-rate-sources.md` |
 
 ## Ticket summary
 
@@ -1041,6 +1043,7 @@ cancellation or failure.
 | 104 | TICKET-104 | Verify export pipeline integrity and resume | FEAT-031 | TICKET-103; output verification and user-validation gates | verifying | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
 | 106 | TICKET-106 | Set practical timeline wheel seek pacing | FEAT-029 | timeline seek contract; scroll gesture routing | verifying | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
 | 107 | TICKET-107 | Fit preserved-resolution content to the output canvas | FEAT-028 | fixed 1920x1080 canvas; composition filter contract | verifying | `tickets/open/TICKET-107-fit-preserve-resolution-content-to-canvas.md` |
+| 108 | TICKET-108 | Limit FPS enhancement to low-frame-rate sources | FEAT-029 | source-level FPS decisions; 60 FPS output policy | verifying | `tickets/open/TICKET-108-limit-fps-enhancement-to-low-frame-rate-sources.md` |
 
 ### Dependency order
 

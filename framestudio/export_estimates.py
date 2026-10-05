@@ -7,6 +7,7 @@ from fractions import Fraction
 from typing import Any
 
 from .fps_policy import (
+    FPS_ENHANCEMENT_SOURCE_RATE_LIMIT,
     FrameRatePolicy,
     ResolvedFrameRatePolicy,
     SourceRateDecision,
@@ -290,6 +291,7 @@ def estimate_export(
             else (
                 resolved_policy.enhancement_enabled
                 and item.source_rate < resolved_policy.target_rate
+                and item.source_rate < FPS_ENHANCEMENT_SOURCE_RATE_LIMIT
             )
         )
         if eligible:

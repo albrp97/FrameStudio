@@ -82,6 +82,31 @@ def make_mixed_rate_project(root: Path) -> Project:
     return Project.create_multi(entries)
 
 
+def make_threshold_rate_project(root: Path) -> Project:
+    entries = []
+    for name, frame_rate in (
+        ("source-59.94.mp4", "60000/1001"),
+        ("source-29.97.mp4", "30000/1001"),
+    ):
+        source = root / name
+        source.write_bytes(b"fixture")
+        entries.append(
+            (
+                source,
+                {
+                    "duration_seconds": 10.0,
+                    "width": 1920,
+                    "height": 1080,
+                    "frame_rate": frame_rate,
+                    "video_codec": "h264",
+                    "audio_codec": None,
+                    "format_name": "mp4",
+                },
+            )
+        )
+    return Project.create_multi(entries)
+
+
 def unavailable_rve_validation(
     backend,
     *,
@@ -158,6 +183,27 @@ class EditorExportPanelTests(unittest.TestCase):
         self.assertEqual(rows["Videos to FPS enhance"], "1")
         self.assertEqual(state.summary["fps"]["eligible_source_count"], 1)
         self.assertEqual(state.summary["fps"]["source_count"], 3)
+
+    def test_panel_only_counts_sources_below_fifty_fps_for_enhancement(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            state = prepare_export_panel(
+                make_threshold_rate_project(root),
+                root,
+                choice="60",
+                enhancement_enabled=True,
+                upscale_enabled=False,
+                backend="ffmpeg-minterpolate",
+                project_path=root / "edit.framestudio.json",
+            )
+
+        rows = dict(state.display_rows)
+        self.assertEqual(rows["Videos to FPS enhance"], "1")
+        self.assertEqual(state.policy.eligible_source_ids, (state.policy.decisions[1].source_id,))
+        self.assertEqual(
+            [item.action for item in state.policy.decisions],
+            ["convert", "interpolate"],
+        )
 
     def test_pending_fps_rows_report_source_count_before_export_plan_finishes(self):
         with TemporaryDirectory() as temporary_directory:
