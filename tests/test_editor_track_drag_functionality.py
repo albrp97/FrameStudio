@@ -453,6 +453,7 @@ class TrackDragFunctionalityTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), digest)
 
     def test_real_gtk_invalid_fps_confirmation_keeps_legacy_attachment(self):
+        from framestudio.app_project import _audio_analysis_worker
         from framestudio.model import Project
 
         legacy = Project.create(
@@ -476,6 +477,19 @@ class TrackDragFunctionalityTests(unittest.TestCase):
         )
         window._track_confirmation_dialog.response(1)
         _pump_events(self.GLib, 20)
+
+        window._audio_analysis_in_progress = True
+        _audio_analysis_worker(
+            window,
+            window.project,
+            window._audio_analysis_generation,
+            (window.project.source,),
+            self.GLib,
+        )
+        self._wait_until(
+            lambda: not window._audio_analysis_in_progress,
+            "background audio analysis did not complete after invalid-FPS confirmation",
+        )
 
         self.assertEqual(window.project.timeline.timing_mode, "legacy-ripple")
         self.assertIs(window.controller, controller)

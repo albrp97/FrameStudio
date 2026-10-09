@@ -257,6 +257,14 @@ def _record_rejected_audio_source(window: Any, source_id: str) -> None:
     rejected.add(source_id)
 
 
+def _set_audio_analysis_status(window: Any, message: str) -> None:
+    label = getattr(window, "status_label", None)
+    current = "" if label is None else label.get_text()
+    if isinstance(current, str) and current.startswith("Error: "):
+        return
+    window._set_status(message)
+
+
 def _audio_analysis_worker(
     window: Any,
     project: Project,
@@ -347,7 +355,10 @@ def _finish_source_audio_analysis(
             getattr(window, "_audio_analysis_source_ids", ()),
         )
     )
-    window._set_status(f"Analyzing audio {index}/{total} ({round(index * 100 / total)}%)")
+    _set_audio_analysis_status(
+        window,
+        f"Analyzing audio {index}/{total} ({round(index * 100 / total)}%)",
+    )
     return False
 
 
@@ -405,7 +416,7 @@ def _finish_audio_analysis(
     else:
         status_message = "Audio analysis complete"
     window._audio_analysis_rejected_source_ids = set()
-    window._set_status(status_message)
+    _set_audio_analysis_status(window, status_message)
     if getattr(window, "audio_preview_enabled", False):
         refresh_playback_backend(window, force=True)
     window._update_segment_controls()
@@ -436,7 +447,7 @@ def _start_audio_analysis(
     window.audio_status_label.set_text(
         format_audio_decisions(project, window._audio_analysis_source_ids)
     )
-    window._set_status(f"Analyzing audio 0/{len(sources)} (0%)")
+    _set_audio_analysis_status(window, f"Analyzing audio 0/{len(sources)} (0%)")
     worker = threading.Thread(
         target=_audio_analysis_worker,
         args=(window, project, generation, sources, glib, cancel_event),

@@ -490,3 +490,56 @@ high reasoning, all-validation. Source fallback, authentic missing-RVE
 functionality, previous focused corrections and final local review are PASS.
 This is automaticValidation, not human validation. Replacement Ubuntu checks,
 merge and phase/ticket closure are explicitly not covered by this local GO.
+
+## Corrective publication and replacement provider execution
+
+The exact reviewed 13 paths were committed as
+`569cfac8fe761de5f1db0b054147667581dab19b`,
+`fix(editor): repair portable export verification`, with the configured
+author/committer and required co-author trailer. The non-force source-branch
+push succeeded; actual remote ref equals this commit and the worktree was
+clean immediately afterward. Main remains unchanged.
+
+Replacement Ubuntu-24.04 Quality run:
+`https://github.com/albrp97/FrameStudio/actions/runs/38002667661`.
+Its checkout head is the exact corrective commit. Runtime/tool installation,
+GTK environment and pinned dependencies succeed; the repository quality suite
+is running. Contract, smoke and functionality stages are pending. These
+running provider checks are not terminal PASS evidence.
+
+## Replacement provider result and deterministic status-race repair
+
+Replacement run `38002667661` completes with **721 cases in 843.708 seconds:
+one failure and one skip**. All ten original provider failures are resolved.
+The remaining failure is the invalid-FPS native conversion case: late
+background audio completion overwrites its foreground `frame_rate` error
+with `Audio analysis complete`. Later quality/contract/smoke stages remain
+unexecuted. Raw provider evidence:
+`files/phase010-provider-replacement-failure.log`.
+
+Given a visible foreground operation error, background audio progress and
+completion should preserve that error while still applying audio results,
+clearing running state and updating the dedicated audio diagnostic label.
+Scope: existing T117/T125 acceptance, not a new product feature.
+The unit worker regression and strengthened existing real GTK conversion
+case force late callbacks after the error and both fail before the fix:
+`files/phase010-status-race-red.log`.
+
+The background status writer now preserves the repository-standard visible
+`Error: ` message. Audio start/progress/completion use the same small helper;
+normal completion, source failures, cancelled/stale generations and playback
+behavior remain protected. The real GTK case reruns actual audio analysis on
+its generated source through GLib after the rejected conversion rather than
+relying on thread timing or weakening the assertion.
+All composition and native track-control cases pass **68 in 11.153 seconds**:
+`files/phase010-status-race-green.log`.
+Final configured static/compile/diff checks pass, 46 existing clones and zero
+new clones: `files/phase010-status-race-static.log`.
+Exact-profile publication review and actual final Ubuntu rerun remain required.
+
+All six native track-control cases also pass in the authentic isolated-HOME /
+FFmpeg 6.1 environment in 9.020 seconds:
+`files/phase010-status-race-provider-green.log`.
+Exact validator turn 17 grants bounded five-file commit/non-force-push GO,
+classifies the foreground-error preservation and retained audio diagnostics
+as focused PASS, and explicitly withholds provider/phase closeout.

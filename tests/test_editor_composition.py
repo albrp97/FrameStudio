@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import threading
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -360,6 +361,26 @@ class EditorCompositionTests(unittest.TestCase):
             self.assertEqual(window._audio_analysis_source_ids, ())
             self.assertEqual(refresh.call_count, 0)
             self.assertIn("Audio analysis complete", statuses)
+
+    def test_background_audio_callbacks_preserve_visible_operation_error(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_project(Path(temporary_directory))
+            window = make_editor_window(
+                project=project,
+                _audio_analysis_generation=3,
+                _audio_analysis_in_progress=True,
+                status_label=SimpleNamespace(get_text=lambda: "Error: invalid frame_rate"),
+            )
+            decision = replace(pending_audio_decision(project.source), status="not-applicable")
+            glib = SimpleNamespace(idle_add=lambda callback, *args: callback(*args))
+            with patch("framestudio.app_project.analyze_source_audio", return_value=decision):
+                _audio_analysis_worker(window, project, 3, (project.source,), glib)
+
+            self.assertFalse(window._audio_analysis_in_progress)
+            self.assertEqual(
+                project.source_audio_settings(project.source.source_id)["status"], "not-applicable"
+            )
+            window._set_status.assert_not_called()
 
     def test_empty_edit_refresh_stops_preview_without_reporting_an_error(self):
         with TemporaryDirectory() as temporary_directory:

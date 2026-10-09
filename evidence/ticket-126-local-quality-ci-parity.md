@@ -194,3 +194,22 @@ configured static/compile/diff gates pass. The existing final compositor's
 RVE availability behavior is reused by standalone source planning. No baseline
 update or check waiver is introduced. The required replacement Ubuntu run and
 lifecycle closeout remain pending.
+
+The reviewed compatibility correction is committed and non-force published as
+`569cfac8fe761de5f1db0b054147667581dab19b`.
+Actual replacement Ubuntu-24.04 run `38002667661` checks out that exact head.
+Runtime/tools, system GTK and virtual-environment GTK checks succeed; the
+repository quality suite is running. Subsequent contract/smoke/functionality
+stages remain pending, not inferred from local evidence.
+
+Replacement run `38002667661` fails one of 721 cases, with one supplemental
+skip, in 843.708 seconds. The ten original provider failures are resolved.
+The remaining native invalid-FPS assertion exposes a genuine asynchronous
+audio-completion/foreground-error race. A deterministic unit regression and
+strengthened real GTK case reproduce it; preserving foreground errors in
+the background audio status writer yields 68 protected composition/native
+passes and terminal configured static/compile/diff gates with zero new clones.
+Raw logs: `files/phase010-provider-replacement-failure.log`,
+`files/phase010-status-race-red.log`, `files/phase010-status-race-green.log`,
+and `files/phase010-status-race-static.log`. The provider gate remains failed
+until the corrected source is published and actually reexecuted.
