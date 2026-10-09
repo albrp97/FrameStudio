@@ -5,11 +5,13 @@
 **Change:** CHG-012; CHG-013 supersedes the initial multi-track export restriction
 **Planning depth:** crossCutting
 **Horizon:** next approved extension, not the original one-source horizon
-**Status:** confirmed for planning only
+**Status:** implemented and verified in PHASE-010
 **Approval:** User approved the clarified functionality contract and planning
 artifact creation on 2026-10-09.
 **Reviewed at:** 2026-10-09
-**Confidence:** confirmed product behavior; implementation design remains gated
+**Confidence:** implemented GTK/CLI/media behavior with terminal source-provider evidence
+**Verification:** source `981e5e2a`, Ubuntu run `38004558177`,
+`../../evidence/ticket-125-phase010-functionality.md`
 **Repository map:** `../planning/repo-map.md`
 **Sources:** user request and clarification responses on 2026-10-09; current
 `../../README.md`; `phase-002-cut-semantics.md`; `cli-contract.md`;

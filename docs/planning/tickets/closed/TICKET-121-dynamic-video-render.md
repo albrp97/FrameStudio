@@ -3,7 +3,7 @@
 **Ticket ID:** TICKET-121
 **Parents:** OBJ-001, SCOPE-001, PHASE-010, FEAT-036
 **Capability links:** CAP-005, CAP-009, CAP-010, CAP-011, CAP-012, CAP-013
-**Status:** verifying
+**Status:** complete
 **Approval:** execution/delegation authorized by the 2026-10-09 orchestration
 request and CHG-014 autonomous authorization; dependencies and exact-profile
 automatic validation remain required
@@ -14,6 +14,9 @@ ordering, verified output and tests
 **Risks:** incorrect active-set boundaries, processing exclusions, cache aliasing
 **Evidence path:** `evidence/ticket-121-dynamic-video-render.md`
 **Path history:** created in `tickets/open/` on 2026-10-09
+Moved unchanged-ID to `tickets/closed/` on 2026-10-09 (UTC) after source provider PASS.
+**Completion evidence:** `evidence/ticket-125-phase010-functionality.md`,
+source `981e5e2a`, CI `38004558177`, exact validator turns 18/19.
 
 ## Scope and acceptance
 

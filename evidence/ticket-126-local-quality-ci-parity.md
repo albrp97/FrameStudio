@@ -213,3 +213,22 @@ Raw logs: `files/phase010-provider-replacement-failure.log`,
 `files/phase010-status-race-red.log`, `files/phase010-status-race-green.log`,
 and `files/phase010-status-race-static.log`. The provider gate remains failed
 until the corrected source is published and actually reexecuted.
+
+Final actual Ubuntu run `38004558177` succeeds on
+`981e5e2a4f115ee8d0e9b3a1d11ec38dce1faeba`.
+All required quality, 42 CLI contracts, generated-media GTK smoke and explicit
+native functionality stages succeed. The suite completes 722 cases in
+770.756 seconds with the one exactly mapped supplemental RVE/CUDA skip.
+The explicit two-case GTK functionality charter completes in 59.891 seconds.
+Configured static/compile/diff/churn stages succeed with the unchanged
+duplication baseline, 46 existing clones and zero new clones.
+Raw evidence: `files/phase010-provider-final-success.log` and
+`files/phase010-provider-final-skip-receipt.json`.
+Actual provider results now supply the formerly missing local-to-CI proof;
+exact-profile delivery/closeout classification remains separate.
+
+Exact validator turn 18 classifies actual source-provider and automatic
+validation as PASS and authorizes a bounded documentation completion
+checkpoint. The final docs-head workflow remains a separate mandatory
+remote check; no local full-suite repeat is required for unchanged
+source/tests/configuration. Main and unrelated open work remain untouched.

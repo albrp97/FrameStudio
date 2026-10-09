@@ -3,7 +3,7 @@
 **Feature ID:** FEAT-037
 **Parents:** OBJ-001, SCOPE-001, PHASE-010
 **Capability links:** CAP-008, CAP-012, CAP-013
-**Status:** active
+**Status:** complete
 **Approval:** planning approved 2026-10-09; subsequent orchestration request
 authorizes execution/delegation; CHG-014 supplies autonomous routine approval,
 with exact-profile automatic validation and delivery gates retained
@@ -19,6 +19,9 @@ video/audio assembly, verification and tests
 **Risks:** reversed channels, clipping, drift, double source gain,
 unexpected loudness changes and absent-audio handling
 **Path history:** created in `features/open/` on 2026-10-09
+Moved unchanged-ID to `features/closed/` on 2026-10-09 (UTC) after required tickets completed.
+**Completion evidence:** `evidence/ticket-125-phase010-functionality.md`,
+source `981e5e2a`, CI `38004558177`, exact validator turns 18/19.
 
 ## Outcome, scope, and acceptance
 

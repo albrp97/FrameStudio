@@ -1,5 +1,9 @@
 # Activity Log
 
+## 2026-10-09
+
+- :rocket: - Synchronized editing and exports - Four tracks, ripple Undo and source reels ([evidence](evidence/ticket-125-phase010-functionality.md))
+
 ## 2026-08-21
 
 - :rocket: - Deterministic editor CLI - Inspect, edit, export, and round-trip one-source projects ([evidence/phase-003-gui-cli-parity.md](evidence/phase-003-gui-cli-parity.md))

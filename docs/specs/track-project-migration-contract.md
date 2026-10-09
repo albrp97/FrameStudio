@@ -2,11 +2,13 @@
 
 **Design ID:** DESIGN-010-115
 **Parents:** DISC-010 / REQ-010-04 / PHASE-010 / FEAT-035 / TICKET-115
-**Status:** approved for implementation, not implemented or verified
+**Status:** implemented and verified
 **Prepared:** 2026-10-09
 **Owner:** orchestrator; grounded draft from GPT-5.6 Luna max design agent
 **Product contract:** `multi-track-editing-contract.md`
-**Ticket:** `../planning/tickets/open/TICKET-115-track-project-migration.md`
+**Ticket:** `../planning/tickets/closed/TICKET-115-track-project-migration.md`
+**Verification:** source `981e5e2a`, Ubuntu run `38004558177`,
+`../../evidence/ticket-125-phase010-functionality.md`
 
 ## Approved product decisions
 

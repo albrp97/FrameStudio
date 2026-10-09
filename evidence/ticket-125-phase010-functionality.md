@@ -543,3 +543,57 @@ FFmpeg 6.1 environment in 9.020 seconds:
 Exact validator turn 17 grants bounded five-file commit/non-force-push GO,
 classifies the foreground-error preservation and retained audio diagnostics
 as focused PASS, and explicitly withholds provider/phase closeout.
+
+The exact 721-progress-marker/discovery mapping identifies the replacement
+run's single skip as the same supplemental real RVE/CUDA source-output case,
+not native track acceptance:
+`files/phase010-provider-replacement-skip-receipt.json`.
+The reviewed five-file status correction is committed and non-force published
+as `981e5e2a4f115ee8d0e9b3a1d11ec38dce1faeba`; actual remote ref matches.
+Final Ubuntu run `38004558177` is executing that exact head:
+`https://github.com/albrp97/FrameStudio/actions/runs/38004558177`.
+Expected discovery expands to 722 after the new deterministic worker
+regression. Actual terminal quality/contract/smoke/charter results are pending;
+no phase or child record has been closed.
+
+## Final actual Ubuntu result
+
+Run `38004558177`, job `114070245921`, completes successfully on the exact
+published source head `981e5e2a4f115ee8d0e9b3a1d11ec38dce1faeba`.
+All runtime, GTK environment, quality, contract, smoke, production-functionality
+and artifact-upload stages succeed.
+
+- Discovered suite: **722 cases in 770.756 seconds, OK with one skip**.
+- CLI contracts: **42 cases in 3.896 seconds, OK**.
+- Generated-media GTK smoke: both configured flows complete successfully.
+- Explicit selected-video and complete editing/delivery GTK charters:
+  **two cases in 59.891 seconds, OK**.
+- Configured formatter/lint/type/complexity/dependency/audit/security/churn,
+  compile and diff stages succeed. Duplication retains 46 existing clones,
+  zero new clones, and the unchanged approved baseline.
+
+Raw evidence: `files/phase010-provider-final-success.log`.
+The exact 722-progress-marker/discovered-case mapping confirms the sole skip
+is the supplemental real RVE/CUDA source-output case already executed on the
+target workstation, not a portable/native charter:
+`files/phase010-provider-final-skip-receipt.json`.
+The first failed Ubuntu runs remain historical FAIL evidence. Exact-profile
+remote/delivery/closeout classification is requested before moving any record.
+
+Exact validator turn 18 classifies source provider validation,
+automaticValidation and source-branch delivery as PASS. Profile: Rubber Duck
+GPT-5.6 Luna/high/all-validation. The one exactly mapped supplemental RVE
+skip is accepted against real workstation evidence. PR remains optional,
+main remains unchanged, and unrelated T104/older work is not closed.
+The bounded 35-path Markdown completion checkpoint is authorized; its
+automatically triggered docs-head remote check must also become terminal
+before final delivery is reported. Source CI is not misrepresented as CI
+for that later documentation commit.
+
+Exact validator turn 19 clarifies the finite completion sequence: source
+provider PASS authorizes the 26 unchanged-ID complete-status moves and
+35-path Markdown checkpoint. The checkpoint is committed/non-force published
+once, then its own mandatory provider result determines final task delivery.
+That final classification is recorded in the session/response only, avoiding
+a self-referential evidence-commit/CI loop. No source/test/configuration changes
+or extra user approval are authorized or needed.

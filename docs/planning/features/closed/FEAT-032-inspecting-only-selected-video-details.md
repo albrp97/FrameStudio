@@ -3,7 +3,7 @@
 **Feature ID:** FEAT-032
 **Parents:** OBJ-001, SCOPE-001, PHASE-010
 **Capability links:** CAP-001
-**Status:** active
+**Status:** complete
 **Approval:** planning approved 2026-10-09; subsequent user request authorizes
 implementation and isolated GPT-5.6 Luna max delegation. CHG-014 automatic closure gates
 remain required.
@@ -16,6 +16,9 @@ remain required.
 selection callbacks and GUI tests
 **Risks:** stale focused-source metadata; inadvertently hiding real failures
 **Path history:** created in `features/open/` on 2026-10-09
+Moved unchanged-ID to `features/closed/` on 2026-10-09 (UTC) after required tickets completed.
+**Completion evidence:** `evidence/ticket-125-phase010-functionality.md`,
+source `981e5e2a`, CI `38004558177`, exact validator turns 18/19.
 
 ## Outcome, scope, and acceptance
 

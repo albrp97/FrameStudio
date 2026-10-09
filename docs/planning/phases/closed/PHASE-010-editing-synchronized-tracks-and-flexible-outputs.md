@@ -5,7 +5,7 @@
 **Capability links:** CAP-001, CAP-002, CAP-003, CAP-004, CAP-005, CAP-006,
 CAP-007, CAP-008, CAP-009, CAP-010, CAP-011, CAP-012, CAP-013
 **Sequence:** 10
-**Status:** active
+**Status:** complete
 **Horizon:** next approved extension
 **Approval:** functionality/planning approved 2026-10-09; implementation and
 bounded GPT-5.6 Luna max delegation authorized by the subsequent user request.
@@ -23,6 +23,9 @@ FEAT-037, FEAT-038
 policies, migration, verified exports; export consumers require TICKET-104
 terminal route-integrity evidence before integration
 **Path history:** created at this `phases/open/` path on 2026-10-09
+Moved unchanged-ID to `phases/closed/` on 2026-10-09 (UTC) after required features completed.
+**Completion evidence:** `evidence/ticket-125-phase010-functionality.md`,
+source `981e5e2a`, CI `38004558177`, exact validator turns 18/19.
 
 ## Outcome and boundaries
 
@@ -133,3 +136,37 @@ surface owners; do not overwrite their work or infer their validation.
 
 **Evidence plan:** each ticket's `evidence/ticket-NNN-*.md` is a future
 implementation record; none is fabricated by this planning write.
+
+## Completion and phase feedback - 2026-10-09 (UTC)
+
+All six DISC-010 requirements are implemented across seven features and
+18 tickets. Real GTK/CLI/media acceptance covers selected-video details,
+Delete versus Backspace/Undo, schema-4 migration, four collision-safe tracks,
+silent active-only layouts, fixed stereo composition, independent track/source
+reels and truthful failure/cancellation/resume. Source media and legacy
+compatibility are preserved; no fifth track, general-purpose Undo, transitions
+or unapproved future horizon was introduced.
+
+Source `981e5e2a` is committed, non-force published and verified by actual
+Ubuntu run `38004558177`: 722 discovered cases with one accepted supplemental
+RVE/CUDA skip, 42 contracts, both GTK smoke flows and the explicit native
+functionality charters. The supplemental real backend was exercised in the
+skip-free target-workstation baseline. Exact validator turns 18/19 classify
+source provider/delivery and automaticValidation as PASS and authorize this
+unchanged-ID lifecycle completion checkpoint. Main and unrelated open records
+remain untouched. The docs-only checkpoint receives its own mandatory remote
+check before final task delivery is reported, without another repository write.
+
+The first two actual Ubuntu runs exposed FFmpeg frame-boundary portability,
+initial native frame capture, pointer/display geometry, HOME fixture assumptions,
+absent optional restoration and a late background-status race. These are
+corrected with explicit failing regressions, authentic missing-runtime proofs
+and unchanged count/pixel/hash assertions. Failed and interrupted runs remain
+in evidence rather than being relabeled.
+
+For subsequent authorized work, match the provider runtime early and use
+named, bounded supported-boundary charters before publication. Keep GLib pumps
+bounded, assert actual pointer positions, isolate HOME-dependent fixtures, and
+do not accidentally invoke `make check` when only static/compile/diff gates are
+needed. Independent worktrees helped isolate implementation ownership, but
+final integrated and actual provider evidence remained necessary.

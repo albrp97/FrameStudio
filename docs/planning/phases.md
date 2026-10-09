@@ -60,7 +60,7 @@ the first horizon without approved scope change.
 | 7 | PHASE-007 | Produce validated 60 FPS edits | CAP-005, CAP-011, CAP-012 | PHASE-004A, PHASE-005; PHASE-006 if segment-scoped enhancement is approved | complete |
 | 8 | PHASE-008 | Optimize responsive preview and select evidence-based media strategies | CAP-002, CAP-003, CAP-004, CAP-005, CAP-009, CAP-011, CAP-012 | PHASE-006, PHASE-007; target-workstation media and benchmark evidence | active |
 | 9 | PHASE-009 | Select and deliver efficient export pipelines | CAP-005, CAP-011, CAP-012 | PHASE-008; benchmark protocol, representative media, and target-workstation evidence | active |
-| 10 | PHASE-010 | Edit synchronized tracks and deliver flexible outputs | CAP-001 through CAP-013 | CHG-012 / DISC-010; ticket-specific interfaces; export integration after TICKET-104 | active |
+| 10 | PHASE-010 | Edit synchronized tracks and deliver flexible outputs | CAP-001 through CAP-013 | CHG-012 / DISC-010; ticket-specific interfaces; export integration after TICKET-104 | complete |
 
 ## Common Phase Rules
 
@@ -92,7 +92,7 @@ are closed; confirmed future phases remain open.
 | 8 | PHASE-007 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-007-producing-validated-60-fps-edits.md` |
 | 9 | PHASE-008 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md` |
 | 10 | PHASE-009 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-009-selecting-and-delivering-efficient-export-pipelines.md` |
-| 11 | PHASE-010 | active | OBJ-001, SCOPE-001 | `phases/open/PHASE-010-editing-synchronized-tracks-and-flexible-outputs.md` |
+| 11 | PHASE-010 | complete | OBJ-001, SCOPE-001 | `phases/closed/PHASE-010-editing-synchronized-tracks-and-flexible-outputs.md` |
 
 ## Capability Coverage
 
@@ -197,13 +197,12 @@ It explicitly extends the deferred track boundary to at most four
 synchronized video tracks. Its ticket dependency graph permits independent
 selected-metadata work without treating all older phases as closure gates.
 Export integrations still require TICKET-104's terminal route evidence.
-No execution, validation, or lifecycle completion is claimed.
+That initial planning write did not claim execution, validation or completion.
 
 The subsequent 2026-10-09 user request authorizes orchestrated implementation,
 review and real UI/CLI functionality tests with GPT-5.6 Luna max agents.
-PHASE-010 is active. TICKET-109 is verifying; TICKET-115 implementation is
-under scoped migration/persistence remediation. Maintenance126 is verifying;
-bounded prerequisite104 verification is independent of model work. CHG-014
+Execution included scoped migration/persistence remediation and independent
+maintenance126 and prerequisite104 verification. CHG-014
 supersedes guided waits with automatic mode and authorizes routine approvals.
 Every validation decision uses Rubber Duck GPT-5.6 Luna high `all-validation`;
 actual dependency, technical, source-protection and delivery gates remain.
@@ -215,3 +214,12 @@ stereo pan. Multi-track projects no longer disable separate source exports.
 
 CAP-013 is first covered by PHASE-010; CAP-001 through CAP-012 gain the
 bounded extension coverage recorded in `../specs/capability-map.md`.
+
+PHASE-010, FEAT-032 through FEAT-038 and TICKET-109 through TICKET-126 are
+complete after source-branch delivery and exact-profile automatic validation.
+Ubuntu run `38004558177` verifies source `981e5e2a`, including 722 discovered
+cases with one accepted supplemental RVE skip, 42 CLI contracts, GTK smoke and
+the explicit native editing/delivery charters. Completion evidence and phase
+feedback are preserved in the closed phase record and
+`../../evidence/ticket-125-phase010-functionality.md`. Older open work, main,
+the first-horizon boundary and deferred non-goals remain unchanged.

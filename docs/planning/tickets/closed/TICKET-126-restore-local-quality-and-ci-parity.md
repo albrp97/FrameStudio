@@ -3,7 +3,7 @@
 **Ticket ID:** TICKET-126
 **Parents:** OBJ-001, SCOPE-001, PHASE-010, FEAT-038
 **Capability links:** CAP-012
-**Status:** verifying
+**Status:** complete
 **Approval:** autonomous repair authorized 2026-10-09 through CHG-014
 **Requirements:** protected workflow quality and DISC-010 delivery gates
 **Dependencies:** existing Makefile, pinned quality tools and approved baseline
@@ -11,6 +11,9 @@
 `tests/test_editor_ci_parity.py`, and native track-drag test display focus
 **Evidence path:** `evidence/ticket-126-local-quality-ci-parity.md`
 **Path history:** created in `tickets/open/` on 2026-10-09
+Moved unchanged-ID to `tickets/closed/` on 2026-10-09 (UTC) after source provider PASS.
+**Completion evidence:** `evidence/ticket-125-phase010-functionality.md`,
+source `981e5e2a`, CI `38004558177`, exact validator turns 18/19.
 
 ## Objective, scope and non-goals
 

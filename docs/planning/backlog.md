@@ -189,24 +189,24 @@ export integrity and resume scope.
 | 106 | TICKET-106 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
 | 107 | TICKET-107 | verifying | FEAT-028 | PHASE-008 | `tickets/open/TICKET-107-fit-preserve-resolution-content-to-canvas.md` |
 | 108 | TICKET-108 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-108-limit-fps-enhancement-to-low-frame-rate-sources.md` |
-| 109 | TICKET-109 | verifying | FEAT-032 | PHASE-010 | `tickets/open/TICKET-109-selected-video-details.md` |
-| 110 | TICKET-110 | verifying | FEAT-033 | PHASE-010 | `tickets/open/TICKET-110-ripple-removal-undo.md` |
-| 111 | TICKET-111 | verifying | FEAT-033 | PHASE-010 | `tickets/open/TICKET-111-backspace-controls.md` |
-| 112 | TICKET-112 | verifying | FEAT-034 | PHASE-010 | `tickets/open/TICKET-112-source-output-plans.md` |
-| 113 | TICKET-113 | verifying | FEAT-034 | PHASE-010 | `tickets/open/TICKET-113-source-output-rendering.md` |
-| 114 | TICKET-114 | verifying | FEAT-034 | PHASE-010 | `tickets/open/TICKET-114-export-choice-controls.md` |
-| 115 | TICKET-115 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-115-track-project-migration.md` |
-| 116 | TICKET-116 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-116-collision-safe-placement.md` |
-| 117 | TICKET-117 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-117-track-drag-controls.md` |
-| 118 | TICKET-118 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-118-track-cli-parity.md` |
-| 119 | TICKET-119 | verifying | FEAT-036 | PHASE-010 | `tickets/open/TICKET-119-active-layout-contract.md` |
-| 120 | TICKET-120 | verifying | FEAT-036 | PHASE-010 | `tickets/open/TICKET-120-silent-composed-preview.md` |
-| 121 | TICKET-121 | verifying | FEAT-036 | PHASE-010 | `tickets/open/TICKET-121-dynamic-video-render.md` |
-| 122 | TICKET-122 | verifying | FEAT-037 | PHASE-010 | `tickets/open/TICKET-122-fixed-stereo-mix.md` |
-| 123 | TICKET-123 | verifying | FEAT-037 | PHASE-010 | `tickets/open/TICKET-123-layout-audio-integration.md` |
-| 124 | TICKET-124 | verifying | FEAT-038 | PHASE-010 | `tickets/open/TICKET-124-flexible-export-recovery.md` |
-| 125 | TICKET-125 | verifying | FEAT-038 | PHASE-010 | `tickets/open/TICKET-125-phase010-functionality.md` |
-| 126 | TICKET-126 | verifying | FEAT-038 | PHASE-010 | `tickets/open/TICKET-126-restore-local-quality-and-ci-parity.md` |
+| 109 | TICKET-109 | complete | FEAT-032 | PHASE-010 | `tickets/closed/TICKET-109-selected-video-details.md` |
+| 110 | TICKET-110 | complete | FEAT-033 | PHASE-010 | `tickets/closed/TICKET-110-ripple-removal-undo.md` |
+| 111 | TICKET-111 | complete | FEAT-033 | PHASE-010 | `tickets/closed/TICKET-111-backspace-controls.md` |
+| 112 | TICKET-112 | complete | FEAT-034 | PHASE-010 | `tickets/closed/TICKET-112-source-output-plans.md` |
+| 113 | TICKET-113 | complete | FEAT-034 | PHASE-010 | `tickets/closed/TICKET-113-source-output-rendering.md` |
+| 114 | TICKET-114 | complete | FEAT-034 | PHASE-010 | `tickets/closed/TICKET-114-export-choice-controls.md` |
+| 115 | TICKET-115 | complete | FEAT-035 | PHASE-010 | `tickets/closed/TICKET-115-track-project-migration.md` |
+| 116 | TICKET-116 | complete | FEAT-035 | PHASE-010 | `tickets/closed/TICKET-116-collision-safe-placement.md` |
+| 117 | TICKET-117 | complete | FEAT-035 | PHASE-010 | `tickets/closed/TICKET-117-track-drag-controls.md` |
+| 118 | TICKET-118 | complete | FEAT-035 | PHASE-010 | `tickets/closed/TICKET-118-track-cli-parity.md` |
+| 119 | TICKET-119 | complete | FEAT-036 | PHASE-010 | `tickets/closed/TICKET-119-active-layout-contract.md` |
+| 120 | TICKET-120 | complete | FEAT-036 | PHASE-010 | `tickets/closed/TICKET-120-silent-composed-preview.md` |
+| 121 | TICKET-121 | complete | FEAT-036 | PHASE-010 | `tickets/closed/TICKET-121-dynamic-video-render.md` |
+| 122 | TICKET-122 | complete | FEAT-037 | PHASE-010 | `tickets/closed/TICKET-122-fixed-stereo-mix.md` |
+| 123 | TICKET-123 | complete | FEAT-037 | PHASE-010 | `tickets/closed/TICKET-123-layout-audio-integration.md` |
+| 124 | TICKET-124 | complete | FEAT-038 | PHASE-010 | `tickets/closed/TICKET-124-flexible-export-recovery.md` |
+| 125 | TICKET-125 | complete | FEAT-038 | PHASE-010 | `tickets/closed/TICKET-125-phase010-functionality.md` |
+| 126 | TICKET-126 | complete | FEAT-038 | PHASE-010 | `tickets/closed/TICKET-126-restore-local-quality-and-ci-parity.md` |
 
 ## Ticket summary
 
@@ -1237,7 +1237,7 @@ the optimization.
 ## PHASE-010 - Approved Planning Backlog
 
 **Parents:** OBJ-001, SCOPE-001, PHASE-010
-**Status:** active; per-ticket readiness and exact-profile automatic validation remain required
+**Status:** complete; source delivery and exact-profile automatic validation terminal
 **Approval:** planning 2026-10-09, followed by user-authorized implementation,
 review and actual UI/CLI functionality tests with GPT-5.6 Luna max agents
 **Autonomous approval:** CHG-014 authorizes completion without routine questions,
@@ -1249,24 +1249,24 @@ using Rubber Duck GPT-5.6 Luna high `all-validation` for every validation decisi
 
 | Ticket | Outcome | Feature | Hard ticket dependencies | Status |
 |---|---|---|---|---|
-| TICKET-109 | Selected filename/dimensions/FPS only | FEAT-032 | None in this phase | verifying |
-| TICKET-110 | Atomic track-local removal and exact Undo | FEAT-033 | TICKET-115 | verifying |
-| TICKET-111 | Backspace/Delete/Undo controls and CLI removal | FEAT-033 | TICKET-110, TICKET-117 | verifying |
-| TICKET-112 | Plan stable track/source outputs and final/source modes | FEAT-034 | TICKET-115 | verifying |
-| TICKET-113 | Render independent full-canvas source reels per track, with normal audio | FEAT-034 | TICKET-112, TICKET-104 | verifying |
-| TICKET-114 | Output toggles, track/source listings and CLI errors | FEAT-034 | TICKET-113 | verifying |
-| TICKET-115 | Track/timebase schema and legacy migration | FEAT-035 | Existing baseline; approved DESIGN-010-115 | verifying |
-| TICKET-116 | Collision-safe placement and track domain operations | FEAT-035 | TICKET-115 | verifying |
-| TICKET-117 | Track rows and mouse drag/drop | FEAT-035 | TICKET-116 | verifying |
-| TICKET-118 | Deterministic track CLI parity | FEAT-035 | TICKET-116 | verifying |
-| TICKET-119 | Shared active-interval layout/transform contract | FEAT-036 | TICKET-115 | verifying |
-| TICKET-120 | Silent synchronized composed preview | FEAT-036 | TICKET-119, TICKET-117 | verifying |
-| TICKET-121 | Dynamic multi-track video composition render | FEAT-036 | TICKET-119, TICKET-104 | verifying |
-| TICKET-122 | Fixed stereo pan and clipping-safe active mix | FEAT-037 | TICKET-119 | verifying |
-| TICKET-123 | Final layout-aligned audio/video export | FEAT-037 | TICKET-121, TICKET-122 | verifying |
-| TICKET-124 | Per-output resume, invalidation and atomic delivery | FEAT-038 | TICKET-113, TICKET-121, TICKET-123 | verifying |
-| TICKET-125 | Integrated GTK/CLI/media functionality and automatic acceptance | FEAT-038 | TICKET-109, TICKET-111, TICKET-114, TICKET-118, TICKET-120, TICKET-124, TICKET-126 | verifying |
-| TICKET-126 | Restore existing local quality and executable CI parity | FEAT-038 | Existing Makefile, pinned tools and approved baseline; independent of product model | verifying |
+| TICKET-109 | Selected filename/dimensions/FPS only | FEAT-032 | None in this phase | complete |
+| TICKET-110 | Atomic track-local removal and exact Undo | FEAT-033 | TICKET-115 | complete |
+| TICKET-111 | Backspace/Delete/Undo controls and CLI removal | FEAT-033 | TICKET-110, TICKET-117 | complete |
+| TICKET-112 | Plan stable track/source outputs and final/source modes | FEAT-034 | TICKET-115 | complete |
+| TICKET-113 | Render independent full-canvas source reels per track, with normal audio | FEAT-034 | TICKET-112, TICKET-104 | complete |
+| TICKET-114 | Output toggles, track/source listings and CLI errors | FEAT-034 | TICKET-113 | complete |
+| TICKET-115 | Track/timebase schema and legacy migration | FEAT-035 | Existing baseline; approved DESIGN-010-115 | complete |
+| TICKET-116 | Collision-safe placement and track domain operations | FEAT-035 | TICKET-115 | complete |
+| TICKET-117 | Track rows and mouse drag/drop | FEAT-035 | TICKET-116 | complete |
+| TICKET-118 | Deterministic track CLI parity | FEAT-035 | TICKET-116 | complete |
+| TICKET-119 | Shared active-interval layout/transform contract | FEAT-036 | TICKET-115 | complete |
+| TICKET-120 | Silent synchronized composed preview | FEAT-036 | TICKET-119, TICKET-117 | complete |
+| TICKET-121 | Dynamic multi-track video composition render | FEAT-036 | TICKET-119, TICKET-104 | complete |
+| TICKET-122 | Fixed stereo pan and clipping-safe active mix | FEAT-037 | TICKET-119 | complete |
+| TICKET-123 | Final layout-aligned audio/video export | FEAT-037 | TICKET-121, TICKET-122 | complete |
+| TICKET-124 | Per-output resume, invalidation and atomic delivery | FEAT-038 | TICKET-113, TICKET-121, TICKET-123 | complete |
+| TICKET-125 | Integrated GTK/CLI/media functionality and automatic acceptance | FEAT-038 | TICKET-109, TICKET-111, TICKET-114, TICKET-118, TICKET-120, TICKET-124, TICKET-126 | complete |
+| TICKET-126 | Restore existing local quality and executable CI parity | FEAT-038 | Existing Makefile, pinned tools and approved baseline; independent of product model | complete |
 
 ### Requirement coverage
 

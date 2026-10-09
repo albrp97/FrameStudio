@@ -814,7 +814,7 @@ gates, resumable sessions, and source preservation remain protected.
 ## PHASE-010 - Synchronized Tracks and Flexible Outputs
 
 **Parent:** OBJ-001, SCOPE-001, PHASE-010
-**Status:** active (FEAT-032 through FEAT-038)
+**Status:** complete (FEAT-032 through FEAT-038)
 **Approval:** 2026-10-09 planning approval, followed by user-authorized
 orchestrated implementation and bounded GPT-5.6 Luna max delegation
 **Contract:** `../specs/multi-track-editing-contract.md` (DISC-010)
@@ -824,19 +824,21 @@ orchestrated implementation and bounded GPT-5.6 Luna max delegation
 
 | ID | Outcome | Capabilities | Dependencies / interface boundary | Status | Current path |
 |---|---|---|---|---|---|
-| FEAT-032 | Inspect only selected video details | CAP-001 | Existing metadata; independent of track migration | active | `features/open/FEAT-032-inspecting-only-selected-video-details.md` |
-| FEAT-033 | Remove and undo timeline blocks | CAP-003, CAP-006, CAP-012 | FEAT-035 model115 and UI117; not whole-feature closure | active | `features/open/FEAT-033-removing-and-undoing-timeline-blocks.md` |
-| FEAT-034 | Export edited sources independently within each track | CAP-004, CAP-005, CAP-006, CAP-007, CAP-008, CAP-011, CAP-012 | FEAT-035 stable pair identity115; rendering after TICKET-104, independent of final stereo/layout renderer | active | `features/open/FEAT-034-exporting-edits-grouped-by-source.md` |
-| FEAT-035 | Arrange up to four synchronized tracks | CAP-002, CAP-003, CAP-004, CAP-006, CAP-007, CAP-012, CAP-013 | Existing identity/timebase; publishes shared interfaces | active | `features/open/FEAT-035-arranging-four-synchronized-tracks.md` |
-| FEAT-036 | Preview/render matching dynamic sections | CAP-002, CAP-005, CAP-009, CAP-010, CAP-011, CAP-012, CAP-013 | FEAT-035 model/UI; render after TICKET-104 | active | `features/open/FEAT-036-previewing-and-rendering-dynamic-sections.md` |
-| FEAT-037 | Mix fixed stereo audio by section | CAP-008, CAP-012, CAP-013 | FEAT-036 layout119 and renderer121 | active | `features/open/FEAT-037-mixing-fixed-stereo-audio-by-section.md` |
-| FEAT-038 | Verify recoverable flexible delivery | CAP-004, CAP-005, CAP-006, CAP-012, CAP-013 | Product acceptance consumes FEAT-032 through FEAT-037; maintenance126 independent | active | `features/open/FEAT-038-verifying-recoverable-flexible-delivery.md` |
+| FEAT-032 | Inspect only selected video details | CAP-001 | Existing metadata; independent of track migration | complete | `features/closed/FEAT-032-inspecting-only-selected-video-details.md` |
+| FEAT-033 | Remove and undo timeline blocks | CAP-003, CAP-006, CAP-012 | FEAT-035 model115 and UI117; not whole-feature closure | complete | `features/closed/FEAT-033-removing-and-undoing-timeline-blocks.md` |
+| FEAT-034 | Export edited sources independently within each track | CAP-004, CAP-005, CAP-006, CAP-007, CAP-008, CAP-011, CAP-012 | FEAT-035 stable pair identity115; rendering after TICKET-104, independent of final stereo/layout renderer | complete | `features/closed/FEAT-034-exporting-edits-grouped-by-source.md` |
+| FEAT-035 | Arrange up to four synchronized tracks | CAP-002, CAP-003, CAP-004, CAP-006, CAP-007, CAP-012, CAP-013 | Existing identity/timebase; publishes shared interfaces | complete | `features/closed/FEAT-035-arranging-four-synchronized-tracks.md` |
+| FEAT-036 | Preview/render matching dynamic sections | CAP-002, CAP-005, CAP-009, CAP-010, CAP-011, CAP-012, CAP-013 | FEAT-035 model/UI; render after TICKET-104 | complete | `features/closed/FEAT-036-previewing-and-rendering-dynamic-sections.md` |
+| FEAT-037 | Mix fixed stereo audio by section | CAP-008, CAP-012, CAP-013 | FEAT-036 layout119 and renderer121 | complete | `features/closed/FEAT-037-mixing-fixed-stereo-audio-by-section.md` |
+| FEAT-038 | Verify recoverable flexible delivery | CAP-004, CAP-005, CAP-006, CAP-012, CAP-013 | Product acceptance consumes FEAT-032 through FEAT-037; maintenance126 independent | complete | `features/closed/FEAT-038-verifying-recoverable-flexible-delivery.md` |
 
 Feature dependencies mean stable ticket interfaces where indicated, not
 artificial whole-feature barriers. Explicit ticket edges and conflict-aware
-waves are in the PHASE-010 record and backlog. Existing statuses remain
-unchanged. Execution is authorized by the subsequent user request; individual
-readiness, technical contracts and terminal validation evidence remain required.
+waves are in the PHASE-010 record and backlog. These seven features and their
+18 required tickets are complete after source delivery and exact-profile
+validation. Unrelated older statuses remain unchanged. Source commit
+`981e5e2a` is verified by Ubuntu run `38004558177`; evidence is recorded in
+`../../evidence/ticket-125-phase010-functionality.md`.
 CHG-014 selects automatic mode, supplies routine autonomous approvals and
 requires Rubber Duck GPT-5.6 Luna high `all-validation` decisions rather than
 guided human waits. Product boundaries and actual delivery gates are unchanged.

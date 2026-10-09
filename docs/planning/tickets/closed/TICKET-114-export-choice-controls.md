@@ -3,7 +3,7 @@
 **Ticket ID:** TICKET-114
 **Parents:** OBJ-001, SCOPE-001, PHASE-010, FEAT-034
 **Capability links:** CAP-004, CAP-005, CAP-006, CAP-012
-**Status:** verifying
+**Status:** complete
 **Approval:** execution/delegation authorized by the 2026-10-09 orchestration
 request and CHG-014 autonomous authorization; dependencies and exact-profile
 automatic validation remain required
@@ -14,6 +14,9 @@ output-choice persistence and tests
 **Risks:** obsolete track-count restriction, silent omissions, inconsistent CLI errors
 **Evidence path:** `evidence/ticket-114-export-choice-controls.md`
 **Path history:** created in `tickets/open/` on 2026-10-09
+Moved unchanged-ID to `tickets/closed/` on 2026-10-09 (UTC) after source provider PASS.
+**Completion evidence:** `evidence/ticket-125-phase010-functionality.md`,
+source `981e5e2a`, CI `38004558177`, exact validator turns 18/19.
 
 ## Scope and acceptance
 

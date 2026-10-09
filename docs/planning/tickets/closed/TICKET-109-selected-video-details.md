@@ -3,7 +3,7 @@
 **Ticket ID:** TICKET-109
 **Parents:** OBJ-001, SCOPE-001, PHASE-010, FEAT-032
 **Capability links:** CAP-001
-**Status:** verifying
+**Status:** complete
 **Approval:** execution and isolated GPT-5.6 Luna max delegation authorized by
 the 2026-10-09 orchestration request and CHG-014 autonomous authorization;
 exact-profile automatic validation and delivery gates remain required
@@ -14,6 +14,9 @@ callbacks, GTK functionality tests
 **Risks:** delayed callbacks replace selected metadata or hide genuine errors
 **Evidence path:** `evidence/ticket-109-selected-video-details.md`
 **Path history:** created in `tickets/open/` on 2026-10-09
+Moved unchanged-ID to `tickets/closed/` on 2026-10-09 (UTC) after source provider PASS.
+**Completion evidence:** `evidence/ticket-125-phase010-functionality.md`,
+source `981e5e2a`, CI `38004558177`, exact validator turns 18/19.
 
 ## Scope and acceptance
 
