@@ -107,6 +107,18 @@ def make_threshold_rate_project(root: Path) -> Project:
     return Project.create_multi(entries)
 
 
+def prepare_fps_panel(root: Path, project_factory):
+    return prepare_export_panel(
+        project_factory(root),
+        root,
+        choice="60",
+        enhancement_enabled=True,
+        upscale_enabled=False,
+        backend="ffmpeg-minterpolate",
+        project_path=root / "edit.framestudio.json",
+    )
+
+
 def unavailable_rve_validation(
     backend,
     *,
@@ -169,15 +181,7 @@ class EditorExportPanelTests(unittest.TestCase):
     def test_panel_reports_source_level_videos_to_fps_enhance_count(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            state = prepare_export_panel(
-                make_mixed_rate_project(root),
-                root,
-                choice="60",
-                enhancement_enabled=True,
-                upscale_enabled=False,
-                backend="ffmpeg-minterpolate",
-                project_path=root / "edit.framestudio.json",
-            )
+            state = prepare_fps_panel(root, make_mixed_rate_project)
 
         rows = dict(state.display_rows)
         self.assertEqual(rows["Videos to FPS enhance"], "1")
@@ -187,15 +191,7 @@ class EditorExportPanelTests(unittest.TestCase):
     def test_panel_only_counts_sources_below_fifty_fps_for_enhancement(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            state = prepare_export_panel(
-                make_threshold_rate_project(root),
-                root,
-                choice="60",
-                enhancement_enabled=True,
-                upscale_enabled=False,
-                backend="ffmpeg-minterpolate",
-                project_path=root / "edit.framestudio.json",
-            )
+            state = prepare_fps_panel(root, make_threshold_rate_project)
 
         rows = dict(state.display_rows)
         self.assertEqual(rows["Videos to FPS enhance"], "1")

@@ -59,7 +59,9 @@ class MixedSourceModelTests(unittest.TestCase):
             payload = project.to_dict()
             restored = Project.from_dict(payload)
 
-            self.assertEqual(restored.to_dict(), payload)
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+            self.assertEqual(restored.timeline.track_ids, ("track-1",))
             self.assertEqual(
                 [block.source_id for block in restored.timeline.blocks],
                 [source.source_id for source in restored.sources],
@@ -107,7 +109,13 @@ class MixedSourceModelTests(unittest.TestCase):
             self.assertEqual(project.timeline.edited_duration_seconds, 4.0)
 
             restored = Project.from_dict(project.to_dict())
-            self.assertEqual(restored.to_dict(), project.to_dict())
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+            self.assertEqual(restored.duration_seconds, project.duration_seconds)
+            self.assertEqual(
+                [block.segment_id for block in restored.timeline.blocks],
+                [block.segment_id for block in project.timeline.blocks],
+            )
 
     def test_append_sources_rejects_duplicate_paths_without_mutating_project(self):
         with TemporaryDirectory() as temporary_directory:
@@ -290,7 +298,10 @@ class MixedSourceModelTests(unittest.TestCase):
             save_project(project, destination)
             restored = load_project(destination)
 
-            self.assertEqual(restored.to_dict(), project.to_dict())
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+            self.assertEqual(restored.timeline.track_ids, ("track-1",))
+            self.assertEqual(restored.duration_seconds, project.duration_seconds)
 
     def test_canonical_timebase_rounds_deterministically(self):
         self.assertEqual(seconds_to_ticks(1.2345674), 1234567)

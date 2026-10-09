@@ -78,9 +78,25 @@ See [`docs/planning/phases.md`](../planning/phases.md),
 [`docs/planning/features.md`](../planning/features.md), and
 [`docs/planning/backlog.md`](../planning/backlog.md) for the delivery record.
 
+## Approved Next Extension (Planning Only)
+
+CHG-012, its CHG-013 export refinement, and DISC-010 were approved on
+2026-10-09 for planning, not
+implementation. PHASE-010 covers selected-video filename/dimensions/FPS,
+undoable Backspace removal with track-local ripple, optional edited exports
+grouped by source within each independent track, and up to four synchronized
+video tracks with dynamic split-screen layouts and fixed stereo pan in the
+final composed export. Separate source files use the full canvas and normal
+source audio without layout pan; multi-track projects allow this option and
+empty tracks produce no source outputs. Preview is video-only. Exact behavior is in
+[`multi-track-editing-contract.md`](multi-track-editing-contract.md).
+
+This extension does not change the delivered initial horizon or close any
+existing work. Implementation requires the new tickets' readiness checks.
+
 ## Current Deferred / Out of Scope
 
-- Multiple video or audio tracks.
+- More than four video tracks or standalone audio tracks.
 - Keyframed or animated transforms, advanced effects, transitions, titles,
   captions, color grading, and full Resolve parity.
 - Cloud, collaboration, accounts, telemetry, and non-Linux support.

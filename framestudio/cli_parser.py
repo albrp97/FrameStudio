@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from typing import NoReturn
 
+from .cli_removal import add_removal_parser
 from .cli_types import CLI_EXIT_USAGE, CliError
 
 
@@ -26,6 +27,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
         required=True,
         parser_class=JsonArgumentParser,
     )
+    add_removal_parser(commands)
     inspect_parser = commands.add_parser(
         "inspect",
         help="inspect a project",
@@ -80,6 +82,65 @@ def build_cli_parser() -> argparse.ArgumentParser:
     analyze_audio_parser.add_argument("--output", type=Path)
     analyze_audio_parser.add_argument("--full-paths", action="store_true")
 
+    convert_parser = commands.add_parser(
+        "track-convert",
+        help="explicitly convert legacy timing to absolute synchronized tracks",
+    )
+    convert_parser.add_argument("project", type=Path)
+    convert_parser.add_argument(
+        "--confirm-legacy-conversion",
+        "--confirm",
+        action="store_true",
+        help="confirm that legacy visible positions may become absolute placements",
+    )
+    convert_parser.add_argument("--output", type=Path)
+    convert_parser.add_argument("--full-paths", action="store_true")
+
+    track_add_parser = commands.add_parser(
+        "track-add",
+        help="add an empty synchronized track",
+    )
+    track_add_parser.add_argument("project", type=Path)
+    track_add_parser.add_argument("--track-id", "--track", dest="track_id")
+    track_add_parser.add_argument(
+        "--confirm-legacy-conversion",
+        "--confirm",
+        action="store_true",
+        help="confirm conversion before adding a track",
+    )
+    track_add_parser.add_argument("--output", type=Path)
+    track_add_parser.add_argument("--full-paths", action="store_true")
+
+    track_remove_parser = commands.add_parser(
+        "track-remove",
+        help="remove an empty synchronized track",
+    )
+    track_remove_parser.add_argument("project", type=Path)
+    track_remove_parser.add_argument("--track-id", "--track", dest="track_id", required=True)
+    track_remove_parser.add_argument(
+        "--confirm-legacy-conversion",
+        "--confirm",
+        action="store_true",
+        help="confirm conversion before removing a track",
+    )
+    track_remove_parser.add_argument("--output", type=Path)
+    track_remove_parser.add_argument("--full-paths", action="store_true")
+
+    track_select_parser = commands.add_parser(
+        "track-select",
+        help="select the active synchronized track",
+    )
+    track_select_parser.add_argument("project", type=Path)
+    track_select_parser.add_argument("--track-id", "--track", dest="track_id", required=True)
+    track_select_parser.add_argument(
+        "--confirm-legacy-conversion",
+        "--confirm",
+        action="store_true",
+        help="confirm conversion before selecting a track",
+    )
+    track_select_parser.add_argument("--output", type=Path)
+    track_select_parser.add_argument("--full-paths", action="store_true")
+
     move_parser = commands.add_parser(
         "move",
         help="move one or more timeline blocks left or right",
@@ -91,7 +152,22 @@ def build_cli_parser() -> argparse.ArgumentParser:
         action="append",
         required=True,
     )
-    move_parser.add_argument("--direction", choices=("left", "right"), required=True)
+    move_target = move_parser.add_mutually_exclusive_group(required=True)
+    move_target.add_argument("--direction", choices=("left", "right"))
+    move_target.add_argument(
+        "--timeline-start-ticks",
+        "--at-ticks",
+        dest="timeline_start_ticks",
+        type=int,
+        help="absolute non-negative timeline start in integer microsecond ticks",
+    )
+    move_parser.add_argument("--target-track-id", "--track", dest="target_track_id")
+    move_parser.add_argument(
+        "--confirm-legacy-conversion",
+        "--confirm",
+        action="store_true",
+        help="confirm conversion before absolute track placement",
+    )
     move_parser.add_argument("--output", type=Path)
     move_parser.add_argument("--full-paths", action="store_true")
 
@@ -119,7 +195,22 @@ def build_cli_parser() -> argparse.ArgumentParser:
         action="append",
         required=True,
     )
-    paste_parser.add_argument("--at", type=float, required=True)
+    paste_position = paste_parser.add_mutually_exclusive_group(required=True)
+    paste_position.add_argument("--at", type=float)
+    paste_position.add_argument(
+        "--at-ticks",
+        "--timeline-start-ticks",
+        dest="at_ticks",
+        type=int,
+        help="absolute non-negative paste position in integer microsecond ticks",
+    )
+    paste_parser.add_argument("--target-track-id", "--track", dest="target_track_id")
+    paste_parser.add_argument(
+        "--confirm-legacy-conversion",
+        "--confirm",
+        action="store_true",
+        help="confirm conversion before absolute track pasting",
+    )
     paste_parser.add_argument("--output", type=Path)
     paste_parser.add_argument("--full-paths", action="store_true")
 
@@ -228,18 +319,31 @@ def build_cli_parser() -> argparse.ArgumentParser:
         "project",
         type=Path,
     )
-    split_parser.add_argument(
+    split_position = split_parser.add_mutually_exclusive_group(required=True)
+    split_position.add_argument(
         "--at",
         "--position",
         dest="position",
         type=float,
-        required=True,
+    )
+    split_position.add_argument(
+        "--position-ticks",
+        "--at-ticks",
+        dest="position_ticks",
+        type=int,
+        help="split position in exact integer microsecond ticks",
     )
     split_parser.add_argument("--segment")
     split_parser.add_argument(
         "--coordinate",
         choices=("source", "timeline"),
-        default="source",
+        default=None,
+    )
+    split_parser.add_argument(
+        "--confirm-legacy-conversion",
+        "--confirm",
+        action="store_true",
+        help="confirm conversion before absolute track splitting",
     )
     split_parser.add_argument("--output", type=Path)
     split_parser.add_argument(
@@ -286,6 +390,11 @@ def build_cli_parser() -> argparse.ArgumentParser:
     )
     export_parser.add_argument("project", type=Path)
     export_parser.add_argument("--output", type=Path, required=True)
+    export_parser.add_argument(
+        "--output-mode",
+        choices=("final-only", "combined", "source-only"),
+        help="transient final/source output choice for this export",
+    )
     export_parser.add_argument(
         "--fps-choice",
         choices=("lowest", "highest", "custom", "60"),
@@ -371,6 +480,11 @@ def build_cli_parser() -> argparse.ArgumentParser:
     )
     plan_parser.add_argument("project", type=Path)
     plan_parser.add_argument("--output", type=Path)
+    plan_parser.add_argument(
+        "--output-mode",
+        choices=("final-only", "combined", "source-only"),
+        help="transient final/source output choice for this plan",
+    )
     plan_parser.add_argument("--fps-choice", choices=("lowest", "highest", "custom", "60"))
     plan_parser.add_argument("--custom-fps", help="positive rational custom target FPS")
     plan_enhancement_toggle = plan_parser.add_mutually_exclusive_group()

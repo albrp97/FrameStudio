@@ -189,6 +189,24 @@ export integrity and resume scope.
 | 106 | TICKET-106 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
 | 107 | TICKET-107 | verifying | FEAT-028 | PHASE-008 | `tickets/open/TICKET-107-fit-preserve-resolution-content-to-canvas.md` |
 | 108 | TICKET-108 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-108-limit-fps-enhancement-to-low-frame-rate-sources.md` |
+| 109 | TICKET-109 | verifying | FEAT-032 | PHASE-010 | `tickets/open/TICKET-109-selected-video-details.md` |
+| 110 | TICKET-110 | verifying | FEAT-033 | PHASE-010 | `tickets/open/TICKET-110-ripple-removal-undo.md` |
+| 111 | TICKET-111 | verifying | FEAT-033 | PHASE-010 | `tickets/open/TICKET-111-backspace-controls.md` |
+| 112 | TICKET-112 | verifying | FEAT-034 | PHASE-010 | `tickets/open/TICKET-112-source-output-plans.md` |
+| 113 | TICKET-113 | verifying | FEAT-034 | PHASE-010 | `tickets/open/TICKET-113-source-output-rendering.md` |
+| 114 | TICKET-114 | verifying | FEAT-034 | PHASE-010 | `tickets/open/TICKET-114-export-choice-controls.md` |
+| 115 | TICKET-115 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-115-track-project-migration.md` |
+| 116 | TICKET-116 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-116-collision-safe-placement.md` |
+| 117 | TICKET-117 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-117-track-drag-controls.md` |
+| 118 | TICKET-118 | verifying | FEAT-035 | PHASE-010 | `tickets/open/TICKET-118-track-cli-parity.md` |
+| 119 | TICKET-119 | verifying | FEAT-036 | PHASE-010 | `tickets/open/TICKET-119-active-layout-contract.md` |
+| 120 | TICKET-120 | verifying | FEAT-036 | PHASE-010 | `tickets/open/TICKET-120-silent-composed-preview.md` |
+| 121 | TICKET-121 | verifying | FEAT-036 | PHASE-010 | `tickets/open/TICKET-121-dynamic-video-render.md` |
+| 122 | TICKET-122 | verifying | FEAT-037 | PHASE-010 | `tickets/open/TICKET-122-fixed-stereo-mix.md` |
+| 123 | TICKET-123 | verifying | FEAT-037 | PHASE-010 | `tickets/open/TICKET-123-layout-audio-integration.md` |
+| 124 | TICKET-124 | verifying | FEAT-038 | PHASE-010 | `tickets/open/TICKET-124-flexible-export-recovery.md` |
+| 125 | TICKET-125 | verifying | FEAT-038 | PHASE-010 | `tickets/open/TICKET-125-phase010-functionality.md` |
+| 126 | TICKET-126 | verifying | FEAT-038 | PHASE-010 | `tickets/open/TICKET-126-restore-local-quality-and-ci-parity.md` |
 
 ## Ticket summary
 
@@ -1215,3 +1233,83 @@ the optimization.
 - `framestudio/export_interpolation.py`
 - `framestudio/export_cache.py`
 - `framestudio/export_session.py`
+
+## PHASE-010 - Approved Planning Backlog
+
+**Parents:** OBJ-001, SCOPE-001, PHASE-010
+**Status:** active; per-ticket readiness and exact-profile automatic validation remain required
+**Approval:** planning 2026-10-09, followed by user-authorized implementation,
+review and actual UI/CLI functionality tests with GPT-5.6 Luna max agents
+**Autonomous approval:** CHG-014 authorizes completion without routine questions,
+using Rubber Duck GPT-5.6 Luna high `all-validation` for every validation decision
+**Contract:** `../specs/multi-track-editing-contract.md` (DISC-010)
+**Change:** `reviews/CHG-012-synchronized-tracks-and-flexible-delivery.md`
+**Export refinement:** `reviews/CHG-013-independent-track-source-exports.md`
+**Feature range:** FEAT-032 through FEAT-038
+
+| Ticket | Outcome | Feature | Hard ticket dependencies | Status |
+|---|---|---|---|---|
+| TICKET-109 | Selected filename/dimensions/FPS only | FEAT-032 | None in this phase | verifying |
+| TICKET-110 | Atomic track-local removal and exact Undo | FEAT-033 | TICKET-115 | verifying |
+| TICKET-111 | Backspace/Delete/Undo controls and CLI removal | FEAT-033 | TICKET-110, TICKET-117 | verifying |
+| TICKET-112 | Plan stable track/source outputs and final/source modes | FEAT-034 | TICKET-115 | verifying |
+| TICKET-113 | Render independent full-canvas source reels per track, with normal audio | FEAT-034 | TICKET-112, TICKET-104 | verifying |
+| TICKET-114 | Output toggles, track/source listings and CLI errors | FEAT-034 | TICKET-113 | verifying |
+| TICKET-115 | Track/timebase schema and legacy migration | FEAT-035 | Existing baseline; approved DESIGN-010-115 | verifying |
+| TICKET-116 | Collision-safe placement and track domain operations | FEAT-035 | TICKET-115 | verifying |
+| TICKET-117 | Track rows and mouse drag/drop | FEAT-035 | TICKET-116 | verifying |
+| TICKET-118 | Deterministic track CLI parity | FEAT-035 | TICKET-116 | verifying |
+| TICKET-119 | Shared active-interval layout/transform contract | FEAT-036 | TICKET-115 | verifying |
+| TICKET-120 | Silent synchronized composed preview | FEAT-036 | TICKET-119, TICKET-117 | verifying |
+| TICKET-121 | Dynamic multi-track video composition render | FEAT-036 | TICKET-119, TICKET-104 | verifying |
+| TICKET-122 | Fixed stereo pan and clipping-safe active mix | FEAT-037 | TICKET-119 | verifying |
+| TICKET-123 | Final layout-aligned audio/video export | FEAT-037 | TICKET-121, TICKET-122 | verifying |
+| TICKET-124 | Per-output resume, invalidation and atomic delivery | FEAT-038 | TICKET-113, TICKET-121, TICKET-123 | verifying |
+| TICKET-125 | Integrated GTK/CLI/media functionality and automatic acceptance | FEAT-038 | TICKET-109, TICKET-111, TICKET-114, TICKET-118, TICKET-120, TICKET-124, TICKET-126 | verifying |
+| TICKET-126 | Restore existing local quality and executable CI parity | FEAT-038 | Existing Makefile, pinned tools and approved baseline; independent of product model | verifying |
+
+### Requirement coverage
+
+| DISC-010 requirement | Ticket acceptance coverage |
+|---|---|
+| REQ-010-01 selected-source details | 109, integrated125 |
+| REQ-010-02 Backspace/Undo | 110,111, integrated125 |
+| REQ-010-03 independent track/source output modes | 112,113,114,124,125 |
+| REQ-010-04 track timing/placement/migration | 115,116,117,118,125 |
+| REQ-010-05 dynamic framing and transform parity | 119,120,121,123,125 |
+| REQ-010-06 silent preview and fixed stereo export mix | 120,122,123,125 |
+
+### Parallel scheduling and conflict guards
+
+109 and115 have no mutual functional dependency. After115, 110/112/116/119
+can advance from stable interfaces, but110/116 share domain write risk.
+After116,117 GUI and118 CLI can proceed separately. After119,122 audio work
+can overlap121 video work (once104 is terminal);120 also waits for117.
+113 and121 share export helper seams and require separate ownership or
+serialized writes, not blind parallel execution. Standalone track/source
+rendering in113/114 does not wait for121/122/123's final split-screen/stereo
+path; multi-track combined-mode acceptance is integrated in124/125.
+111/114/120 share application
+wiring and must reserve it.124 is a single integration owner;125 follows all
+acceptance predecessors plus maintenance126. Verification104 and maintenance126
+can proceed independently of115 with disjoint ownership. See the phase record
+for candidate waves.
+
+No ready status is inferred from numbering or this dependency graph.
+TICKET-104 remains verifying; its evidence blocks dependent export integrations
+until terminal. Existing open ticket/shared-file conflicts, baselines, technical
+contract decisions, runtime availability, execution approval, automated
+functionality, exact-profile automatic validation, review and delivery gates
+remain binding. No human validation is fabricated or awaited under CHG-014.
+Planned functionality commands name tests to create, not tests already run.
+
+### Final source-export behavior (CHG-013)
+
+With Track 1 A/B and Track 2 A/C, source mode produces four files under
+`Track 1/` and `Track 2/`. Group by stable track/source pair; concatenate only
+that pair's included segments in its track order and preserve repeated copies.
+Every source reel uses the full canvas, its individual modifications and normal
+source audio without final slot crop/pan. One to four populated tracks are
+allowed; empty/excluded-only tracks produce none. Default remains final-only;
+combined/source-only are optional, and no-output/empty-edit requests fail.
+No additional combined-per-track export or synchronized source-layer mode.

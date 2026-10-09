@@ -7,6 +7,14 @@
 **Status:** confirmed
 **Last updated:** 2026-09-07
 
+**Development mode:** automatic, selected by the user's 2026-10-09
+authorization to finish PHASE-010 and necessary workflow repairs without
+further routine questions. `.github/aidd-config.yml`
+`delivery.development.mode` is authoritative. Workers use GPT-5.6 Luna max;
+the configured Rubber Duck GPT-5.6 Luna high `all-validation` profile owns
+automatic validation. Original source protection and real delivery blockers
+remain required. Other open phases are not implicitly selected by this run.
+
 ## Overview
 
 FrameStudio is a local Linux video-editing tool for one user. It replaces the

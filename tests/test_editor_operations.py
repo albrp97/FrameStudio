@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from framestudio.export import ExportPlan
+from framestudio.export import ExportPlan, ExportPlanningError
 from framestudio.fps_policy import FrameRatePolicy
 from framestudio.media import MediaProbe
 from framestudio.model import Project, ProjectValidationError
@@ -170,6 +170,43 @@ class EditorOperationsTests(unittest.TestCase):
 
             self.assertEqual(actual, expected)
             plan.assert_called_once()
+
+    def test_absolute_export_planning_fails_before_probe_or_audio_side_effects(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"fixture")
+            project = Project.create_synchronized(
+                source,
+                {
+                    "duration_seconds": 10.0,
+                    "width": 320,
+                    "height": 180,
+                    "frame_rate": "10/1",
+                    "video_codec": "h264",
+                    "audio_codec": None,
+                    "format_name": "mp4",
+                },
+            )
+
+            with (
+                patch(
+                    "framestudio.operations.ensure_project_audio_analysis",
+                    return_value={},
+                ) as analyze,
+                patch(
+                    "framestudio.operations.probe_media",
+                    return_value=make_probe(root),
+                ) as probe,
+            ):
+                with self.assertRaisesRegex(
+                    ExportPlanningError,
+                    "absolute synchronized timeline export is not supported",
+                ):
+                    plan_project_export(project, root / "edited.mp4")
+
+            analyze.assert_not_called()
+            probe.assert_not_called()
 
     def test_mixed_project_planning_leaves_target_rate_resolution_to_mixed_planner(self):
         with TemporaryDirectory() as temporary_directory:

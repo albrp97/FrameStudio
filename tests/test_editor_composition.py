@@ -110,6 +110,7 @@ def make_editor_window(**attributes):
         "_update_selected_clip_label": MagicMock(),
         "_update_playback_controls": MagicMock(),
         "_update_segment_controls": MagicMock(),
+        "_set_status": MagicMock(),
     }
     values.update(attributes)
     return SimpleNamespace(**values)
@@ -396,22 +397,7 @@ class EditorCompositionTests(unittest.TestCase):
         with TemporaryDirectory() as temporary_directory:
             project = make_project(Path(temporary_directory))
             project.timeline.set_deleted(project.timeline.segments[0].segment_id, True)
-            window = SimpleNamespace(
-                project=None,
-                project_path=None,
-                backend=None,
-                controller=None,
-                _audio_analysis_generation=0,
-                _stop_backend=MagicMock(),
-                timeline_canvas=MagicMock(),
-                audio_status_label=MagicMock(),
-                _on_frame=MagicMock(),
-                _on_backend_error=MagicMock(),
-                _on_backend_end=MagicMock(),
-                _on_backend_warning=MagicMock(),
-                _update_selected_clip_label=MagicMock(),
-                _update_playback_controls=MagicMock(),
-                _update_segment_controls=MagicMock(),
+            window = make_editor_window(
                 _autosave_current_project=MagicMock(),
             )
 
@@ -423,6 +409,33 @@ class EditorCompositionTests(unittest.TestCase):
         window.timeline_canvas.set_timeline.assert_called_once()
         window._update_segment_controls.assert_called_once_with()
         window._autosave_current_project.assert_called_once_with()
+        window._set_status.assert_called_once_with("No included clips in the timeline")
+
+    def test_attach_absolute_timeline_configures_synchronized_playback(self):
+        with TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "source.mp4"
+            source.write_bytes(b"fixture")
+            project = Project.create_synchronized(
+                source,
+                metadata(),
+            )
+            project.set_playhead(4.0)
+            window = make_editor_window()
+
+            with patch(
+                "framestudio.app_project.FfmpegSynchronizedPlaybackBackend",
+            ) as backend_type:
+                attach_project(window, project, None)
+
+        self.assertIs(window.project, project)
+        self.assertIs(window.backend, backend_type.return_value)
+        self.assertEqual(backend_type.call_args.args[0], ((project.source.source_id, source),))
+        self.assertEqual(backend_type.call_args.args[1].final_duration_seconds, 10.0)
+        backend_type.return_value.seek.assert_called_once_with(4.0)
+        self.assertEqual(window.controller.snapshot().position_seconds, 4.0)
+        self.assertEqual(window.controller.snapshot().duration_seconds, 10.0)
+        window.timeline_canvas.set_timeline.assert_called_once()
+        window._update_playback_controls.assert_called_once_with()
 
     def test_cancelled_background_audio_analysis_does_not_publish_completion(self):
         with TemporaryDirectory() as temporary_directory:
@@ -1606,7 +1619,9 @@ class EditorCompositionTests(unittest.TestCase):
             save_project(project, destination)
             restored = load_project(destination)
 
-            self.assertEqual(restored.to_dict(), project.to_dict())
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+            self.assertEqual(restored.timeline.blocks[0].segment_id, segment_id)
             restored_segment = restored.timeline.segments[0]
             self.assertEqual(restored_segment.visual_transform.zoom, 2.0)
             self.assertEqual(

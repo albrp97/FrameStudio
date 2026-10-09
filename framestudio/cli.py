@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from functools import partial
 from pathlib import Path
-from typing import Any, Callable, TextIO
+from typing import Any, Callable, TextIO, TypeVar
 
 from .cli_export import handle_export, progress_payload
 from .cli_parser import JsonArgumentParser, build_cli_parser
@@ -20,6 +21,8 @@ from .cli_payload import (
 from .cli_payload import (
     source_payload as _source_payload,
 )
+from .cli_removal import handle_remove
+from .cli_tracks import ensure_absolute_track_editing, track_error_details
 from .cli_types import (
     CLI_COMMANDS,
     CLI_CONTRACT_VERSION,
@@ -51,7 +54,7 @@ from .fps_policy import (
 )
 from .interpolation import resolve_frame_rate_policy_with_fallback
 from .media import MediaProbeError, probe_media
-from .model import Project, ProjectValidationError, Segment
+from .model import Project, ProjectValidationError, Segment, SegmentTimeline
 from .operations import (
     analyze_project_audio,
     apply_visual_transform,
@@ -82,6 +85,8 @@ from .upscale_policy import (
     UpscalePolicyError,
     resolve_upscale_policy,
 )
+
+_TrackMutationResult = TypeVar("_TrackMutationResult")
 
 __all__ = [
     "CLI_COMMANDS",
@@ -276,6 +281,92 @@ def _handle_open(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def _handle_track_convert(args: argparse.Namespace) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    converted = ensure_absolute_track_editing(
+        project,
+        confirmed=args.confirm_legacy_conversion,
+    )
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        "track-convert",
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation={
+            "converted": converted,
+            "timing_mode": project.timeline.timing_mode,
+            "track_ids": list(project.timeline.track_ids),
+        },
+    )
+
+
+def _handle_track_mutation(
+    args: argparse.Namespace,
+    command: str,
+    mutate: Callable[[SegmentTimeline], _TrackMutationResult],
+    operation: Callable[[Project, _TrackMutationResult], dict[str, Any]],
+) -> dict[str, Any]:
+    project = _load_project_for_cli(args.project)
+    ensure_absolute_track_editing(
+        project,
+        confirmed=args.confirm_legacy_conversion,
+    )
+    try:
+        mutation_result = mutate(project.timeline)
+    except ProjectValidationError as error:
+        raise CliError(
+            "invalid_operation",
+            str(error),
+            exit_code=CLI_EXIT_INVALID,
+            details=track_error_details(project, getattr(args, "track_id", None)),
+        ) from error
+    destination = _save_project_for_cli(project, args.project, args.output)
+    return _project_result(
+        command,
+        project,
+        destination,
+        include_paths=args.full_paths,
+        operation=operation(project, mutation_result),
+    )
+
+
+def _handle_track_add(args: argparse.Namespace) -> dict[str, Any]:
+    return _handle_track_mutation(
+        args,
+        "track-add",
+        lambda timeline: timeline.add_track(args.track_id),
+        lambda project, track_id: {
+            "track_id": track_id,
+            "track_ids": list(project.timeline.track_ids),
+        },
+    )
+
+
+def _handle_track_remove(args: argparse.Namespace) -> dict[str, Any]:
+    return _handle_track_mutation(
+        args,
+        "track-remove",
+        lambda timeline: timeline.remove_track(args.track_id),
+        lambda project, _result: {
+            "track_id": args.track_id,
+            "track_ids": list(project.timeline.track_ids),
+        },
+    )
+
+
+def _handle_track_select(args: argparse.Namespace) -> dict[str, Any]:
+    return _handle_track_mutation(
+        args,
+        "track-select",
+        lambda timeline: timeline.set_active_track(args.track_id),
+        lambda project, _result: {
+            "active_track_id": project.timeline.active_track_id,
+            "track_ids": list(project.timeline.track_ids),
+        },
+    )
+
+
 def _handle_split(args: argparse.Namespace) -> dict[str, Any]:
     project = _load_project_for_cli(args.project)
     if project.segment_timeline is None:
@@ -284,7 +375,18 @@ def _handle_split(args: argparse.Namespace) -> dict[str, Any]:
             "Project segment timeline is required",
             exit_code=CLI_EXIT_INVALID,
         )
-    if project.segment_timeline.mixed_source and args.segment is None:
+    coordinate = args.coordinate or ("timeline" if args.position_ticks is not None else "source")
+    absolute_request = args.position_ticks is not None
+    if absolute_request:
+        ensure_absolute_track_editing(
+            project,
+            confirmed=args.confirm_legacy_conversion,
+        )
+    if (
+        project.segment_timeline.mixed_source
+        and len(project.sources or (project.source,)) > 1
+        and args.segment is None
+    ):
         raise CliError(
             "invalid_arguments",
             "Mixed-source split requires --segment",
@@ -295,7 +397,8 @@ def _handle_split(args: argparse.Namespace) -> dict[str, Any]:
             project.segment_timeline,
             args.position,
             segment_id=args.segment,
-            coordinate=args.coordinate,
+            coordinate=coordinate,
+            position_ticks=args.position_ticks,
         )
     except ProjectValidationError as error:
         raise CliError(
@@ -311,6 +414,8 @@ def _handle_split(args: argparse.Namespace) -> dict[str, Any]:
         include_paths=args.full_paths,
         operation={
             "position_seconds": args.position,
+            "position_ticks": args.position_ticks,
+            "coordinate": coordinate,
             "segment_ids": [first.segment_id, second.segment_id],
         },
     )
@@ -319,7 +424,30 @@ def _handle_split(args: argparse.Namespace) -> dict[str, Any]:
 def _handle_move(args: argparse.Namespace) -> dict[str, Any]:
     project = _load_project_for_cli(args.project)
     try:
-        if len(args.segments) == 1:
+        if args.target_track_id is not None and args.timeline_start_ticks is None:
+            raise ProjectValidationError(
+                "A target track requires --timeline-start-ticks",
+            )
+        if args.timeline_start_ticks is not None:
+            if len(args.segments) != 1:
+                raise ProjectValidationError(
+                    "Absolute track movement accepts exactly one segment_id",
+                )
+            ensure_absolute_track_editing(
+                project,
+                confirmed=args.confirm_legacy_conversion,
+            )
+            changed = move_segment(
+                project,
+                args.segments[0],
+                timeline_start_ticks=args.timeline_start_ticks,
+                target_track_id=args.target_track_id,
+            )
+        elif project.timeline.is_synchronized and project.timeline.timing_mode == "absolute":
+            raise ProjectValidationError(
+                "Absolute track movement requires --timeline-start-ticks",
+            )
+        elif len(args.segments) == 1:
             changed = move_segment(project, args.segments[0], args.direction)
         else:
             changed = move_segments(project, args.segments, args.direction)
@@ -338,6 +466,8 @@ def _handle_move(args: argparse.Namespace) -> dict[str, Any]:
         operation={
             "segment_ids": list(args.segments),
             "direction": args.direction,
+            "timeline_start_ticks": args.timeline_start_ticks,
+            "target_track_id": args.target_track_id,
             "changed": changed,
         },
     )
@@ -372,8 +502,19 @@ def _handle_copy(args: argparse.Namespace) -> dict[str, Any]:
 def _handle_paste(args: argparse.Namespace) -> dict[str, Any]:
     project = _load_project_for_cli(args.project)
     try:
+        if args.target_track_id is not None or args.at_ticks is not None:
+            ensure_absolute_track_editing(
+                project,
+                confirmed=args.confirm_legacy_conversion,
+            )
         copied = copy_segments(project, args.segments)
-        pasted = paste_segments(project, copied, at_seconds=args.at)
+        pasted = paste_segments(
+            project,
+            copied,
+            at_seconds=args.at,
+            at_ticks=args.at_ticks,
+            target_track_id=args.target_track_id,
+        )
     except ProjectValidationError as error:
         raise CliError(
             "invalid_operation",
@@ -390,6 +531,8 @@ def _handle_paste(args: argparse.Namespace) -> dict[str, Any]:
             "source_segment_ids": list(args.segments),
             "pasted_segment_ids": [segment.segment_id for segment in pasted],
             "at_seconds": args.at,
+            "at_ticks": args.at_ticks,
+            "target_track_id": args.target_track_id,
         },
     )
 
@@ -897,6 +1040,10 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         "import": _handle_import,
         "add": _handle_add,
         "analyze-audio": _handle_analyze_audio,
+        "track-convert": _handle_track_convert,
+        "track-add": _handle_track_add,
+        "track-remove": _handle_track_remove,
+        "track-select": _handle_track_select,
         "move": _handle_move,
         "copy": _handle_copy,
         "paste": _handle_paste,
@@ -916,6 +1063,12 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
         "delete": _handle_deletion,
         "restore": _handle_deletion,
         "toggle-delete": _handle_deletion,
+        "remove": partial(
+            handle_remove,
+            load_project_fn=_load_project_for_cli,
+            save_project_fn=_save_project_for_cli,
+            project_result_fn=_project_result,
+        ),
         "duration": _handle_duration,
         "save": _handle_save,
         "set-fps-policy": _handle_set_fps_policy,

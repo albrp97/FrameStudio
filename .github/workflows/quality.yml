@@ -1,0 +1,111 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install media and GTK runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            ffmpeg \
+            gir1.2-gtk-4.0 \
+            python3-gi \
+            python3-gi-cairo \
+            python3-venv \
+            xauth \
+            xdotool \
+            xvfb
+
+      - name: Verify required system tools
+        run: |
+          command -v /usr/bin/python3
+          command -v ffmpeg
+          command -v ffprobe
+          command -v xdotool
+          command -v xvfb-run
+          /usr/bin/python3 -c 'import gi; gi.require_foreign("cairo"); gi.require_version("Gtk", "4.0")'
+
+      - name: Create Python quality environment
+        run: /usr/bin/python3 -m venv --system-site-packages .venv
+
+      - name: Verify GTK quality environment
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            env GDK_BACKEND=x11 .venv/bin/python -c \
+            'import gi; gi.require_foreign("cairo"); gi.require_version("Gdk", "4.0"); gi.require_version("Gtk", "4.0"); from gi.repository import Gtk; assert Gtk.init_check()'
+
+      - name: Install pinned Python quality tools
+        run: .venv/bin/python -m pip install --requirement requirements-dev.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install pinned npm quality tools
+        run: npm ci
+
+      - name: Run repository quality suite
+        run: |
+          mkdir -p "$RUNNER_TEMP/framestudio-quality-tmp" \
+            "$RUNNER_TEMP/framestudio-phase010-artifacts"
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-quality-tmp" \
+              FRAMESTUDIO_PHASE010_ARTIFACT_DIR="$RUNNER_TEMP/framestudio-phase010-artifacts" \
+            make quality PYTHON=.venv/bin/python STATIC_ANALYSIS_DIR=evidence/static-analysis
+
+      - name: Run CLI contract suite
+        run: |
+          mkdir -p "$RUNNER_TEMP/framestudio-contract-tmp"
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-contract-tmp" \
+            make contract PYTHON=.venv/bin/python
+
+      - name: Run generated-media GTK smoke
+        run: |
+          mkdir -p "$RUNNER_TEMP/framestudio-smoke-tmp"
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-smoke-tmp" \
+            make smoke PYTHON=.venv/bin/python FFMPEG=ffmpeg
+
+      - name: Run production GTK functionality charters
+        run: |
+          mkdir -p "$RUNNER_TEMP/framestudio-functionality-tmp" \
+            "$RUNNER_TEMP/framestudio-phase010-functionality-artifacts"
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-functionality-tmp" \
+              FRAMESTUDIO_PHASE010_ARTIFACT_DIR="$RUNNER_TEMP/framestudio-phase010-functionality-artifacts" \
+            .venv/bin/python -m unittest \
+              tests.test_phase010_functionality.Phase010FunctionalityTests.test_selected_video_details \
+              tests.test_phase010_functionality.Phase010FunctionalityTests.test_complete_edit_and_delivery_journey
+
+      - name: Upload static-analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-reports
+          path: evidence/static-analysis
+          if-no-files-found: warn
+
+      - name: Upload GTK functionality artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase010-functionality-artifacts
+          path: |
+            ${{ runner.temp }}/framestudio-phase010-artifacts
+            ${{ runner.temp }}/framestudio-phase010-functionality-artifacts
+          if-no-files-found: warn

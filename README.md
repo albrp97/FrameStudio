@@ -81,7 +81,8 @@ Original source files are never overwritten or deleted by editor operations.
 FrameStudio targets a Linux workstation and requires:
 
 - Python 3.10 or newer.
-- GTK 4 and PyGObject (`gi`).
+- GTK 4 and PyGObject (`gi`), including the Cairo bridge for timeline drawing
+  (`python3-gi-cairo` on Ubuntu/Debian).
 - FFmpeg and FFprobe.
 
 `ffplay` is optional and is used for audio preview. The editor reports audio
@@ -159,6 +160,9 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 5. Press `B` to split at the playhead.
 6. Select segments with click, `Ctrl`-click, or `Shift`-click.
 7. Press `Delete` to toggle a selected segment between deleted and included.
+   Press `Backspace` to remove selected segments instead, closing their space
+   on each affected track. **Undo removal** restores up to the last 20 removals
+   in the current editor session. Other timeline edits invalidate this history.
 8. Move selected segments with `Shift+Left` and `Shift+Right`.
 9. Copy and paste segments with `Ctrl+C` and `Ctrl+V`.
 10. Use Focus and Triplicate controls when a segment needs a different framing.
@@ -167,6 +171,12 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 13. Review the export plan, enhancement counts, and destination before
     starting the render.
 
+The information strip shows only the focused selected video's filename,
+original dimensions, and original FPS. For a multi-selection, it follows the
+last focused segment. Clearing the selection shows **No video selected**.
+Background audio analysis continues without listing routine audio decisions
+in that strip. Analysis failures remain visible in the status area.
+
 ### Timeline controls
 
 | Control | Action |
@@ -174,6 +184,8 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 | `Space` | Play or pause |
 | `B` | Split at the playhead |
 | `Delete` | Toggle the selected segment deleted/included |
+| `Backspace` | Remove selected segments and ripple later blocks on their tracks |
+| **Undo removal** | Restore the latest removal in the current editor session |
 | `Shift+Left` / `Shift+Right` | Move selected segments |
 | `Ctrl+C` / `Ctrl+V` | Copy and paste selected segments |
 | `Ctrl` + mouse wheel | Zoom the timeline |
@@ -184,6 +196,25 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 
 Seeking while playing keeps playback active. Enabling or disabling Triplicate
 keeps the current playhead and play/pause state.
+
+### Synchronized tracks
+
+Use **Add track** to create up to four tracks. For an existing sequential
+project, confirm **Convert and add track** to preserve its clips while
+switching to absolute timeline positions. The Track selector chooses where
+newly imported clips go. **Remove track** removes only an empty track.
+
+Drag clips within or between track rows. Clips cannot overlap on the same
+track, including excluded clips. A colliding drop snaps forward to the first
+available position. Framing, copies and Triplicate remain individual block
+settings.
+
+Preview is silent. Simultaneously included clips determine the visible
+layout: one fills the canvas, two use vertical halves, three use vertical
+thirds, and four use a row-major 2-by-2 grid. Sources are centered in their
+cells, with their individual framing applied. Empty intervals are black.
+The final video uses the same layout with fixed stereo positioning, while
+independent source reels retain normal source audio.
 
 ## Projects and autosave
 
@@ -223,6 +254,26 @@ framestudio export PROJECT.framestudio.json \
   --human-progress
 ```
 
+The export planner defaults to the final video only. Enable edited source
+reels to also export a compact video for each included `(track, source)`
+pair. The same source on two tracks produces two independent reels. Each
+reel preserves retained cuts, copies, framing and smart enhancement policies,
+but has no timeline gaps, split-screen layout or other tracks' audio.
+Empty and excluded-only tracks produce no reels.
+
+Disable the final-video option to export only the reels. These choices also
+work with synchronized tracks:
+
+```sh
+framestudio export PROJECT.framestudio.json \
+  --output ~/Videos/edited.mp4 --output-mode combined
+framestudio export PROJECT.framestudio.json \
+  --output ~/Videos/edited.mp4 --output-mode source-only
+```
+
+In these examples, the reels are written under `~/Videos/edited-sources/`.
+Source-only mode does not render `edited.mp4` or start the final compositor.
+
 Export sessions are scoped to the destination and keep compatible checkpoints
 in adjacent working directories:
 
@@ -250,6 +301,15 @@ framestudio export PROJECT.framestudio.json \
 Resume rejects changes to the project, source files, destination, export
 policies, runtime, or FFmpeg/FFprobe identity. A normal export without a
 session option starts fresh.
+
+Each output is verified before its own atomic publication. A failure or
+cancellation can leave verified siblings available without making the whole
+batch complete. Resume checks both the request fingerprint and the published
+file's content proof before skipping it. A changed output is rendered again.
+Successful batches have an adjacent hidden
+`.<destination-name>.framestudio-batch-receipt.json` receipt. It is advisory
+recovery state, not an atomic transaction across all output files.
+Discard removes recovery state, never original media or published outputs.
 
 When stdout is used for automation, export progress is JSON Lines. Human
 readable numbered stages are written to stderr, so terminal progress does not

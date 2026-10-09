@@ -208,7 +208,12 @@ class EditorModelTests(unittest.TestCase):
 
             self.assertEqual(restored.duration_seconds, 14.0)
             self.assertEqual(restored.timeline.source_duration_seconds, 10.0)
-            self.assertEqual(restored.to_dict(), project.to_dict())
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+            self.assertEqual(
+                [segment.segment_id for segment in restored.timeline.blocks],
+                [segment.segment_id for segment in project.timeline.blocks],
+            )
 
     def test_split_uses_timeline_order_after_one_source_block_move(self):
         timeline = SegmentTimeline(10.0)
@@ -350,9 +355,14 @@ class EditorModelTests(unittest.TestCase):
             restored = Project.from_dict(payload)
 
             self.assertEqual(payload["schema_version"], 2)
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
             self.assertEqual(
-                restored.segment_timeline.to_dict(),
-                project.segment_timeline.to_dict(),
+                [(segment.segment_id, segment.deleted) for segment in restored.timeline.blocks],
+                [
+                    (segment.segment_id, segment.deleted)
+                    for segment in project.segment_timeline.segment_items
+                ],
             )
             self.assertEqual(
                 restored.segment_timeline.edited_duration_seconds,
@@ -371,7 +381,9 @@ class EditorModelTests(unittest.TestCase):
 
             restored = Project.from_dict(payload)
 
-            self.assertEqual(restored.schema_version, 2)
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+            self.assertEqual(restored.timeline.track_ids, ("track-1",))
             self.assertEqual(len(restored.segment_timeline.segments), 1)
             self.assertEqual(
                 restored.segment_timeline.edited_duration_seconds,

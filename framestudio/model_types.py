@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import uuid
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -15,7 +15,9 @@ from .composition import (
 
 LEGACY_SCHEMA_VERSION = 1
 ONE_SOURCE_SCHEMA_VERSION = 2
-SCHEMA_VERSION = 3
+MIXED_SOURCE_SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+TRACK_PROJECT_SCHEMA_VERSION = SCHEMA_VERSION
 PROJECT_TIMEBASE = 1_000_000
 _TIME_EPSILON = 1e-9
 _SEGMENT_COLOR_SLOT_COUNT = 4
@@ -252,7 +254,12 @@ class Segment:
     color_index: int | None = None
     visual_transform: VisualTransform = field(default_factory=VisualTransform)
     triplicate: TriplicateGroup | None = None
+    track_id: str | None = None
     _color_index_explicit: bool = field(default=False, init=False, repr=False, compare=False)
+    _source_start_ticks: int = field(default=0, init=False, repr=False, compare=False)
+    _source_end_ticks: int = field(default=0, init=False, repr=False, compare=False)
+    _timeline_start_ticks: int = field(default=0, init=False, repr=False, compare=False)
+    _timeline_end_ticks: int = field(default=0, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.segment_id, str) or not self.segment_id:
@@ -269,6 +276,8 @@ class Segment:
             not isinstance(self.source_id, str) or not self.source_id
         ):
             raise ProjectValidationError("Segment source_id must be a non-empty string")
+        if self.track_id is not None and (not isinstance(self.track_id, str) or not self.track_id):
+            raise ProjectValidationError("Segment track_id must be a non-empty string")
         timeline_start = self.timeline_start_seconds
         timeline_end = self.timeline_end_seconds
         if (timeline_start is None) != (timeline_end is None):
@@ -315,6 +324,10 @@ class Segment:
         object.__setattr__(self, "visual_transform", visual_transform)
         object.__setattr__(self, "triplicate", triplicate)
         object.__setattr__(self, "_color_index_explicit", color_index_explicit)
+        object.__setattr__(self, "_source_start_ticks", seconds_to_ticks(start))
+        object.__setattr__(self, "_source_end_ticks", seconds_to_ticks(end))
+        object.__setattr__(self, "_timeline_start_ticks", seconds_to_ticks(self.timeline_start))
+        object.__setattr__(self, "_timeline_end_ticks", seconds_to_ticks(self.timeline_end))
 
     @classmethod
     def create(
@@ -332,6 +345,7 @@ class Segment:
         color_index: int | None = None,
         visual_transform: VisualTransform | None = None,
         triplicate: TriplicateGroup | None = None,
+        track_id: str | None = None,
     ) -> Segment:
         return cls(
             segment_id=segment_id or uuid.uuid4().hex,
@@ -346,6 +360,7 @@ class Segment:
             color_index=color_index,
             visual_transform=(VisualTransform() if visual_transform is None else visual_transform),
             triplicate=triplicate,
+            track_id=track_id,
         )
 
     @property
@@ -364,7 +379,50 @@ class Segment:
     def timeline_end(self) -> float:
         return self.end_seconds if self.timeline_end_seconds is None else self.timeline_end_seconds
 
-    def to_dict(self) -> dict[str, Any]:
+    @property
+    def source_start_ticks(self) -> int:
+        return self._source_start_ticks
+
+    @property
+    def source_end_ticks(self) -> int:
+        return self._source_end_ticks
+
+    @property
+    def timeline_start_ticks(self) -> int:
+        return self._timeline_start_ticks
+
+    @property
+    def timeline_end_ticks(self) -> int:
+        return self._timeline_end_ticks
+
+    def to_dict(
+        self,
+        *,
+        canonical_ticks: bool = False,
+        track_id: str | None = None,
+    ) -> dict[str, Any]:
+        if canonical_ticks:
+            canonical_track_id = self.track_id if track_id is None else track_id
+            if canonical_track_id is None:
+                raise ProjectValidationError(
+                    f"Segment {self.segment_id} needs a track_id for canonical serialization"
+                )
+            canonical_value: dict[str, Any] = {
+                "segment_id": self.segment_id,
+                "block_id": self.block_id or self.segment_id,
+                "track_id": canonical_track_id,
+                "source_id": self.source_id,
+                "source_start_ticks": self.source_start_ticks,
+                "source_end_ticks": self.source_end_ticks,
+                "timeline_start_ticks": self.timeline_start_ticks,
+                "timeline_end_ticks": self.timeline_end_ticks,
+                "deleted": self.deleted,
+                "state": deepcopy(self.state),
+                "color_index": self.color_index,
+                "visual_transform": self.visual_transform.to_dict(),
+                "triplicate": (None if self.triplicate is None else self.triplicate.to_dict()),
+            }
+            return canonical_value
         value: dict[str, Any] = {
             "segment_id": self.segment_id,
             "start_seconds": self.start_seconds,
@@ -388,6 +446,96 @@ class Segment:
         return value
 
     @classmethod
+    def from_canonical_dict(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        expected_track_id: str | None = None,
+    ) -> Segment:
+        if not isinstance(value, Mapping):
+            raise ProjectValidationError("Project track block must be an object")
+
+        def required_tick(name: str) -> int:
+            tick = value.get(name)
+            if not isinstance(tick, int) or isinstance(tick, bool) or tick < 0:
+                raise ProjectValidationError(
+                    f"Project track block {name} must be a non-negative integer"
+                )
+            return tick
+
+        segment_id = value.get("segment_id")
+        block_id = value.get("block_id")
+        source_id = value.get("source_id")
+        track_id = value.get("track_id")
+        deleted = value.get("deleted")
+        state = value.get("state")
+        visual_transform_value = value.get("visual_transform")
+        triplicate_value = value.get("triplicate")
+        if not isinstance(segment_id, str) or not segment_id:
+            raise ProjectValidationError(
+                "Project track block segment_id must be a non-empty string"
+            )
+        if block_id is not None and (not isinstance(block_id, str) or not block_id):
+            raise ProjectValidationError("Project track block block_id must be a non-empty string")
+        if not isinstance(source_id, str) or not source_id:
+            raise ProjectValidationError("Project track block source_id must be a non-empty string")
+        if not isinstance(track_id, str) or not track_id:
+            raise ProjectValidationError("Project track block track_id must be a non-empty string")
+        if expected_track_id is not None and track_id != expected_track_id:
+            raise ProjectValidationError(
+                f"Project track block {segment_id} references track {track_id!r}, "
+                f"expected {expected_track_id!r}"
+            )
+        if not isinstance(deleted, bool):
+            raise ProjectValidationError("Project track block deleted must be a boolean")
+        if not isinstance(state, Mapping):
+            raise ProjectValidationError("Project track block state must be an object")
+        source_start = required_tick("source_start_ticks")
+        source_end = required_tick("source_end_ticks")
+        timeline_start = required_tick("timeline_start_ticks")
+        timeline_end = required_tick("timeline_end_ticks")
+        if source_end <= source_start:
+            raise ProjectValidationError(f"Project track block {segment_id} source range is empty")
+        if timeline_end <= timeline_start:
+            raise ProjectValidationError(
+                f"Project track block {segment_id} timeline range is empty"
+            )
+        try:
+            visual_transform = VisualTransform.from_dict(visual_transform_value)
+            triplicate = (
+                None if triplicate_value is None else TriplicateGroup.from_dict(triplicate_value)
+            )
+        except (TypeError, ValueError) as error:
+            raise ProjectValidationError(str(error)) from error
+        color_index = value.get("color_index")
+        if color_index is not None and (
+            not isinstance(color_index, int) or isinstance(color_index, bool) or color_index < 0
+        ):
+            raise ProjectValidationError(
+                "Project track block color_index must be a non-negative integer"
+            )
+        segment = cls(
+            segment_id=segment_id,
+            start_seconds=ticks_to_seconds(source_start),
+            end_seconds=ticks_to_seconds(source_end),
+            deleted=deleted,
+            source_id=source_id,
+            timeline_start_seconds=ticks_to_seconds(timeline_start),
+            timeline_end_seconds=ticks_to_seconds(timeline_end),
+            state=dict(state),
+            block_id=block_id or segment_id,
+            color_index=color_index,
+            visual_transform=visual_transform,
+            triplicate=triplicate,
+            track_id=track_id,
+        )
+        object.__setattr__(segment, "_source_start_ticks", source_start)
+        object.__setattr__(segment, "_source_end_ticks", source_end)
+        object.__setattr__(segment, "_timeline_start_ticks", timeline_start)
+        object.__setattr__(segment, "_timeline_end_ticks", timeline_end)
+        return segment
+
+    @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> Segment:
         if not isinstance(value, Mapping):
             raise ProjectValidationError("Project segment must be an object")
@@ -403,6 +551,7 @@ class Segment:
         color_index = value.get("color_index")
         visual_transform_value = value.get("visual_transform")
         triplicate_value = value.get("triplicate")
+        track_id = value.get("track_id")
         if not isinstance(segment_id, str) or not segment_id:
             raise ProjectValidationError("Project segment_id must be a non-empty string")
         if not isinstance(start_seconds, (int, float)) or isinstance(start_seconds, bool):
@@ -413,6 +562,8 @@ class Segment:
             raise ProjectValidationError("Project segment deleted must be a boolean")
         if source_id is not None and not isinstance(source_id, str):
             raise ProjectValidationError("Project segment source_id must be a string")
+        if track_id is not None and (not isinstance(track_id, str) or not track_id):
+            raise ProjectValidationError("Project segment track_id must be a non-empty string")
         if timeline_start_seconds is not None and not isinstance(
             timeline_start_seconds,
             (int, float),
@@ -457,6 +608,7 @@ class Segment:
             color_index=color_index,
             visual_transform=visual_transform,
             triplicate=triplicate,
+            track_id=track_id,
         )
 
     def clone(
@@ -467,12 +619,9 @@ class Segment:
         timeline_end_seconds: float | None = None,
     ) -> Segment:
         segment_id = uuid.uuid4().hex if new_id else self.segment_id
-        return Segment(
+        return replace(
+            self,
             segment_id=segment_id,
-            start_seconds=self.start_seconds,
-            end_seconds=self.end_seconds,
-            deleted=self.deleted,
-            source_id=self.source_id,
             timeline_start_seconds=(
                 self.timeline_start_seconds
                 if timeline_start_seconds is None
@@ -483,42 +632,18 @@ class Segment:
             ),
             state=deepcopy(self.state),
             block_id=(segment_id if new_id else self.block_id),
-            color_index=self.color_index,
-            visual_transform=self.visual_transform,
             triplicate=(None if self.triplicate is None else self.triplicate.clone(new_id=new_id)),
         )
 
     def with_color_index(self, color_index: int) -> Segment:
-        return Segment(
-            segment_id=self.segment_id,
-            start_seconds=self.start_seconds,
-            end_seconds=self.end_seconds,
-            deleted=self.deleted,
-            source_id=self.source_id,
-            timeline_start_seconds=self.timeline_start_seconds,
-            timeline_end_seconds=self.timeline_end_seconds,
-            state=self.state,
-            block_id=self.block_id,
-            color_index=color_index,
-            visual_transform=self.visual_transform,
-            triplicate=self.triplicate,
-        )
+        return replace(self, color_index=color_index)
 
     def with_visual_transform(self, visual_transform: VisualTransform) -> Segment:
         triplicate = (
             None if self.triplicate is None else self.triplicate.with_transform(visual_transform)
         )
-        return Segment(
-            segment_id=self.segment_id,
-            start_seconds=self.start_seconds,
-            end_seconds=self.end_seconds,
-            deleted=self.deleted,
-            source_id=self.source_id,
-            timeline_start_seconds=self.timeline_start_seconds,
-            timeline_end_seconds=self.timeline_end_seconds,
-            state=self.state,
-            block_id=self.block_id,
-            color_index=self.color_index,
+        return replace(
+            self,
             visual_transform=visual_transform,
             triplicate=triplicate,
         )
@@ -527,20 +652,14 @@ class Segment:
         visual_transform = (
             self.visual_transform if triplicate is None else triplicate.shared_transform
         )
-        return Segment(
-            segment_id=self.segment_id,
-            start_seconds=self.start_seconds,
-            end_seconds=self.end_seconds,
-            deleted=self.deleted,
-            source_id=self.source_id,
-            timeline_start_seconds=self.timeline_start_seconds,
-            timeline_end_seconds=self.timeline_end_seconds,
-            state=self.state,
-            block_id=self.block_id,
-            color_index=self.color_index,
+        return replace(
+            self,
             visual_transform=visual_transform,
             triplicate=triplicate,
         )
+
+    def with_track_id(self, track_id: str) -> Segment:
+        return replace(self, track_id=track_id)
 
     @property
     def has_visual_modifications(self) -> bool:
@@ -553,6 +672,29 @@ class Segment:
         if self.color_index is None:
             raise ProjectValidationError("Segment color_index is not assigned")
         return self.color_index
+
+
+@dataclass(frozen=True)
+class TimelineTrack:
+    track_id: str
+    blocks: tuple[Segment, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.track_id, str) or not self.track_id:
+            raise ProjectValidationError("Track track_id must be a non-empty string")
+        if not isinstance(self.blocks, tuple):
+            object.__setattr__(self, "blocks", tuple(self.blocks))
+        for index, block in enumerate(self.blocks):
+            if not isinstance(block, Segment):
+                raise ProjectValidationError(f"Track block at index {index} must be a Segment")
+            if block.track_id != self.track_id:
+                raise ProjectValidationError(
+                    f"Track block {block.segment_id} does not belong to {self.track_id}"
+                )
+
+    @property
+    def segment_items(self) -> tuple[Segment, ...]:
+        return self.blocks
 
 
 def _split_segment_color_indices(segment: Segment) -> tuple[int, int]:

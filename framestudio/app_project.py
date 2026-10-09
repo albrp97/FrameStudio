@@ -21,11 +21,19 @@ from .audio import (
     audio_decision_is_stale,
     pending_audio_decision,
 )
+from .composed_playback import FfmpegSynchronizedPlaybackBackend
 from .export import OutputPolicy, resolve_output_policy
 from .export_session import find_export_sessions_for_sources
 from .ffmpeg_playback import FfmpegComposedPlaybackBackend, FfmpegPlaybackBackend
+from .layout_plan import LayoutPlan, plan_project_layout
 from .media import MediaProbeError
-from .model import Project, ProjectValidationError, Segment, SourceReference
+from .model import (
+    ABSOLUTE_TIMING_MODE,
+    Project,
+    ProjectValidationError,
+    Segment,
+    SourceReference,
+)
 from .operations import (
     analyze_project_audio,
     create_project_from_source,
@@ -44,6 +52,7 @@ from .persistence import (
 )
 from .playback import PlaybackBackendError, PlaybackController, PlaybackState
 from .timeline_order import randomize_clip_order
+from .ui import format_duration
 
 
 def _schedule_on_main(glib: Any | None, callback: Callable[..., bool], *args: Any) -> None:
@@ -360,6 +369,18 @@ def _finish_audio_analysis(
         project.source_audio_settings(source.source_id).get("status") == "failed"
         for source in project.sources or (project.source,)
     )
+    failure_diagnostics = [
+        f"{Path(source.path).name}: {diagnostic}"
+        for source in project.sources or (project.source,)
+        if (
+            project.source_audio_settings(source.source_id).get("status") == "failed"
+            and isinstance(
+                diagnostic := project.source_audio_settings(source.source_id).get("diagnostic"),
+                str,
+            )
+            and diagnostic
+        )
+    ]
     unresolved_sources = _audio_sources_needing_analysis(project)
     rejected_source_ids: set[str] = getattr(
         window,
@@ -375,8 +396,12 @@ def _finish_audio_analysis(
             status_message = "Audio analysis incomplete: source changed or unavailable"
         else:
             status_message = "Audio analysis incomplete: unresolved source audio"
+        if failure_diagnostics:
+            status_message = f"{status_message}: {'; '.join(failure_diagnostics)}"
     elif has_failures:
         status_message = "Audio analysis complete with failures"
+        if failure_diagnostics:
+            status_message = f"{status_message}: {'; '.join(failure_diagnostics)}"
     else:
         status_message = "Audio analysis complete"
     window._audio_analysis_rejected_source_ids = set()
@@ -440,6 +465,32 @@ def _invalidate_audio_analysis(window: Any) -> None:
     window._audio_analysis_source_ids = ()
     window._audio_analysis_cancel_event = None
     window._audio_analysis_rejected_source_ids = set()
+
+
+def _clear_empty_preview_state(window: Any) -> None:
+    frame_lock = getattr(window, "_frame_lock", None)
+    if frame_lock is None:
+        window._latest_frame = None
+        window._latest_frame_generation = None
+        window._frame_delivery_scheduled = False
+    else:
+        with frame_lock:
+            window._latest_frame = None
+            window._latest_frame_generation = None
+            window._frame_delivery_scheduled = False
+    preview = getattr(window, "preview", None)
+    if preview is not None:
+        preview.set_paintable(None)
+    play_button = getattr(window, "play_button", None)
+    if play_button is not None:
+        play_button.set_label("Play")
+        play_button.set_sensitive(False)
+    position_label = getattr(window, "position_label", None)
+    if position_label is not None:
+        position_label.set_text(format_duration(0.0))
+    timeline_canvas = getattr(window, "timeline_canvas", None)
+    if timeline_canvas is not None:
+        timeline_canvas.set_playhead(0.0)
 
 
 def _create_backend_callbacks(
@@ -506,14 +557,39 @@ def _create_composed_preview_backend(
     )
 
 
+def _create_synchronized_preview_backend(
+    sources: Sequence[SourceReference],
+    layout: LayoutPlan,
+    policy: OutputPolicy,
+    frame_rate: float,
+    callbacks: tuple[Any, Any, Any, Any],
+) -> FfmpegSynchronizedPlaybackBackend:
+    on_frame, on_error, on_end, on_warning = callbacks
+    source_ids = {block.source_id for block in layout.included_blocks}
+    if source_ids:
+        sources = tuple(source for source in sources if source.source_id in source_ids)
+    return FfmpegSynchronizedPlaybackBackend(
+        tuple((source.source_id, Path(source.path)) for source in sources),
+        layout,
+        policy.width,
+        policy.height,
+        frame_rate,
+        on_frame,
+        on_error,
+        on_end,
+        on_warning=on_warning,
+    )
+
+
 def _sync_project_playhead(window: Any) -> None:
     if window.controller is None:
         return
     if window.segment_timeline is not None:
+        position = window.controller.snapshot().position_seconds
         window.project.set_playhead(
-            window.segment_timeline.edited_to_timeline_position(
-                window.controller.snapshot().position_seconds,
-            )
+            position
+            if window.segment_timeline.timing_mode == ABSOLUTE_TIMING_MODE
+            else window.segment_timeline.edited_to_timeline_position(position)
         )
     else:
         window.project.set_playhead(window.controller.snapshot().position_seconds)
@@ -704,6 +780,9 @@ def attach_project(
     project: Project,
     project_path: Path | None,
 ) -> None:
+    timeline = project.segment_timeline
+    if timeline is None:
+        raise ProjectValidationError("Project segment timeline is required")
     sources = project.sources or (project.source,)
     policy = resolve_output_policy([source.metadata for source in sources])
     audio_decisions = _preview_audio_decisions(project)
@@ -711,21 +790,34 @@ def attach_project(
         {"frame_rate": policy.frame_rate},
         "frame_rate",
     )
-    timeline = project.segment_timeline
-    if timeline is None:
-        raise ProjectValidationError("Project segment timeline is required")
     active_segments = timeline.active_blocks()
     segments = timeline.segment_items
-    if not segments:
-        raise ProjectValidationError("Project segment timeline must contain a segment")
+    synchronized_layout = (
+        plan_project_layout(project) if timeline.timing_mode == ABSOLUTE_TIMING_MODE else None
+    )
     use_composed_preview = (
         timeline.mixed_source
         or timeline.has_explicit_timeline
         or any(segment.deleted for segment in segments)
         or any(segment.has_visual_modifications for segment in active_segments)
     )
-    selected_segment_id = segments[0].segment_id
-    selected_segment_ids = (selected_segment_id,)
+    known_segment_ids = {segment.segment_id for segment in segments}
+    previous_selected_id = getattr(window, "selected_segment_id", None)
+    previous_selected_ids = tuple(getattr(window, "selected_segment_ids", ()))
+    selected_segment_ids = tuple(
+        segment_id for segment_id in previous_selected_ids if segment_id in known_segment_ids
+    )
+    if not active_segments:
+        selected_segment_id = None
+        selected_segment_ids = ()
+    else:
+        selected_segment_id = (
+            previous_selected_id
+            if previous_selected_id in known_segment_ids
+            else (selected_segment_ids[-1] if selected_segment_ids else segments[0].segment_id)
+        )
+        if selected_segment_id not in selected_segment_ids:
+            selected_segment_ids = (*selected_segment_ids, selected_segment_id)
     generation = int(getattr(window, "_playback_generation", 0)) + 1
     pending_events: list[tuple[Callable[..., None], tuple[Any, ...]]] = []
     callbacks = _create_backend_callbacks(
@@ -737,7 +829,16 @@ def attach_project(
     backend: FfmpegPlaybackBackend | None = None
     controller: PlaybackController | None = None
     if active_segments:
-        if use_composed_preview:
+        if synchronized_layout is not None:
+            backend = _create_synchronized_preview_backend(
+                sources,
+                synchronized_layout,
+                policy,
+                frame_rate,
+                callbacks,
+            )
+            playback_duration = synchronized_layout.final_duration_seconds
+        elif use_composed_preview:
             backend = _create_composed_preview_backend(
                 sources,
                 active_segments,
@@ -746,8 +847,9 @@ def attach_project(
                 timeline.edited_duration_seconds,
                 callbacks,
                 audio_decisions,
-                getattr(window, "audio_preview_enabled", False),
+                False,
             )
+            playback_duration = timeline.edited_duration_seconds
         else:
             backend = FfmpegPlaybackBackend(
                 Path(project.source.path),
@@ -759,13 +861,18 @@ def attach_project(
                 on_error,
                 on_end,
                 audio_decision=audio_decisions[project.source.source_id],
-                audio_preview_enabled=getattr(window, "audio_preview_enabled", False),
+                audio_preview_enabled=False,
                 on_warning=on_warning,
             )
-        initial_position = timeline.timeline_to_edited_position(project.playhead_seconds)
+            playback_duration = timeline.edited_duration_seconds
+        initial_position = (
+            project.playhead_seconds
+            if synchronized_layout is not None
+            else timeline.timeline_to_edited_position(project.playhead_seconds)
+        )
         controller = PlaybackController(
             backend,
-            timeline.edited_duration_seconds,
+            playback_duration,
             initial_position,
         )
         if not controller.seek(initial_position):
@@ -798,14 +905,19 @@ def attach_project(
     for callback, args in pending_events:
         callback(*args)
     if not active_segments:
+        _clear_empty_preview_state(window)
         window._update_playback_controls()
         window._update_segment_controls()
+        window._set_status("No included clips in the timeline")
         autosave_callback = getattr(window, "_autosave_current_project", None)
         if callable(autosave_callback):
             autosave_callback()
         return
     window._update_playback_controls()
     window._update_segment_controls()
+    play_button = getattr(window, "play_button", None)
+    if play_button is not None:
+        play_button.set_sensitive(True)
     autosave_callback = getattr(window, "_autosave_current_project", None)
     if callable(autosave_callback):
         autosave_callback()
@@ -829,6 +941,9 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
             stop_backend()
         else:
             window._stop_backend()
+        window.selected_segment_id = None
+        window.selected_segment_ids = ()
+        _clear_empty_preview_state(window)
         window.audio_status_label.set_text(
             format_audio_decisions(
                 window.project,
@@ -841,6 +956,7 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
     if (
         not force
         and not requires_composed_preview
+        and window.backend is not None
         and not isinstance(
             window.backend,
             FfmpegComposedPlaybackBackend,
@@ -860,10 +976,18 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
         position = previous_snapshot.position_seconds
     if position is None:
         timeline_position = 0.0 if window.project is None else window.project.playhead_seconds
-        position = window.segment_timeline.timeline_to_edited_position(timeline_position)
+        position = (
+            timeline_position
+            if window.segment_timeline.timing_mode == ABSOLUTE_TIMING_MODE
+            else window.segment_timeline.timeline_to_edited_position(timeline_position)
+        )
     if force and window.project is not None and previous_snapshot is not None:
         window.project.set_playhead(
-            window.segment_timeline.edited_to_timeline_position(position),
+            (
+                position
+                if window.segment_timeline.timing_mode == ABSOLUTE_TIMING_MODE
+                else window.segment_timeline.edited_to_timeline_position(position)
+            ),
         )
     was_playing = previous_snapshot is not None and previous_snapshot.state == PlaybackState.PLAYING
     sources = window.project.sources or (window.project.source,)
@@ -877,7 +1001,21 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
     )
     window._stop_backend()
     on_frame, on_error, on_end, on_warning = _create_backend_callbacks(window)
-    if requires_composed_preview:
+    synchronized_layout = (
+        plan_project_layout(window.project)
+        if window.segment_timeline.timing_mode == ABSOLUTE_TIMING_MODE
+        else None
+    )
+    if synchronized_layout is not None:
+        window.backend = _create_synchronized_preview_backend(
+            sources,
+            synchronized_layout,
+            policy,
+            window.source_frame_rate,
+            (on_frame, on_error, on_end, on_warning),
+        )
+        playback_duration = synchronized_layout.final_duration_seconds
+    elif requires_composed_preview:
         composed_sources = (
             sources if window.segment_timeline.mixed_source else (window.project.source,)
         )
@@ -889,8 +1027,9 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
             window.segment_timeline.edited_duration_seconds,
             (on_frame, on_error, on_end, on_warning),
             audio_decisions,
-            getattr(window, "audio_preview_enabled", False),
+            False,
         )
+        playback_duration = window.segment_timeline.edited_duration_seconds
     else:
         window.backend = FfmpegPlaybackBackend(
             Path(window.project.source.path),
@@ -902,12 +1041,13 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
             on_error,
             on_end,
             audio_decision=audio_decisions[window.project.source.source_id],
-            audio_preview_enabled=getattr(window, "audio_preview_enabled", False),
+            audio_preview_enabled=False,
             on_warning=on_warning,
         )
+        playback_duration = window.segment_timeline.edited_duration_seconds
     window.controller = PlaybackController(
         window.backend,
-        window.segment_timeline.edited_duration_seconds,
+        playback_duration,
         position,
     )
     if not window.controller.seek(position):

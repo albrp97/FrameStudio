@@ -1,0 +1,1313 @@
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+import shutil
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
+from fractions import Fraction
+from pathlib import Path
+from typing import Any
+from urllib.parse import unquote, urlparse
+
+from .export_process import (
+    partial_path,
+    probe_frame_count,
+    publish_verified_export,
+    remove_partial,
+    run_ffmpeg,
+    validate_decoded_output,
+)
+from .export_types import ExportExecutionError
+from .fps_policy import (
+    DEFAULT_FPS_BACKEND,
+    DEFAULT_FPS_FALLBACK_BACKEND,
+    FrameRatePolicy,
+    FrameRatePolicyError,
+    ResolvedFrameRatePolicy,
+    canonical_rate,
+    resolve_frame_rate_policy,
+)
+from .interpolation import (
+    run_source_interpolation,
+    validate_interpolation_backend,
+)
+from .layout_plan import (
+    DEFAULT_CANVAS,
+    CropPlan,
+    LayoutInterval,
+    LayoutPlan,
+    LayoutPlanError,
+    PlannedBlock,
+    SlotPlan,
+    SourceGeometry,
+    plan_project_layout,
+)
+from .media import MediaProbe, MediaProbeError, probe_media
+from .model import Project, ProjectValidationError
+from .upscale_policy import (
+    ResolvedUpscalePolicy,
+    UpscaleDecision,
+    UpscalePolicy,
+    UpscalePolicyError,
+    resolve_upscale_policy,
+)
+
+PROJECT_TIMEBASE = 1_000_000
+
+
+class VideoCompositorError(RuntimeError):
+    """Base error for bounded video-only composition."""
+
+
+class VideoCompositorPlanningError(VideoCompositorError):
+    """Raised when a project cannot be planned for video-only rendering."""
+
+
+class VideoCompositorExecutionError(VideoCompositorError):
+    """Raised when a planned video render cannot be verified and published."""
+
+
+@dataclass(frozen=True)
+class VideoSourceProbe:
+    source_id: str
+    path: Path
+    media: MediaProbe
+    geometry: SourceGeometry
+    sample_aspect_ratio: tuple[int, int]
+    frame_count: int
+    source_hash: str
+    source_stat: os.stat_result
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return {
+            **self.media.metadata(),
+            "source_id": self.source_id,
+            "sample_aspect_ratio": f"{self.sample_aspect_ratio[0]}/{self.sample_aspect_ratio[1]}",
+        }
+
+
+@dataclass(frozen=True)
+class VideoProcessingRoute:
+    source_id: str
+    source_rate: Fraction
+    target_rate: Fraction
+    fps_action: str
+    fps_backend: str
+    fps_status: str
+    fps_reason: str
+    upscale_requested: bool
+    upscale_backend: str
+    upscale_status: str
+    upscale_reason: str
+    upscale_model: str | None = None
+
+
+@dataclass(frozen=True)
+class VideoPreparationIdentity:
+    block_id: str
+    source_id: str
+    source_hash: str
+    source_range_ticks: tuple[int, int]
+    target_rate: Fraction
+    input_domain: str = "native-source"
+    output_domain: str = "native-preparation"
+    modification_identity: tuple[object, ...] = ()
+    policy_identity: tuple[object, ...] = ()
+
+    @property
+    def cache_key(self) -> str:
+        payload = {
+            "block_id": self.block_id,
+            "source_id": self.source_id,
+            "source_hash": self.source_hash,
+            "source_range_ticks": self.source_range_ticks,
+            "target_rate": str(self.target_rate),
+            "input_domain": self.input_domain,
+            "output_domain": self.output_domain,
+            "modification_identity": self.modification_identity,
+            "policy_identity": self.policy_identity,
+        }
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True, default=str).encode("utf-8"),
+        ).hexdigest()
+
+
+@dataclass(frozen=True)
+class VideoRenderPlan:
+    project: Project
+    destination: Path
+    layout_plan: LayoutPlan
+    probed_metadata: tuple[VideoSourceProbe, ...]
+    target_rate: Fraction
+    frame_boundaries: tuple[int, ...]
+    interval_frame_counts: tuple[int, ...]
+    expected_frames: int
+    include_audio: bool
+    frame_rate_policy: ResolvedFrameRatePolicy
+    upscale_policy: ResolvedUpscalePolicy
+    processing_routes: tuple[VideoProcessingRoute, ...]
+    preparation_identities: tuple[VideoPreparationIdentity, ...]
+
+    @property
+    def expected_duration_seconds(self) -> float:
+        return self.expected_frames / float(self.target_rate)
+
+    @property
+    def source_paths(self) -> tuple[Path, ...]:
+        return tuple(item.path for item in self.probed_metadata)
+
+
+@dataclass(frozen=True)
+class VideoRenderResult:
+    destination: Path
+    output_probe: MediaProbe
+    actual_frames: int
+    expected_frames: int
+    source_hashes_unchanged: bool
+    processing_fallbacks: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _PreparedAsset:
+    path: Path
+    fps_converted: bool
+
+
+def cumulative_frame_boundaries(
+    timeline_boundaries: Sequence[int],
+    target_rate: Fraction | int | float | str,
+) -> tuple[int, ...]:
+    """Round cumulative timeline positions half-up, then derive interval counts."""
+    rate = canonical_rate(target_rate)
+    if not timeline_boundaries:
+        raise VideoCompositorPlanningError("At least one timeline boundary is required")
+    previous = -1
+    result: list[int] = []
+    for value in timeline_boundaries:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise VideoCompositorPlanningError("Timeline boundaries must be non-negative ticks")
+        if value <= previous:
+            raise VideoCompositorPlanningError("Timeline boundaries must be strictly increasing")
+        exact = Fraction(value, PROJECT_TIMEBASE) * rate
+        rounded = (exact.numerator * 2 + exact.denominator) // (2 * exact.denominator)
+        result.append(rounded)
+        previous = value
+    return tuple(result)
+
+
+def _source_destination_conflict(
+    project: Project,
+    destination: Path,
+    planned_source_paths: Sequence[Path] = (),
+) -> Path | None:
+    resolved_destination = destination.expanduser().resolve()
+    aliases = {path.expanduser().resolve() for path in planned_source_paths}
+    project_sources = project.sources if project.sources is not None else ()
+    sources = (project.source, *project_sources)
+    for source in sources:
+        aliases.add(Path(source.path).expanduser().resolve())
+        parsed_uri = urlparse(source.uri)
+        if parsed_uri.scheme == "file":
+            uri_path = unquote(parsed_uri.path)
+            if parsed_uri.netloc and parsed_uri.netloc != "localhost":
+                uri_path = f"//{parsed_uri.netloc}{uri_path}"
+            aliases.add(Path(uri_path).expanduser().resolve())
+    for source_path in aliases:
+        if resolved_destination == source_path:
+            return source_path
+    return None
+
+
+def plan_project_video(
+    project: Project,
+    destination: Path,
+    *,
+    target_rate: Fraction | int | float | str | None = None,
+    frame_rate_policy: (
+        FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, object] | None
+    ) = None,
+    upscale_policy: (UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, object] | None) = None,
+    ffprobe_path: str = "ffprobe",
+) -> VideoRenderPlan:
+    """Plan the final-slot, video-only render without mutating the project."""
+    if not isinstance(project, Project):
+        raise VideoCompositorPlanningError("project must be a Project")
+    if not isinstance(destination, Path):
+        destination = Path(destination)
+    destination = destination.expanduser().resolve()
+    if destination.name in {"", ".", ".."}:
+        raise VideoCompositorPlanningError("A file destination is required")
+    conflict = _source_destination_conflict(project, destination)
+    if conflict is not None:
+        raise VideoCompositorPlanningError(
+            f"Export destination must differ from project source media: {conflict.name}",
+        )
+
+    try:
+        project.validate()
+    except ProjectValidationError as error:
+        raise VideoCompositorPlanningError(f"Project validation failed: {error}") from error
+
+    sources = tuple(project.sources) if project.sources is not None else (project.source,)
+    probes = tuple(
+        _probe_source(source.source_id, Path(source.path), ffprobe_path=ffprobe_path)
+        for source in sources
+    )
+    source_geometries = {item.source_id: item.geometry for item in probes}
+    try:
+        layout = plan_project_layout(
+            project,
+            source_geometries,
+            canvas=DEFAULT_CANVAS,
+        )
+    except LayoutPlanError as error:
+        raise VideoCompositorPlanningError(
+            f"Could not plan synchronized layout: {error}",
+        ) from error
+
+    metadata = tuple(item.metadata for item in probes)
+    resolved_fps = _resolve_frame_rate_policy(
+        metadata,
+        project,
+        target_rate=target_rate,
+        frame_rate_policy=frame_rate_policy,
+    )
+    resolved_upscale = _resolve_upscale_policy(
+        metadata,
+        project,
+        policy=upscale_policy,
+    )
+    routes = tuple(
+        _processing_route(
+            item,
+            resolved_fps,
+            resolved_upscale,
+        )
+        for item in probes
+    )
+    route_by_source = {item.source_id: item for item in routes}
+    probe_by_source = {item.source_id: item for item in probes}
+    preparation_identities = tuple(
+        _preparation_identity(
+            block,
+            probe_by_source[block.source_id],
+            route_by_source[block.source_id],
+        )
+        for block in layout.included_blocks
+    )
+    boundaries = cumulative_frame_boundaries(layout.boundaries, resolved_fps.policy.target_rate)
+    counts = tuple(
+        right - left for left, right in zip(boundaries[:-1], boundaries[1:], strict=True)
+    )
+    expected_frames = boundaries[-1]
+    if expected_frames <= 0 or any(count < 0 for count in counts):
+        raise VideoCompositorPlanningError("The planned timeline has no positive output frames")
+    return VideoRenderPlan(
+        project=project,
+        destination=destination,
+        layout_plan=layout,
+        probed_metadata=probes,
+        target_rate=resolved_fps.policy.target_rate,
+        frame_boundaries=boundaries,
+        interval_frame_counts=counts,
+        expected_frames=expected_frames,
+        include_audio=False,
+        frame_rate_policy=resolved_fps,
+        upscale_policy=resolved_upscale,
+        processing_routes=routes,
+        preparation_identities=preparation_identities,
+    )
+
+
+def render_project_video(
+    plan: VideoRenderPlan,
+    *,
+    ffmpeg_path: str = "ffmpeg",
+    ffprobe_path: str = "ffprobe",
+    cancel_event: threading.Event | None = None,
+    cancellation_lock: threading.Lock | None = None,
+) -> VideoRenderResult:
+    """Render, verify, and atomically publish a planned video-only composition."""
+    if not isinstance(plan, VideoRenderPlan):
+        raise VideoCompositorExecutionError("plan must be a VideoRenderPlan")
+    if plan.include_audio:
+        raise VideoCompositorExecutionError("Video compositor cannot render audio")
+    conflict = _source_destination_conflict(
+        plan.project,
+        plan.destination,
+        plan.source_paths,
+    )
+    if conflict is not None:
+        raise VideoCompositorExecutionError(
+            f"Export destination must differ from project source media: {conflict.name}",
+        )
+    if shutil.which(ffmpeg_path) is None:
+        raise VideoCompositorExecutionError(f"FFmpeg executable was not found: {ffmpeg_path}")
+    if shutil.which(ffprobe_path) is None:
+        raise VideoCompositorExecutionError(f"ffprobe executable was not found: {ffprobe_path}")
+
+    destination = plan.destination
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = partial_path(destination)
+    workspace = destination.parent / f".{destination.name}.video-compositor-{uuid.uuid4().hex}"
+    workspace.mkdir(parents=True, exist_ok=False)
+    source_hashes = tuple(item.source_hash for item in plan.probed_metadata)
+    fallbacks: list[str] = []
+    started = time.monotonic()
+    try:
+        source_stats = tuple(item.path.stat() for item in plan.probed_metadata)
+        assets = _prepare_assets(
+            plan,
+            workspace,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            fallbacks=fallbacks,
+        )
+        command = _build_render_command(
+            plan,
+            assets,
+            output=partial,
+            ffmpeg_path=ffmpeg_path,
+        )
+        run_ffmpeg(
+            command,
+            cancel_event=cancel_event,
+            stage="video composition",
+            command_duration_seconds=plan.expected_duration_seconds,
+            command_total_frames=plan.expected_frames,
+            progress_total_duration_seconds=plan.expected_duration_seconds,
+            progress_total_frames=plan.expected_frames,
+        )
+
+        _verify_rendered_output(
+            partial,
+            plan,
+            ffprobe_path=ffprobe_path,
+            ffmpeg_path=ffmpeg_path,
+            cancel_event=cancel_event,
+        )
+        output_probe = probe_media(partial, ffprobe_path)
+        actual_frames = probe_frame_count(partial, ffprobe_path)
+        current_hashes = tuple(_sha256(path) for path in plan.source_paths)
+        if current_hashes != source_hashes:
+            raise VideoCompositorExecutionError(
+                "A source changed during rendering; output was not published",
+            )
+        if tuple(path.stat() for path in plan.source_paths) != source_stats:
+            raise VideoCompositorExecutionError(
+                "Source metadata changed during rendering; output was not published",
+            )
+        publish_verified_export(
+            partial,
+            destination,
+            plan.source_paths,
+            source_stats,
+            cancel_event=None,
+            progress_callback=None,
+            expected_duration_seconds=plan.expected_duration_seconds,
+            total_frames=plan.expected_frames,
+            started=started,
+            cancellation_lock=cancellation_lock,
+        )
+        output_probe = replace(output_probe, path=destination)
+        return VideoRenderResult(
+            destination=destination,
+            output_probe=output_probe,
+            actual_frames=actual_frames,
+            expected_frames=plan.expected_frames,
+            source_hashes_unchanged=True,
+            processing_fallbacks=tuple(fallbacks),
+        )
+    except ExportExecutionError as error:
+        raise VideoCompositorExecutionError(str(error)) from error
+    except (OSError, MediaProbeError, VideoCompositorError) as error:
+        if isinstance(error, VideoCompositorError):
+            raise
+        raise VideoCompositorExecutionError(str(error)) from error
+    finally:
+        cleanup_error = _cleanup_render_artifacts(partial, workspace)
+        if cleanup_error is not None:
+            active_error = sys.exc_info()[1]
+            if active_error is not None:
+                raise VideoCompositorExecutionError(
+                    f"Render failed: {active_error}; cleanup failed: {cleanup_error}",
+                ) from active_error
+            else:
+                raise VideoCompositorExecutionError(str(cleanup_error)) from cleanup_error
+
+
+def _cleanup_render_artifacts(partial: Path, workspace: Path) -> OSError | None:
+    errors: list[str] = []
+    partial_error = remove_partial(partial)
+    if partial_error is not None:
+        errors.append(f"Could not remove partial output {partial.name}: {partial_error}")
+    try:
+        shutil.rmtree(workspace)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        errors.append(f"Could not remove render workspace {workspace.name}: {error}")
+    if not errors:
+        return None
+    return OSError("; ".join(errors))
+
+
+def _probe_source(
+    source_id: str,
+    path: Path,
+    *,
+    ffprobe_path: str = "ffprobe",
+) -> VideoSourceProbe:
+    resolved_path = Path(path).expanduser().resolve()
+    try:
+        media = probe_media(resolved_path, ffprobe_path)
+        sample_aspect_ratio = _probe_sample_aspect_ratio(resolved_path, ffprobe_path)
+        source_stat = resolved_path.stat()
+    except (OSError, MediaProbeError, VideoCompositorPlanningError) as error:
+        raise VideoCompositorPlanningError(
+            f"Could not probe source {source_id}: {error}",
+        ) from error
+    try:
+        frame_count = probe_frame_count(resolved_path, ffprobe_path)
+        source_hash = _sha256(resolved_path)
+        geometry = SourceGeometry(
+            source_id,
+            media.width,
+            media.height,
+            sar_num=sample_aspect_ratio[0],
+            sar_den=sample_aspect_ratio[1],
+        )
+    except (ExportExecutionError, OSError, VideoCompositorError) as error:
+        raise VideoCompositorPlanningError(
+            f"Could not prepare source {source_id}: {error}",
+        ) from error
+    return VideoSourceProbe(
+        source_id=source_id,
+        path=resolved_path,
+        media=media,
+        geometry=geometry,
+        sample_aspect_ratio=sample_aspect_ratio,
+        frame_count=frame_count,
+        source_hash=source_hash,
+        source_stat=source_stat,
+    )
+
+
+def _probe_sample_aspect_ratio(path: Path, ffprobe_path: str) -> tuple[int, int]:
+    result = subprocess.run(
+        [
+            ffprobe_path,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=sample_aspect_ratio",
+            "-of",
+            "json",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise VideoCompositorPlanningError(
+            result.stderr.strip() or f"Could not probe SAR for {path.name}",
+        )
+    try:
+        streams = json.loads(result.stdout)["streams"]
+        value = streams[0].get("sample_aspect_ratio")
+    except (IndexError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise VideoCompositorPlanningError(f"Could not read SAR for {path.name}") from error
+    if value in (None, "", "N/A", "0:1", "0/1"):
+        return (1, 1)
+    if not isinstance(value, str):
+        raise VideoCompositorPlanningError(f"Invalid SAR for {path.name}: {value!r}")
+    return _parse_ratio(value, f"sample aspect ratio for {path.name}")
+
+
+def _parse_ratio(value: str, label: str) -> tuple[int, int]:
+    separator = "/" if "/" in value else ":"
+    pieces = value.split(separator)
+    if len(pieces) != 2:
+        raise VideoCompositorPlanningError(f"Invalid {label}: {value!r}")
+    try:
+        numerator = int(pieces[0])
+        denominator = int(pieces[1])
+    except ValueError as error:
+        raise VideoCompositorPlanningError(f"Invalid {label}: {value!r}") from error
+    if numerator <= 0 or denominator <= 0:
+        raise VideoCompositorPlanningError(f"Invalid {label}: {value!r}")
+    divisor = math.gcd(numerator, denominator)
+    return numerator // divisor, denominator // divisor
+
+
+def _resolve_frame_rate_policy(
+    metadata: Sequence[Mapping[str, Any]],
+    project: Project,
+    *,
+    target_rate: Fraction | int | float | str | None,
+    frame_rate_policy: (FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, object] | None),
+) -> ResolvedFrameRatePolicy:
+    if target_rate is not None and frame_rate_policy is not None:
+        raise VideoCompositorPlanningError(
+            "target_rate and frame_rate_policy are mutually exclusive",
+        )
+    try:
+        if target_rate is not None:
+            rate = canonical_rate(target_rate)
+            policy = FrameRatePolicy(
+                choice="custom",
+                target_rate=rate,
+                custom_rate=rate,
+                enhancement_enabled=True,
+                backend=DEFAULT_FPS_BACKEND,
+            )
+            resolved = resolve_frame_rate_policy(
+                metadata,
+                choice=policy.choice,
+                custom_rate=policy.custom_rate,
+                enhancement_enabled=policy.enhancement_enabled,
+                backend=policy.backend,
+            )
+        elif isinstance(frame_rate_policy, ResolvedFrameRatePolicy):
+            resolved = frame_rate_policy
+        elif frame_rate_policy is None:
+            persisted = project.output_settings.get("frame_rate_policy")
+            if persisted is None:
+                resolved = resolve_frame_rate_policy(metadata)
+            else:
+                normalized = FrameRatePolicy.from_dict(persisted)
+                resolved = resolve_frame_rate_policy(
+                    metadata,
+                    choice=normalized.choice,
+                    custom_rate=normalized.custom_rate,
+                    enhancement_enabled=normalized.enhancement_enabled,
+                    backend=normalized.backend,
+                )
+        else:
+            normalized = (
+                frame_rate_policy
+                if isinstance(frame_rate_policy, FrameRatePolicy)
+                else FrameRatePolicy.from_dict(frame_rate_policy)
+            )
+            resolved = resolve_frame_rate_policy(
+                metadata,
+                choice=normalized.choice,
+                custom_rate=normalized.custom_rate,
+                enhancement_enabled=normalized.enhancement_enabled,
+                backend=normalized.backend,
+            )
+    except FrameRatePolicyError as error:
+        raise VideoCompositorPlanningError(f"Invalid frame-rate policy: {error}") from error
+
+    if not resolved.policy.enhancement_enabled:
+        return resolved
+    if not any(item.action in {"interpolate", "unsupported"} for item in resolved.decisions):
+        return resolved
+    validations = tuple(
+        validate_interpolation_backend(
+            resolved.policy.backend,
+            source_rate=item.source_rate,
+            target_rate=item.target_rate,
+        )
+        for item in resolved.decisions
+        if item.action in {"interpolate", "unsupported"}
+    )
+    if all(item.available for item in validations):
+        return resolved
+    if not resolved.policy.backend.casefold().strip().startswith("rve"):
+        return resolved
+    fallback = resolve_frame_rate_policy(
+        metadata,
+        choice=resolved.policy.choice,
+        custom_rate=resolved.policy.custom_rate,
+        enhancement_enabled=resolved.policy.enhancement_enabled,
+        backend=DEFAULT_FPS_FALLBACK_BACKEND,
+    )
+    fallback_validations = tuple(
+        validate_interpolation_backend(
+            fallback.policy.backend,
+            source_rate=item.source_rate,
+            target_rate=item.target_rate,
+        )
+        for item in fallback.decisions
+        if item.action in {"interpolate", "unsupported"}
+    )
+    if (
+        all(item.available for item in fallback_validations)
+        and not fallback.has_unsupported_sources
+    ):
+        return fallback
+    if resolved.has_unsupported_sources or fallback.has_unsupported_sources:
+        reasons = "; ".join(
+            item.reason
+            for item in (*resolved.decisions, *fallback.decisions)
+            if item.action == "unsupported"
+        )
+        raise VideoCompositorPlanningError(
+            f"Video frame-rate preparation is unsupported: {reasons}",
+        )
+    return resolved
+
+
+def _resolve_upscale_policy(
+    metadata: Sequence[Mapping[str, Any]],
+    project: Project,
+    policy: UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, object] | None,
+) -> ResolvedUpscalePolicy:
+    try:
+        if isinstance(policy, ResolvedUpscalePolicy):
+            return policy
+        if policy is None:
+            persisted = project.output_settings.get("upscale_policy")
+            if persisted is None:
+                return resolve_upscale_policy(metadata)
+            return resolve_upscale_policy(
+                metadata,
+                policy=UpscalePolicy.from_dict(persisted),
+            )
+        normalized = (
+            policy if isinstance(policy, UpscalePolicy) else UpscalePolicy.from_dict(policy)
+        )
+        return resolve_upscale_policy(metadata, policy=normalized)
+    except UpscalePolicyError as error:
+        raise VideoCompositorPlanningError(f"Invalid upscale policy: {error}") from error
+
+
+def _processing_route(
+    source: VideoSourceProbe,
+    frame_rate_policy: ResolvedFrameRatePolicy,
+    upscale_policy: ResolvedUpscalePolicy,
+) -> VideoProcessingRoute:
+    fps_decision = next(
+        item for item in frame_rate_policy.decisions if item.source_id == source.source_id
+    )
+    upscale_decision = next(
+        item for item in upscale_policy.decisions if item.source_id == source.source_id
+    )
+    fps_status = "passthrough" if fps_decision.action == "passthrough" else "planned"
+    fps_reason = fps_decision.reason
+    if fps_decision.action == "unsupported":
+        fps_status = "unsupported"
+    upscale_requested = upscale_decision.eligible
+    upscale_status = "not-requested"
+    upscale_reason = upscale_decision.reason
+    if upscale_requested:
+        upscale_status, upscale_reason = _upscale_runtime_status(
+            upscale_policy.policy,
+            upscale_decision,
+        )
+    return VideoProcessingRoute(
+        source_id=source.source_id,
+        source_rate=canonical_rate(source.media.frame_rate),
+        target_rate=frame_rate_policy.policy.target_rate,
+        fps_action=fps_decision.action,
+        fps_backend=frame_rate_policy.policy.backend,
+        fps_status=fps_status,
+        fps_reason=fps_reason,
+        upscale_requested=upscale_requested,
+        upscale_backend=upscale_policy.policy.backend,
+        upscale_status=upscale_status,
+        upscale_reason=upscale_reason,
+        upscale_model=upscale_decision.model,
+    )
+
+
+def _preparation_identity(
+    block: PlannedBlock,
+    source: VideoSourceProbe,
+    route: VideoProcessingRoute,
+) -> VideoPreparationIdentity:
+    transform = block.visual_transform
+    modification_identity = (
+        "native-preparation-v2",
+        transform.version,
+        transform.zoom,
+        transform.offset_x,
+        transform.offset_y,
+        "triplicate" if block.triplicate_enabled else "single",
+    )
+    policy_identity = (
+        "video-preparation-v1",
+        route.fps_action,
+        route.fps_backend,
+        route.target_rate,
+        route.upscale_requested,
+        route.upscale_backend,
+        route.upscale_model,
+    )
+    return VideoPreparationIdentity(
+        block_id=block.block_id,
+        source_id=block.source_id,
+        source_hash=source.source_hash,
+        source_range_ticks=(
+            block.source_range.source_start_tick,
+            block.source_range.source_end_tick,
+        ),
+        target_rate=route.target_rate,
+        modification_identity=modification_identity,
+        policy_identity=policy_identity,
+    )
+
+
+def _upscale_runtime_status(
+    policy: UpscalePolicy,
+    decision: UpscaleDecision,
+) -> tuple[str, str]:
+    if not policy.backend.casefold().strip().startswith("rve"):
+        return "unavailable", f"Unsupported dynamic upscale backend: {policy.backend}"
+    try:
+        from framestudio_fps import (
+            DEFAULT_FPS_PYTHON,
+            DEFAULT_FPS_SITE,
+            DEFAULT_RVE_MODEL,
+            DEFAULT_RVE_RESTORATION_MODEL,
+            DEFAULT_RVE_ROOT,
+            DEFAULT_RVE_SHIMS,
+            rve_unavailable_reason,
+        )
+
+        reason = rve_unavailable_reason(
+            argparse.Namespace(
+                python=DEFAULT_FPS_PYTHON,
+                site_packages=DEFAULT_FPS_SITE,
+                rve_model=DEFAULT_RVE_MODEL,
+                rve_root=DEFAULT_RVE_ROOT,
+                rve_shims=DEFAULT_RVE_SHIMS,
+            ),
+            announce=False,
+        )
+    except (ImportError, OSError, RuntimeError) as error:
+        return "unavailable", str(error)
+    if reason is not None:
+        return "unavailable", reason
+    model = decision.model or policy.model
+    model_path = _restoration_model_path(model, DEFAULT_RVE_RESTORATION_MODEL)
+    if not model_path.is_file():
+        return "unavailable", f"RVE restoration model was not found: {model_path}"
+    return "available", f"Validated RVE restoration runtime is available for {model}"
+
+
+def _restoration_model_path(model: str, default_path: Path) -> Path:
+    candidate = Path(model).expanduser()
+    if model == "SuperUltraCompact" or not candidate.is_absolute():
+        return default_path.expanduser().resolve()
+    return candidate.resolve()
+
+
+def _renderable_block_ids(plan: VideoRenderPlan) -> set[str]:
+    block_ids: set[str] = set()
+    for interval, frame_count in zip(
+        plan.layout_plan.intervals,
+        plan.interval_frame_counts,
+        strict=True,
+    ):
+        if frame_count <= 0:
+            continue
+        block_ids.update(slot.block.block_id for slot in interval.slots)
+    return block_ids
+
+
+def _prepare_assets(
+    plan: VideoRenderPlan,
+    workspace: Path,
+    *,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    fallbacks: list[str],
+) -> dict[str, _PreparedAsset]:
+    routes = {item.source_id: item for item in plan.processing_routes}
+    probes = {item.source_id: item for item in plan.probed_metadata}
+    renderable_block_ids = _renderable_block_ids(plan)
+    assets: dict[str, _PreparedAsset] = {}
+    for block in plan.layout_plan.included_blocks:
+        if block.block_id not in renderable_block_ids:
+            continue
+        route = routes[block.source_id]
+        if not route.upscale_requested and route.fps_action != "interpolate":
+            continue
+        probe = probes[block.source_id]
+        source_frames = _round_half_up(
+            Fraction(block.source_range.source_duration_ticks, PROJECT_TIMEBASE)
+            * canonical_rate(probe.media.frame_rate),
+        )
+        source_frames = max(1, source_frames)
+        asset_stem = _asset_stem(block.block_id)
+        raw = workspace / f"{asset_stem}-native.mp4"
+        _extract_block(
+            probe.path,
+            raw,
+            block.source_range.source_start_tick / PROJECT_TIMEBASE,
+            block.source_range.source_end_tick / PROJECT_TIMEBASE,
+            source_frames,
+            ffmpeg_path,
+        )
+        current = raw
+        if route.upscale_requested:
+            if route.upscale_status == "available":
+                restored = workspace / f"{asset_stem}-restored.mp4"
+                try:
+                    model_path = _restoration_model_path(
+                        route.upscale_model or "SuperUltraCompact",
+                        _default_restoration_model(),
+                    )
+                    _run_rve_restoration(
+                        current,
+                        restored,
+                        probe,
+                        source_frames,
+                        model_path,
+                    )
+                    current = restored
+                except (ExportExecutionError, OSError, RuntimeError, VideoCompositorError) as error:
+                    fallbacks.append(
+                        f"{block.block_id}: RVE upscale unavailable at render time; "
+                        f"native scaling fallback used ({error})",
+                    )
+            else:
+                fallbacks.append(
+                    f"{block.block_id}: upscale unavailable; native scaling fallback used "
+                    f"({route.upscale_reason})",
+                )
+        if route.fps_action == "interpolate":
+            target_frames = _round_half_up(
+                Fraction(block.source_range.source_duration_ticks, PROJECT_TIMEBASE)
+                * plan.target_rate,
+            )
+            target_frames = max(1, target_frames)
+            interpolated = workspace / f"{asset_stem}-fps.mp4"
+            try:
+                run_source_interpolation(
+                    current,
+                    interpolated,
+                    source_rate=canonical_rate(probe.media.frame_rate),
+                    source_frames=source_frames,
+                    target_rate=plan.target_rate,
+                    target_frames=target_frames,
+                    backend=route.fps_backend,
+                    ffmpeg_path=ffmpeg_path,
+                    artifact_gate=False,
+                )
+                current = interpolated
+                fps_converted = True
+            except (ExportExecutionError, OSError, RuntimeError, VideoCompositorError) as error:
+                if route.fps_backend != DEFAULT_FPS_FALLBACK_BACKEND:
+                    try:
+                        run_source_interpolation(
+                            current,
+                            interpolated,
+                            source_rate=canonical_rate(probe.media.frame_rate),
+                            source_frames=source_frames,
+                            target_rate=plan.target_rate,
+                            target_frames=target_frames,
+                            backend=DEFAULT_FPS_FALLBACK_BACKEND,
+                            ffmpeg_path=ffmpeg_path,
+                            artifact_gate=False,
+                        )
+                        current = interpolated
+                        fps_converted = True
+                        fallbacks.append(
+                            f"{block.block_id}: {route.fps_backend} failed; "
+                            "verified FFmpeg minterpolate fallback used",
+                        )
+                    except (
+                        ExportExecutionError,
+                        OSError,
+                        RuntimeError,
+                        VideoCompositorError,
+                    ) as fallback_error:
+                        raise VideoCompositorExecutionError(
+                            f"{block.block_id}: interpolation failed with "
+                            f"{route.fps_backend} ({error}); verified fallback "
+                            f"{DEFAULT_FPS_FALLBACK_BACKEND} also failed "
+                            f"({fallback_error})",
+                        ) from fallback_error
+                else:
+                    raise VideoCompositorExecutionError(
+                        f"{block.block_id}: interpolation failed with {route.fps_backend}: {error}",
+                    ) from error
+        else:
+            fps_converted = False
+        assets[block.block_id] = _PreparedAsset(
+            path=current,
+            fps_converted=fps_converted,
+        )
+        _verify_preparation(current, ffprobe_path, ffmpeg_path)
+    return assets
+
+
+def _extract_block(
+    source: Path,
+    destination: Path,
+    start_seconds: float,
+    end_seconds: float,
+    expected_frames: int,
+    ffmpeg_path: str,
+) -> None:
+    command = [
+        ffmpeg_path,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-nostdin",
+        "-y",
+        "-i",
+        str(source),
+        "-vf",
+        f"trim=start={start_seconds:.9f}:end={end_seconds:.9f},setpts=PTS-STARTPTS",
+        "-frames:v",
+        str(expected_frames),
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        str(destination),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise VideoCompositorExecutionError(
+            result.stderr.strip() or f"Could not extract {source.name}",
+        )
+
+
+def _run_rve_restoration(
+    source: Path,
+    destination: Path,
+    probe: VideoSourceProbe,
+    source_frames: int,
+    model_path: Path,
+) -> None:
+    from framestudio_fps import (
+        DEFAULT_FPS_PYTHON,
+        DEFAULT_FPS_SITE,
+        DEFAULT_RVE_ROOT,
+        DEFAULT_RVE_SHIMS,
+        run_restoration_rve,
+    )
+
+    arguments = argparse.Namespace(
+        force=True,
+        python=DEFAULT_FPS_PYTHON,
+        site_packages=DEFAULT_FPS_SITE,
+        rve_root=DEFAULT_RVE_ROOT,
+        rve_shims=DEFAULT_RVE_SHIMS,
+        restoration_model=model_path,
+        encoder="h264_nvenc",
+    )
+    run_restoration_rve(
+        source,
+        destination,
+        canonical_rate(probe.media.frame_rate),
+        source_frames,
+        arguments,
+        restoration_model=model_path,
+    )
+
+
+def _default_restoration_model() -> Path:
+    from framestudio_fps import DEFAULT_RVE_RESTORATION_MODEL
+
+    return DEFAULT_RVE_RESTORATION_MODEL
+
+
+def _verify_preparation(path: Path, ffprobe_path: str, ffmpeg_path: str) -> None:
+    try:
+        probe_media(path, ffprobe_path)
+        probe_frame_count(path, ffprobe_path)
+        validate_decoded_output(path, ffmpeg_path, label=f"prepared clip {path.name}")
+    except (ExportExecutionError, OSError, MediaProbeError, VideoCompositorError) as error:
+        raise VideoCompositorExecutionError(
+            f"Prepared clip verification failed for {path.name}: {error}",
+        ) from error
+
+
+def _crop_plans_for_slot(slot: SlotPlan) -> tuple[CropPlan, ...]:
+    if slot.triplicate_crops:
+        if len(slot.triplicate_crops) != 3:
+            raise VideoCompositorExecutionError(
+                f"Triplicate slot {slot.block.block_id} has an invalid crop count",
+            )
+        return slot.triplicate_crops
+    if slot.crop is None:
+        raise VideoCompositorExecutionError(
+            f"Slot {slot.block.block_id} has no crop plan",
+        )
+    return (slot.crop,)
+
+
+def _build_render_command(
+    plan: VideoRenderPlan,
+    assets: Mapping[str, _PreparedAsset],
+    *,
+    output: Path,
+    ffmpeg_path: str,
+) -> list[str]:
+    inputs: list[Path] = []
+    filters: list[str] = []
+    interval_labels: list[str] = []
+    target_rate = str(plan.target_rate)
+    for interval_index, (interval, frame_count) in enumerate(
+        zip(plan.layout_plan.intervals, plan.interval_frame_counts, strict=True),
+    ):
+        if frame_count == 0:
+            continue
+        if frame_count < 0:
+            raise VideoCompositorExecutionError(
+                f"Layout interval {interval_index} has a negative frame count",
+            )
+        if interval.is_black:
+            label = f"interval{interval_index}"
+            filters.append(
+                f"color=c=black:s={DEFAULT_CANVAS.width}x{DEFAULT_CANVAS.height}:"
+                f"r={target_rate}:d={frame_count / float(plan.target_rate):.9f},"
+                f"format=yuv444p,trim=end_frame={frame_count},setpts=PTS-STARTPTS[{label}]",
+            )
+            interval_labels.append(label)
+            continue
+        slot_labels: list[str] = []
+        for slot_index, slot in enumerate(interval.slots):
+            input_index = len(inputs)
+            asset = assets.get(slot.block.block_id)
+            inputs.append(
+                asset.path if asset is not None else _source_path(plan, slot.block.source_id),
+            )
+            prepared = asset is not None
+            fps_ready = asset.fps_converted if asset is not None else False
+            source_start = slot.block.source_range.source_start_tick / PROJECT_TIMEBASE
+            source_end = slot.block.source_range.source_end_tick / PROJECT_TIMEBASE
+            if prepared:
+                sample_start = (
+                    _interval_source_tick(interval, slot.block)
+                    - slot.block.source_range.source_start_tick
+                ) / PROJECT_TIMEBASE
+                sample_end = (
+                    sample_start + (interval.end_tick - interval.start_tick) / PROJECT_TIMEBASE
+                )
+            else:
+                sample_start = source_start + (
+                    _interval_source_tick(interval, slot.block) / PROJECT_TIMEBASE - source_start
+                )
+                sample_end = min(
+                    source_end,
+                    sample_start + (interval.end_tick - interval.start_tick) / PROJECT_TIMEBASE,
+                )
+            crop_plans = _crop_plans_for_slot(slot)
+            first_crop = crop_plans[0]
+            crop_labels: list[str] = []
+            trim_prefix = (
+                f"[{input_index}:v]trim=start={sample_start:.9f}:end={sample_end:.9f},"
+                f"setpts=PTS-STARTPTS,"
+                f"{'' if fps_ready else f'fps={target_rate},'}"
+                "setsar=1,"
+            )
+            if len(crop_plans) == 1:
+                crop = first_crop
+                crop_label = f"i{interval_index}s{slot_index}c0"
+                filters.append(
+                    f"{trim_prefix}scale={crop.scaled_width}:{crop.scaled_height}:"
+                    f"flags=lanczos,format=yuv444p,"
+                    f"crop={crop.target.width}:{crop.target.height}:"
+                    f"{crop.crop_x}:{crop.crop_y},setsar=1[{crop_label}]",
+                )
+                crop_labels.append(crop_label)
+            else:
+                split_labels = [
+                    f"i{interval_index}s{slot_index}split{crop_index}"
+                    for crop_index in range(len(crop_plans))
+                ]
+                filters.append(
+                    f"{trim_prefix}split={len(split_labels)}"
+                    + "".join(f"[{label}]" for label in split_labels),
+                )
+                for crop_index, crop in enumerate(crop_plans):
+                    crop_label = f"i{interval_index}s{slot_index}c{crop_index}"
+                    filters.append(
+                        f"[{split_labels[crop_index]}]"
+                        f"scale={crop.scaled_width}:{crop.scaled_height}:flags=lanczos,"
+                        f"format=yuv444p,crop={crop.target.width}:{crop.target.height}:"
+                        f"{crop.crop_x}:{crop.crop_y},setsar=1[{crop_label}]",
+                    )
+                    crop_labels.append(crop_label)
+            if len(crop_labels) == 1:
+                slot_label = crop_labels[0]
+            else:
+                slot_label = f"i{interval_index}s{slot_index}trip"
+                filters.append(
+                    f"{''.join(f'[{label}]' for label in crop_labels)}"
+                    f"hstack=inputs={len(crop_labels)}:shortest=1[{slot_label}]",
+                )
+            slot_labels.append(slot_label)
+        interval_label = f"interval{interval_index}"
+        if len(slot_labels) == 1:
+            filters.append(
+                f"[{slot_labels[0]}]format=yuv444p,trim=end_frame={frame_count},"
+                f"tpad=stop_mode=clone:stop={frame_count},trim=end_frame={frame_count},"
+                f"setpts=PTS-STARTPTS[{interval_label}]",
+            )
+        else:
+            layout = "|".join(f"{slot.slot.x}_{slot.slot.y}" for slot in interval.slots)
+            filters.append(
+                f"{''.join(f'[{label}]' for label in slot_labels)}"
+                f"xstack=inputs={len(slot_labels)}:layout={layout}:fill=black,"
+                f"format=yuv444p,trim=end_frame={frame_count},"
+                f"tpad=stop_mode=clone:stop={frame_count},trim=end_frame={frame_count},"
+                f"setpts=PTS-STARTPTS[{interval_label}]",
+            )
+        interval_labels.append(interval_label)
+    concat_inputs = "".join(f"[{label}]" for label in interval_labels)
+    filters.append(
+        f"{concat_inputs}concat=n={len(interval_labels)}:v=1:a=0,format=yuv420p[vout]",
+    )
+    return [
+        ffmpeg_path,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-nostdin",
+        "-y",
+        *sum((["-i", str(path)] for path in inputs), []),
+        "-filter_complex",
+        ";".join(filters),
+        "-map",
+        "[vout]",
+        "-an",
+        "-r",
+        target_rate,
+        "-frames:v",
+        str(plan.expected_frames),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        str(output),
+    ]
+
+
+def _verify_rendered_output(
+    partial: Path,
+    plan: VideoRenderPlan,
+    *,
+    ffprobe_path: str,
+    ffmpeg_path: str,
+    cancel_event: threading.Event | None = None,
+) -> None:
+    if not partial.is_file() or partial.stat().st_size <= 0:
+        raise VideoCompositorExecutionError("FFmpeg did not create a non-empty partial output")
+    try:
+        output = probe_media(partial, ffprobe_path)
+        actual_frames = probe_frame_count(
+            partial,
+            ffprobe_path,
+            cancel_event=cancel_event,
+        )
+        validate_decoded_output(
+            partial,
+            ffmpeg_path,
+            label="composed video",
+            cancel_event=cancel_event,
+        )
+    except (ExportExecutionError, OSError, MediaProbeError, VideoCompositorError) as error:
+        raise VideoCompositorExecutionError(
+            f"Rendered output verification failed: {error}",
+        ) from error
+    if output.width != DEFAULT_CANVAS.width or output.height != DEFAULT_CANVAS.height:
+        raise VideoCompositorExecutionError(
+            f"Rendered dimensions are {output.width}x{output.height}, expected 1920x1080",
+        )
+    if canonical_rate(output.frame_rate) != plan.target_rate:
+        raise VideoCompositorExecutionError(
+            f"Rendered FPS is {output.frame_rate}, expected {plan.target_rate}",
+        )
+    if output.has_audio_stream:
+        raise VideoCompositorExecutionError("Video-only render unexpectedly contains audio")
+    if actual_frames != plan.expected_frames:
+        raise VideoCompositorExecutionError(
+            f"Rendered frame count is {actual_frames}, expected {plan.expected_frames}",
+        )
+    expected_duration = plan.expected_duration_seconds
+    duration_tolerance = max(0.05, 2.0 / float(plan.target_rate))
+    if abs(output.duration_seconds - expected_duration) > duration_tolerance:
+        raise VideoCompositorExecutionError(
+            f"Rendered duration is {output.duration_seconds:.6f}s, expected "
+            f"{expected_duration:.6f}s",
+        )
+
+
+def _source_probe(plan: VideoRenderPlan, source_id: str) -> VideoSourceProbe:
+    try:
+        return next(item for item in plan.probed_metadata if item.source_id == source_id)
+    except StopIteration as error:
+        raise VideoCompositorExecutionError(f"Unknown source in layout: {source_id}") from error
+
+
+def _source_path(plan: VideoRenderPlan, source_id: str) -> Path:
+    return _source_probe(plan, source_id).path
+
+
+def _interval_source_tick(interval: LayoutInterval, block: PlannedBlock) -> int:
+    if not block.timeline_start_tick <= interval.start_tick < block.timeline_end_tick:
+        raise VideoCompositorExecutionError(
+            f"Interval {interval.start_tick} is outside block {block.block_id}",
+        )
+    return block.source_range.source_tick_at(interval.start_tick)
+
+
+def _round_half_up(value: Fraction) -> int:
+    if value < 0:
+        raise VideoCompositorPlanningError("Frame positions cannot be negative")
+    return (value.numerator * 2 + value.denominator) // (2 * value.denominator)
+
+
+def _safe_name(value: str) -> str:
+    return "".join(
+        character if character.isalnum() or character in "-_" else "_" for character in value
+    )
+
+
+def _asset_stem(block_id: str) -> str:
+    readable = _safe_name(block_id) or "block"
+    identity = hashlib.sha256(block_id.encode("utf-8")).hexdigest()[:12]
+    return f"{readable}-{identity}"
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    buffer = bytearray(1024 * 1024)
+    with path.open("rb") as handle:
+        while count := handle.readinto(buffer):
+            digest.update(memoryview(buffer)[:count])
+    return digest.hexdigest()
+
+
+__all__ = [
+    "VideoCompositorError",
+    "VideoCompositorExecutionError",
+    "VideoCompositorPlanningError",
+    "VideoProcessingRoute",
+    "VideoPreparationIdentity",
+    "VideoRenderPlan",
+    "VideoRenderResult",
+    "VideoSourceProbe",
+    "cumulative_frame_boundaries",
+    "plan_project_video",
+    "render_project_video",
+]

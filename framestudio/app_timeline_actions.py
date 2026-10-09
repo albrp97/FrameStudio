@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import math
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
 from .app_helpers import (
     FOCUS_SCROLL_FIELDS,
+    _metadata_float,
     editing_is_locked,
     focus_scroll_value,
     format_output_duration_label,
 )
 from .composition import VisualTransform, focus_offset_bounds
 from .model import ProjectValidationError
+from .model_types import seconds_to_ticks
 from .operations import (
     apply_visual_transform,
     clean_visual_modifications,
@@ -19,7 +22,9 @@ from .operations import (
     copy_visual_transform,
     disable_triplicate,
     enable_triplicate,
+    move_segment,
     move_segments,
+    paste_segments,
     paste_segments_after_selection,
     split_segment,
 )
@@ -52,6 +57,8 @@ def _live_timeline_position(window: Any) -> float:
     timeline = getattr(window, "segment_timeline", None)
     if timeline is None:
         return float(position)
+    if timeline.timing_mode == "absolute":
+        return float(getattr(getattr(window, "project", None), "playhead_seconds", position))
     return float(timeline.edited_to_timeline_position(position))
 
 
@@ -68,50 +75,119 @@ def on_timeline_selection_changed(
     segment_ids: tuple[str, ...],
 ) -> None:
     window.selected_segment_ids = segment_ids
-    window.selected_segment_id = segment_ids[-1] if segment_ids else None
+    focused_segment_id = getattr(window, "selected_segment_id", None)
+    if focused_segment_id not in segment_ids:
+        focused_segment_id = segment_ids[-1] if segment_ids else None
+    window.selected_segment_id = focused_segment_id
     window._update_selected_clip_label()
     window._update_segment_controls()
+
+
+def on_timeline_segment_dropped(
+    window: Any,
+    segment_id: str,
+    timeline_start_ticks: int,
+    target_track_id: str,
+) -> None:
+    if _editing_locked(window):
+        return
+    if window.project is None or window.segment_timeline is None:
+        return
+    if window.segment_timeline.timing_mode != "absolute":
+        window._show_error("Track drops require synchronized timing")
+        return
+    selected_segment_ids = tuple(getattr(window, "selected_segment_ids", ()))
+    focused_segment_id = getattr(window, "selected_segment_id", None)
+    preserve_selection = segment_id in selected_segment_ids
+    try:
+        move_segment(
+            window.project,
+            segment_id,
+            timeline_start_ticks=timeline_start_ticks,
+            target_track_id=target_track_id,
+        )
+    except ProjectValidationError as error:
+        window._show_error(str(error))
+        return
+    if preserve_selection:
+        window.selected_segment_ids = selected_segment_ids
+        if focused_segment_id not in selected_segment_ids:
+            focused_segment_id = segment_id
+        window.selected_segment_id = focused_segment_id
+    else:
+        window.selected_segment_id = segment_id
+        window.selected_segment_ids = (segment_id,)
+    window._refresh_timeline(window.selected_segment_id)
+    window._set_status("Moved clip on the absolute timeline")
+
+
+def on_timeline_invalid_drop(window: Any, message: str) -> None:
+    window._show_error(message)
 
 
 def update_selected_clip_label(window: Any) -> None:
     project = window.project
     if project is None or window.segment_timeline is None or window.selected_segment_id is None:
-        window.timeline_selection_label.set_text("No clip selected")
+        window.timeline_selection_label.set_text("No video selected")
         return
-    for index, segment in enumerate(window.segment_timeline.segment_items):
-        if segment.segment_id == window.selected_segment_id:
-            state = "Deleted" if segment.deleted else "Included"
-            source_label = ""
-            if segment.source_id is not None:
-                try:
-                    source = project.source_by_id(segment.source_id)
-                except ProjectValidationError:
-                    source_label = segment.source_id
-                else:
-                    source_label = Path(source.path).name
-                source_label = f" | source {source_label}"
-            selection_label = (
-                f" | {len(window.selected_segment_ids)} selected"
-                if len(window.selected_segment_ids) > 1
-                else ""
-            )
-            composition_label = ""
-            if segment.triplicate is not None and segment.triplicate.enabled:
-                composition_label = " | Triplicate: center + left + right"
-            elif not segment.visual_transform.is_default:
-                composition_label = (
-                    f" | Focus: {segment.visual_transform.zoom:.2f}x, "
-                    f"X {segment.visual_transform.offset_x:.0f}, "
-                    f"Y {segment.visual_transform.offset_y:.0f}"
-                )
-            window.timeline_selection_label.set_text(
-                f"Clip {index + 1} | "
-                f"{format_duration(segment.start_seconds)} - "
-                f"{format_duration(segment.end_seconds)} | {state}"
-                f"{source_label}{selection_label}{composition_label}"
-            )
-            return
-    window.timeline_selection_label.set_text("No clip selected")
+    segment = next(
+        (
+            segment
+            for segment in window.segment_timeline.segment_items
+            if segment.segment_id == window.selected_segment_id
+        ),
+        None,
+    )
+    if segment is None:
+        window.timeline_selection_label.set_text("Selected video: metadata unavailable")
+        return
+    source = None
+    if segment.source_id is None:
+        sources = tuple(project.sources or (project.source,))
+        if len(sources) == 1:
+            source = sources[0]
+    else:
+        try:
+            source = project.source_by_id(segment.source_id)
+        except ProjectValidationError:
+            source = None
+    if source is None:
+        window.timeline_selection_label.set_text("Selected video: metadata unavailable")
+        return
+    metadata = source.metadata
+    frame_rate = metadata.get("frame_rate")
+    try:
+        width = _metadata_float(metadata, "width")
+        height = _metadata_float(metadata, "height")
+        frame_rate_value = _metadata_float(metadata, "frame_rate")
+    except (TypeError, ValueError, OverflowError):
+        window.timeline_selection_label.set_text("Selected video: metadata unavailable")
+        return
+    if (
+        not all(math.isfinite(value) for value in (width, height, frame_rate_value))
+        or not width.is_integer()
+        or not height.is_integer()
+    ):
+        window.timeline_selection_label.set_text("Selected video: metadata unavailable")
+        return
+    try:
+        parsed_frame_rate = Fraction(str(frame_rate))
+    except (TypeError, ValueError, ZeroDivisionError):
+        window.timeline_selection_label.set_text("Selected video: metadata unavailable")
+        return
+    if parsed_frame_rate <= 0:
+        window.timeline_selection_label.set_text("Selected video: metadata unavailable")
+        return
+    fps_value = float(parsed_frame_rate)
+    fps_label = (
+        str(parsed_frame_rate.numerator)
+        if parsed_frame_rate.denominator == 1
+        else f"{fps_value:.3f}".rstrip("0").rstrip(".")
+    )
+    window.timeline_selection_label.set_text(
+        f"Selected video: {Path(source.path).name} | "
+        f"Dimensions: {int(width)}×{int(height)} | FPS: {fps_label}"
+    )
 
 
 def on_timeline_viewport_changed(window: Any, adjustment: Any, _param: Any) -> None:
@@ -148,20 +224,29 @@ def fit_timeline_to_thirty_minutes(window: Any) -> None:
 
 
 def center_timeline_on_playhead(window: Any) -> None:
-    if window.controller is None:
+    if window.controller is None and not (
+        window.segment_timeline is not None and window.segment_timeline.timing_mode == "absolute"
+    ):
         return
     adjustment = window.timeline_viewport.get_hadjustment()
     page_size = adjustment.get_page_size()
     if page_size <= 1.0:
         return
-    position = window.controller.snapshot().position_seconds
-    if window.segment_timeline is not None:
+    if window.controller is not None:
+        position = window.controller.snapshot().position_seconds
+    else:
+        position = window.project.playhead_seconds
+    if window.segment_timeline is not None and window.segment_timeline.timing_mode != "absolute":
         position = window.segment_timeline.edited_to_timeline_position(position)
     clips = window.timeline_canvas.get_content_width()
     if clips <= page_size:
         adjustment.set_value(adjustment.get_lower())
         return
-    duration = window.controller.snapshot().duration_seconds
+    duration = (
+        window.controller.snapshot().duration_seconds
+        if window.controller is not None
+        else window.segment_timeline.timeline_duration_seconds
+    )
     content_width = window.timeline_canvas.get_content_width()
     position_ratio = position / duration if duration else 0.0
     target = position_ratio * content_width - page_size / 2.0
@@ -429,26 +514,43 @@ def on_triplicate_clicked(window: Any, _button: Any) -> None:
 def on_split_clicked(window: Any, _button: Any) -> None:
     if _editing_locked(window):
         return
-    if window.segment_timeline is None or window.controller is None:
+    if window.segment_timeline is None:
         window._show_error("Open a source before splitting segments")
         return
-    playback_position = window.controller.snapshot().position_seconds
-    position = window.segment_timeline.edited_to_timeline_position(
-        playback_position,
-    )
+    absolute = window.segment_timeline.timing_mode == "absolute"
+    if absolute:
+        position = _live_timeline_position(window)
+    else:
+        if window.controller is None:
+            window._show_error("Open a source before splitting segments")
+            return
+        playback_position = window.controller.snapshot().position_seconds
+        position = window.segment_timeline.edited_to_timeline_position(playback_position)
     try:
         segment_id = window.selected_segment_id
         coordinate = "source"
-        if window.segment_timeline.mixed_source or window.segment_timeline.has_explicit_timeline:
+        if (
+            absolute
+            or window.segment_timeline.mixed_source
+            or window.segment_timeline.has_explicit_timeline
+        ):
             coordinate = "timeline"
             if segment_id is None:
                 raise ProjectValidationError("Select a clip before splitting segments")
-        _first, second = split_segment(
-            window.segment_timeline,
-            position,
-            segment_id=segment_id,
-            coordinate=coordinate,
-        )
+        if absolute:
+            _first, second = split_segment(
+                window.segment_timeline,
+                segment_id=segment_id,
+                position_ticks=seconds_to_ticks(position),
+                coordinate="timeline",
+            )
+        else:
+            _first, second = split_segment(
+                window.segment_timeline,
+                position,
+                segment_id=segment_id,
+                coordinate=coordinate,
+            )
     except ProjectValidationError as error:
         window._show_error(str(error))
         return
@@ -533,11 +635,25 @@ def paste_selected_segments(window: Any) -> None:
         window._show_error("Copy a clip before pasting")
         return
     try:
-        pasted = paste_segments_after_selection(
-            window.project,
-            window._segment_clipboard,
-            window.selected_segment_id,
-        )
+        if (
+            window.segment_timeline is not None
+            and window.segment_timeline.timing_mode == "absolute"
+        ):
+            if window.selected_segment_id is None:
+                raise ProjectValidationError("Select a clip before pasting blocks")
+            selected = window.segment_timeline.find(window.selected_segment_id)
+            pasted = paste_segments(
+                window.project,
+                window._segment_clipboard,
+                at_ticks=selected.timeline_end_ticks,
+                target_track_id=selected.track_id,
+            )
+        else:
+            pasted = paste_segments_after_selection(
+                window.project,
+                window._segment_clipboard,
+                window.selected_segment_id,
+            )
     except ProjectValidationError as error:
         window._show_error(str(error))
         return

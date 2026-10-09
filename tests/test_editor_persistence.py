@@ -115,7 +115,9 @@ class EditorPersistenceTests(unittest.TestCase):
             save_project(project, destination)
             restored = load_project(destination)
 
-            self.assertEqual(restored.to_dict(), project.to_dict())
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+            self.assertEqual(restored.duration_seconds, project.duration_seconds)
             self.assertEqual(
                 restored.segment_timeline.edited_duration_seconds,
                 4.5,
@@ -149,7 +151,8 @@ class EditorPersistenceTests(unittest.TestCase):
             save_project(project, destination)
             restored = load_project(destination)
 
-            self.assertEqual(restored.schema_version, 3)
+            self.assertEqual(restored.schema_version, 4)
+            self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
             self.assertEqual(len(restored.sources), 2)
             self.assertTrue(restored.timeline.find(deleted_id).deleted)
             self.assertEqual(restored.timeline.blocks[-1].source_id, restored.sources[1].source_id)
@@ -189,7 +192,9 @@ class EditorPersistenceTests(unittest.TestCase):
                 )
                 self.assertEqual(autosave_path(), saved)
                 self.assertTrue(autosave_exists())
-                self.assertEqual(restored.to_dict(), project.to_dict())
+                self.assertEqual(restored.schema_version, 4)
+                self.assertEqual(restored.timeline.timing_mode, "legacy-ripple")
+                self.assertEqual(restored.duration_seconds, project.duration_seconds)
 
     def test_recovery_attaches_valid_autosave_without_changing_project_path(self):
         with TemporaryDirectory() as temporary_directory:
@@ -214,7 +219,9 @@ class EditorPersistenceTests(unittest.TestCase):
                 attach.assert_called_once()
                 self.assertIs(attach.call_args.args[0], window)
                 recovered = attach.call_args.args[1]
-                self.assertEqual(recovered.to_dict(), project.to_dict())
+                self.assertEqual(recovered.schema_version, 4)
+                self.assertEqual(recovered.timeline.timing_mode, "legacy-ripple")
+                self.assertEqual(recovered.duration_seconds, project.duration_seconds)
                 self.assertIsNone(attach.call_args.args[2])
                 analyze.assert_called_once()
                 self.assertEqual(

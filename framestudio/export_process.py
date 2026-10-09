@@ -11,7 +11,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from .export_types import (
     _BOUNDARY_TOLERANCE,
@@ -216,6 +216,7 @@ def validate_decoded_output(
     label: str,
     heartbeat_callback: Callable[[], None] | None = None,
     heartbeat_interval_seconds: float = 5.0,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     try:
         result = _run_command_with_heartbeat(
@@ -236,6 +237,7 @@ def validate_decoded_output(
             ],
             heartbeat_callback=heartbeat_callback,
             heartbeat_interval_seconds=heartbeat_interval_seconds,
+            cancel_event=cancel_event,
         )
     except OSError as error:
         raise ExportExecutionError(
@@ -327,8 +329,9 @@ def _run_command_with_heartbeat(
     *,
     heartbeat_callback: Callable[[], None] | None,
     heartbeat_interval_seconds: float,
+    cancel_event: threading.Event | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    if heartbeat_callback is None:
+    if heartbeat_callback is None and cancel_event is None:
         return subprocess.run(command, capture_output=True, text=True, check=False)
     if not math.isfinite(heartbeat_interval_seconds) or heartbeat_interval_seconds <= 0.0:
         raise ValueError("Heartbeat interval must be a positive finite number")
@@ -340,11 +343,17 @@ def _run_command_with_heartbeat(
     )
     try:
         while True:
+            if cancel_event is not None and cancel_event.is_set():
+                _terminate_process(process)
+                raise ExportExecutionError("Export cancelled")
             try:
                 stdout, stderr = process.communicate(timeout=heartbeat_interval_seconds)
             except subprocess.TimeoutExpired:
-                heartbeat_callback()
+                if heartbeat_callback is not None:
+                    heartbeat_callback()
             else:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise ExportExecutionError("Export cancelled")
                 return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     except BaseException:
         if process.poll() is None:
@@ -360,6 +369,52 @@ def _run_command_with_heartbeat(
                 except ProcessLookupError:
                     pass
                 process.communicate()
+        raise
+
+
+def run_command_with_cancellation(
+    command: Sequence[str],
+    *,
+    cancel_event: threading.Event | None = None,
+    text: bool = True,
+) -> subprocess.CompletedProcess[Any]:
+    """Run one bounded helper command while honoring the shared cancellation event."""
+    if cancel_event is None:
+        try:
+            return subprocess.run(
+                list(command),
+                capture_output=True,
+                text=text,
+                check=False,
+            )
+        except OSError as error:
+            raise ExportExecutionError(f"Could not start command: {command[0]}") from error
+    process = subprocess.Popen(
+        list(command),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=text,
+    )
+    try:
+        while True:
+            if cancel_event.is_set():
+                _terminate_process(process)
+                raise ExportExecutionError("Export cancelled")
+            try:
+                stdout, stderr = process.communicate(timeout=0.1)
+            except subprocess.TimeoutExpired:
+                continue
+            if cancel_event.is_set():
+                raise ExportExecutionError("Export cancelled")
+            return subprocess.CompletedProcess(
+                list(command),
+                process.returncode,
+                stdout,
+                stderr,
+            )
+    except BaseException:
+        if process.poll() is None:
+            _terminate_process(process)
         raise
 
 
@@ -557,6 +612,7 @@ def probe_frame_count(
     *,
     heartbeat_callback: Callable[[], None] | None = None,
     heartbeat_interval_seconds: float = 5.0,
+    cancel_event: threading.Event | None = None,
 ) -> int:
     command = [
         ffprobe_path,
@@ -576,6 +632,7 @@ def probe_frame_count(
             command,
             heartbeat_callback=heartbeat_callback,
             heartbeat_interval_seconds=heartbeat_interval_seconds,
+            cancel_event=cancel_event,
         )
     except OSError as error:
         raise ExportExecutionError(

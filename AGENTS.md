@@ -16,6 +16,18 @@ The first approved horizon is a local Linux editor for one source video:
 playback, seek, split, delete, save/reopen, and export. It is not a full
 DaVinci Resolve replacement.
 
+## Development mode
+
+`.github/aidd-config.yml` `delivery.development.mode` is authoritative.
+The user selected automatic execution for PHASE-010 and its necessary
+workflow repairs on 2026-10-09. Continue implementation, actual UI/CLI
+functionality verification, review/remediation and configured delivery without
+routine approval questions. Workers use GPT-5.6 Luna at maximum reasoning;
+automatic validation uses the configured Rubber Duck GPT-5.6 Luna high,
+`all-validation` profile. Agent-run validation is `automaticValidation`, never
+`userValidation`. Real capability, security, provider and merge blockers remain
+binding. Do not expand this run into unrelated open phases.
+
 The future product direction document preserves deferred intent such as
 multi-video timelines, per-input audio handling, reusable segment
 modifications, triplicate portrait/focused-action layouts, efficient rendering,

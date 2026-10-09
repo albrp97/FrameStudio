@@ -5,7 +5,7 @@ import uuid
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 
 from .audio import pending_audio_decision
 from .composition import COMPOSITION_SCHEMA_VERSION
@@ -18,17 +18,26 @@ from .fps_policy import (
 from .fps_policy import (
     resolve_frame_rate_policy as resolve_fps_policy,
 )
-from .model_timeline import SegmentTimeline
+from .model_timeline import (
+    ABSOLUTE_TIMING_MODE,
+    LEGACY_TIMING_MODE,
+    SegmentTimeline,
+    TimelineTrack,
+)
 from .model_types import (
     _TIME_EPSILON,
     LEGACY_SCHEMA_VERSION,
+    MIXED_SOURCE_SCHEMA_VERSION,
     ONE_SOURCE_SCHEMA_VERSION,
     SCHEMA_VERSION,
     ProjectValidationError,
     Segment,
     SourceReference,
     _finite_float,
+    seconds_to_ticks,
+    ticks_to_seconds,
 )
+from .removal_history import _RuntimeContext
 from .upscale_policy import (
     ResolvedUpscalePolicy,
     UpscalePolicy,
@@ -40,7 +49,7 @@ from .upscale_policy import (
 
 
 @dataclass
-class Project:
+class Project(_RuntimeContext):
     project_id: str
     source: SourceReference
     duration_seconds: float
@@ -51,6 +60,77 @@ class Project:
     source_settings: dict[str, dict[str, Any]] = field(default_factory=dict)
     output_settings: dict[str, Any] = field(default_factory=dict)
     composition_version: int = COMPOSITION_SCHEMA_VERSION
+
+    @staticmethod
+    def _settings_with_pending_audio(
+        source_settings: Mapping[str, Mapping[str, Any]],
+        sources: Sequence[SourceReference],
+    ) -> dict[str, dict[str, Any]]:
+        settings = cast(
+            dict[str, dict[str, Any]],
+            deepcopy(dict(source_settings)),
+        )
+        for source in sources:
+            settings[source.source_id] = {
+                "audio": pending_audio_decision(source).to_dict(),
+            }
+        return settings
+
+    @staticmethod
+    def _track_block(
+        block: Segment,
+        source_id: str,
+        *,
+        track_id: str = "track-1",
+    ) -> Segment:
+        return Segment(
+            segment_id=block.segment_id,
+            start_seconds=block.start_seconds,
+            end_seconds=block.end_seconds,
+            deleted=block.deleted,
+            source_id=source_id,
+            timeline_start_seconds=block.timeline_start,
+            timeline_end_seconds=block.timeline_end,
+            state=block.state,
+            block_id=block.block_id or block.segment_id,
+            color_index=block.color_index,
+            visual_transform=block.visual_transform,
+            triplicate=block.triplicate,
+            track_id=track_id,
+        )
+
+    @staticmethod
+    def _sources_from_value(
+        raw_sources: object,
+        *,
+        missing_message: str,
+    ) -> tuple[SourceReference, ...]:
+        if not isinstance(raw_sources, list) or not raw_sources:
+            raise ProjectValidationError(missing_message)
+        sources: list[SourceReference] = []
+        for item in raw_sources:
+            if not isinstance(item, Mapping):
+                raise ProjectValidationError("Project source must be an object")
+            sources.append(SourceReference.from_dict(item))
+        source_ids = [source.source_id for source in sources]
+        if len(set(source_ids)) != len(source_ids):
+            raise ProjectValidationError("Project sources must have unique source_id values")
+        return tuple(sources)
+
+    @staticmethod
+    def _settings_from_value(
+        value: Mapping[str, Any],
+    ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+        raw_source_settings = value.get("source_settings", {})
+        raw_output_settings = value.get("output_settings", {})
+        if not isinstance(raw_source_settings, Mapping):
+            raise ProjectValidationError("Project source settings must be an object")
+        if not isinstance(raw_output_settings, Mapping):
+            raise ProjectValidationError("Project output settings must be an object")
+        return (
+            cast(dict[str, dict[str, Any]], dict(raw_source_settings)),
+            dict(raw_output_settings),
+        )
 
     @classmethod
     def create(
@@ -77,6 +157,46 @@ class Project:
                     "audio": pending_audio_decision(source).to_dict(),
                 },
             },
+        )
+
+    @classmethod
+    def create_synchronized(
+        cls,
+        source_path: Path,
+        metadata: Mapping[str, Any],
+        project_id: str | None = None,
+    ) -> Project:
+        base = cls.create(source_path, metadata, project_id)
+        duration = _finite_float(
+            base.source.metadata.get("duration_seconds"),
+            "Source duration",
+        )
+        block = Segment.create(
+            0.0,
+            duration,
+            segment_id="segment-1",
+            block_id="block-1",
+            source_id=base.source.source_id,
+            timeline_start_seconds=0.0,
+            timeline_end_seconds=duration,
+            track_id="track-1",
+        )
+        timeline = SegmentTimeline.from_tracks(
+            (TimelineTrack("track-1", (block,)),),
+            source_durations={base.source.source_id: duration},
+            active_track_id="track-1",
+        )
+        return cls(
+            project_id=base.project_id,
+            source=base.source,
+            duration_seconds=timeline.timeline_duration_seconds,
+            playhead_seconds=0.0,
+            schema_version=SCHEMA_VERSION,
+            segment_timeline=timeline,
+            sources=(base.source,),
+            source_settings=deepcopy(base.source_settings),
+            output_settings=deepcopy(base.output_settings),
+            composition_version=base.composition_version,
         )
 
     @classmethod
@@ -140,7 +260,7 @@ class Project:
             project_id=project_id or uuid.uuid4().hex,
             source=sources[0],
             duration_seconds=position,
-            schema_version=SCHEMA_VERSION,
+            schema_version=MIXED_SOURCE_SCHEMA_VERSION,
             segment_timeline=timeline,
             sources=tuple(sources),
             source_settings={
@@ -161,13 +281,25 @@ class Project:
     ) -> Project:
         return cls.create_multi(entries, project_id, frame_rate=frame_rate)
 
+    @classmethod
+    def create_synchronized_multi(
+        cls,
+        entries: Sequence[SourceReference | tuple[Path, Mapping[str, Any]]],
+        project_id: str | None = None,
+        *,
+        frame_rate: str | None = None,
+    ) -> Project:
+        project = cls.create_multi(entries, project_id, frame_rate=frame_rate)
+        project.convert_to_synchronized(confirm=True)
+        return project
+
     def append_sources(self, sources: Sequence[SourceReference]) -> tuple[SourceReference, ...]:
+        timeline = self.timeline
         incoming = tuple(sources)
         if not incoming:
             raise ProjectValidationError("At least one source is required")
         if any(not isinstance(source, SourceReference) for source in incoming):
             raise ProjectValidationError("Appended sources must be SourceReference values")
-
         existing_sources = tuple(self.sources or (self.source,))
         existing_ids = {source.source_id for source in existing_sources}
         existing_paths = {Path(source.path).expanduser().resolve() for source in existing_sources}
@@ -196,8 +328,152 @@ class Project:
                 raise ProjectValidationError("Source duration must be greater than zero")
             incoming_ids.add(source.source_id)
             incoming_paths.add(path)
-
-        timeline = self.timeline
+        source_durations = {
+            source.source_id: _finite_float(
+                source.metadata.get("duration_seconds"),
+                f"Source duration for {source.source_id}",
+            )
+            for source in existing_sources
+        }
+        source_durations.update(
+            {
+                source.source_id: _finite_float(
+                    source.metadata.get("duration_seconds"),
+                    f"Source duration for {source.source_id}",
+                )
+                for source in incoming
+            }
+        )
+        source_duration_ticks = {
+            source_id: seconds_to_ticks(duration)
+            for source_id, duration in source_durations.items()
+        }
+        if self.schema_version == SCHEMA_VERSION and timeline.timing_mode == ABSOLUTE_TIMING_MODE:
+            if timeline.tracks is None or timeline.active_track_id is None:
+                raise ProjectValidationError(
+                    "Synchronized import requires an active timeline track"
+                )
+            existing_sources = tuple(self.sources or (self.source,))
+            active_track = timeline.track_by_id(timeline.active_track_id)
+            position_ticks = max(
+                (block.timeline_end_ticks for block in active_track.blocks),
+                default=0,
+            )
+            imported_blocks: list[Segment] = []
+            for source in incoming:
+                duration_ticks = source_duration_ticks[source.source_id]
+                imported_blocks.append(
+                    Segment.create(
+                        0.0,
+                        ticks_to_seconds(duration_ticks),
+                        source_id=source.source_id,
+                        timeline_start_seconds=ticks_to_seconds(position_ticks),
+                        timeline_end_seconds=ticks_to_seconds(
+                            position_ticks + duration_ticks,
+                        ),
+                        track_id=timeline.active_track_id,
+                    )
+                )
+                position_ticks += duration_ticks
+            candidate_tracks = tuple(
+                TimelineTrack(
+                    track.track_id,
+                    (
+                        track.blocks + tuple(imported_blocks)
+                        if track.track_id == timeline.active_track_id
+                        else track.blocks
+                    ),
+                )
+                for track in timeline.tracks
+            )
+            combined_timeline = SegmentTimeline.from_tracks(
+                candidate_tracks,
+                source_durations=source_durations,
+                source_durations_ticks=source_duration_ticks,
+                active_track_id=timeline.active_track_id,
+                timebase=timeline.timebase,
+                frame_rate=timeline.frame_rate,
+                ripple=False,
+                timing_mode=ABSOLUTE_TIMING_MODE,
+                mutation_revision=timeline.revision + 1,
+            )
+            combined_sources = existing_sources + incoming
+            combined_settings = self._settings_with_pending_audio(
+                self.source_settings,
+                incoming,
+            )
+            candidate = type(self)(
+                project_id=self.project_id,
+                source=combined_sources[0],
+                duration_seconds=combined_timeline.editing_duration_seconds,
+                playhead_seconds=min(
+                    self.playhead_seconds,
+                    combined_timeline.editing_duration_seconds,
+                ),
+                schema_version=SCHEMA_VERSION,
+                segment_timeline=combined_timeline,
+                sources=combined_sources,
+                source_settings=combined_settings,
+                output_settings=deepcopy(self.output_settings),
+                composition_version=self.composition_version,
+            )
+            self._replace_with(candidate)
+            return incoming
+        if self.schema_version == SCHEMA_VERSION and (timeline.timing_mode != LEGACY_TIMING_MODE):
+            raise ProjectValidationError(
+                "Appending sources to synchronized projects requires a later track-aware operation"
+            )
+        if self.schema_version == SCHEMA_VERSION and timeline.timing_mode == "legacy-ripple":
+            position_ticks = timeline.editing_duration_ticks
+            legacy_appended_blocks: list[Segment] = []
+            for source in incoming:
+                duration_ticks = seconds_to_ticks(source_durations[source.source_id])
+                legacy_appended_blocks.append(
+                    Segment.create(
+                        0.0,
+                        ticks_to_seconds(duration_ticks),
+                        source_id=source.source_id,
+                        timeline_start_seconds=ticks_to_seconds(position_ticks),
+                        timeline_end_seconds=ticks_to_seconds(position_ticks + duration_ticks),
+                        track_id=timeline.track_ids[0],
+                    )
+                )
+                position_ticks += duration_ticks
+            combined_timeline = SegmentTimeline.from_tracks(
+                (
+                    TimelineTrack(
+                        timeline.track_ids[0],
+                        timeline.blocks + tuple(legacy_appended_blocks),
+                    ),
+                ),
+                source_durations=source_durations,
+                source_durations_ticks=source_duration_ticks,
+                active_track_id=timeline.active_track_id,
+                timebase=timeline.timebase,
+                frame_rate=timeline.frame_rate,
+                ripple=True,
+                timing_mode=LEGACY_TIMING_MODE,
+                mutation_revision=timeline.revision + 1,
+            )
+            combined_sources = existing_sources + incoming
+            combined_settings = self._settings_with_pending_audio(self.source_settings, incoming)
+            candidate = type(self)(
+                project_id=self.project_id,
+                source=combined_sources[0],
+                duration_seconds=combined_timeline.timeline_duration_seconds,
+                playhead_seconds=min(
+                    self.playhead_seconds,
+                    combined_timeline.timeline_duration_seconds,
+                ),
+                schema_version=SCHEMA_VERSION,
+                segment_timeline=combined_timeline,
+                sources=combined_sources,
+                source_settings=combined_settings,
+                output_settings=deepcopy(self.output_settings),
+                composition_version=self.composition_version,
+            )
+            self._replace_with(candidate)
+            return incoming
         existing_blocks: tuple[Segment, ...]
         position = timeline.timeline_duration_seconds
         if self.schema_version == ONE_SOURCE_SCHEMA_VERSION:
@@ -226,13 +502,6 @@ class Project:
         else:
             existing_blocks = timeline.blocks
 
-        source_durations = {
-            source.source_id: _finite_float(
-                source.metadata.get("duration_seconds"),
-                f"Source duration for {source.source_id}",
-            )
-            for source in existing_sources
-        }
         appended_blocks: list[Segment] = []
         for source in incoming:
             duration = source_durations.setdefault(
@@ -261,32 +530,161 @@ class Project:
             timebase=timeline.timebase,
             frame_rate=timeline.frame_rate,
             ripple=timeline.ripple,
+            mutation_revision=timeline.revision + 1,
         )
-        combined_settings = deepcopy(self.source_settings)
-        for source in incoming:
-            combined_settings[source.source_id] = {
-                "audio": pending_audio_decision(source).to_dict(),
-            }
+        combined_settings = self._settings_with_pending_audio(self.source_settings, incoming)
 
         candidate = type(self)(
             project_id=self.project_id,
             source=combined_sources[0],
             duration_seconds=position,
             playhead_seconds=self.playhead_seconds,
-            schema_version=SCHEMA_VERSION,
+            schema_version=MIXED_SOURCE_SCHEMA_VERSION,
             segment_timeline=combined_timeline,
             sources=combined_sources,
             source_settings=combined_settings,
             output_settings=deepcopy(self.output_settings),
             composition_version=self.composition_version,
         )
-        self.schema_version = candidate.schema_version
-        self.sources = candidate.sources
-        self.source = candidate.source
-        self.source_settings = candidate.source_settings
-        self.segment_timeline = candidate.segment_timeline
-        self.duration_seconds = candidate.duration_seconds
+        self._replace_with(candidate)
         return incoming
+
+    def _legacy_v4_candidate(self) -> Project:
+        """Build the canonical one-track legacy-ripple representation."""
+        if self.schema_version == SCHEMA_VERSION:
+            self.validate()
+            return self
+        existing_sources = tuple(self.sources or (self.source,))
+        source_durations = {
+            source.source_id: _finite_float(
+                source.metadata.get("duration_seconds"),
+                f"Source duration for {source.source_id}",
+            )
+            for source in existing_sources
+        }
+        primary_source_id = existing_sources[0].source_id
+        blocks: list[Segment] = []
+        for block in self.timeline.segment_items:
+            source_id = block.source_id or primary_source_id
+            if source_id not in source_durations:
+                raise ProjectValidationError(
+                    f"Legacy block {block.segment_id} references unknown source {source_id}"
+                )
+            blocks.append(self._track_block(block, source_id))
+        timeline = SegmentTimeline.from_tracks(
+            (TimelineTrack("track-1", tuple(blocks)),),
+            source_durations=source_durations,
+            source_durations_ticks={
+                source_id: seconds_to_ticks(duration)
+                for source_id, duration in source_durations.items()
+            },
+            active_track_id="track-1",
+            timebase=self.timeline.timebase,
+            frame_rate=self.timeline.frame_rate,
+            ripple=True,
+            timing_mode=LEGACY_TIMING_MODE,
+        )
+        timeline.mixed_source = len(existing_sources) > 1
+        return type(self)(
+            project_id=self.project_id,
+            source=existing_sources[0],
+            duration_seconds=timeline.timeline_duration_seconds,
+            playhead_seconds=min(
+                self.playhead_seconds,
+                timeline.timeline_duration_seconds,
+            ),
+            schema_version=SCHEMA_VERSION,
+            segment_timeline=timeline,
+            sources=existing_sources,
+            source_settings=deepcopy(self.source_settings),
+            output_settings=deepcopy(self.output_settings),
+            composition_version=self.composition_version,
+        )
+
+    def _replace_with(self, candidate: Project) -> Project:
+        if self.segment_timeline is not None:
+            self.segment_timeline._project_owner = None
+        self._runtime_epoch += 1
+        self.project_id = candidate.project_id
+        self.source = candidate.source
+        self.duration_seconds = candidate.duration_seconds
+        self.playhead_seconds = candidate.playhead_seconds
+        self.schema_version = candidate.schema_version
+        self.segment_timeline = candidate.segment_timeline
+        self.sources = candidate.sources
+        self.source_settings = candidate.source_settings
+        self.output_settings = candidate.output_settings
+        self.composition_version = candidate.composition_version
+        if self.segment_timeline is not None:
+            self.segment_timeline._project_owner = self
+        return self
+
+    def _migrate_legacy_to_v4(self) -> Project:
+        return self._replace_with(self._legacy_v4_candidate())
+
+    @classmethod
+    def _from_synchronized_dict(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        project_id: str,
+        composition_version: int,
+        timeline: Mapping[str, Any],
+    ) -> Project:
+        sources = cls._sources_from_value(
+            value.get("sources"),
+            missing_message="Synchronized projects need a non-empty sources array",
+        )
+        raw_source = value.get("source")
+        if not isinstance(raw_source, Mapping):
+            raise ProjectValidationError("Synchronized projects need a source object")
+        source = SourceReference.from_dict(raw_source)
+        if source != sources[0]:
+            raise ProjectValidationError("Project source must match the first source entry")
+        duration_ticks = timeline.get("duration_ticks")
+        playhead_ticks = timeline.get("playhead_ticks")
+        if (
+            not isinstance(duration_ticks, int)
+            or isinstance(duration_ticks, bool)
+            or duration_ticks < 0
+        ):
+            raise ProjectValidationError(
+                "Synchronized timeline duration_ticks must be a non-negative integer"
+            )
+        if (
+            not isinstance(playhead_ticks, int)
+            or isinstance(playhead_ticks, bool)
+            or playhead_ticks < 0
+        ):
+            raise ProjectValidationError(
+                "Synchronized timeline playhead_ticks must be a non-negative integer"
+            )
+        segment_timeline = SegmentTimeline.from_dict(timeline)
+        if segment_timeline.timing_mode == LEGACY_TIMING_MODE:
+            segment_timeline.mixed_source = len(sources) > 1
+        if duration_ticks != segment_timeline.editing_duration_ticks:
+            raise ProjectValidationError(
+                "Synchronized timeline duration_ticks does not match its blocks"
+            )
+        if playhead_ticks > duration_ticks:
+            raise ProjectValidationError(
+                "Synchronized timeline playhead_ticks must be within its duration"
+            )
+        source_settings, output_settings = cls._settings_from_value(value)
+        project = cls(
+            project_id=project_id,
+            source=source,
+            duration_seconds=segment_timeline.timeline_duration_seconds,
+            playhead_seconds=ticks_to_seconds(playhead_ticks),
+            schema_version=SCHEMA_VERSION,
+            segment_timeline=segment_timeline,
+            sources=tuple(sources),
+            source_settings=source_settings,
+            output_settings=output_settings,
+            composition_version=composition_version,
+        )
+        project.validate()
+        return project
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> Project:
@@ -300,13 +698,15 @@ class Project:
             not in (
                 LEGACY_SCHEMA_VERSION,
                 ONE_SOURCE_SCHEMA_VERSION,
+                MIXED_SOURCE_SCHEMA_VERSION,
                 SCHEMA_VERSION,
             )
         ):
             raise ProjectValidationError(
                 f"Unsupported project schema version: {schema_version!r}; "
                 f"supported versions are {LEGACY_SCHEMA_VERSION} and "
-                f"{ONE_SOURCE_SCHEMA_VERSION} and {SCHEMA_VERSION}"
+                f"{ONE_SOURCE_SCHEMA_VERSION}, {MIXED_SOURCE_SCHEMA_VERSION}, and "
+                f"{SCHEMA_VERSION}"
             )
         project_id = value.get("project_id")
         if not isinstance(project_id, str) or not project_id:
@@ -326,6 +726,13 @@ class Project:
         timeline = value.get("timeline")
         if not isinstance(timeline, Mapping):
             raise ProjectValidationError("Project timeline must be an object")
+        if schema_version == SCHEMA_VERSION:
+            return cls._from_synchronized_dict(
+                value,
+                project_id=project_id,
+                composition_version=composition_version,
+                timeline=timeline,
+            )
         duration = timeline.get("duration_seconds")
         playhead = timeline.get("playhead_seconds")
         if not isinstance(duration, (int, float)) or isinstance(duration, bool):
@@ -338,7 +745,16 @@ class Project:
                 raise ProjectValidationError("Project source must be an object")
             source = SourceReference.from_dict(raw_source)
             if schema_version == LEGACY_SCHEMA_VERSION:
-                segment_timeline = SegmentTimeline(float(duration))
+                legacy_segment = Segment.create(
+                    0.0,
+                    float(duration),
+                    segment_id="segment-1",
+                    block_id="segment-1",
+                )
+                segment_timeline = SegmentTimeline.from_segments(
+                    float(duration),
+                    (legacy_segment,),
+                )
             else:
                 raw_segments = timeline.get("segments")
                 if not isinstance(raw_segments, list):
@@ -371,12 +787,7 @@ class Project:
                     raise ProjectValidationError(
                         "Timeline edited duration does not match its segments"
                     )
-            raw_source_settings = value.get("source_settings", {})
-            raw_output_settings = value.get("output_settings", {})
-            if not isinstance(raw_source_settings, Mapping):
-                raise ProjectValidationError("Project source settings must be an object")
-            if not isinstance(raw_output_settings, Mapping):
-                raise ProjectValidationError("Project output settings must be an object")
+            source_settings, output_settings = cls._settings_from_value(value)
             project = cls(
                 project_id=project_id,
                 source=source,
@@ -385,24 +796,17 @@ class Project:
                 schema_version=ONE_SOURCE_SCHEMA_VERSION,
                 segment_timeline=segment_timeline,
                 sources=(source,),
-                source_settings=dict(raw_source_settings),
-                output_settings=dict(raw_output_settings),
+                source_settings=source_settings,
+                output_settings=output_settings,
                 composition_version=composition_version,
             )
             project.validate()
-            return project
+            return project._migrate_legacy_to_v4()
 
-        raw_sources = value.get("sources")
-        if not isinstance(raw_sources, list) or not raw_sources:
-            raise ProjectValidationError("Project sources must be a non-empty array")
-        sources: list[SourceReference] = []
-        for item in raw_sources:
-            if not isinstance(item, Mapping):
-                raise ProjectValidationError("Project source must be an object")
-            sources.append(SourceReference.from_dict(item))
-        source_ids = [source.source_id for source in sources]
-        if len(set(source_ids)) != len(source_ids):
-            raise ProjectValidationError("Project sources must have unique source_id values")
+        sources = cls._sources_from_value(
+            value.get("sources"),
+            missing_message="Project sources must be a non-empty array",
+        )
         raw_source = value.get("source")
         source = sources[0] if raw_source is None else SourceReference.from_dict(raw_source)
         if source != sources[0]:
@@ -430,28 +834,24 @@ class Project:
             abs_tol=_TIME_EPSILON,
         ):
             raise ProjectValidationError("Timeline edited duration does not match its blocks")
-        raw_source_settings = value.get("source_settings", {})
-        raw_output_settings = value.get("output_settings", {})
-        if not isinstance(raw_source_settings, Mapping):
-            raise ProjectValidationError("Project source settings must be an object")
-        if not isinstance(raw_output_settings, Mapping):
-            raise ProjectValidationError("Project output settings must be an object")
+        source_settings, output_settings = cls._settings_from_value(value)
         project = cls(
             project_id=project_id,
             source=source,
             duration_seconds=float(duration),
             playhead_seconds=float(playhead),
-            schema_version=SCHEMA_VERSION,
+            schema_version=MIXED_SOURCE_SCHEMA_VERSION,
             segment_timeline=segment_timeline,
             sources=tuple(sources),
-            source_settings=dict(raw_source_settings),
-            output_settings=dict(raw_output_settings),
+            source_settings=source_settings,
+            output_settings=output_settings,
             composition_version=composition_version,
         )
         project.validate()
-        return project
+        return project._migrate_legacy_to_v4()
 
     def __post_init__(self) -> None:
+        self._initialize_runtime_context()
         if self.segment_timeline is None:
             self.segment_timeline = SegmentTimeline(self.duration_seconds)
         if self.sources is None:
@@ -478,6 +878,7 @@ class Project:
             )
         if not isinstance(self.output_settings, dict):
             raise ProjectValidationError("Project output settings must be an object")
+        self.segment_timeline._project_owner = self
         self.validate()
 
     def validate(self) -> None:
@@ -485,7 +886,11 @@ class Project:
             raise ProjectValidationError(
                 f"Unsupported composition version: {self.composition_version!r}"
             )
-        if self.schema_version not in (ONE_SOURCE_SCHEMA_VERSION, SCHEMA_VERSION):
+        if self.schema_version not in (
+            ONE_SOURCE_SCHEMA_VERSION,
+            MIXED_SOURCE_SCHEMA_VERSION,
+            SCHEMA_VERSION,
+        ):
             raise ProjectValidationError(
                 f"Unsupported project schema version: {self.schema_version!r}"
             )
@@ -507,8 +912,16 @@ class Project:
         for source_id, settings in self.source_settings.items():
             if not isinstance(settings, Mapping):
                 raise ProjectValidationError(f"Source settings must be an object: {source_id}")
-        if not math.isfinite(self.duration_seconds) or self.duration_seconds <= 0:
-            raise ProjectValidationError("Project duration must be greater than zero")
+        if not math.isfinite(self.duration_seconds) or (
+            self.duration_seconds < 0
+            if self.schema_version == SCHEMA_VERSION
+            else self.duration_seconds <= 0
+        ):
+            raise ProjectValidationError(
+                "Project duration must not be negative"
+                if self.schema_version == SCHEMA_VERSION
+                else "Project duration must be greater than zero"
+            )
         if not math.isfinite(self.playhead_seconds):
             raise ProjectValidationError("Project playhead must be finite")
         if not 0 <= self.playhead_seconds <= self.duration_seconds:
@@ -521,7 +934,7 @@ class Project:
                 raise ProjectValidationError(
                     "One-source schema cannot contain a mixed-source timeline"
                 )
-        else:
+        elif self.schema_version == MIXED_SOURCE_SCHEMA_VERSION:
             if not self.segment_timeline.mixed_source:
                 raise ProjectValidationError("Multi-source schema requires a mixed-source timeline")
             self.duration_seconds = self.segment_timeline.source_duration_seconds
@@ -540,12 +953,47 @@ class Project:
             }
             self.segment_timeline.source_durations = expected_durations
             self.segment_timeline.validate()
-        if not math.isclose(
-            self.segment_timeline.timeline_duration_seconds,
-            self.duration_seconds,
-            rel_tol=0.0,
-            abs_tol=_TIME_EPSILON,
-        ):
+        else:
+            if not self.segment_timeline.is_synchronized:
+                raise ProjectValidationError("Track schema requires a synchronized timeline")
+            if not self.segment_timeline.tracks:
+                raise ProjectValidationError("Track schema requires at least one track")
+            expected_durations = {
+                source.source_id: _finite_float(
+                    source.metadata.get("duration_seconds"),
+                    f"Source duration for {source.source_id}",
+                )
+                for source in self.sources
+            }
+            actual_duration_ticks = self.segment_timeline.source_durations_ticks or {}
+            expected_duration_ticks = {
+                source_id: seconds_to_ticks(duration)
+                for source_id, duration in expected_durations.items()
+            }
+            if set(actual_duration_ticks) != set(expected_duration_ticks):
+                raise ProjectValidationError(
+                    "Synchronized timeline source durations must match project sources"
+                )
+            for source_id in expected_durations:
+                actual = actual_duration_ticks[source_id]
+                if actual != expected_duration_ticks[source_id]:
+                    raise ProjectValidationError(
+                        f"Synchronized timeline source duration does not match source {source_id}"
+                    )
+            self.segment_timeline.validate()
+        if self.schema_version == SCHEMA_VERSION:
+            duration_matches = (
+                seconds_to_ticks(self.duration_seconds)
+                == self.segment_timeline.editing_duration_ticks
+            )
+        else:
+            duration_matches = math.isclose(
+                self.segment_timeline.timeline_duration_seconds,
+                self.duration_seconds,
+                rel_tol=0.0,
+                abs_tol=_TIME_EPSILON,
+            )
+        if not duration_matches:
             raise ProjectValidationError(
                 "Project segment timeline duration must match project duration"
             )
@@ -659,6 +1107,89 @@ class Project:
             raise ProjectValidationError("Project segment timeline is required")
         return self.segment_timeline
 
+    @property
+    def runtime_identity(self) -> str:
+        return self._runtime_identity
+
+    @property
+    def runtime_epoch(self) -> int:
+        return self._runtime_epoch
+
+    def _sync_timeline_state(self) -> None:
+        timeline = self.segment_timeline
+        if timeline is None:
+            return
+        self.duration_seconds = (
+            timeline.editing_duration_seconds
+            if self.schema_version == SCHEMA_VERSION
+            else timeline.timeline_duration_seconds
+        )
+        self.playhead_seconds = max(
+            0.0,
+            min(self.duration_seconds, self.playhead_seconds),
+        )
+
+    def convert_to_synchronized(self, *, confirm: bool = False) -> Project:
+        """Explicitly convert a legacy project to absolute synchronized timing."""
+        if (
+            self.schema_version == SCHEMA_VERSION
+            and self.timeline.timing_mode == ABSOLUTE_TIMING_MODE
+        ):
+            self.validate()
+            return self
+        if confirm is not True:
+            raise ProjectValidationError(
+                "Explicit confirmation is required to convert legacy timing to synchronized tracks"
+            )
+        base = self._legacy_v4_candidate()
+        existing_sources = tuple(base.sources or (base.source,))
+        source_durations = {
+            source.source_id: _finite_float(
+                source.metadata.get("duration_seconds"),
+                f"Source duration for {source.source_id}",
+            )
+            for source in existing_sources
+        }
+        source_id = existing_sources[0].source_id
+        converted: list[Segment] = []
+        for block in base.timeline.segment_items:
+            block_source_id = block.source_id or source_id
+            if block_source_id not in source_durations:
+                raise ProjectValidationError(
+                    f"Legacy block {block.segment_id} references unknown source {block_source_id}"
+                )
+            converted.append(self._track_block(block, block_source_id))
+        timeline = SegmentTimeline.from_tracks(
+            (TimelineTrack("track-1", tuple(converted)),),
+            source_durations=source_durations,
+            active_track_id="track-1",
+            frame_rate=base.timeline.frame_rate,
+            ripple=False,
+            timing_mode=ABSOLUTE_TIMING_MODE,
+        )
+        candidate = type(self)(
+            project_id=self.project_id,
+            source=existing_sources[0],
+            duration_seconds=timeline.timeline_duration_seconds,
+            playhead_seconds=min(
+                base.playhead_seconds,
+                timeline.timeline_duration_seconds,
+            ),
+            schema_version=SCHEMA_VERSION,
+            segment_timeline=timeline,
+            sources=existing_sources,
+            source_settings=deepcopy(self.source_settings),
+            output_settings=deepcopy(self.output_settings),
+            composition_version=self.composition_version,
+        )
+        return self._replace_with(candidate)
+
+    def migrate_to_v4(self, *, confirm: bool = False) -> Project:
+        if self.schema_version == SCHEMA_VERSION:
+            self.validate()
+            return self
+        return self._migrate_legacy_to_v4()
+
     def source_by_id(self, source_id: str) -> SourceReference:
         for source in self.sources or ():
             if source.source_id == source_id:
@@ -722,6 +1253,24 @@ class Project:
         self.validate()
         if self.segment_timeline is None:
             raise ProjectValidationError("Project segment timeline is required")
+        if self.schema_version == SCHEMA_VERSION:
+            timeline = self.segment_timeline.to_dict()
+            timeline.update(
+                {
+                    "duration_ticks": seconds_to_ticks(self.duration_seconds),
+                    "playhead_ticks": seconds_to_ticks(self.playhead_seconds),
+                }
+            )
+            return {
+                "schema_version": self.schema_version,
+                "composition_version": self.composition_version,
+                "project_id": self.project_id,
+                "source": self.source.to_dict(),
+                "sources": [source.to_dict() for source in self.sources or ()],
+                "timeline": timeline,
+                "source_settings": deepcopy(self.source_settings),
+                "output_settings": deepcopy(self.output_settings),
+            }
         if self.schema_version == ONE_SOURCE_SCHEMA_VERSION:
             segments = self.segment_timeline.segment_items
             return {

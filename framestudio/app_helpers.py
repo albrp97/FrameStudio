@@ -21,6 +21,7 @@ FOCUS_OFFSET_SCROLL_STEP = 10.0
 FOCUS_SCROLL_FIELDS = ("zoom", "offset_x", "offset_y")
 KEYVAL_LEFT = 0xFF51
 KEYVAL_RIGHT = 0xFF53
+KEYVAL_BACKSPACE = 0xFF08
 KEYVAL_DELETE = 0xFFFF
 KEYVAL_KP_DELETE = 0xFF9F
 KEYVAL_KP_SPACE = 0xFF80
@@ -28,6 +29,7 @@ KEYCODE_SPACE = 65
 KEY_BINDINGS: tuple[tuple[str, str], ...] = (
     ("Space", "Play or pause playback"),
     ("B", "Split the selected clip at the playhead"),
+    ("Backspace", "Remove the selected clip(s) and enable bounded Undo"),
     ("Delete", "Toggle the selected clip between included and deleted"),
     ("Left / Right", "Move the playhead by one output frame"),
     ("Shift+Left / Shift+Right", "Move selected block(s) left or right"),
@@ -46,6 +48,7 @@ KEY_BINDINGS: tuple[tuple[str, str], ...] = (
 __all__ = [
     "KEY_BINDINGS",
     "KEYCODE_SPACE",
+    "KEYVAL_BACKSPACE",
     "KEYVAL_DELETE",
     "KEYVAL_KP_DELETE",
     "KEYVAL_KP_SPACE",
@@ -61,6 +64,7 @@ __all__ = [
     "create_play_pause_key_controller",
     "editing_is_locked",
     "focus_control_has_keyboard_focus",
+    "text_input_has_keyboard_focus",
     "format_audio_decisions",
     "format_export_progress_label",
     "format_key_bindings",
@@ -69,11 +73,13 @@ __all__ = [
     "frame_step_direction",
     "frame_step_position",
     "is_delete_key",
+    "is_backspace_key",
     "is_fit_zoom_key",
     "is_frame_step_key",
     "is_play_pause_key",
     "is_split_key",
     "playback_action_label",
+    "route_timeline_scroll",
     "segment_action_state",
     "timeline_scroll_mode",
     "timeline_scroll_position",
@@ -157,6 +163,20 @@ def focus_control_has_keyboard_focus(window: object) -> bool:
     return False
 
 
+def text_input_has_keyboard_focus(window: object) -> bool:
+    focused = getattr(window, "get_focus", None)
+    if not callable(focused):
+        return False
+    widget = focused()
+    if widget is None:
+        return False
+    has_text = callable(getattr(widget, "get_text", None))
+    can_edit = callable(getattr(widget, "set_text", None)) or callable(
+        getattr(widget, "get_buffer", None)
+    )
+    return has_text and can_edit
+
+
 def is_play_pause_key(keyval: int, keycode: int | None = None) -> bool:
     return keyval in (ord(" "), KEYVAL_KP_SPACE) or keycode == KEYCODE_SPACE
 
@@ -171,6 +191,10 @@ def is_split_key(keyval: int) -> bool:
 
 def is_delete_key(keyval: int) -> bool:
     return keyval in (KEYVAL_DELETE, KEYVAL_KP_DELETE)
+
+
+def is_backspace_key(keyval: int) -> bool:
+    return keyval == KEYVAL_BACKSPACE
 
 
 def is_frame_step_key(keyval: int) -> bool:
@@ -269,6 +293,36 @@ def timeline_scroll_mode(
     if abs(delta_y) > 0.01:
         return "playhead"
     return "none"
+
+
+def route_timeline_scroll(
+    window: Any,
+    controller: Any,
+    delta_x: float,
+    delta_y: float,
+    Gdk: Any,
+) -> str:
+    state_getter = getattr(controller, "get_current_event_state", None)
+    state = int(state_getter()) if callable(state_getter) else 0
+    mode = timeline_scroll_mode(
+        delta_x,
+        delta_y,
+        state,
+        int(Gdk.ModifierType.CONTROL_MASK),
+        int(Gdk.ModifierType.ALT_MASK),
+        int(Gdk.ModifierType.SHIFT_MASK),
+    )
+    if mode == "zoom":
+        delta = delta_y if abs(delta_y) > 0.01 else delta_x
+        window._zoom_timeline(1 if delta < 0 else -1)
+    elif mode == "viewport":
+        adjustment = window.timeline_viewport.get_hadjustment()
+        delta = delta_x if abs(delta_x) > 0.01 else delta_y
+        lower = adjustment.get_lower()
+        upper = max(lower, adjustment.get_upper() - adjustment.get_page_size())
+        target = adjustment.get_value() + delta * TIMELINE_SCROLL_PIXELS
+        adjustment.set_value(max(lower, min(upper, target)))
+    return mode
 
 
 def toggle_segment_deleted_state(

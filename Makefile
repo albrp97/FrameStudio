@@ -4,6 +4,7 @@ NPX ?= npx
 NPM ?= npm
 STATIC_ANALYSIS_DIR ?= evidence/static-analysis
 QUALITY_PATHS = framestudio.py framestudio tests/test_editor_*.py \
+	tests/test_phase010_functionality.py \
 	tests/test_framestudio_compatibility.py \
 	benchmarks/restoration_benchmark.py tests/test_restoration_benchmark.py \
 	benchmarks/render_strategy_benchmark.py tests/test_render_strategy_benchmark.py \

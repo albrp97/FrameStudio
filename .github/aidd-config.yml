@@ -90,7 +90,7 @@ delivery:
     # Select once during project bootstrap. Guided preserves interactive
     # approvals and user functionality validation; automatic continues through
     # the configured workflow after bootstrap without asking or waiting.
-    mode: guided # guided | automatic
+    mode: automatic # guided | automatic; user-authorized PHASE-010 orchestration
     # Automatic mode uses this validator for every validation decision. The
     # deterministic command or analyzer remains the source of raw results.
     automatic_validation:

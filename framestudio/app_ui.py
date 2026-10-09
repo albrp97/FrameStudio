@@ -179,6 +179,40 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     window.timeline_output_label.set_tooltip_text("Duration of included clips in the final export")
     timeline_toolbar.append(window.timeline_output_label)
 
+    undo_removal = Gtk.Button(label="Undo removal")
+    undo_removal.set_tooltip_text(
+        "Undo the latest in-memory Backspace removal when the project is unchanged"
+    )
+    undo_removal.set_sensitive(False)
+    undo_removal.connect("clicked", window._on_undo_removal_clicked)
+    timeline_toolbar.append(undo_removal)
+    window.undo_removal_button = undo_removal
+
+    track_label = Gtk.Label(label="Track", xalign=0.0)
+    timeline_toolbar.append(track_label)
+    window.track_selector = Gtk.DropDown.new(
+        Gtk.StringList.new(["track-1"]),
+        None,
+    )
+    window.track_selector.set_tooltip_text("Choose the ordered track that receives imported clips")
+    window.track_selector.connect(
+        "notify::selected",
+        window._on_track_selected,
+    )
+    timeline_toolbar.append(window.track_selector)
+
+    add_track = Gtk.Button(label="Add track")
+    add_track.set_tooltip_text("Add an empty synchronized track")
+    add_track.connect("clicked", window._on_add_track_clicked)
+    timeline_toolbar.append(add_track)
+    window.add_track_button = add_track
+
+    remove_track = Gtk.Button(label="Remove track")
+    remove_track.set_tooltip_text("Remove the active empty synchronized track")
+    remove_track.connect("clicked", window._on_remove_track_clicked)
+    timeline_toolbar.append(remove_track)
+    window.remove_track_button = remove_track
+
     fit_thirty_minutes = Gtk.Button(label="30 min")
     fit_thirty_minutes.set_tooltip_text("Fit the timeline scale so 30 minutes spans the viewport")
     fit_thirty_minutes.connect("clicked", window._fit_timeline_to_thirty_minutes)
@@ -202,25 +236,29 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
         on_seek=window._on_timeline_view_seek,
         on_segment_selected=window._on_timeline_segment_selected,
         on_selection_changed=window._on_timeline_selection_changed,
+        on_segment_dropped=window._on_timeline_segment_dropped,
+        on_invalid_drop=window._on_timeline_invalid_drop,
+        on_track_activated=window._on_track_activated,
         selection_modifier_mask=int(Gdk.ModifierType.CONTROL_MASK),
         range_selection_modifier_mask=int(Gdk.ModifierType.SHIFT_MASK),
     )
     window.timeline_canvas.set_tooltip_text(
         "Click/drag to seek; normal wheel seeks 30 seconds per unit; Ctrl+wheel zooms; "
         "Alt/Shift/horizontal wheel scrolls; Ctrl-click selects multiple clips"
-        "; Shift-click selects an inclusive range"
+        "; Shift-click selects an inclusive range; drag clips between track rows"
     )
     timeline_scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.BOTH_AXES)
     timeline_scroll.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
     timeline_scroll.connect("scroll", window._on_timeline_scroll)
     window.timeline_canvas.add_controller(timeline_scroll)
+    window.timeline_scroll_controller = timeline_scroll
 
     timeline_viewport = Gtk.ScrolledWindow()
     timeline_viewport.set_policy(
         Gtk.PolicyType.AUTOMATIC,
         Gtk.PolicyType.NEVER,
     )
-    timeline_viewport.set_min_content_height(132)
+    timeline_viewport.set_min_content_height(280)
     timeline_viewport.set_child(window.timeline_canvas)
     timeline_layout.append(timeline_viewport)
     window.timeline_viewport = timeline_viewport
@@ -235,15 +273,19 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     )
     window._on_timeline_viewport_changed(adjustment, None)
 
-    timeline_selection = Gtk.Label(label="No clip selected")
+    timeline_selection = Gtk.Label(label="No video selected")
     timeline_selection.set_xalign(0.0)
     timeline_selection.set_wrap(True)
+    timeline_selection.set_tooltip_text(
+        "Focused selected source: filename, original dimensions, and original FPS"
+    )
     timeline_layout.append(timeline_selection)
     window.timeline_selection_label = timeline_selection
 
     audio_status = Gtk.Label(label="Audio decisions: no project loaded")
     audio_status.set_xalign(0.0)
     audio_status.set_wrap(True)
+    audio_status.set_visible(False)
     timeline_layout.append(audio_status)
     window.audio_status_label = audio_status
 

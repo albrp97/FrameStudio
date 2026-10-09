@@ -4,6 +4,7 @@ import math
 from dataclasses import dataclass
 
 from .model import SegmentTimeline
+from .model_types import seconds_to_ticks, ticks_to_seconds
 
 TIMELINE_HORIZONTAL_PADDING = 12.0
 TIMELINE_MIN_PIXELS_PER_SECOND = 8.0
@@ -11,6 +12,9 @@ TIMELINE_HEIGHT = 124
 TIMELINE_RULER_HEIGHT = 34.0
 TIMELINE_TRACK_Y = 44.0
 TIMELINE_TRACK_HEIGHT = 54.0
+TIMELINE_TRACK_GAP = 0.0
+TIMELINE_TRACK_HEADER_HEIGHT = 18.0
+TIMELINE_CANVAS_BOTTOM_PADDING = 12.0
 TIMELINE_MIN_ZOOM = 0.5
 TIMELINE_DEFAULT_ZOOM = 1.0
 TIMELINE_MAX_ZOOM = 12.0
@@ -49,16 +53,44 @@ class TimelineClipGeometry:
     x: float
     width: float
     color_index: int = 0
+    track_id: str = "track-1"
+    track_index: int = 0
+    y: float = TIMELINE_TRACK_Y + TIMELINE_TRACK_HEADER_HEIGHT + 2.0
+    height: float = TIMELINE_TRACK_HEIGHT - TIMELINE_TRACK_HEADER_HEIGHT - 8.0
 
     @property
     def end_x(self) -> float:
         return self.x + self.width
+
+    @property
+    def end_y(self) -> float:
+        return self.y + self.height
+
+
+@dataclass(frozen=True)
+class TimelineTrackGeometry:
+    track_id: str
+    index: int
+    y: float
+    height: float = TIMELINE_TRACK_HEIGHT
+    active: bool = False
+
+    @property
+    def end_y(self) -> float:
+        return self.y + self.height
 
 
 def _positive_float(value: float, label: str) -> float:
     parsed = float(value)
     if not math.isfinite(parsed) or parsed <= 0:
         raise ValueError(f"{label} must be greater than zero")
+    return parsed
+
+
+def _nonnegative_finite_float(value: float, label: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed < 0:
+        raise ValueError(f"{label} must be finite and non-negative")
     return parsed
 
 
@@ -100,13 +132,14 @@ def timeline_pixels_per_second(
     viewport_width: float,
     zoom: float,
 ) -> float:
-    duration = _positive_float(duration_seconds, "Timeline duration")
+    duration = _nonnegative_finite_float(duration_seconds, "Timeline duration")
     viewport = _positive_float(viewport_width, "Timeline viewport width")
     usable_width = max(
         1.0,
         viewport - TIMELINE_HORIZONTAL_PADDING * 2,
     )
-    return (usable_width / duration) * _positive_float(zoom, "Timeline zoom")
+    scale_duration = max(duration, 1e-9)
+    return (usable_width / scale_duration) * _positive_float(zoom, "Timeline zoom")
 
 
 def timeline_content_width(
@@ -114,17 +147,72 @@ def timeline_content_width(
     viewport_width: float,
     zoom: float,
 ) -> float:
+    duration = _nonnegative_finite_float(duration_seconds, "Timeline duration")
     viewport = _positive_float(viewport_width, "Timeline viewport width")
     pixels_per_second = timeline_pixels_per_second(
-        duration_seconds,
+        duration,
         viewport,
         zoom,
     )
     return max(
         TIMELINE_HORIZONTAL_PADDING * 2,
-        _positive_float(duration_seconds, "Timeline duration") * pixels_per_second
-        + TIMELINE_HORIZONTAL_PADDING * 2,
+        duration * pixels_per_second + TIMELINE_HORIZONTAL_PADDING * 2,
     )
+
+
+def timeline_content_height(track_count: int) -> float:
+    if not isinstance(track_count, int) or isinstance(track_count, bool) or track_count < 1:
+        raise ValueError("Timeline track count must be a positive integer")
+    return (
+        TIMELINE_TRACK_Y
+        + track_count * TIMELINE_TRACK_HEIGHT
+        + (track_count - 1) * TIMELINE_TRACK_GAP
+        + TIMELINE_CANVAS_BOTTOM_PADDING
+    )
+
+
+def _track_ids(timeline: SegmentTimeline) -> tuple[str, ...]:
+    if timeline.tracks is None:
+        return ("track-1",)
+    return timeline.track_ids
+
+
+def layout_timeline_tracks(
+    timeline: SegmentTimeline,
+) -> tuple[TimelineTrackGeometry, ...]:
+    track_ids = _track_ids(timeline)
+    active_track_id = timeline.active_track_id
+    return tuple(
+        TimelineTrackGeometry(
+            track_id=track_id,
+            index=index,
+            y=TIMELINE_TRACK_Y + index * (TIMELINE_TRACK_HEIGHT + TIMELINE_TRACK_GAP),
+            active=active_track_id == track_id,
+        )
+        for index, track_id in enumerate(track_ids)
+    )
+
+
+def timeline_track_id_at_y(
+    timeline: SegmentTimeline,
+    y: float,
+) -> str | None:
+    position = float(y)
+    for row in layout_timeline_tracks(timeline):
+        if row.y <= position < row.end_y:
+            return row.track_id
+    return None
+
+
+def timeline_track_index_at_y(
+    timeline: SegmentTimeline,
+    y: float,
+) -> int | None:
+    position = float(y)
+    for row in layout_timeline_tracks(timeline):
+        if row.y <= position < row.end_y:
+            return row.index
+    return None
 
 
 def layout_timeline_segments(
@@ -138,25 +226,39 @@ def layout_timeline_segments(
         viewport_width,
         zoom,
     )
-    return tuple(
-        TimelineClipGeometry(
-            segment_id=segment.segment_id,
-            index=index,
-            start_seconds=segment.start_seconds,
-            end_seconds=segment.end_seconds,
-            timeline_start_seconds=segment.timeline_start,
-            timeline_end_seconds=segment.timeline_end,
-            source_id=segment.source_id,
-            deleted=segment.deleted,
-            x=TIMELINE_HORIZONTAL_PADDING + segment.timeline_start * pixels_per_second,
-            width=max(
-                1.0,
-                (segment.timeline_end - segment.timeline_start) * pixels_per_second,
-            ),
-            color_index=segment.color_slot,
-        )
-        for index, segment in enumerate(timeline.segment_items)
-    )
+    rows = layout_timeline_tracks(timeline)
+    clips: list[TimelineClipGeometry] = []
+    index = 0
+    for row in rows:
+        if timeline.tracks is None:
+            segments = timeline.segment_items
+        else:
+            segments = timeline.track_by_id(row.track_id).blocks
+        for segment in segments:
+            clips.append(
+                TimelineClipGeometry(
+                    segment_id=segment.segment_id,
+                    index=index,
+                    start_seconds=segment.start_seconds,
+                    end_seconds=segment.end_seconds,
+                    timeline_start_seconds=segment.timeline_start,
+                    timeline_end_seconds=segment.timeline_end,
+                    source_id=segment.source_id,
+                    deleted=segment.deleted,
+                    x=TIMELINE_HORIZONTAL_PADDING + segment.timeline_start * pixels_per_second,
+                    width=max(
+                        1.0,
+                        (segment.timeline_end - segment.timeline_start) * pixels_per_second,
+                    ),
+                    color_index=segment.color_slot,
+                    track_id=row.track_id,
+                    track_index=row.index,
+                    y=row.y + TIMELINE_TRACK_HEADER_HEIGHT + 2.0,
+                    height=TIMELINE_TRACK_HEIGHT - TIMELINE_TRACK_HEADER_HEIGHT - 8.0,
+                )
+            )
+            index += 1
+    return tuple(clips)
 
 
 def timeline_position_from_x(
@@ -165,29 +267,88 @@ def timeline_position_from_x(
     viewport_width: float,
     zoom: float,
 ) -> float:
-    duration = _positive_float(duration_seconds, "Timeline duration")
+    duration = _nonnegative_finite_float(duration_seconds, "Timeline duration")
+    position_x = float(x)
+    if not math.isfinite(position_x):
+        raise ValueError("Timeline x position must be finite")
+    if duration <= 0.0:
+        return 0.0
     pixels_per_second = timeline_pixels_per_second(
         duration,
         viewport_width,
         zoom,
     )
-    position = (float(x) - TIMELINE_HORIZONTAL_PADDING) / pixels_per_second
+    position = (position_x - TIMELINE_HORIZONTAL_PADDING) / pixels_per_second
     return max(0.0, min(duration, position))
+
+
+def timeline_ticks_from_x(
+    x: float,
+    duration_seconds: float,
+    viewport_width: float,
+    zoom: float,
+) -> int:
+    return seconds_to_ticks(
+        timeline_position_from_x(
+            x,
+            duration_seconds,
+            viewport_width,
+            zoom,
+        )
+    )
+
+
+def timeline_drag_ticks_from_x(
+    x: float,
+    duration_seconds: float,
+    viewport_width: float,
+    zoom: float,
+) -> int:
+    """Map a drag pointer to non-negative absolute ticks without an end clamp."""
+    duration = _nonnegative_finite_float(duration_seconds, "Timeline duration")
+    position_x = float(x)
+    if not math.isfinite(position_x):
+        raise ValueError("Timeline x position must be finite")
+    pixels_per_second = timeline_pixels_per_second(
+        duration,
+        viewport_width,
+        zoom,
+    )
+    position = max(0.0, (position_x - TIMELINE_HORIZONTAL_PADDING) / pixels_per_second)
+    return seconds_to_ticks(position)
+
+
+def timeline_x_from_ticks(
+    ticks: int,
+    duration_seconds: float,
+    viewport_width: float,
+    zoom: float,
+) -> float:
+    return TIMELINE_HORIZONTAL_PADDING + ticks_to_seconds(ticks) * timeline_pixels_per_second(
+        duration_seconds,
+        viewport_width,
+        zoom,
+    )
 
 
 def hit_test_timeline_segment(
     clips: tuple[TimelineClipGeometry, ...],
     x: float,
+    y: float | None = None,
 ) -> TimelineClipGeometry | None:
     position = float(x)
     for index, clip in enumerate(clips):
-        if clip.x <= position < clip.end_x:
+        if clip.x <= position < clip.end_x and (y is None or clip.y <= float(y) < clip.end_y):
             return clip
-        if index == len(clips) - 1 and math.isclose(
-            position,
-            clip.end_x,
-            rel_tol=0.0,
-            abs_tol=1e-9,
+        if (
+            index == len(clips) - 1
+            and math.isclose(
+                position,
+                clip.end_x,
+                rel_tol=0.0,
+                abs_tol=1e-9,
+            )
+            and (y is None or clip.y <= float(y) <= clip.end_y)
         ):
             return clip
     return None

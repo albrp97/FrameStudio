@@ -36,6 +36,47 @@ implementation work.
 | CAP-010 | Composing linked triplicate focused-action layouts | Future | draft | `future-product-direction.md` |
 | CAP-011 | Enhancing frame rate to 60 FPS | Future | draft | `future-product-direction.md`, `FPS-ENHANCEMENT-RESEARCH.md` |
 | CAP-012 | Protecting media, state, and failure recovery | Cross-cutting | draft | `vision.md`, `project-scope.md`, existing scripts |
+| CAP-013 | Synchronizing simultaneous video tracks and layouts | Next extension | confirmed for planning | `multi-track-editing-contract.md`, CHG-012 |
+
+## Approved PHASE-010 Coverage Extension
+
+Approved on 2026-10-09 through CHG-012, CHG-013 and DISC-010. This is planning
+coverage, not evidence of implemented capabilities.
+
+| Existing capability | Extended outcome | Feature coverage |
+|---|---|---|
+| CAP-001 | Focused source filename, dimensions, FPS | FEAT-032 |
+| CAP-002 | One silent synchronized preview/playhead for up to four tracks | FEAT-035, FEAT-036 |
+| CAP-003 | Track placement, collisions, Backspace removal and Undo | FEAT-033, FEAT-035 |
+| CAP-004 | Versioned track/placement and output-choice persistence | FEAT-034, FEAT-035, FEAT-038 |
+| CAP-005 | Verified independent track/source outputs and simultaneous final composition | FEAT-034, FEAT-036, FEAT-038 |
+| CAP-006 | Shared GUI/CLI editing and export contracts | FEAT-033, FEAT-034, FEAT-035, FEAT-038 |
+| CAP-007 | Stable track/source pair identities and independent duplicated-source outputs | FEAT-034, FEAT-035 |
+| CAP-008 | Fixed stereo pan for final composition; normal source audio in standalone exports | FEAT-034, FEAT-037 |
+| CAP-009, CAP-010 | Segment transforms/triplicate contained inside each section | FEAT-036 |
+| CAP-011 | Existing selective FPS policy retained across requested outputs | FEAT-034, FEAT-036 |
+| CAP-012 | Undo safety, migration, resume, atomic publication, original-media safety | FEAT-033 through FEAT-038 |
+
+### CAP-013 - Synchronizing Simultaneous Video Tracks and Layouts
+
+**Parents:** OBJ-001, SCOPE-001
+**Horizon:** approved next extension
+**Status:** confirmed for planning
+**Outcome:** Up to four ordered tracks share absolute timing and produce the
+same active-clip composition in preview and final export.
+**Behavior:** non-overlapping blocks within a track, freely placed gaps,
+one shared playhead, active-only full/vertical-half/vertical-third/2x2 layouts,
+centered section framing, and fixed layout-associated stereo export pan.
+**Dependencies:** stable source identity, project migration, track placement,
+shared interval/layout contract, source audio handling, output verification.
+**Risks:** gaps/half-open boundaries, schema compatibility, drifting decoders,
+incorrect framing, stereo clipping, stale cache/session identities.
+**Affected surfaces:** project/timeline, persistence, GUI/CLI, playback,
+composition, audio, export/cache/session, tests.
+**Evidence plan:** generated-media preview/export parity, decoded pixels,
+channel-energy/clipping measurements, source hashes, round trips and resume.
+**Coverage:** PHASE-010 / FEAT-035 through FEAT-038.
+**Source:** `multi-track-editing-contract.md` / CHG-012, 2026-10-09.
 
 ## Capability Definitions
 

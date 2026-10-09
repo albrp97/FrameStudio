@@ -26,6 +26,7 @@ from .interpolation import (
     resolve_frame_rate_policy_with_fallback,
     validate_interpolation_backend,
 )
+from .output_plan import OutputPlan
 from .upscale_policy import (
     DEFAULT_UPSCALE_BACKEND,
     DEFAULT_UPSCALE_MODEL,
@@ -205,6 +206,20 @@ def upscale_panel_rows(
 ) -> tuple[tuple[str, str], ...]:
     return _upscale_display_rows(
         resolve_upscale_panel_policy(project, enabled=enabled),
+    )
+
+
+def output_panel_rows(plan: OutputPlan) -> tuple[tuple[str, str], ...]:
+    """Return concise, user-visible counts for the selected output plan."""
+    folder_ids = {
+        request.identity.track_id
+        for request in plan.source_outputs
+        if request.identity.track_id is not None
+    }
+    return (
+        ("Output mode", plan.mode),
+        ("Source output folders", str(len(folder_ids))),
+        ("Source output pairs", str(len(plan.source_outputs))),
     )
 
 
@@ -438,6 +453,7 @@ def prepare_export_panel(
 __all__ = [
     "ExportPanelState",
     "fps_panel_rows",
+    "output_panel_rows",
     "prepare_export_panel",
     "resolve_upscale_panel_policy",
     "upscale_panel_rows",

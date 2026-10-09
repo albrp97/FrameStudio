@@ -113,11 +113,12 @@ class EditorPerformanceModeTests(unittest.TestCase):
         )
         glib = SimpleNamespace(idle_add=MagicMock())
         plan = SimpleNamespace(route="stream-copy", reason="test")
+        output_plan = SimpleNamespace(mode="final-only")
 
         with (
             patch(
-                "framestudio.app_export.run_export_job",
-                return_value=(destination, plan),
+                "framestudio.app_export.run_output_choice_job",
+                return_value=(destination, output_plan, plan, 0),
             ) as run_job,
             patch("framestudio.app_export.threading.Thread") as thread,
         ):

@@ -5,7 +5,6 @@ from typing import Any
 
 from .app_export import request_close_after_export
 from .app_helpers import (
-    TIMELINE_SCROLL_PIXELS,
     frame_step_direction,
     frame_step_position,
     is_delete_key,
@@ -14,11 +13,12 @@ from .app_helpers import (
     is_play_pause_key,
     is_split_key,
     playback_action_label,
-    timeline_scroll_mode,
+    route_timeline_scroll,
     timeline_scroll_position,
 )
 from .app_project import _invalidate_audio_analysis
 from .ffmpeg_playback import PlaybackBackendError, VideoFrame
+from .model_timeline import ABSOLUTE_TIMING_MODE
 from .playback import PlaybackState
 from .ui import format_duration
 
@@ -148,13 +148,14 @@ def request_timeline_preview(window: Any, position_seconds: float) -> None:
                 window.controller.snapshot().error or "Could not pause source for preview",
             )
             return
-    edited_position = (
-        window.segment_timeline.timeline_to_edited_position(
+    edited_position = position_seconds
+    if (
+        window.segment_timeline is not None
+        and getattr(window.segment_timeline, "timing_mode", None) != ABSOLUTE_TIMING_MODE
+    ):
+        edited_position = window.segment_timeline.timeline_to_edited_position(
             position_seconds,
         )
-        if window.segment_timeline is not None
-        else position_seconds
-    )
     window.controller.update_position(edited_position)
     actual_position = window.controller.snapshot().position_seconds
     if window.project is not None:
@@ -182,32 +183,9 @@ def on_timeline_scroll(
     delta_y: float,
     Gdk: Any,
 ) -> bool:
-    state = _controller.get_current_event_state()
-    mode = timeline_scroll_mode(
-        _delta_x,
-        delta_y,
-        int(state),
-        int(Gdk.ModifierType.CONTROL_MASK),
-        int(Gdk.ModifierType.ALT_MASK),
-        int(Gdk.ModifierType.SHIFT_MASK),
-    )
-    if mode == "none":
-        return False
-    if mode == "zoom":
-        delta = delta_y if abs(delta_y) > 0.01 else _delta_x
-        window._zoom_timeline(1 if delta < 0 else -1)
-        return True
-    adjustment = window.timeline_viewport.get_hadjustment()
-    if mode == "viewport":
-        delta = _delta_x if abs(_delta_x) > 0.01 else delta_y
-        lower = adjustment.get_lower()
-        upper = max(
-            lower,
-            adjustment.get_upper() - adjustment.get_page_size(),
-        )
-        target = adjustment.get_value() + delta * TIMELINE_SCROLL_PIXELS
-        adjustment.set_value(max(lower, min(upper, target)))
-        return True
+    mode = route_timeline_scroll(window, _controller, _delta_x, delta_y, Gdk)
+    if mode != "playhead":
+        return mode != "none"
     if window.controller is None:
         return False
     snapshot = window.controller.snapshot()
@@ -250,6 +228,8 @@ def _timeline_position(window: Any, edited_position: float | None = None) -> flo
             return 0.0
         position = float(window.controller.snapshot().position_seconds)
     if window.segment_timeline is None:
+        return float(position)
+    if getattr(window.segment_timeline, "timing_mode", None) == ABSOLUTE_TIMING_MODE:
         return float(position)
     return float(window.segment_timeline.edited_to_timeline_position(position))
 

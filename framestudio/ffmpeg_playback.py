@@ -706,14 +706,21 @@ class FfmpegPlaybackBackend:
             )
         )
 
-    def seek(self, position_seconds: float) -> None:
+    def _is_active_playback_locked(self) -> bool:
+        return self._process is not None and not self._paused
+
+    def _prepare_seek(self, position_seconds: float) -> tuple[float, bool]:
         target = max(0.0, min(self.duration_seconds, float(position_seconds)))
         self._cancel_preview_requests()
         with self._lock:
-            was_playing = self._process is not None and not self._paused
+            was_playing = self._is_active_playback_locked()
         self._terminate_process()
         with self._lock:
             self._position_seconds = target
+        return target, was_playing
+
+    def seek(self, position_seconds: float) -> None:
+        target, was_playing = self._prepare_seek(position_seconds)
         if was_playing:
             self.play()
         else:

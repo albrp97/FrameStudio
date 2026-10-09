@@ -18,12 +18,21 @@ from .composition import (
     focus_offset_bounds,
 )
 from .model_project import Project
-from .model_timeline import SegmentTimeline
+from .model_timeline import (
+    ABSOLUTE_TIMING_MODE,
+    LEGACY_TIMING_MODE,
+    MAX_TRACK_COUNT,
+    TIMELINE_MODEL_VERSION,
+    SegmentTimeline,
+    TimelineTrack,
+)
 from .model_types import (
     LEGACY_SCHEMA_VERSION,
+    MIXED_SOURCE_SCHEMA_VERSION,
     ONE_SOURCE_SCHEMA_VERSION,
     PROJECT_TIMEBASE,
     SCHEMA_VERSION,
+    TRACK_PROJECT_SCHEMA_VERSION,
     ProjectValidationError,
     Segment,
     SourceReference,
@@ -42,9 +51,11 @@ ProjectTimeline = SegmentTimeline
 
 __all__ = [
     "LEGACY_SCHEMA_VERSION",
+    "MIXED_SOURCE_SCHEMA_VERSION",
     "ONE_SOURCE_SCHEMA_VERSION",
     "PROJECT_TIMEBASE",
     "SCHEMA_VERSION",
+    "TRACK_PROJECT_SCHEMA_VERSION",
     "CANVAS_HEIGHT",
     "CANVAS_WIDTH",
     "COMPOSITION_SCHEMA_VERSION",
@@ -59,9 +70,14 @@ __all__ = [
     "Project",
     "ProjectTimeline",
     "ProjectValidationError",
+    "ABSOLUTE_TIMING_MODE",
+    "LEGACY_TIMING_MODE",
+    "MAX_TRACK_COUNT",
+    "TIMELINE_MODEL_VERSION",
     "ResolvedUpscalePolicy",
     "Segment",
     "SegmentTimeline",
+    "TimelineTrack",
     "SourceReference",
     "SourceStatus",
     "TriplicateGroup",

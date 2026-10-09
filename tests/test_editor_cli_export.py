@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import shlex
 import shutil
 import signal
@@ -23,6 +24,7 @@ from framestudio.media import MediaProbe, probe_media
 from framestudio.model import Project
 from framestudio.persistence import save_project
 from framestudio.upscale_policy import UpscalePolicy, resolve_upscale_policy
+from tests.test_editor_source_outputs_functionality import _make_constant_source
 
 
 def make_project(root: Path) -> Project:
@@ -67,6 +69,106 @@ def run_cli(*arguments: str):
 
 
 class EditorCliExportTests(unittest.TestCase):
+    def test_sigint_during_synchronized_audio_planning_is_structured_and_cleans_child(self):
+        self._assert_audio_planning_cancellation(synchronized=True)
+
+    def test_sigint_during_legacy_audio_planning_is_structured_and_cleans_child(self):
+        self._assert_audio_planning_cancellation(synchronized=False)
+
+    def test_sigint_during_source_only_audio_planning_is_structured_and_cleans_child(self):
+        self._assert_audio_planning_cancellation(synchronized=True, output_mode="source-only")
+
+    def _assert_audio_planning_cancellation(
+        self,
+        *,
+        synchronized: bool,
+        output_mode: str = "final-only",
+    ) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "source.mp4"
+            _make_constant_source(
+                source,
+                color="red",
+                frame_rate=24,
+                width=320,
+                height=180,
+                frequencies=(440, 880),
+                duration=4.0,
+            )
+            metadata = probe_media(source).metadata()
+            project = (
+                Project.create_synchronized_multi(((source, metadata),))
+                if synchronized
+                else Project.create(source, metadata)
+            )
+            project_path = root / "edit.framestudio.json"
+            save_project(project, project_path)
+            source_before = source.read_bytes()
+            project_before = project_path.read_bytes()
+            destination = root / "edited.mp4"
+            child_marker = root / "analysis-child.pid"
+            wrapper = root / "analysis-ffmpeg"
+            wrapper.write_text(
+                f"#!{sys.executable}\n"
+                "import os, sys\n"
+                "from pathlib import Path\n"
+                "arguments = sys.argv[1:]\n"
+                "if 'pcm_f32le' in arguments:\n"
+                f"    Path({str(child_marker)!r}).write_text(str(os.getpid()))\n"
+                "    arguments.insert(arguments.index('-i'), '-re')\n"
+                f"os.execv({shutil.which('ffmpeg')!r}, ['ffmpeg', *arguments])\n",
+                encoding="utf-8",
+            )
+            wrapper.chmod(0o755)
+            repository_root = Path(__file__).resolve().parents[1]
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(repository_root / "framestudio.py"),
+                    "export",
+                    str(project_path),
+                    "--output",
+                    str(destination),
+                    "--output-mode",
+                    output_mode,
+                    "--no-enhance-fps",
+                    "--no-upscale-enhancement",
+                    "--ffmpeg",
+                    str(wrapper),
+                ],
+                cwd=repository_root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            child_pid = None
+            try:
+                deadline = time.monotonic() + 10.0
+                while not child_marker.exists() and process.poll() is None:
+                    self.assertLess(time.monotonic(), deadline, "audio analysis did not start")
+                    time.sleep(0.01)
+                self.assertTrue(child_marker.exists(), "export exited before audio analysis")
+                child_pid = int(child_marker.read_text())
+                self.assertIsNone(process.poll())
+                process.send_signal(signal.SIGINT)
+                stdout, stderr = process.communicate(timeout=2.0)
+                self.assertEqual(process.returncode, 5, stderr)
+                self.assertEqual(stdout, "")
+                payload = json.loads(stderr)
+                self.assertFalse(payload["ok"])
+                self.assertEqual(payload["error"]["code"], "export_cancelled")
+                self.assertFalse(destination.exists())
+                self.assertFalse(Path(f"/proc/{child_pid}").exists())
+                self.assertEqual(source.read_bytes(), source_before)
+                self.assertEqual(project_path.read_bytes(), project_before)
+            finally:
+                if process.poll() is None:
+                    process.terminate()
+                    process.communicate(timeout=10.0)
+                if child_pid is not None and Path(f"/proc/{child_pid}").exists():
+                    os.kill(child_pid, signal.SIGTERM)
+
     def test_export_resumes_after_cli_process_restart(self):
         if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
             self.skipTest("FFmpeg and ffprobe are required")
@@ -109,6 +211,9 @@ class EditorCliExportTests(unittest.TestCase):
                 "\n".join(
                     (
                         "#!/bin/sh",
+                        'case " $* " in',
+                        f'  *" -version "*|*" --version "*) exec {shlex.quote(real_ffmpeg)} "$@" ;;',
+                        "esac",
                         f"count_file={shlex.quote(str(counter))}",
                         "count=0",
                         'if [ -f "$count_file" ]; then count=$(cat "$count_file"); fi',
@@ -148,10 +253,10 @@ class EditorCliExportTests(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            manifest_path = session_root(destination) / "manifest.json"
+            checkpoint_found = False
             deadline = time.monotonic() + 30.0
             while time.monotonic() < deadline:
-                if manifest_path.is_file():
+                for manifest_path in session_root(destination).rglob("manifest.json"):
                     try:
                         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                     except (OSError, json.JSONDecodeError):
@@ -160,11 +265,15 @@ class EditorCliExportTests(unittest.TestCase):
                         isinstance(manifest, dict)
                         and manifest.get("stages", {}).get("cut-0", {}).get("status") == "complete"
                     ):
+                        checkpoint_found = True
                         break
+                if checkpoint_found:
+                    break
                 if process.poll() is not None:
                     break
                 time.sleep(0.05)
             self.assertIsNone(process.poll(), "export exited before a checkpoint was persisted")
+            self.assertTrue(checkpoint_found, "no owned child cut checkpoint was persisted")
             process.send_signal(signal.SIGINT)
             stdout, stderr = process.communicate(timeout=15.0)
             self.assertNotEqual(process.returncode, 0)
@@ -218,21 +327,32 @@ class EditorCliExportTests(unittest.TestCase):
                 expected_duration_seconds=10.0,
                 reason="target policy",
             )
-            session = ExportSession.open(destination, {"request": "same"}, ("render",))
-            session.mark_failure("cancelled", cancelled=True)
-            session.close()
             output_probe = make_probe(destination)
 
-            def fake_execute(_plan, **kwargs):
-                self.assertEqual(kwargs["resume_mode"], "resume")
-                destination.write_bytes(b"verified")
-                return destination
+            def fake_execute(execution_plan, **_kwargs):
+                execution_plan.destination.write_bytes(b"verified")
+                return execution_plan.destination
 
             with (
                 patch("framestudio.cli.plan_project_export", return_value=plan),
-                patch("framestudio.cli.execute_export", side_effect=fake_execute),
+                patch(
+                    "framestudio.cli.execute_export",
+                    side_effect=[ExportExecutionError("interrupted"), fake_execute],
+                ) as execute,
                 patch("framestudio.cli.probe_media", return_value=output_probe),
+                patch(
+                    "framestudio.cli_export.verify_planned_output",
+                    return_value={"verified": True, "metadata": output_probe.metadata()},
+                ),
             ):
+                interrupted, _stdout, _stderr = run_cli(
+                    "export",
+                    str(project_path),
+                    "--output",
+                    str(destination),
+                )
+                self.assertNotEqual(interrupted, 0)
+                execute.side_effect = fake_execute
                 result, stdout, stderr = run_cli(
                     "export",
                     str(project_path),
@@ -240,6 +360,7 @@ class EditorCliExportTests(unittest.TestCase):
                     str(destination),
                     "--resume",
                 )
+            self.assertEqual(execute.call_count, 2)
 
             self.assertEqual(result, 0)
             self.assertEqual(stderr.getvalue(), "")
@@ -623,6 +744,7 @@ class EditorCliExportTests(unittest.TestCase):
                         eta_seconds=1.0,
                     )
                 )
+                plan.destination.write_bytes(b"verified")
                 return plan.destination
 
             with (
@@ -637,6 +759,10 @@ class EditorCliExportTests(unittest.TestCase):
                 patch(
                     "framestudio.cli.execute_export",
                     side_effect=fake_execute,
+                ),
+                patch(
+                    "framestudio.cli_export.verify_planned_output",
+                    return_value={"verified": True, "metadata": output_probe.metadata()},
                 ),
             ):
                 result, stdout, stderr = run_cli(

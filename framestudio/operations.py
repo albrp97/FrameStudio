@@ -32,12 +32,14 @@ from .fps_policy import (
 )
 from .media import MediaProbe, probe_media
 from .model import (
+    ABSOLUTE_TIMING_MODE,
     Project,
     ProjectValidationError,
     Segment,
     SegmentTimeline,
     SourceReference,
 )
+from .removal_history import RemovalReceipt, RemovalUndoResult
 from .upscale_policy import (
     ResolvedUpscalePolicy,
     UpscalePolicy,
@@ -91,17 +93,21 @@ def export_destination_conflicts_with_project(
 
 def split_segment(
     timeline: SegmentTimeline,
-    position_seconds: float,
+    position_seconds: float | None = None,
     *,
     segment_id: str | None = None,
     coordinate: str = "source",
+    position_ticks: int | None = None,
 ) -> tuple[Segment, Segment]:
     if segment_id is not None:
         return timeline.split_block(
             segment_id,
             position_seconds,
             coordinate=coordinate,
+            position_ticks=position_ticks,
         )
+    if position_seconds is None:
+        raise ProjectValidationError("A split position is required")
     if timeline.mixed_source:
         for segment in timeline.segment_items:
             if segment.timeline_start < position_seconds < segment.timeline_end:
@@ -146,12 +152,69 @@ def toggle_segment_deleted(
     raise ProjectValidationError(f"Unknown segment_id: {segment_id}")
 
 
+def remove_segments(
+    project: Project,
+    segment_ids: Sequence[str],
+    *,
+    selection_ids: Sequence[str] | None = None,
+    focused_segment_id: str | None = None,
+) -> RemovalReceipt:
+    project.validate()
+    receipt = project.timeline.remove_blocks(
+        segment_ids,
+        selection_ids=selection_ids,
+        focused_segment_id=focused_segment_id,
+    )
+    project.validate()
+    return receipt
+
+
+def undo_remove(
+    project: Project,
+    receipt: RemovalReceipt,
+) -> RemovalUndoResult:
+    project.validate()
+    result = project.timeline.undo_remove(receipt)
+    project.validate()
+    return result
+
+
+def remove_blocks(
+    project: Project,
+    segment_ids: Sequence[str],
+    *,
+    selection_ids: Sequence[str] | None = None,
+    focused_segment_id: str | None = None,
+) -> RemovalReceipt:
+    return remove_segments(
+        project,
+        segment_ids,
+        selection_ids=selection_ids,
+        focused_segment_id=focused_segment_id,
+    )
+
+
+def undo_removed_blocks(
+    project: Project,
+    receipt: RemovalReceipt,
+) -> RemovalUndoResult:
+    return undo_remove(project, receipt)
+
+
 def move_segment(
     project: Project,
     segment_id: str,
-    direction: str | int,
+    direction: str | int | None = None,
+    *,
+    target_track_id: str | None = None,
+    timeline_start_ticks: int | None = None,
 ) -> bool:
-    return project.timeline.move_block(segment_id, direction)
+    return project.timeline.move_block(
+        segment_id,
+        direction,
+        target_track_id=target_track_id,
+        timeline_start_ticks=timeline_start_ticks,
+    )
 
 
 def move_segments(
@@ -175,11 +238,15 @@ def paste_segments(
     *,
     at_index: int | None = None,
     at_seconds: float | None = None,
+    at_ticks: int | None = None,
+    target_track_id: str | None = None,
 ) -> tuple[Segment, ...]:
     pasted = project.timeline.paste_blocks(
         segments,
         at_index=at_index,
         at_seconds=at_seconds,
+        at_ticks=at_ticks,
+        target_track_id=target_track_id,
     )
     project.duration_seconds = project.timeline.timeline_duration_seconds
     project.set_playhead(project.playhead_seconds)
@@ -437,6 +504,11 @@ def plan_project_export(
 ) -> ExportPlan:
     if project.segment_timeline is None:
         raise ValueError("Project segment timeline is required")
+    if project.segment_timeline.timing_mode == ABSOLUTE_TIMING_MODE:
+        raise ExportPlanningError(
+            "absolute synchronized timeline export is not supported before "
+            "synchronized export integration"
+        )
     audio_decisions = ensure_project_audio_analysis(
         project,
         ffmpeg_path=ffmpeg_path,

@@ -9,6 +9,8 @@ framestudio import SOURCE [SOURCE ...] --project PROJECT
 framestudio add PROJECT SOURCE [SOURCE ...] [--output PROJECT]
 framestudio split PROJECT --at SECONDS
 framestudio delete PROJECT --segment SEGMENT_ID
+framestudio remove PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+  [--output PROJECT]
 framestudio restore PROJECT --segment SEGMENT_ID
 framestudio toggle-delete PROJECT --segment SEGMENT_ID
 framestudio move PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
@@ -35,11 +37,13 @@ framestudio set-upscale-policy PROJECT \
   (--enable-upscale|--disable-upscale) [--upscale-model MODEL] \
   [--upscale-backend BACKEND]
 framestudio export-plan PROJECT [--output VIDEO] \
+  [--output-mode {final-only,combined,source-only}] \
   [--fps-choice {lowest,highest,custom,60}] [--custom-fps FPS] \
   [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND] \
   [--upscale-enhancement|--no-upscale-enhancement] \
   [--upscale-model MODEL] [--upscale-backend BACKEND]
 framestudio export PROJECT --output VIDEO \
+  [--output-mode {final-only,combined,source-only}] \
   [--fps-choice {lowest,highest,custom,60}] [--custom-fps FPS] \
   [--enhance-fps|--no-enhance-fps] [--fps-backend BACKEND] \
   [--upscale-enhancement|--no-upscale-enhancement] \
@@ -82,6 +86,13 @@ Repeated inspection of unchanged inputs is byte-equivalent. Explicit delete
 and restore operations are idempotent; split creates two new stable segment
 identifiers once and rejects invalid or boundary positions without saving a
 partial mutation. Project writes use the existing atomic persistence boundary.
+`remove` physically removes the selected blocks and ripples later blocks on
+each affected track left by the removed durations. Other tracks retain their
+placements. It returns `operation.removed_segment_ids` and saves in place
+unless `--output` is supplied. Unknown or duplicate IDs fail without saving.
+Unlike removal, `delete` retains the excluded block and its occupied position.
+Bounded removal Undo is available only in the running editor. No receipt or
+Undo token is persisted or exposed by the CLI.
 Copy and paste on one-source or mixed-source timelines create fresh segment
 identities, preserve source coverage and block-owned state, and return the
 source and pasted IDs in the operation result. Source relinking requires an
@@ -93,6 +104,101 @@ cuts, deleted blocks, source identities, focus transforms, triplicate state,
 and playhead position are preserved. The operation result reports the added
 source IDs and total source count. Duplicate source paths or source IDs are
 rejected before the project is mutated.
+
+## Synchronized track inspection and editing
+
+Track-aware inspection is available through `inspect`. For synchronized projects,
+`project.timeline` additively reports `track_ids` in persisted order,
+`active_track_id`, `track_count`, `populated_track_count`,
+`included_track_count`, `editing_duration_ticks`,
+`included_duration_ticks`, and `final_duration_ticks`. Each `tracks` entry
+contains its `track_id`, zero-based `order`, `active` and `populated` flags,
+placed `blocks`, and `gaps`; block placement and source boundaries are exact
+integer ticks.
+
+Legacy ripple timing is not silently rewritten. Convert it explicitly before
+track editing:
+
+```sh
+framestudio track-convert PROJECT --confirm-legacy-conversion
+framestudio track-add PROJECT [--track-id TRACK_ID]
+framestudio track-remove PROJECT --track-id TRACK_ID
+framestudio track-select PROJECT --track-id TRACK_ID
+```
+
+`track-add`, `track-remove`, and `track-select` also accept
+`--confirm-legacy-conversion` when conversion and the requested operation are
+combined. Track removal requires an empty track, and no more than four tracks
+may exist. Invalid lifecycle requests fail before the project is written.
+
+Absolute synchronized placement uses exact non-negative integer ticks while
+retaining the existing seconds and direction forms:
+
+```sh
+framestudio move PROJECT --segment SEGMENT_ID \
+  --timeline-start-ticks TICKS [--target-track-id TRACK_ID]
+framestudio split PROJECT --segment SEGMENT_ID \
+  --position-ticks TICKS --coordinate timeline
+framestudio copy PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...]
+framestudio paste PROJECT --segment SEGMENT_ID [--segment SEGMENT_ID ...] \
+  --at-ticks TICKS [--target-track-id TRACK_ID]
+```
+
+Absolute move, split, and paste require synchronized timing; legacy projects
+must use the explicit conversion confirmation. Copy returns selected block
+data, and paste accepts explicit source segment IDs, so separate CLI
+processes do not rely on mutable clipboard state. Paste creates fresh segment identities while preserving source ranges and
+block-owned state. Unknown IDs or tracks, negative or non-integer ticks, and
+other invalid requests return the structured error contract and leave the
+project bytes unchanged. Collision-safe moves and pastes use the shared
+placement resolver: they snap forward to the earliest fitting placement and
+persist that resolved placement instead of reporting a collision failure.
+
+## Independent source-output routing
+
+PHASE-010's integrated renderer consumes persisted
+`output_settings.output_selection`: final-only is the default, combined
+requests final plus source reels, and source-only requests only reels.
+The `framestudio.output_plan.set_output_selection` API validates and persists
+these choices. Both export commands accept
+`--output-mode {final-only,combined,source-only}` to override the saved
+selection for that invocation without modifying the project file. Without
+this option, the saved selection applies. The GTK export planner provides
+separate final-video and source-reel toggles, showing the source folder and
+number of independent track/source outputs. Selecting neither disables the
+planner's Start export control without preventing the planner from reopening.
+
+`export-plan` reports the deterministic output requests without rendering.
+`export` routes source requests independently by stable `(track_id, source_id)`.
+Retained cuts, copies and block framing become compact full-canvas reels,
+without placement gaps, another track's audio or final-layout stereo pan.
+Each output reuses the existing source-aware FPS/upscale and verified export
+route. Source-only does not invoke final rendering.
+
+The JSON export result includes `output_plan`, `source_plans` and
+`source_outputs`, with per-output identity, verification, metadata or error.
+Combined results also include `final`. `verified` requires all requested
+outputs to verify, while `partial_success` means at least one but not all
+requested outputs verified. A failed batch uses `export_failed` and exit 5,
+preserving verified independent outputs in error details.
+
+Original paths and aliases are protected before execution. Each reel is
+staged and verified before atomic publication, preserving an existing final
+destination on failure. Combined final rendering for absolute synchronized
+projects uses the synchronized video/audio compositor, with the same
+dynamic layouts as silent preview and fixed stereo slot positioning.
+All output modes use the shared batch coordinator. Per-output states are
+`pending`, `running`, `verified`, `failed`, `cancelled` and `skipped`.
+Only a fully verified batch has `complete: true`.
+
+The coordinator retains incomplete sibling proof in the destination session.
+A complete batch also writes an adjacent
+`.<destination-name>.framestudio-batch-receipt.json` receipt. Resume compares
+canonical project/source/policy/tool fingerprints and re-verifies published
+SHA-256/stat proof and expected media properties before skipping an output.
+Valid but altered media is rendered again. Restart preserves published
+destinations until verified replacements are ready. Discard removes only
+owned recovery state, not source/project files or published outputs.
 
 ## Errors and exit statuses
 

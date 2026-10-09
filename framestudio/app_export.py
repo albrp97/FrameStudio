@@ -2,10 +2,19 @@ from __future__ import annotations
 
 import threading
 from copy import deepcopy
+from dataclasses import replace
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
 from .app_helpers import format_export_progress_label
+from .av_compositor import (
+    AVCompositorExecutionError,
+    AVCompositorPlanningError,
+    AVRenderPlan,
+    plan_project_av,
+    render_project_av,
+)
 from .export import (
     ExportExecutionError,
     ExportPlan,
@@ -15,10 +24,28 @@ from .export import (
     execute_export,
 )
 from .export_console import ConsoleProgressReporter
+from .export_coordinator import (
+    ExportBatchResult,
+    ExportCancelled,
+    ExportCoordinator,
+    ExportResultState,
+    build_output_fingerprint,
+    build_output_request_maps,
+    build_project_output_fingerprint_payload,
+    build_tool_identities,
+    child_resume_mode,
+    discard_batch_receipt,
+    output_identity_key,
+    protected_receipt_paths,
+    protected_source_paths,
+    resolve_output_plan,
+    verify_planned_output,
+)
 from .export_naming import smart_export_name
 from .export_panel import (
     ExportPanelState,
     fps_panel_rows,
+    output_panel_rows,
     prepare_export_panel,
     upscale_panel_rows,
 )
@@ -29,8 +56,22 @@ from .export_session import (
 )
 from .fps_policy import FrameRatePolicy, policy_source_metadata, rate_choice_labels
 from .media import MediaProbeError
-from .model import Project
-from .operations import export_destination_conflicts_with_project, plan_project_export
+from .model import Project, ProjectValidationError
+from .model_timeline import ABSOLUTE_TIMING_MODE
+from .operations import (
+    ensure_project_audio_analysis,
+    export_destination_conflicts_with_project,
+    plan_project_export,
+)
+from .output_plan import (
+    OutputPlan,
+    OutputPlanError,
+    OutputRequest,
+    OutputSelection,
+    plan_project_outputs,
+    resolve_output_selection,
+    set_output_selection,
+)
 from .performance import PerformanceMode, PerformanceModeError
 from .post_export import (
     POST_EXPORT_ACTIONS,
@@ -39,7 +80,21 @@ from .post_export import (
     normalize_post_export_action,
     write_export_failure_log,
 )
+from .source_outputs import plan_source_outputs, render_source_output
 from .upscale_policy import UpscalePolicy
+
+
+class ExportBatchExecutionError(ExportExecutionError):
+    """Carry the structured batch result through the GTK worker boundary."""
+
+    def __init__(self, result: ExportBatchResult) -> None:
+        self.result = result
+        message = (
+            result.error.get("message")
+            if result.error is not None
+            else "One or more export outputs did not complete"
+        )
+        super().__init__(message)
 
 
 def on_export_clicked(window: Any, Gtk: Any, GLib: Any) -> None:
@@ -195,6 +250,23 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
     )
     root.append(upscale_enhancement)
 
+    output_frame = Gtk.Frame.new("Outputs")
+    output_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    output_box.set_margin_top(8)
+    output_box.set_margin_bottom(8)
+    output_box.set_margin_start(12)
+    output_box.set_margin_end(12)
+    final_output_toggle = Gtk.CheckButton.new_with_label("Final edited video")
+    source_output_toggle = Gtk.CheckButton.new_with_label(
+        "Source reels (one output per track/source pair)",
+    )
+    output_box.append(final_output_toggle)
+    output_box.append(source_output_toggle)
+    output_frame.set_child(output_box)
+    root.append(output_frame)
+    panel.final_output_toggle = final_output_toggle
+    panel.source_output_toggle = source_output_toggle
+
     post_export_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     post_export_row.append(Gtk.Label(label="After export", xalign=0.0))
     post_export_model = Gtk.StringList.new(["Nothing", "Sleep", "Shutdown"])
@@ -274,6 +346,14 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
     custom_entry.set_sensitive(current_policy.choice == "custom")
     enhancement.set_active(current_policy.enhancement_enabled)
     upscale_enhancement.set_active(current_upscale_policy.enhancement_enabled)
+    try:
+        current_output_selection = resolve_output_selection(project)
+        initial_output_error = None
+    except OutputPlanError as error:
+        current_output_selection = OutputSelection()
+        initial_output_error = str(error)
+    final_output_toggle.set_active(current_output_selection.include_final)
+    source_output_toggle.set_active(current_output_selection.include_source_outputs)
     panel_state: dict[str, Any] = {
         "folder": folder,
         "state": None,
@@ -282,7 +362,106 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
         "automatic_filename": True,
         "suggested_filename": suggested_filename,
         "updating_filename": False,
+        "output_mode": current_output_selection.mode,
+        "output_plan": None,
+        "output_rows": (),
+        "output_error": initial_output_error,
+        "render_guard": None,
     }
+
+    def _combined_final_supported() -> bool:
+        timeline = project.timeline
+        if timeline.tracks is None:
+            return True
+        return len(timeline.tracks) == 1 and timeline.timing_mode == "legacy-ripple"
+
+    def _output_destination() -> Path:
+        state = panel_state.get("state")
+        if state is not None and state.destination is not None:
+            return Path(state.destination)
+        filename = filename_entry.get_text().strip() or suggested_filename
+        return Path(panel_state["folder"]) / filename
+
+    def _set_output_error(message: str | None) -> None:
+        panel_state["output_error"] = message
+        if message is not None:
+            panel_state["render_guard"] = None
+
+    def _refresh_output_plan(destination: Path, *, persist: bool) -> None:
+        final_selected = final_output_toggle.get_active()
+        source_selected = source_output_toggle.get_active()
+        if not final_selected and not source_selected:
+            panel_state["output_plan"] = None
+            panel_state["output_rows"] = ()
+            panel_state["output_mode"] = None
+            _set_output_error("Select at least one output: final video or source reels.")
+            return
+        mode = (
+            "combined"
+            if final_selected and source_selected
+            else "final-only"
+            if final_selected
+            else "source-only"
+        )
+        try:
+            output_plan = plan_project_outputs(project, destination, mode=mode)
+            if persist:
+                try:
+                    set_output_selection(project, mode=mode)
+                except OutputPlanError:
+                    previous_settings = deepcopy(project.output_settings)
+                    project.output_settings["output_selection"] = OutputSelection.from_mode(
+                        mode
+                    ).to_dict()
+                    try:
+                        project.validate()
+                    except (ProjectValidationError, ValueError) as error:
+                        project.output_settings = previous_settings
+                        raise OutputPlanError(str(error)) from error
+        except OutputPlanError as error:
+            panel_state["output_plan"] = None
+            panel_state["output_rows"] = ()
+            panel_state["output_mode"] = mode
+            _set_output_error(str(error))
+            return
+        panel_state["output_plan"] = output_plan
+        panel_state["output_rows"] = output_panel_rows(output_plan)
+        panel_state["output_mode"] = mode
+        _set_output_error(initial_output_error if not persist else None)
+        panel_state["render_guard"] = None
+
+    def _summary_rows(state: ExportPanelState | None) -> tuple[tuple[str, str], ...]:
+        if state is None:
+            selected_choice = _choice_from_index(rate_dropdown.get_selected())
+            rows = (
+                *fps_panel_rows(
+                    project,
+                    choice=selected_choice,
+                    custom_rate=custom_entry.get_text().strip() or None,
+                    enhancement_enabled=enhancement.get_active(),
+                    backend=current_policy.backend,
+                ),
+                *upscale_panel_rows(
+                    project,
+                    enabled=upscale_enhancement.get_active(),
+                ),
+            )
+        else:
+            rows = state.display_rows
+        return (*rows, *panel_state["output_rows"])
+
+    def _update_render_button(state: ExportPanelState | None) -> None:
+        if state is None:
+            confirm.set_sensitive(False)
+            return
+        if not state.valid:
+            confirm.set_sensitive(False)
+            return
+        confirm.set_sensitive(
+            panel_state["output_plan"] is not None
+            and panel_state["output_error"] is None
+            and panel_state["render_guard"] is None,
+        )
 
     def refresh_session_controls(destination: Path | None) -> None:
         if destination is None:
@@ -314,6 +493,9 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
         panel_state["generation"] += 1
         generation = panel_state["generation"]
         panel_state["state"] = None
+        panel_state["output_plan"] = None
+        panel_state["output_rows"] = ()
+        panel_state["render_guard"] = None
         _set_summary_grid(
             summary_grid,
             Gtk,
@@ -332,7 +514,7 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
             ),
         )
         notice_label.set_text("Preparing export plan...")
-        error_label.set_text("")
+        error_label.set_text(panel_state["output_error"] or "")
         confirm.set_sensitive(False)
 
         def apply_state(state: ExportPanelState) -> bool:
@@ -347,10 +529,13 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
                 panel_state["suggested_filename"] = state.filename
             if state.destination is not None:
                 folder_label.set_text(str(state.destination.parent))
-            _set_summary_grid(summary_grid, Gtk, state.display_rows)
+                _refresh_output_plan(state.destination, persist=False)
+            _set_summary_grid(summary_grid, Gtk, _summary_rows(state))
             notice_label.set_text(state.notice or "")
-            error_label.set_text(state.reason or "")
-            confirm.set_sensitive(state.valid)
+            error_label.set_text(
+                panel_state["output_error"] or panel_state["render_guard"] or state.reason or "",
+            )
+            _update_render_button(state)
             refresh_session_controls(state.destination)
             return False
 
@@ -369,6 +554,12 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
             )
         except (OSError, RuntimeError, ValueError) as error:
             apply_state(_export_panel_error_state(filename or "", error))
+        _refresh_output_plan(_output_destination(), persist=False)
+        _set_summary_grid(summary_grid, Gtk, _summary_rows(panel_state["state"]))
+        error_label.set_text(
+            panel_state["output_error"] or panel_state["render_guard"] or "",
+        )
+        _update_render_button(panel_state["state"])
 
     def filename_changed(_entry: Any) -> None:
         if panel_state["updating_filename"]:
@@ -396,13 +587,39 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
         dialog.set_title("Choose export folder")
         dialog.select_folder(panel, None, choose_folder_done, None)
 
+    def output_choice_toggled(_button: Any) -> None:
+        state = panel_state.get("state")
+        _refresh_output_plan(
+            state.destination
+            if state is not None and state.destination is not None
+            else _output_destination(),
+            persist=True,
+        )
+        _set_summary_grid(summary_grid, Gtk, _summary_rows(state))
+        error_label.set_text(
+            panel_state["output_error"]
+            or panel_state["render_guard"]
+            or (state.reason if state is not None else "")
+            or "",
+        )
+        _update_render_button(state)
+
     def cancel_clicked(_button: Any) -> None:
         panel.close()
         window.export_planning_window = None
 
     def begin_export(mode: str) -> None:
-        state: ExportPanelState = panel_state["state"]
-        if not state.valid or state.destination is None or state.policy is None:
+        state: ExportPanelState | None = panel_state.get("state")
+        output_plan: OutputPlan | None = panel_state["output_plan"]
+        if (
+            state is None
+            or not state.valid
+            or state.destination is None
+            or state.policy is None
+            or output_plan is None
+            or panel_state["output_error"] is not None
+            or panel_state["render_guard"] is not None
+        ):
             return
         panel.close()
         window.export_planning_window = None
@@ -414,6 +631,7 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
             state.upscale_policy.policy if state.upscale_policy is not None else None,
             _post_export_action_from_index(post_export_dropdown.get_selected()),
             resume_mode=mode,
+            output_mode=output_plan.mode,
         )
 
     def confirm_clicked(_button: Any) -> None:
@@ -430,6 +648,20 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
         if state is None or state.destination is None:
             return
         try:
+            output_plan: OutputPlan | None = panel_state.get("output_plan")
+            planned_outputs = (
+                ()
+                if output_plan is None
+                else tuple(request.destination for request in output_plan.output_requests)
+            )
+            discard_batch_receipt(
+                state.destination,
+                protected_source_paths=protected_receipt_paths(
+                    project,
+                    project_path=window.project_path,
+                    planned_outputs=planned_outputs,
+                ),
+            )
             discard_export_session(state.destination)
         except ExportSessionError as error:
             error_label.set_text(str(error))
@@ -444,6 +676,8 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
     custom_entry.connect("changed", refresh)
     enhancement.connect("toggled", refresh)
     upscale_enhancement.connect("toggled", refresh)
+    final_output_toggle.connect("toggled", output_choice_toggled)
+    source_output_toggle.connect("toggled", output_choice_toggled)
     filename_entry.connect("changed", filename_changed)
     resume_session.connect("clicked", resume_clicked)
     restart_session.connect("clicked", restart_clicked)
@@ -525,29 +759,17 @@ def run_export_job(
     analysis_lock: threading.Lock | None = None,
     upscale_policy: UpscalePolicy | None = None,
     resume_mode: str = "fresh",
+    batch_result_holder: dict[str, ExportBatchResult] | None = None,
 ) -> tuple[Path, ExportPlan]:
     def plan_export_job() -> ExportPlan:
-        if analysis_lock is None:
-            return plan_project_export(
-                project,
-                destination,
-                frame_rate_policy=frame_rate_policy,
-                upscale_policy=upscale_policy,
-                cancel_event=cancel_event,
-            )
-        while not analysis_lock.acquire(timeout=0.05):
-            if cancel_event is not None and cancel_event.is_set():
-                raise ExportPlanningError("Export cancelled")
-        try:
-            return plan_project_export(
-                project,
-                destination,
-                frame_rate_policy=frame_rate_policy,
-                upscale_policy=upscale_policy,
-                cancel_event=cancel_event,
-            )
-        finally:
-            analysis_lock.release()
+        return _plan_export_with_analysis_lock(
+            project,
+            destination,
+            frame_rate_policy=frame_rate_policy,
+            upscale_policy=upscale_policy,
+            cancel_event=cancel_event,
+            analysis_lock=analysis_lock,
+        )
 
     with PerformanceMode("on"):
         plan = plan_export_job()
@@ -561,6 +783,245 @@ def run_export_job(
     return output, plan
 
 
+def _plan_export_with_analysis_lock(
+    project: Project,
+    destination: Path,
+    *,
+    cancel_event: threading.Event | None,
+    analysis_lock: threading.Lock | None,
+    frame_rate_policy: FrameRatePolicy | None = None,
+    upscale_policy: UpscalePolicy | None = None,
+    ffprobe_path: str = "ffprobe",
+    ffmpeg_path: str = "ffmpeg",
+) -> ExportPlan:
+    planner = partial(
+        plan_project_export,
+        project,
+        destination,
+        frame_rate_policy=frame_rate_policy,
+        upscale_policy=upscale_policy,
+        ffprobe_path=ffprobe_path,
+        ffmpeg_path=ffmpeg_path,
+        cancel_event=cancel_event,
+    )
+    if analysis_lock is None:
+        return planner()
+    while not analysis_lock.acquire(timeout=0.05):
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportPlanningError("Export cancelled")
+    try:
+        return planner()
+    finally:
+        analysis_lock.release()
+
+
+def _ensure_audio_analysis_with_lock(
+    project: Project,
+    *,
+    ffmpeg_path: str,
+    cancel_event: threading.Event | None,
+    analysis_lock: threading.Lock | None,
+) -> None:
+    if analysis_lock is None:
+        ensure_project_audio_analysis(
+            project,
+            ffmpeg_path=ffmpeg_path,
+            cancel_event=cancel_event,
+        )
+        return
+    while not analysis_lock.acquire(timeout=0.05):
+        if cancel_event is not None and cancel_event.is_set():
+            raise ExportPlanningError("Export cancelled")
+    try:
+        ensure_project_audio_analysis(
+            project,
+            ffmpeg_path=ffmpeg_path,
+            cancel_event=cancel_event,
+        )
+    finally:
+        analysis_lock.release()
+
+
+def _needs_synchronized_final(project: Project) -> bool:
+    timeline = getattr(project, "timeline", None)
+    if timeline is None:
+        return False
+    return (
+        timeline.timing_mode == ABSOLUTE_TIMING_MODE
+        or timeline.tracks is not None
+        and len(timeline.tracks) > 1
+    )
+
+
+def run_output_choice_job(
+    project: Project,
+    destination: Path,
+    *,
+    output_mode: str,
+    frame_rate_policy: FrameRatePolicy | None,
+    upscale_policy: UpscalePolicy | None = None,
+    progress_callback: ExportProgressCallback | None,
+    cancel_event: threading.Event | None,
+    cancellation_lock: threading.Lock | None = None,
+    analysis_lock: threading.Lock | None = None,
+    resume_mode: str = "fresh",
+    batch_result_holder: dict[str, ExportBatchResult] | None = None,
+    project_path: Path | None = None,
+) -> tuple[Path, OutputPlan, ExportPlan | AVRenderPlan | None, int]:
+    """Render a selected output set through one recoverable coordinator."""
+
+    plan_export_job = partial(
+        _plan_export_with_analysis_lock,
+        cancel_event=cancel_event,
+        analysis_lock=analysis_lock,
+    )
+
+    with PerformanceMode("on"):
+        output_plan = plan_project_outputs(project, destination, mode=output_mode)
+        final_plan: ExportPlan | AVRenderPlan | None = None
+        if output_plan.final_request is not None:
+            if _needs_synchronized_final(project):
+                _ensure_audio_analysis_with_lock(
+                    project,
+                    ffmpeg_path="ffmpeg",
+                    cancel_event=cancel_event,
+                    analysis_lock=analysis_lock,
+                )
+                final_plan = plan_project_av(
+                    project,
+                    output_plan.final_request.destination,
+                    frame_rate_policy=frame_rate_policy,
+                    upscale_policy=upscale_policy,
+                )
+            else:
+                final_plan = plan_export_job(
+                    project,
+                    output_plan.final_request.destination,
+                    frame_rate_policy=frame_rate_policy,
+                    upscale_policy=upscale_policy,
+                )
+        source_plans = plan_source_outputs(
+            project,
+            output_plan.source_outputs,
+            ffprobe_path="ffprobe",
+            ffmpeg_path="ffmpeg",
+            frame_rate_policy=frame_rate_policy,
+            upscale_policy=upscale_policy,
+            plan_project_export_fn=plan_export_job,
+        )
+        source_by_key = {output_identity_key(plan.request.identity): plan for plan in source_plans}
+        final_by_key: dict[str, ExportPlan | AVRenderPlan]
+        request_by_key: dict[str, OutputRequest]
+        final_by_key, request_by_key = build_output_request_maps(
+            output_plan,
+            final_plan,
+        )
+        tool_identities = build_tool_identities()
+        fingerprints = {
+            key: build_output_fingerprint(
+                build_project_output_fingerprint_payload(
+                    project,
+                    request,
+                    frame_rate_policy=frame_rate_policy,
+                    upscale_policy=upscale_policy,
+                    tool_identities=tool_identities,
+                )
+            )
+            for key, request in request_by_key.items()
+        }
+        lock = cancellation_lock or threading.Lock()
+
+        def render_output(request: Any, candidate: Path, event: threading.Event) -> Path:
+            key = output_identity_key(request.identity)
+            if request.output_kind == "source":
+                rendered = render_source_output(
+                    source_by_key[key],
+                    resume_mode=resume_mode,
+                    progress_callback=progress_callback,
+                    destination_override=candidate,
+                    cancel_event=event,
+                    cancellation_lock=lock,
+                )
+                if not rendered.verified:
+                    if event.is_set():
+                        raise ExportCancelled(rendered.error or "Export cancelled")
+                    raise ExportExecutionError(
+                        rendered.error or "Source output failed verification"
+                    )
+                return candidate
+            planned = final_by_key[key]
+            if isinstance(planned, AVRenderPlan):
+                render_project_av(
+                    replace(planned, destination=candidate),
+                    cancel_event=event,
+                    cancellation_lock=lock,
+                )
+                return candidate
+            rendered_path = execute_export(
+                replace(planned, destination=candidate),
+                progress_callback=progress_callback,
+                cancel_event=event,
+                cancellation_lock=lock,
+                resume_mode=child_resume_mode(candidate, resume_mode),
+            )
+            if rendered_path.expanduser().resolve() != candidate.expanduser().resolve():
+                raise ExportExecutionError("Final renderer returned an unexpected candidate path")
+            return candidate
+
+        def verify_output(
+            request: Any,
+            candidate: Path,
+            event: threading.Event,
+        ) -> dict[str, Any]:
+            key = output_identity_key(request.identity)
+            planned = resolve_output_plan(key, source_by_key, final_by_key)
+            if planned is None:
+                raise ExportExecutionError(
+                    "No concrete output plan is available for verification",
+                )
+            return verify_planned_output(
+                planned,
+                candidate,
+                ffmpeg_path="ffmpeg",
+                ffprobe_path="ffprobe",
+                cancel_event=event,
+            )
+
+        try:
+            coordinator = ExportCoordinator(
+                output_requests=output_plan.output_requests,
+                session_destination=destination,
+                output_fingerprints=fingerprints,
+                render_output=render_output,
+                verify_output=verify_output,
+                publication_lock=lock,
+                tool_versions=tool_identities,
+                protected_source_paths=protected_source_paths(project),
+                protected_receipt_paths=protected_receipt_paths(
+                    project,
+                    project_path=project_path,
+                    planned_outputs=tuple(
+                        request.destination for request in output_plan.output_requests
+                    ),
+                ),
+            )
+        except (ExportSessionError, ValueError) as error:
+            raise ExportExecutionError(str(error)) from error
+        coordinated = coordinator.run(mode=resume_mode, cancel_event=cancel_event)
+        if batch_result_holder is not None:
+            batch_result_holder["result"] = coordinated
+        if not coordinated.complete:
+            raise ExportBatchExecutionError(coordinated)
+        output = (
+            output_plan.final_request.destination
+            if output_plan.final_request is not None
+            else output_plan.source_output_root
+        )
+        if output is None:
+            raise ExportExecutionError("Selected output set produced no destination")
+    return output, output_plan, final_plan, len(source_plans)
+
+
 def start_export(
     window: Any,
     destination: Path,
@@ -569,6 +1030,7 @@ def start_export(
     upscale_policy: UpscalePolicy | None = None,
     post_export_action: str | None = None,
     resume_mode: str = "fresh",
+    output_mode: str = "final-only",
 ) -> None:
     if window.project is None or window.segment_timeline is None:
         window._show_error("Open a source before exporting")
@@ -595,6 +1057,7 @@ def start_export(
     cancellation_lock = threading.Lock()
     window._export_cancel_event = cancel_event
     window._export_cancellation_lock = cancellation_lock
+    batch_result_holder: dict[str, ExportBatchResult] = {}
     window._close_after_export = False
     window._export_in_progress = True
     window._update_segment_controls()
@@ -609,23 +1072,54 @@ def start_export(
             GLib.idle_add(update_export_progress, window, progress)
 
         try:
-            output, plan = run_export_job(
+            analysis_lock = getattr(window, "_audio_analysis_worker_lock", None)
+            output, output_plan, final_plan, source_count = run_output_choice_job(
                 export_project,
                 destination,
+                output_mode=output_mode,
                 frame_rate_policy=frame_rate_policy,
                 upscale_policy=upscale_policy,
                 progress_callback=report_progress,
                 cancel_event=cancel_event,
                 cancellation_lock=cancellation_lock,
-                analysis_lock=getattr(window, "_audio_analysis_worker_lock", None),
+                analysis_lock=analysis_lock,
                 resume_mode=resume_mode,
+                batch_result_holder=batch_result_holder,
+                project_path=window.project_path,
             )
+            if final_plan is None:
+                message = f"Exported {source_count} source output(s) in {output_plan.mode} mode"
+            elif isinstance(final_plan, AVRenderPlan):
+                message = (
+                    f"Exported synchronized final output and {source_count} "
+                    f"source output(s) in {output_plan.mode} mode"
+                )
+            else:
+                message = (
+                    f"Exported final output and {source_count} source output(s) "
+                    f"in {output_plan.mode} mode using {final_plan.route}: "
+                    f"{final_plan.reason}"
+                )
         except (
+            ExportBatchExecutionError,
+            AVCompositorExecutionError,
+            AVCompositorPlanningError,
             ExportExecutionError,
             ExportPlanningError,
             MediaProbeError,
             PerformanceModeError,
         ) as error:
+            if isinstance(error, ExportBatchExecutionError):
+                GLib.idle_add(
+                    finish_export,
+                    window,
+                    None,
+                    str(error),
+                    frame_rate_policy,
+                    upscale_policy,
+                    error.result,
+                )
+                return
             message = str(error)
             if "export cancelled" in message.casefold():
                 message = "Export cancelled"
@@ -635,9 +1129,10 @@ def start_export(
             finish_export,
             window,
             output,
-            f"Exported {output.name} using {plan.route}: {plan.reason}",
+            message,
             frame_rate_policy,
             upscale_policy,
+            batch_result_holder.get("result"),
         )
 
     threading.Thread(
@@ -653,6 +1148,7 @@ def finish_export(
     message: str,
     frame_rate_policy: FrameRatePolicy | None = None,
     upscale_policy: UpscalePolicy | None = None,
+    batch_result: ExportBatchResult | None = None,
 ) -> bool:
     post_export_action = normalize_post_export_action(
         getattr(window, "_export_post_export_action", None),
@@ -669,14 +1165,62 @@ def finish_export(
     window._export_destination = None
     window._export_post_export_action = None
     window._export_resume_mode = None
+    window._last_export_batch_result = batch_result
+    window._export_output_results = (
+        tuple(result.to_dict() for result in batch_result.results)
+        if batch_result is not None
+        else ()
+    )
     close_after_export = bool(getattr(window, "_close_after_export", False))
     window._close_after_export = False
     window.cancel_export_button.set_visible(False)
     window.cancel_export_button.set_sensitive(False)
     window._update_segment_controls()
     if output is None:
-        window.export_progress_label.set_text(f"Export failed: {message}")
-        if message == "Export cancelled":
+        if batch_result is not None:
+            window._export_output_results = tuple(
+                result.to_dict() for result in batch_result.results
+            )
+            completed = sum(result.verified for result in batch_result.results)
+            total = len(batch_result.results)
+            state_summary = ", ".join(
+                f"{result.identity.output_kind}:{result.state}" for result in batch_result.results
+            )
+            window.export_progress_label.set_text(
+                f"Export {completed}/{total} outputs complete: {state_summary}",
+            )
+            if batch_result.partial_success:
+                window._set_status(
+                    f"Export partially completed ({completed}/{total} outputs); "
+                    "resume to finish pending outputs",
+                )
+            elif any(
+                result.state is ExportResultState.CANCELLED for result in batch_result.results
+            ):
+                window._set_status("Export cancelled")
+            else:
+                window._show_error(message)
+        else:
+            window._export_output_results = ()
+            window.export_progress_label.set_text(f"Export failed: {message}")
+        if batch_result is not None:
+            if not batch_result.partial_success and not any(
+                result.state is ExportResultState.CANCELLED for result in batch_result.results
+            ):
+                try:
+                    failure_log = write_export_failure_log(
+                        project_path=project_path,
+                        destination=destination,
+                        message=message,
+                        action=post_export_action,
+                    )
+                except PostExportActionError as error:
+                    window._show_error(str(error))
+                else:
+                    window._set_status(
+                        f"{message}; saved failure log {failure_log.name}",
+                    )
+        elif message == "Export cancelled":
             window._set_status(message)
         else:
             window._show_error(message)
@@ -699,7 +1243,9 @@ def finish_export(
         if window.project is not None and upscale_policy is not None:
             window.project.set_upscale_policy(upscale_policy)
         window._set_status(message)
-    if output is not None or message != "Export cancelled":
+    if (output is not None and (batch_result is None or batch_result.complete)) or (
+        batch_result is None and message != "Export cancelled"
+    ):
         try:
             execute_post_export_action(post_export_action)
         except PostExportActionError as error:

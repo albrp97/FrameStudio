@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gi.repository import Gtk
 
 from .app_export import (
     cancel_export,
@@ -16,6 +20,7 @@ from .app_export import (
 from .app_helpers import (
     KEY_BINDINGS,
     KEYCODE_SPACE,
+    KEYVAL_BACKSPACE,
     KEYVAL_DELETE,
     KEYVAL_KP_DELETE,
     KEYVAL_KP_SPACE,
@@ -34,6 +39,7 @@ from .app_helpers import (
     format_segment_label,
     frame_step_direction,
     frame_step_position,
+    is_backspace_key,
     is_delete_key,
     is_fit_zoom_key,
     is_frame_step_key,
@@ -41,6 +47,7 @@ from .app_helpers import (
     is_split_key,
     playback_action_label,
     segment_action_state,
+    text_input_has_keyboard_focus,
     timeline_scroll_mode,
     timeline_scroll_position,
     toggle_segment_deleted_state,
@@ -81,6 +88,10 @@ from .app_project import (
     refresh_timeline,
     save_to,
 )
+from .app_removal import (
+    remove_selected_blocks,
+    undo_last_removal,
+)
 from .app_timeline_actions import (
     center_timeline_on_playhead,
     copy_selected_segments,
@@ -94,6 +105,8 @@ from .app_timeline_actions import (
     on_focus_control_changed,
     on_focus_control_scroll,
     on_split_clicked,
+    on_timeline_invalid_drop,
+    on_timeline_segment_dropped,
     on_timeline_segment_selected,
     on_timeline_selection_changed,
     on_timeline_viewport_changed,
@@ -102,6 +115,25 @@ from .app_timeline_actions import (
     update_segment_controls,
     update_selected_clip_label,
     zoom_timeline,
+)
+from .app_tracks import (
+    attach_editing_only,
+    is_absolute_project,
+    on_timeline_scroll_editing_only,
+    refresh_editing_only,
+    request_add_track,
+    request_remove_active_track,
+    seek_editing_only,
+    set_active_track,
+)
+from .app_tracks import (
+    load_project_path as load_track_project_path,
+)
+from .app_tracks import (
+    load_sources as load_track_sources,
+)
+from .app_tracks import (
+    refresh_playback_backend as refresh_editing_playback_backend,
 )
 from .app_ui import build_editor_ui, build_key_bindings_window
 from .export import ExportProgress
@@ -112,14 +144,17 @@ from .ffmpeg_playback import (
 from .graphics import configure_graphics_environment
 from .model import (
     Project,
+    ProjectValidationError,
     Segment,
     SegmentTimeline,
 )
 from .playback import PlaybackController
+from .removal_history import RemovalHistory
 
 __all__ = [
     "KEY_BINDINGS",
     "KEYCODE_SPACE",
+    "KEYVAL_BACKSPACE",
     "KEYVAL_DELETE",
     "KEYVAL_KP_DELETE",
     "KEYVAL_KP_SPACE",
@@ -130,6 +165,7 @@ __all__ = [
     "TIMELINE_SCROLL_STEP_SECONDS",
     "_metadata_float",
     "create_play_pause_key_controller",
+    "create_editor_application",
     "format_export_progress_label",
     "format_key_bindings",
     "format_output_duration_label",
@@ -137,6 +173,7 @@ __all__ = [
     "frame_step_direction",
     "frame_step_position",
     "is_delete_key",
+    "is_backspace_key",
     "is_fit_zoom_key",
     "is_frame_step_key",
     "is_play_pause_key",
@@ -151,12 +188,13 @@ __all__ = [
 ]
 
 
-def run_gui(
+def create_editor_application(
     source_path: Path | None = None,
     project_path: Path | None = None,
     smoke_test: bool = False,
     smoke_project_path: Path | None = None,
-) -> int:
+    application_id: str | None = None,
+) -> tuple[Gtk.Application, Callable[[Gtk.Application], Gtk.ApplicationWindow]]:
     configure_graphics_environment()
     try:
         import gi
@@ -205,8 +243,10 @@ def run_gui(
             self._export_project_snapshot = None
             self._updating_focus_controls = False
             self._playback_generation = 0
+            self.removal_history = RemovalHistory()
             self._smoke_test = smoke_test
             self._smoke_project_path = smoke_project_path
+            self._Gtk = Gtk
             self._build_ui()
             self.set_focusable(True)
             key_controller = create_play_pause_key_controller(
@@ -247,6 +287,79 @@ def run_gui(
 
         def _show_error(self, message: str) -> None:
             self._set_status(f"Error: {message}")
+
+        def _clear_removal_history(self) -> None:
+            self.removal_history.clear()
+            button = getattr(self, "undo_removal_button", None)
+            if button is not None:
+                button.set_sensitive(False)
+
+        def _update_removal_undo_sensitivity(self) -> None:
+            button = getattr(self, "undo_removal_button", None)
+            if button is not None:
+                button.set_sensitive(bool(self.removal_history.values()))
+
+        def _on_backspace_removal(self) -> bool:
+            if editing_is_locked(self):
+                return True
+            if self.project is None or self.segment_timeline is None:
+                self._show_error("Open a project and select a clip before removing")
+                return True
+            selected_ids = tuple(self.selected_segment_ids)
+            if not selected_ids:
+                self._show_error("Select a clip before removing")
+                return True
+            focused_segment_id = self.selected_segment_id
+            try:
+                receipt = remove_selected_blocks(
+                    self.project,
+                    selected_ids,
+                    focused_segment_id=focused_segment_id,
+                )
+            except ProjectValidationError as error:
+                self._show_error(str(error))
+                return True
+
+            self.segment_timeline = self.project.timeline
+            remaining_ids = tuple(
+                segment.segment_id for segment in self.segment_timeline.segment_items
+            )
+            next_selected = next(
+                (segment_id for segment_id in selected_ids if segment_id in remaining_ids),
+                None,
+            )
+            if next_selected is None and remaining_ids:
+                next_selected = remaining_ids[0]
+            self.selected_segment_id = next_selected
+            self.selected_segment_ids = () if next_selected is None else (next_selected,)
+            self._refresh_timeline(next_selected, preserve_removal_history=True)
+            self.removal_history.append(receipt)
+            self._update_removal_undo_sensitivity()
+            noun = "clips" if len(receipt.removed_segment_ids) > 1 else "clip"
+            self._set_status(f"Removed {len(receipt.removed_segment_ids)} selected {noun}")
+            return True
+
+        def _on_undo_removal_clicked(self, _button) -> None:
+            receipts = self.removal_history.values()
+            receipt = receipts[-1] if receipts else None
+            if self.project is None or receipt is None:
+                self._clear_removal_history()
+                return
+            try:
+                result = undo_last_removal(self.project, receipt)
+            except ProjectValidationError as error:
+                self._clear_removal_history()
+                self._show_error(str(error))
+                return
+            self.selected_segment_ids = result.restored_selection_ids
+            self.selected_segment_id = result.focused_segment_id
+            self.removal_history.remove(receipt.receipt_id)
+            self._refresh_timeline(
+                result.focused_segment_id,
+                preserve_removal_history=True,
+            )
+            self._update_removal_undo_sensitivity()
+            self._set_status("Undid the latest timeline removal")
 
         def _on_open_source_clicked(self, _button) -> None:
             if editing_is_locked(self):
@@ -309,6 +422,7 @@ def run_gui(
                 self._load_project_path(Path(selected.get_path()))
 
         def _on_recover_autosave_clicked(self, _button) -> None:
+            self._clear_removal_history()
             recover_autosave(self, GLib)
 
         def _on_save_clicked(self, _button) -> None:
@@ -376,23 +490,104 @@ def run_gui(
             self._load_project_path(self.project_path)
 
         def _load_source(self, paths: Path | Sequence[Path]) -> bool:
+            self._clear_removal_history()
+            if is_absolute_project(self.project):
+                return load_track_sources(self, paths)
             return load_source(self, paths, GLib)
 
         def _load_project_path(self, path: Path) -> bool:
-            return load_project_path(self, path, GLib)
+            self._clear_removal_history()
+            return load_track_project_path(
+                self,
+                path,
+                lambda legacy_path: load_project_path(self, legacy_path, GLib),
+            )
 
         def _attach_project(
             self,
             project: Project,
             project_path: Path | None,
         ) -> None:
+            self._clear_removal_history()
+            if is_absolute_project(project):
+                attach_editing_only(self, project, project_path)
+                return
             attach_project(self, project, project_path)
 
         def _refresh_playback_backend(self) -> None:
+            if is_absolute_project(self.project):
+                refresh_editing_playback_backend(self)
+                return
             refresh_playback_backend(self)
 
-        def _refresh_timeline(self, selected_segment_id: str | None = None) -> None:
-            refresh_timeline(self, selected_segment_id)
+        def _refresh_timeline(
+            self,
+            selected_segment_id: str | None = None,
+            *,
+            preserve_removal_history: bool = False,
+        ) -> None:
+            preserved_receipts = self.removal_history.values() if preserve_removal_history else ()
+            if not preserve_removal_history:
+                self._clear_removal_history()
+            try:
+                if is_absolute_project(self.project):
+                    refresh_editing_only(self, selected_segment_id)
+                    return
+                refresh_timeline(self, selected_segment_id)
+            finally:
+                if preserve_removal_history:
+                    self.removal_history.clear()
+                    for receipt in preserved_receipts:
+                        self.removal_history.append(receipt)
+                    self._update_removal_undo_sensitivity()
+
+        def _on_timeline_segment_dropped(
+            self,
+            segment_id: str,
+            timeline_start_ticks: int,
+            target_track_id: str,
+        ) -> None:
+            on_timeline_segment_dropped(
+                self,
+                segment_id,
+                timeline_start_ticks,
+                target_track_id,
+            )
+
+        def _on_timeline_invalid_drop(self, message: str) -> None:
+            on_timeline_invalid_drop(self, message)
+
+        def _on_track_selected(self, selector, _param) -> None:
+            if getattr(self, "_updating_track_selector", False):
+                return
+            timeline = self.segment_timeline
+            if timeline is None or timeline.tracks is None:
+                return
+            selected = selector.get_selected()
+            if selected >= len(timeline.track_ids):
+                return
+            track_id = timeline.track_ids[selected]
+            if timeline.active_track_id == track_id:
+                return
+            self._clear_removal_history()
+            set_active_track(self, track_id)
+
+        def _on_track_activated(self, track_id: str) -> None:
+            if (
+                self.segment_timeline is not None
+                and self.segment_timeline.active_track_id == track_id
+            ):
+                return
+            self._clear_removal_history()
+            set_active_track(self, track_id)
+
+        def _on_add_track_clicked(self, _button) -> None:
+            self._clear_removal_history()
+            request_add_track(self, Gtk)
+
+        def _on_remove_track_clicked(self, _button) -> None:
+            self._clear_removal_history()
+            request_remove_active_track(self)
 
         def _on_timeline_segment_selected(self, segment_id: str) -> None:
             on_timeline_segment_selected(self, segment_id)
@@ -470,20 +665,35 @@ def run_gui(
             keycode: int,
             _state,
         ) -> bool:
-            if focus_control_has_keyboard_focus(self):
+            if focus_control_has_keyboard_focus(self) or text_input_has_keyboard_focus(self):
                 return False
+            if is_backspace_key(keyval):
+                return self._on_backspace_removal()
             return on_key_pressed(self, _controller, keyval, keycode, _state, Gdk)
 
         def _step_playhead(self, direction: int) -> None:
             step_playhead(self, direction)
 
         def _seek_timeline(self, position_seconds: float) -> bool:
+            if is_absolute_project(self.project):
+                return seek_editing_only(self, position_seconds)
             return seek_timeline(self, position_seconds)
 
         def _request_timeline_preview(self, position_seconds: float) -> None:
+            if is_absolute_project(self.project):
+                seek_editing_only(self, position_seconds)
+                return
             request_timeline_preview(self, position_seconds)
 
         def _on_timeline_scroll(self, _controller, _delta_x, delta_y) -> bool:
+            if is_absolute_project(self.project):
+                return on_timeline_scroll_editing_only(
+                    self,
+                    _controller,
+                    _delta_x,
+                    delta_y,
+                    Gdk,
+                )
             return on_timeline_scroll(
                 self,
                 _controller,
@@ -493,6 +703,9 @@ def run_gui(
             )
 
         def _on_timeline_view_seek(self, position_seconds: float) -> None:
+            if is_absolute_project(self.project):
+                seek_editing_only(self, position_seconds)
+                return
             on_timeline_view_seek(self, position_seconds)
 
         def _poll_playback(self) -> bool:
@@ -550,13 +763,32 @@ def run_gui(
             return end_smoke_test(self)
 
     application = Gtk.Application(
-        application_id="io.github.framestudio.editor",
+        application_id=application_id or "io.github.framestudio.editor",
     )
 
-    def on_activate(app) -> None:
+    def create_window(app: Gtk.Application) -> Gtk.ApplicationWindow:
         window = EditorWindow(app, source_path, project_path)
         window.present()
         window.grab_focus()
+        return window
+
+    def on_activate(app: Gtk.Application) -> None:
+        create_window(app)
 
     application.connect("activate", on_activate)
+    return application, create_window
+
+
+def run_gui(
+    source_path: Path | None = None,
+    project_path: Path | None = None,
+    smoke_test: bool = False,
+    smoke_project_path: Path | None = None,
+) -> int:
+    application, _create_window = create_editor_application(
+        source_path,
+        project_path,
+        smoke_test,
+        smoke_project_path,
+    )
     return int(application.run([]))

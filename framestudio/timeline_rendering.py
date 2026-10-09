@@ -9,6 +9,7 @@ from .timeline_geometry import (
     TIMELINE_TRACK_HEIGHT,
     TIMELINE_TRACK_Y,
     TimelineClipGeometry,
+    TimelineTrackGeometry,
     timeline_tick_interval,
 )
 from .ui import format_duration
@@ -30,6 +31,8 @@ def draw_ruler(
         0.78,
         10.0,
     )
+    if duration_seconds == 0.0:
+        return
     interval = timeline_tick_interval(
         duration_seconds,
         pixels_per_second,
@@ -57,24 +60,57 @@ def draw_ruler(
         current += interval
 
 
-def draw_track(context, width: int) -> None:
-    context.set_source_rgba(0.09, 0.105, 0.16, 0.96)
-    context.rectangle(
-        TIMELINE_HORIZONTAL_PADDING,
-        TIMELINE_TRACK_Y,
-        max(1.0, width - TIMELINE_HORIZONTAL_PADDING * 2),
-        TIMELINE_TRACK_HEIGHT,
-    )
-    context.fill()
-    context.set_source_rgba(0.35, 0.39, 0.52, 0.65)
-    context.set_line_width(1.0)
-    context.rectangle(
-        TIMELINE_HORIZONTAL_PADDING,
-        TIMELINE_TRACK_Y,
-        max(1.0, width - TIMELINE_HORIZONTAL_PADDING * 2),
-        TIMELINE_TRACK_HEIGHT,
-    )
-    context.stroke()
+def draw_track(
+    context,
+    width: int,
+    rows: tuple[TimelineTrackGeometry, ...] | list[TimelineTrackGeometry] = (),
+) -> None:
+    if not rows:
+        rows = (
+            TimelineTrackGeometry(
+                track_id="track-1",
+                index=0,
+                y=TIMELINE_TRACK_Y,
+            ),
+        )
+    for row in rows:
+        context.set_source_rgba(
+            0.12 if row.active else 0.09,
+            0.14 if row.active else 0.105,
+            0.22 if row.active else 0.16,
+            0.96,
+        )
+        context.rectangle(
+            TIMELINE_HORIZONTAL_PADDING,
+            row.y,
+            max(1.0, width - TIMELINE_HORIZONTAL_PADDING * 2),
+            row.height,
+        )
+        context.fill()
+        context.set_source_rgba(
+            0.58 if row.active else 0.35,
+            0.66 if row.active else 0.39,
+            0.86 if row.active else 0.52,
+            0.82 if row.active else 0.65,
+        )
+        context.set_line_width(1.5 if row.active else 1.0)
+        context.rectangle(
+            TIMELINE_HORIZONTAL_PADDING,
+            row.y,
+            max(1.0, width - TIMELINE_HORIZONTAL_PADDING * 2),
+            row.height,
+        )
+        context.stroke()
+        draw_text(
+            context,
+            row.track_id,
+            TIMELINE_HORIZONTAL_PADDING + 6.0,
+            row.y + 13.0,
+            0.85 if row.active else 0.56,
+            0.9 if row.active else 0.61,
+            1.0 if row.active else 0.72,
+            9.0,
+        )
 
 
 def draw_clip(
@@ -82,8 +118,8 @@ def draw_clip(
     clip: TimelineClipGeometry,
     selected_segment_ids: tuple[str, ...] = (),
 ) -> None:
-    y = TIMELINE_TRACK_Y + 3.0
-    height = TIMELINE_TRACK_HEIGHT - 6.0
+    y = clip.y
+    height = clip.height
     if clip.deleted:
         fill = (0.22, 0.12, 0.18, 0.96)
         border = (0.82, 0.28, 0.38, 0.95)
@@ -154,7 +190,7 @@ def draw_clip(
             context,
             label,
             clip.x + 8.0,
-            y + 34.0,
+            y + min(height - 7.0, 24.0),
             0.94,
             0.95,
             1.0,
@@ -175,17 +211,25 @@ def draw_clip(
     if clip.index > 0:
         context.set_source_rgba(0.84, 0.88, 0.98, 0.62)
         context.set_line_width(1.0)
-        context.move_to(clip.x, TIMELINE_TRACK_Y - 5.0)
-        context.line_to(clip.x, TIMELINE_TRACK_Y + 2.0)
+        context.move_to(clip.x, clip.y - 5.0)
+        context.line_to(clip.x, clip.y - 2.0)
         context.stroke()
 
 
-def draw_playhead(context, playhead_seconds: float, pixels_per_second: float) -> None:
+def draw_playhead(
+    context,
+    playhead_seconds: float,
+    pixels_per_second: float,
+    rows: tuple[TimelineTrackGeometry, ...] | list[TimelineTrackGeometry] = (),
+) -> None:
     x = TIMELINE_HORIZONTAL_PADDING + playhead_seconds * pixels_per_second
+    last_row_end = max(
+        (row.end_y for row in rows), default=TIMELINE_TRACK_Y + TIMELINE_TRACK_HEIGHT
+    )
     context.set_source_rgba(0.96, 0.97, 1.0, 0.95)
     context.set_line_width(1.5)
     context.move_to(x, TIMELINE_RULER_HEIGHT - 4.0)
-    context.line_to(x, TIMELINE_TRACK_Y + TIMELINE_TRACK_HEIGHT + 7.0)
+    context.line_to(x, last_row_end + 7.0)
     context.stroke()
     context.set_source_rgba(0.95, 0.28, 0.34, 1.0)
     context.move_to(x - 6.0, 23.0)
