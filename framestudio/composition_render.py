@@ -183,23 +183,21 @@ def segment_video_filters(
         for role, source_label in zip(TRIPLICATE_ROLES, source_labels, strict=True):
             role_label = f"[{root}_{role}]"
             role_labels[role] = role_label
-            filters.append(
-                _triplicate_branch(
-                    source_label,
-                    transform,
-                    width,
-                    height,
-                    preserve_resolution=preserve_source_resolution,
-                    content_width=content_width,
-                    content_height=content_height,
-                )
-                + role_label
+            branch = _triplicate_branch(
+                source_label,
+                transform,
+                width,
+                height,
+                preserve_resolution=preserve_source_resolution,
+                content_width=content_width,
+                content_height=content_height,
             )
+            if rate is not None:
+                branch += f",fps={rate}"
+            filters.append(branch + role_label)
         composed = (
             f"{role_labels['left']}{role_labels['center']}{role_labels['right']}hstack=inputs=3"
         )
-        if rate is not None:
-            composed += f",fps={rate}"
         filters.append(f"{composed}{output_label}")
         return filters
     normal = _normal_branch(

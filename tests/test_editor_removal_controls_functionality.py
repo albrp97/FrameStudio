@@ -417,7 +417,15 @@ class NativeRemovalControlsFunctionalityTests(unittest.TestCase):
             window_title=window_title,
         )
         self._xdotool("keyup", "Control_L", "Shift_L", "Alt_L")
-        self._xdotool("mousemove", "--sync", str(screen_x), str(screen_y))
+        self._xdotool("mousemove", str(screen_x), str(screen_y))
+        self.assertEqual(
+            _screen_coordinates(
+                self._xdotool("getmouselocation", "--shell"),
+                (0.0, 0.0),
+            ),
+            (screen_x, screen_y),
+            "physical pointer did not reach the click target",
+        )
         if control:
             self._xdotool("keydown", "Control_L")
         try:

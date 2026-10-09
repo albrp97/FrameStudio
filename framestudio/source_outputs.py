@@ -48,6 +48,7 @@ from .operations import plan_project_export
 from .output_plan import OutputIdentity, OutputRequest
 from .upscale_policy import (
     ResolvedUpscalePolicy,
+    UpscaleDecision,
     UpscalePolicy,
     UpscalePolicyError,
     resolve_upscale_policy,
@@ -242,6 +243,7 @@ def plan_source_output(
     source = _source_for_request(project, request)
     selected_frame_rate = _source_frame_rate_policy(project, source, frame_rate_policy)
     selected_upscale = _source_upscale_policy(project, source, upscale_policy)
+    selected_upscale = _fallback_unavailable_source_upscale(selected_upscale, source)
     protected = _protected_source_paths(project)
     _ensure_destination_not_protected(request.destination, protected)
     derived = derive_standalone_source_project(
@@ -625,6 +627,39 @@ def _source_upscale_policy(
         raise SourceOutputPlanningError(
             f"Could not resolve upscale policy for source {source.source_id}: {error}",
         ) from error
+
+
+def _fallback_unavailable_source_upscale(
+    policy: UpscalePolicy,
+    source: SourceReference,
+) -> UpscalePolicy:
+    if not policy.enhancement_enabled or not policy.backend.casefold().startswith("rve"):
+        return policy
+    resolved = resolve_upscale_policy(
+        upscale_policy_source_metadata((source,)),
+        policy=policy,
+    )
+    decision = resolved.decisions[0]
+    if not decision.eligible or _source_upscale_runtime_reason(policy, decision) is None:
+        return policy
+    return UpscalePolicy(
+        enhancement_enabled=False,
+        model=policy.model,
+        backend=policy.backend,
+        target_short_side=policy.target_short_side,
+        landscape_max_short_side=policy.landscape_max_short_side,
+        portrait_max_short_side=policy.portrait_max_short_side,
+    )
+
+
+def _source_upscale_runtime_reason(
+    policy: UpscalePolicy,
+    decision: UpscaleDecision,
+) -> str | None:
+    from .video_compositor import _upscale_runtime_status
+
+    status, reason = _upscale_runtime_status(policy, decision)
+    return None if status == "available" else reason
 
 
 def _source_snapshots(paths: Sequence[Path]) -> tuple[tuple[Path, int, int], ...]:

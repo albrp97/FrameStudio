@@ -657,11 +657,11 @@ def _normalization_output_options(
                 str(policy.audio_channels),
             ]
         )
+    options.extend(["-movflags", "+faststart"])
+    if frame_count is None:
+        options.append("-shortest")
     options.extend(
         [
-            "-movflags",
-            "+faststart",
-            "-shortest",
             "-avoid_negative_ts",
             "make_zero",
             "-f",
@@ -686,7 +686,7 @@ def build_source_normalization_command(
     content_width: int | None = None,
     content_height: int | None = None,
 ) -> list[str]:
-    filters, _, _, _ = _build_source_normalization_filter_parts(
+    filters, _, _, frame_counts = _build_source_normalization_filter_parts(
         segments,
         target_rate=target_rate,
         policy=policy,
@@ -710,7 +710,7 @@ def build_source_normalization_command(
             policy,
             video_label="[outv]",
             audio_label="[outa]" if policy.audio_stream_present else None,
-            frame_count=None,
+            frame_count=sum(frame_counts),
             destination=destination,
         )
     )

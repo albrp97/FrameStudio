@@ -4,6 +4,7 @@ import array
 import hashlib
 import json
 import math
+import os
 import shlex
 import shutil
 import subprocess
@@ -47,13 +48,19 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
+def _run(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=cwd,
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
 
 
@@ -401,31 +408,40 @@ def _run_export(
     destination: Path,
     *,
     ffmpeg: str = "ffmpeg",
+    disable_upscale: bool = True,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     assert FFPROBE is not None
-    return _run(
+    command = [
+        sys.executable,
+        str(REPOSITORY_ROOT / "framestudio.py"),
+        "export",
+        str(project_path),
+        "--output",
+        str(destination),
+        "--fps-choice",
+        "custom",
+        "--custom-fps",
+        "24",
+        "--enhance-fps",
+        "--fps-backend",
+        "ffmpeg-minterpolate",
+    ]
+    if disable_upscale:
+        command.append("--no-upscale-enhancement")
+    command.extend(
         [
-            sys.executable,
-            str(REPOSITORY_ROOT / "framestudio.py"),
-            "export",
-            str(project_path),
-            "--output",
-            str(destination),
-            "--fps-choice",
-            "custom",
-            "--custom-fps",
-            "24",
-            "--enhance-fps",
-            "--fps-backend",
-            "ffmpeg-minterpolate",
-            "--no-upscale-enhancement",
             "--ffmpeg",
             ffmpeg,
             "--ffprobe",
             FFPROBE,
             "--full-paths",
         ],
+    )
+    return _run(
+        command,
         cwd=REPOSITORY_ROOT,
+        env=env,
     )
 
 
@@ -684,6 +700,43 @@ class SourceOutputFunctionalityTests(unittest.TestCase):
                 len(list((published / "edited-sources").rglob("*.mp4"))),
                 6,
             )
+
+    def test_source_only_render_falls_back_when_rve_runtime_is_unavailable(self):
+        with TemporaryDirectory(
+            dir=Path(__file__).resolve().parent,
+            prefix=".ticket113-unavailable-rve-functionality-",
+        ) as folder:
+            root = Path(folder)
+            project, source_paths, project_path, published = _saved_project(root)
+            isolated_home = root / "empty-home"
+            isolated_home.mkdir()
+            env = os.environ.copy()
+            env["HOME"] = str(isolated_home)
+            source_hashes = {path: _sha256(path) for path in source_paths}
+
+            result = _run_export(
+                project_path,
+                published / "edited.mp4",
+                disable_upscale=False,
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = _result_payload(result.stdout)
+            export = cast(dict[str, Any], payload["export"])
+            self.assertTrue(export["verified"])
+            self.assertFalse(export["partial_success"])
+            outputs = cast(list[dict[str, Any]], export["source_outputs"])
+            self.assertEqual(len(outputs), 6)
+            for item in outputs:
+                self.assertTrue(item["verified"])
+                self.assertFalse(item["upscale_policy"]["enhancement_enabled"])
+                destination = Path(item["request"]["destination"])
+                self.assertTrue(destination.is_file(), destination)
+                media = probe_media(destination)
+                self.assertEqual((media.width, media.height), (1920, 1080))
+                self.assertEqual(media.frame_rate, "24/1")
+            self.assertEqual({path: _sha256(path) for path in source_paths}, source_hashes)
 
     def test_public_source_only_failure_reports_partial_success_and_no_failed_publish(self):
         with TemporaryDirectory(

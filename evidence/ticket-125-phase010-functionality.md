@@ -311,3 +311,182 @@ Routine scoped staging/commit/publication is integration-owner execution
 authorized by CHG-014, not a userDirectiveOverride or invented human result.
 The final three Cairo CI guards and real local GTK initialization are
 persisted in `files/phase010-ci-cairo-bridge-final.log`.
+
+## Publication and first actual provider result
+
+Committed the exact reviewed 148 paths as
+`70a26cb23f361ff46d9389827c63a075cef8123b`,
+`feat(editor): add synchronized tracks and outputs`.
+The configured author/committer and required co-author trailer were verified.
+Non-force `git push --set-upstream origin phase/010-synchronized-tracks`
+succeeded; remote ref equals the commit, upstream ahead/behind is 0/0 and
+the worktree was clean. Exact validator turn 9 classified commit/push PASS
+and resolved `pull_request.required: auto` as optional from actual repository
+policy. Source-branch delivery is permitted after required remote checks;
+main has not been merged or modified.
+
+Actual Ubuntu workflow
+`https://github.com/albrp97/FrameStudio/actions/runs/37993006614`
+installed and verified the runtime/tools and GTK virtual environment, then
+**failed 719 cases in 467.416 seconds: 10 failures, 1 skip**.
+The passing workstation run is not replaced with a remote pass.
+Complete provider log: `files/phase010-provider-first-failure.log`.
+
+Observed failure groups: standalone 0.4-second/24-FPS outputs contain 9
+frames where planning requires 10 on FFmpeg 6; one dynamic marker coordinate
+differs; bare-Xvfb repeated Undo pointer synchronization hangs; the integrated
+initial GTK snapshot has no render node; and a benchmark fixture assumes
+temporary directories cannot be under HOME. Scoped export and snapshot
+remediation runs in exact-commit isolated worktrees. No phase, feature or
+ticket closes while this required gate is failed.
+
+Parent reproduced the HOME fixture assumption locally, then verifies both
+outside-HOME basename redaction and inside-HOME tilde redaction with
+deterministic fixture homes. All 13 benchmark cases pass under CI-shaped
+TMPDIR. Native clicking now verifies the actual pointer coordinates without
+the older `mousemove --sync` no-op wait. An initial GLib-pumping coordinate
+wait changed event ordering and failed three native cases; replacing it with
+direct server-coordinate acknowledgement preserves dispatch order.
+All five native Backspace/Undo cases pass in 8.773 seconds:
+`files/phase010-provider-pointer-final-green.log`.
+The workstation's newer xdotool did not reproduce the older no-op hang;
+actual Ubuntu reexecution remains required proof, not a local claim.
+
+The snapshot-only private patch was reviewed and integrated. It observes
+actual GTK frame production within a bounded interval and uses the live
+window/child renderer, failing explicitly if no image can be captured.
+No requirement assertion, tolerance or skip was weakened. The private native
+path also passed with the optional external capture tools suppressed.
+Root's complete strong journey passes in **39.883 seconds**:
+`files/phase010-provider-root-snapshot-green.log`.
+Final non-GUI static/compilation/diff gates pass:
+`files/phase010-provider-root-portability-final-static.log`.
+The earlier `static-analysis check` invocation was interrupted after
+recognizing that `check` also starts a redundant full suite; that log is not
+terminal full-suite evidence.
+
+Exact validator turns 10 and 11 classify the two parent fixture corrections
+and bounded snapshot correction as focused PASS, with no introduced blocker.
+This does not release the remaining FFmpeg/provider gate.
+
+The provider's one skip is identified by an exact 719-progress-marker /
+719-discovered-test mapping as
+`test_fractional_rve_source_outputs_use_real_backend_and_reuse_high_rate_source`.
+Exact validator turn 12 classifies it as supplemental GPU/RVE capability
+unavailable in Ubuntu CI and actually verified on the target workstation by
+the skip-free 719-case runner. T117's physical-pointer charter was not skipped.
+Portable media/native acceptance remains mandatory in CI, with no blanket
+waiver or inferred provider pass.
+
+## Integrated FFmpeg 6 compatibility correction
+
+The bounded worker returned three surgical corrections:
+triplicate branches apply target FPS before framesync/hstack; source
+normalization uses its existing allocated frame totals explicitly and does
+not terminate exact-frame video at the shorter audio endpoint; the decoded
+marker oracle uses half-open slot rectangles rather than including one pixel
+from the neighboring slot. Existing count/pixel tolerances remain unchanged.
+No source media, render policy, default enhancement backend or final layout
+contract changed.
+
+Isolated actual FFmpeg 6.1 reproduced 9 frames before and 10 afterward:
+`files/phase010-provider-export-fix-artifacts/frame-count-boundary-proof.log`.
+Worker public CLI/source tests pass four cases and the provider-style marker
+case passes. Root shared composition/export/frame-count/smart regressions
+pass **94 cases in 2.196 seconds**:
+`files/phase010-provider-root-unit94.log`.
+All configured final integrated static/compile/diff gates pass:
+`files/phase010-provider-final-integrated-static.log`.
+Root affected functionality on FFmpeg 8 and the seven actual failed
+CLI/native/media cases on isolated FFmpeg 6.1 are executing before final
+local review/publication. These running checks are not terminal evidence.
+
+## Bounded observer and physical display correction
+
+The affected 39-case Root run stopped advancing after 34 passing cases
+because the shared GTK observer drained continuously pending GLib work
+without yielding. That runner and its queued seven-case FFmpeg 6 runner
+were interrupted, not passed. A deterministic continuously pending context
+reproduced the defect before the observer was changed to one nonblocking
+iteration per bounded round. The snapshot helper uses the same bounded pump.
+Regression RED: `files/phase010-provider-event-pump-red.log`.
+
+The first corrected native run exposed an actual planner button center below
+the workstation screen. Its strict pointer assertion failed rather than
+pretending the click reached the target. The uniquely titled planner fixture
+is positioned at the screen origin before physical interaction. All five CI
+Xvfb invocations now use 1920x1200, sufficient for the real fixture geometry.
+The regression, three CI parity guards, five physical Backspace/Undo cases,
+and complete integrated GTK/CLI/media journey pass **10 cases in 50.747
+seconds**: `files/phase010-provider-final-bounded-gtk.log`.
+All final configured static/compile/diff gates also pass:
+`files/phase010-provider-final-bounded-static.log`.
+
+The subsequent actual FFmpeg 6.1 seven-case run completed in 196.825 seconds
+with five passes and two failures, not a cross-version PASS. Four public
+CLI/source cases and native source-only export pass. The marker test observed
+six interpolation invocations instead of three, and native combined export
+reported one verified output out of five. This run exposed the target
+workstation's available RVE integration while using isolated FFmpeg 6.1,
+unlike Ubuntu's CPU-only runtime. The precise backend/environment difference
+is being investigated without changing the default backend or weakening
+output assertions. Log: `files/phase010-provider-root-seven-ffmpeg61-final.log`.
+
+The worker clarified that its earlier provider-style marker proof forced
+FFmpeg interpolation and unavailable restoration status through Python
+monkeypatches. It is real-media FFmpeg proof, not genuine absent-RVE runtime
+proof. Root therefore reran all seven cases with an actual isolated empty
+HOME and FFmpeg 6.1, without backend mocks. Six cases pass, including the
+marker, and native combined export fails in **76.752 seconds**:
+`files/phase010-provider-root-seven-ffmpeg61-empty-home.log`.
+Observing the real batch error without changing assertions identifies the
+remaining defect: the final output verifies, but the first standalone source
+attempts RVE restoration despite its Python runtime being absent.
+Diagnostic: `files/phase010-native-combined-empty-home-diagnostic.log`.
+This is a genuine portable-runtime source-export defect, not an accepted GPU
+coverage limitation. The retained export worker owns the scoped availability/
+fallback parity correction and failing regression. Delivery remains blocked.
+
+Exact validator turn 14, using Rubber Duck GPT-5.6 Luna/high/all-validation,
+classifies the bounded observer and physical planner/display corrections as
+focused PASS with no introduced finding. It withholds phase readiness until
+the remaining concrete media/runtime failure and actual provider gate pass.
+No interrupted or partially passing runner is treated as terminal acceptance.
+
+## Authentic standalone-runtime repair and final local result
+
+The retained worker adds a failing public source-only regression with a real
+empty HOME and source/output integrity assertions. Standalone planning now
+reuses the final compositor's existing restoration availability check before
+resolving export policy. Unavailable optional RVE restoration is explicitly
+disabled in the reported upscale policy; available RVE and other configured
+policy fields are retained. Normal full-canvas scaling remains supported.
+Private RED: `files/phase010-provider-export-fix-artifacts/unavailable-rve-regression-before-fix.log`.
+
+The first manual integration placed the guard in the derivation helper rather
+than the planning entry point. Root's eight-case run correctly failed the
+native combined and new regression cases. The insertion was corrected to the
+reviewed planning entry point, and both integrated files were verified byte
+identical to the worker's two-file patch before reexecution. The failed
+`files/phase010-provider-root-eight-final.log` is not PASS evidence.
+
+The corrected authentic FFmpeg 6.1 / isolated-empty-HOME run passes **all eight
+cases in 184.800 seconds**, including all seven actual provider media failures
+and the new missing-RVE regression:
+`files/phase010-provider-root-eight-corrected-final.log`.
+Root's affected standalone source regressions pass **11 cases in 21.052
+seconds** with the actual workstation runtime:
+`files/phase010-provider-root-source-regressions.log`.
+Final configured static/compile/diff checks pass with the unchanged baseline,
+46 total clones and zero new clones:
+`files/phase010-provider-corrected-source-static.log`.
+No tolerance, output count, source hash, native control or failure assertion
+was weakened. Exact-profile release and actual Ubuntu reexecution remain
+pending before lifecycle closure.
+
+Exact validator turn 16 grants bounded local commit/non-force-push GO for
+the reviewed 13-file remediation scope. Profile: Rubber Duck GPT-5.6 Luna,
+high reasoning, all-validation. Source fallback, authentic missing-RVE
+functionality, previous focused corrections and final local review are PASS.
+This is automaticValidation, not human validation. Replacement Ubuntu checks,
+merge and phase/ticket closure are explicitly not covered by this local GO.

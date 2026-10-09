@@ -78,18 +78,25 @@ class RestorationBenchmarkContractTests(unittest.TestCase):
             executable.write_text("#!/bin/sh\n", encoding="utf-8")
             executable.chmod(0o700)
 
-            result = discover_runtime(
-                {
-                    "runtime_probe": {
-                        "executables": [],
-                        "executable_paths": [str(executable)],
-                        "modules": [],
-                        "weight_patterns": [],
-                    }
-                }
-            )
-
-        self.assertEqual(result["executable_paths"], ["Video2X.AppImage"])
+            for home, expected in (
+                (Path(temporary_directory) / "unrelated-home", "Video2X.AppImage"),
+                (Path(temporary_directory), "~/Video2X.AppImage"),
+            ):
+                with (
+                    self.subTest(expected=expected),
+                    patch("benchmarks.restoration_benchmark.Path.home", return_value=home),
+                ):
+                    result = discover_runtime(
+                        {
+                            "runtime_probe": {
+                                "executables": [],
+                                "executable_paths": [str(executable)],
+                                "modules": [],
+                                "weight_patterns": [],
+                            }
+                        }
+                    )
+                    self.assertEqual(result["executable_paths"], [expected])
 
     def test_fixture_windows_are_deterministic_and_non_overlapping(self):
         first = choose_windows(60.0)

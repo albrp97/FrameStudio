@@ -42,7 +42,7 @@ jobs:
 
       - name: Verify GTK quality environment
         run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" \
             env GDK_BACKEND=x11 .venv/bin/python -c \
             'import gi; gi.require_foreign("cairo"); gi.require_version("Gdk", "4.0"); gi.require_version("Gtk", "4.0"); from gi.repository import Gtk; assert Gtk.init_check()'
 
@@ -62,7 +62,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/framestudio-quality-tmp" \
             "$RUNNER_TEMP/framestudio-phase010-artifacts"
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" \
             env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-quality-tmp" \
               FRAMESTUDIO_PHASE010_ARTIFACT_DIR="$RUNNER_TEMP/framestudio-phase010-artifacts" \
             make quality PYTHON=.venv/bin/python STATIC_ANALYSIS_DIR=evidence/static-analysis
@@ -70,14 +70,14 @@ jobs:
       - name: Run CLI contract suite
         run: |
           mkdir -p "$RUNNER_TEMP/framestudio-contract-tmp"
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" \
             env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-contract-tmp" \
             make contract PYTHON=.venv/bin/python
 
       - name: Run generated-media GTK smoke
         run: |
           mkdir -p "$RUNNER_TEMP/framestudio-smoke-tmp"
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" \
             env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-smoke-tmp" \
             make smoke PYTHON=.venv/bin/python FFMPEG=ffmpeg
 
@@ -85,7 +85,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/framestudio-functionality-tmp" \
             "$RUNNER_TEMP/framestudio-phase010-functionality-artifacts"
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" \
             env GDK_BACKEND=x11 TMPDIR="$RUNNER_TEMP/framestudio-functionality-tmp" \
               FRAMESTUDIO_PHASE010_ARTIFACT_DIR="$RUNNER_TEMP/framestudio-phase010-functionality-artifacts" \
             .venv/bin/python -m unittest \

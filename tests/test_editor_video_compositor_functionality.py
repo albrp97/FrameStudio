@@ -619,8 +619,8 @@ def _scaled_region(
     return (
         max(0, x * output_width // 1920),
         max(0, y * output_height // 1080),
-        min(output_width, (x + width) * output_width // 1920 + 1),
-        min(output_height, (y + height) * output_height // 1080 + 1),
+        min(output_width, (x + width) * output_width // 1920),
+        min(output_height, (y + height) * output_height // 1080),
     )
 
 

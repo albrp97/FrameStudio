@@ -134,3 +134,63 @@ Exact validator `d3c2c166-b1dc-4485-9583-e30a348b34ba`, turn 8,
 classified final local technical/automatic functionality/review evidence
 PASS and authorized bounded commit/push. Actual Ubuntu/provider execution
 and delivery closure remain pending, not inferred from the local guards.
+
+### Actual Ubuntu execution and scoped follow-up
+
+Published source commit `70a26cb23f361ff46d9389827c63a075cef8123b`
+ran Quality workflow `37993006614`. Actual runtime/tool installation,
+system checks and virtual-environment GTK verification succeeded.
+The discovered suite then failed 10 cases, with one supplemental RVE skip,
+in 467.416 seconds. Later contracts/smoke/charter stages did not run.
+Raw log: `files/phase010-provider-first-failure.log`.
+These facts replace the previously unavailable-provider observation, not the
+historical workstation PASS; remote readiness is failed.
+
+The CI-shaped TMPDIR fixture assumption was reproduced locally and corrected
+without changing benchmark production code or privacy formatting. Both
+outside-HOME basename and inside-HOME tilde outputs are asserted.
+All 13 benchmark cases pass under that TMPDIR arrangement.
+Repeated native pointer targeting no longer relies on the older xdotool
+no-op synchronization behavior; actual server coordinates are asserted
+before click dispatch. All five Backspace/Undo native cases pass.
+The initial empty snapshot now waits for a real bounded GTK frame and native
+texture; the strong integrated Root charter passes in 39.883 seconds.
+
+Exact validator turns 10/11 classify these focused corrections PASS.
+Final configured static/compile/diff gates pass:
+`files/phase010-provider-root-portability-final-static.log`.
+Turn 12 distinguishes the supplemental GPU/RVE skip, already executed on
+the real workstation, from mandatory portable/native CI coverage.
+FFmpeg 6 frame/framing remediation and actual final provider reexecution
+remain required before closure.
+
+### Final bounded observer and display geometry
+
+The shared functionality observer's unbounded GLib pending-event drain was
+reproduced with a deterministic continuously pending context, then replaced
+with a bounded nonblocking iteration per round. Interrupted affected runners
+are not PASS evidence. Strict native pointer checks then exposed a planner
+button center below the physical screen. The uniquely titled fixture is
+positioned at the origin, and all five CI Xvfb screens now use 1920x1200.
+Regression/parity/native/strong-journey coverage passes 10 cases in 50.747
+seconds: `files/phase010-provider-final-bounded-gtk.log`.
+Final configured static, compile and diff checks pass:
+`files/phase010-provider-final-bounded-static.log`.
+An isolated FFmpeg 6.1 run passes five of seven affected cases but exposes
+two workstation-RVE/runtime differences requiring explicit disposition.
+Neither this partial result nor the successful local geometry proof replaces
+the required final Ubuntu provider execution.
+
+The existing native-display parity guard now checks every actual Xvfb
+invocation's 1920x1200 screen geometry. It fails against the published
+1280x720 workflow and all three guards pass against the corrected workflow:
+`files/phase010-ci-geometry-red-green.log`. Final configured static/compile/
+diff checks were rerun after this guard, with the unchanged baseline reporting
+46 total clones and zero new clones.
+
+Exact validator turn 16 grants bounded local commit/non-force-push GO after
+the corrected authentic FFmpeg 6.1 / empty-HOME eight-case run and final
+configured static/compile/diff gates pass. The existing final compositor's
+RVE availability behavior is reused by standalone source planning. No baseline
+update or check waiver is introduced. The required replacement Ubuntu run and
+lifecycle closeout remain pending.

@@ -273,6 +273,9 @@ framestudio export PROJECT.framestudio.json \
 
 In these examples, the reels are written under `~/Videos/edited-sources/`.
 Source-only mode does not render `edited.mp4` or start the final compositor.
+If the optional RVE restoration runtime or model is unavailable, source reels
+use normal full-canvas scaling and report AI upscale enhancement as disabled.
+An available RVE runtime retains the configured enhancement policy.
 
 Export sessions are scoped to the destination and keep compatible checkpoints
 in adjacent working directories:

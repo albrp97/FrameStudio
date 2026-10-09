@@ -51,6 +51,9 @@ class EditorCIParityTests(unittest.TestCase):
         self.assertIn("xdotool", workflow)
         self.assertIn("command -v xdotool", workflow)
         self.assertGreaterEqual(workflow.count("GDK_BACKEND=x11"), 4)
+        for command in workflow.splitlines():
+            if command.strip().startswith("xvfb-run "):
+                self.assertIn("-screen 0 1920x1200x24", command)
 
 
 if __name__ == "__main__":

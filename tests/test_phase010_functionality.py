@@ -14,7 +14,7 @@ from fractions import Fraction
 from io import StringIO
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from framestudio.app import create_editor_application
 from framestudio.audio import (
@@ -45,7 +45,7 @@ ARTIFACT_PARENT = (
 def _pump_events(glib: Any, rounds: int = 20) -> None:
     context = glib.MainContext.default()
     for _ in range(rounds):
-        while context.pending():
+        if context.pending():
             context.iteration(False)
         time.sleep(0.01)
 
@@ -66,27 +66,32 @@ def _visible_widget_text(widget: Any) -> list[str]:
 
 
 def _snapshot_widget(widget: Any, destination: Path, Gtk: Any) -> None:
-    snapshot_widget = widget
-    paintable = Gtk.WidgetPaintable.new(snapshot_widget)
-    current_image = paintable.get_current_image()
-    if current_image is not None and hasattr(current_image, "save_to_png"):
-        if current_image.save_to_png(str(destination)):
-            return
+    from gi.repository import GLib
+
+    snapshot_widgets = [widget]
     child = getattr(widget, "get_child", lambda: None)()
     if child is not None:
-        snapshot_widget = child
+        snapshot_widgets.append(child)
+    for snapshot_widget in snapshot_widgets:
         paintable = Gtk.WidgetPaintable.new(snapshot_widget)
-        current_image = paintable.get_current_image()
-    width = max(1, snapshot_widget.get_width())
-    height = max(1, snapshot_widget.get_height())
-    if (
-        current_image is not None
-        and hasattr(current_image, "save_to_png")
-        and current_image.save_to_png(
-            str(destination),
-        )
-    ):
-        return
+        for _ in range(600):
+            _pump_events(GLib, 1)
+            current_image = paintable.get_current_image()
+            if current_image is not None and hasattr(current_image, "save_to_png"):
+                if current_image.save_to_png(str(destination)):
+                    return
+            width = snapshot_widget.get_width()
+            height = snapshot_widget.get_height()
+            if width > 0 and height > 0:
+                snapshot = Gtk.Snapshot.new()
+                paintable.snapshot(snapshot, width, height)
+                node = snapshot.to_node()
+                native = snapshot_widget.get_native()
+                renderer = None if native is None else native.get_renderer()
+                if node is not None and renderer is not None:
+                    texture = renderer.render_texture(node, None)
+                    if texture is not None and texture.save_to_png(str(destination)):
+                        return
     get_title = getattr(widget, "get_title", None)
     title = get_title() if callable(get_title) else None
     if title and shutil.which("xdotool") and shutil.which("import"):
@@ -106,18 +111,28 @@ def _snapshot_widget(widget: Any, destination: Path, Gtk: Any) -> None:
             )
             if screenshot.returncode == 0 and destination.is_file():
                 return
-    snapshot = Gtk.Snapshot.new()
-    paintable.snapshot(snapshot, width, height)
-    node = snapshot.to_node()
-    if node is None:
-        raise AssertionError("GTK produced no render node for the editor window")
-    native = widget.get_native()
-    renderer = None if native is None else native.get_renderer()
-    if renderer is None:
-        raise AssertionError("GTK editor window has no live native renderer")
-    texture = renderer.render_texture(node, None)
-    if texture is None or not texture.save_to_png(str(destination)):
-        raise AssertionError(f"GTK could not save the application widget snapshot: {destination}")
+    raise AssertionError(
+        "GTK produced no render node for the editor window after bounded frame wait"
+    )
+
+
+class GtkEventPumpTests(unittest.TestCase):
+    def test_continuously_pending_context_yields_between_bounded_rounds(self):
+        glib = Mock()
+        context = glib.MainContext.default.return_value
+        context.pending.return_value = True
+        context.iteration.side_effect = [
+            False,
+            False,
+            False,
+            AssertionError("event pump did not yield between rounds"),
+        ]
+
+        with patch("tests.test_phase010_functionality.time.sleep") as sleep:
+            _pump_events(glib, rounds=3)
+
+        self.assertEqual(context.iteration.call_count, 3)
+        self.assertEqual(sleep.call_count, 3)
 
 
 class Phase010FunctionalityTests(unittest.TestCase):
@@ -2057,6 +2072,15 @@ class Phase010FunctionalityTests(unittest.TestCase):
         panel_title = "FrameStudio T125 Integrated Planner"
         panel.set_title(panel_title)
         panel.present()
+        _pump_events(self.GLib, 20)
+        planner._xdotool(
+            "windowmove",
+            "--sync",
+            planner._window_id(panel_title),
+            "0",
+            "0",
+        )
+        _pump_events(self.GLib, 20)
         gui_destination = journey_root / "ticket125-gui-cancel.mp4"
 
         def owned_ffmpeg_commands() -> tuple[str, ...]:
