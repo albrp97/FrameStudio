@@ -13,7 +13,7 @@ from .operations import toggle_segment_deleted
 from .playback import PlaybackState
 from .ui import format_duration
 
-MAX_SOURCES_PER_PROJECT = 32
+MAX_SOURCES_PER_PROJECT: int | None = None
 TIMELINE_SCROLL_STEP_SECONDS = 30.0
 TIMELINE_SCROLL_PIXELS = 140.0
 FOCUS_ZOOM_SCROLL_STEP = 0.1
@@ -100,19 +100,21 @@ def editing_is_locked(window: Any) -> bool:
 
 def validate_source_selection(
     paths: Sequence[Path],
-    max_sources: int = 1,
+    max_sources: int | None = MAX_SOURCES_PER_PROJECT,
     existing_source_count: int = 0,
 ) -> tuple[Path, ...]:
-    if max_sources < 1:
+    if max_sources is not None and max_sources < 1:
         raise ValueError("The project source limit must be at least one")
     if existing_source_count < 0:
         raise ValueError("The existing source count must not be negative")
-    if existing_source_count > max_sources:
+    if max_sources is not None and existing_source_count > max_sources:
         raise ValueError("The existing source count exceeds the project source limit")
     selected = tuple(Path(path) for path in paths)
     normalized_paths = tuple(path.expanduser().resolve() for path in selected)
     if len(set(normalized_paths)) != len(normalized_paths):
         raise ValueError("Each source video can only be added once")
+    if max_sources is None:
+        return selected
     available_sources = max_sources - existing_source_count
     if len(selected) > available_sources:
         if existing_source_count == 0 and max_sources == 1:
@@ -259,6 +261,12 @@ def format_key_bindings() -> str:
 
 
 def format_export_progress_label(progress: ExportProgress) -> str:
+    if progress.stage == "Analyzing export audio":
+        return (
+            f"{progress.stage} | {progress.percent:.1f}% | "
+            f"sources {progress.frame}/{progress.total_frames} | "
+            f"elapsed {format_duration(progress.elapsed_seconds)}"
+        )
     fps = f"{progress.fps:.1f} fps" if progress.fps is not None else "-- fps"
     eta = format_duration(progress.eta_seconds) if progress.eta_seconds is not None else "--:--"
     return (

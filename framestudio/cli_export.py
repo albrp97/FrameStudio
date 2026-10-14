@@ -365,14 +365,17 @@ def _build_output_plans(
     tuple[SourceOutputPlan, ...],
 ]:
     plan_arguments = _plan_arguments(args)
+    ensure_project_audio_analysis(
+        project,
+        ffmpeg_path=plan_arguments["ffmpeg_path"],
+        cancel_event=cancel_event,
+        source_ids={
+            source_id for request in output_plan.output_requests for source_id in request.source_ids
+        },
+    )
     final_plan: ExportPlan | AVRenderPlan | None = None
     if output_plan.final_request is not None:
         if _needs_synchronized_final(project):
-            ensure_project_audio_analysis(
-                project,
-                ffmpeg_path=plan_arguments["ffmpeg_path"],
-                cancel_event=cancel_event,
-            )
             final_plan = plan_project_av(
                 project,
                 output_plan.final_request.destination,

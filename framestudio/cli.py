@@ -222,7 +222,6 @@ def _handle_import(args: argparse.Namespace) -> dict[str, Any]:
             exit_code=CLI_EXIT_INVALID,
         )
     project = _create_project_from_cli_sources(sources, ffprobe_path=args.ffprobe)
-    analyze_project_audio(project)
     saved = _save_project_for_cli(project, destination, destination)
     return _project_result(
         "import",

@@ -43,14 +43,34 @@ class EditorUiHelperTests(unittest.TestCase):
     def test_metadata_float_accepts_rational_frame_rate(self):
         self.assertEqual(_metadata_float({"frame_rate": "10/1"}, "frame_rate"), 10.0)
 
-    def test_source_selection_accepts_one_source_for_current_phase(self):
+    def test_source_selection_accepts_one_source(self):
         selected = validate_source_selection([Path("/tmp/one.mp4")])
 
         self.assertEqual(selected, (Path("/tmp/one.mp4"),))
 
-    def test_source_selection_rejects_multiple_sources_until_supported(self):
+    def test_source_selection_has_no_default_source_count_limit(self):
+        paths = tuple(Path(f"/tmp/source-{index}.mp4") for index in range(1000))
+
+        self.assertEqual(validate_source_selection(paths), paths)
+        self.assertEqual(
+            validate_source_selection(paths, existing_source_count=1000),
+            paths,
+        )
+
+    def test_source_selection_preserves_explicit_one_source_limit(self):
         with self.assertRaisesRegex(ValueError, "one source video per project"):
-            validate_source_selection([Path("/tmp/one.mp4"), Path("/tmp/two.mp4")])
+            validate_source_selection(
+                [Path("/tmp/one.mp4"), Path("/tmp/two.mp4")],
+                max_sources=1,
+            )
+
+    def test_unlimited_source_selection_rejects_duplicates(self):
+        with self.assertRaisesRegex(ValueError, "only be added once"):
+            validate_source_selection([Path("/tmp/one.mp4"), Path("/tmp/./one.mp4")])
+
+    def test_unlimited_source_selection_rejects_negative_existing_count(self):
+        with self.assertRaisesRegex(ValueError, "must not be negative"):
+            validate_source_selection([Path("/tmp/one.mp4")], existing_source_count=-1)
 
     def test_source_selection_uses_the_configured_phase_limit(self):
         selected = validate_source_selection(

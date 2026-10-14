@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable, Mapping, Sequence
+import time
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 
 from .audio import (
     AUDIO_POLICY_VERSION,
     AudioAnalysisCancelled,
+    AudioAnalysisError,
     AudioDecision,
     analyze_source_audio,
+    analyze_sources_audio,
     audio_decision_is_stale,
     pending_audio_decision,
 )
@@ -17,6 +20,8 @@ from .composition import VisualTransform
 from .export import (
     ExportPlan,
     ExportPlanningError,
+    ExportProgress,
+    ExportProgressCallback,
     plan_export,
     plan_mixed_export,
 )
@@ -370,11 +375,25 @@ def ensure_project_audio_analysis(
     *,
     ffmpeg_path: str = "ffmpeg",
     cancel_event: threading.Event | None = None,
+    source_ids: Collection[str] | None = None,
+    progress_callback: ExportProgressCallback | None = None,
 ) -> dict[str, dict[str, object]]:
-    decisions: dict[str, dict[str, object]] = {}
-    for source in project.sources or (project.source,):
-        if cancel_event is not None and cancel_event.is_set():
-            raise ExportPlanningError("Export cancelled")
+    if cancel_event is not None and cancel_event.is_set():
+        raise ExportPlanningError("Export cancelled")
+    selected_ids = (
+        {block.source_id or project.source.source_id for block in project.timeline.active_blocks()}
+        if source_ids is None
+        else set(source_ids)
+    )
+    for source_id in selected_ids:
+        project.source_by_id(source_id)
+    sources = tuple(
+        source
+        for source in project.sources or (project.source,)
+        if source.source_id in selected_ids
+    )
+    pending: list[SourceReference] = []
+    for source in sources:
         settings = project.source_audio_settings(source.source_id)
         status = settings.get("status")
         if (
@@ -382,19 +401,45 @@ def ensure_project_audio_analysis(
             or settings.get("policy_version") != AUDIO_POLICY_VERSION
             or audio_decision_is_stale(source, settings)
         ):
-            try:
-                decision = analyze_source_audio(
-                    source,
-                    ffmpeg_path=ffmpeg_path,
-                    cancel_event=cancel_event,
+            pending.append(source)
+    started = time.monotonic()
+    completed = 0
+
+    def report_progress() -> None:
+        if progress_callback is not None:
+            progress_callback(
+                ExportProgress(
+                    stage="Analyzing export audio",
+                    percent=completed * 100 / len(pending),
+                    frame=completed,
+                    total_frames=len(pending),
+                    fps=None,
+                    elapsed_seconds=time.monotonic() - started,
+                    eta_seconds=None,
                 )
-            except AudioAnalysisCancelled as error:
-                raise ExportPlanningError("Export cancelled") from error
-            settings = decision.to_dict()
-            project.set_source_audio_settings(source.source_id, settings)
-        decisions[source.source_id] = settings
+            )
+
+    def record(source: SourceReference, decision: AudioDecision) -> None:
+        nonlocal completed
+        project.set_source_audio_settings(source.source_id, decision.to_dict())
+        completed += 1
+        report_progress()
+
+    if pending:
+        report_progress()
+        try:
+            analyze_sources_audio(
+                pending,
+                ffmpeg_path=ffmpeg_path,
+                cancel_event=cancel_event,
+                result_callback=record,
+            )
+        except AudioAnalysisCancelled as error:
+            raise ExportPlanningError("Export cancelled") from error
+        except AudioAnalysisError as error:
+            raise ExportPlanningError(str(error)) from error
     project.validate()
-    return decisions
+    return {source.source_id: project.source_audio_settings(source.source_id) for source in sources}
 
 
 def resolve_project_frame_rate_policy(

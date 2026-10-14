@@ -35,10 +35,8 @@ from .model import (
     SourceReference,
 )
 from .operations import (
-    analyze_project_audio,
     create_project_from_source,
     create_project_from_sources,
-    ensure_project_audio_analysis,
 )
 from .persistence import (
     ProjectPersistenceError,
@@ -98,12 +96,10 @@ def _load_source_blocking(window: Any, selected_paths: tuple[Path, ...]) -> bool
         project = _build_source_project(selected_paths)
         current_project = getattr(window, "project", None)
         if current_project is None:
-            analyze_project_audio(project)
             status_prefix = "Loaded"
             project_path = None
         else:
             current_project.append_sources(project.sources or (project.source,))
-            ensure_project_audio_analysis(current_project)
             project = current_project
             status_prefix = "Added"
             project_path = getattr(window, "project_path", None)
@@ -173,7 +169,6 @@ def _finish_source_load(
 ) -> bool:
     if generation != getattr(window, "_source_load_generation", generation):
         return False
-    should_analyze = False
     try:
         if project is None:
             window._show_error(error_message or "Source loading failed")
@@ -197,13 +192,10 @@ def _finish_source_load(
             return False
         names = ", ".join(path.name for path in selected_paths)
         window._set_status(f"{status_prefix} source video(s): {names} (project not saved)")
-        should_analyze = glib is not None
         return False
     finally:
         window._source_load_in_progress = False
         window._update_segment_controls()
-        if should_analyze and project is not None:
-            _start_audio_analysis(window, project, glib)
 
 
 def _preview_audio_decisions(project: Project) -> dict[str, dict[str, Any]]:
@@ -658,12 +650,6 @@ def _attach_loaded_project(
     *,
     preserve_project_path: bool = False,
 ) -> bool:
-    if glib is None:
-        try:
-            ensure_project_audio_analysis(project)
-        except ProjectValidationError as error:
-            window._show_error(str(error))
-            return False
     previous_project_path = getattr(window, "project_path", None)
     try:
         attach_project(window, project, project_path)
@@ -698,8 +684,6 @@ def recover_autosave(window: Any, glib: Any | None = None) -> bool:
     ):
         return False
     window._set_status("Recovered autosaved editor project")
-    if glib is not None:
-        _start_audio_analysis(window, project, glib)
     return False
 
 
@@ -781,8 +765,6 @@ def load_project_path(
         )
     else:
         window._set_status(f"Reopened editor project: {path.name}")
-    if glib is not None:
-        _start_audio_analysis(window, project, glib)
     return False
 
 

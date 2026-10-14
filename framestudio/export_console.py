@@ -85,7 +85,8 @@ class ConsoleProgressReporter:
         if progress.stage.casefold() not in {label.casefold(), "complete"}:
             detail += f" [{progress.stage}]"
         if progress.total_frames:
-            detail += f" | frame {progress.frame}/{progress.total_frames}"
+            unit = "sources" if progress.stage == "Analyzing export audio" else "frame"
+            detail += f" | {unit} {progress.frame}/{progress.total_frames}"
         if progress.fps is not None:
             detail += f" | {progress.fps:.1f} fps"
         detail += f" | elapsed {_format_seconds(progress.elapsed_seconds)}"

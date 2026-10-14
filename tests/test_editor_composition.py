@@ -212,7 +212,7 @@ class EditorCompositionTests(unittest.TestCase):
                 "framestudio.app_project._build_source_project",
                 side_effect=build_project,
             ),
-            patch("framestudio.app_project.analyze_project_audio") as analyze_audio,
+            patch("framestudio.operations.analyze_project_audio") as analyze_audio,
             patch("framestudio.app_project._finish_source_load"),
         ):
             _load_source_worker(
@@ -231,7 +231,7 @@ class EditorCompositionTests(unittest.TestCase):
         )
         analyze_audio.assert_not_called()
 
-    def test_source_load_attaches_before_background_audio_analysis(self):
+    def test_source_load_attaches_without_background_audio_analysis(self):
         with TemporaryDirectory() as temporary_directory:
             project = make_project(Path(temporary_directory))
             window = SimpleNamespace(
@@ -259,7 +259,7 @@ class EditorCompositionTests(unittest.TestCase):
                 )
 
             attach.assert_called_once_with(window, project, None)
-            start_analysis.assert_called_once_with(window, project, glib)
+            start_analysis.assert_not_called()
             self.assertFalse(window._source_load_in_progress)
 
     def test_source_load_appends_to_existing_project_without_replacing_edited_timeline(self):
@@ -713,7 +713,7 @@ class EditorCompositionTests(unittest.TestCase):
             self.assertEqual(window._audio_analysis_source_ids, ("new-generation",))
             window.audio_status_label.set_text.assert_not_called()
 
-    def test_project_reopen_attaches_before_background_audio_analysis(self):
+    def test_project_reopen_attaches_without_background_audio_analysis(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             project = make_project(root)
@@ -730,7 +730,7 @@ class EditorCompositionTests(unittest.TestCase):
             with (
                 patch("framestudio.app_project.load_project", return_value=project),
                 patch(
-                    "framestudio.app_project.ensure_project_audio_analysis",
+                    "framestudio.operations.ensure_project_audio_analysis",
                     side_effect=AssertionError("reopen must not block on audio analysis"),
                 ) as ensure_audio,
                 patch("framestudio.app_project.attach_project") as attach,
@@ -740,7 +740,7 @@ class EditorCompositionTests(unittest.TestCase):
 
             ensure_audio.assert_not_called()
             attach.assert_called_once_with(window, project, project_path)
-            start_analysis.assert_called_once_with(window, project, glib)
+            start_analysis.assert_not_called()
 
     def test_project_reopen_reports_playback_backend_failure(self):
         with TemporaryDirectory() as temporary_directory:
@@ -774,7 +774,7 @@ class EditorCompositionTests(unittest.TestCase):
             )
 
             with (
-                patch("framestudio.app_project.ensure_project_audio_analysis"),
+                patch("framestudio.operations.ensure_project_audio_analysis"),
                 patch(
                     "framestudio.app_project.FfmpegPlaybackBackend",
                     return_value=candidate_backend,
@@ -1272,7 +1272,7 @@ class EditorCompositionTests(unittest.TestCase):
             )
 
             with (
-                patch("framestudio.app_project.ensure_project_audio_analysis") as analyze,
+                patch("framestudio.operations.ensure_project_audio_analysis") as analyze,
                 patch("framestudio.app_project.FfmpegPlaybackBackend") as direct_type,
                 patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as composed_type,
             ):
@@ -2048,7 +2048,7 @@ class EditorCompositionTests(unittest.TestCase):
             )
 
             with (
-                patch("framestudio.app_project.ensure_project_audio_analysis") as analyze,
+                patch("framestudio.operations.ensure_project_audio_analysis") as analyze,
                 patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as backend_type,
             ):
                 analyze.return_value = {
@@ -2073,33 +2073,15 @@ class EditorCompositionTests(unittest.TestCase):
             project.set_playhead(8.0)
             direct_backend = MagicMock()
             composed_backend = MagicMock()
-            window = SimpleNamespace(
-                backend=None,
-                controller=None,
-                project=None,
-                project_path=None,
-                segment_timeline=None,
+            window = make_editor_window(
                 source_frame_rate=10.0,
-                timeline_canvas=MagicMock(),
-                audio_status_label=MagicMock(),
                 _stop_backend=lambda: stop_backend(window),
-                _on_frame=MagicMock(),
-                _on_backend_error=MagicMock(),
-                _on_backend_end=MagicMock(),
-                _on_backend_warning=MagicMock(),
-                _update_selected_clip_label=MagicMock(),
-                _update_playback_controls=MagicMock(),
-                _update_segment_controls=MagicMock(),
             )
 
             with (
-                patch("framestudio.app_project.ensure_project_audio_analysis") as analyze,
                 patch("framestudio.app_project.FfmpegPlaybackBackend") as direct_type,
                 patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as composed_type,
             ):
-                analyze.return_value = {
-                    project.source.source_id: {"status": "not-applicable", "gain_db": 0.0},
-                }
                 direct_type.return_value = direct_backend
                 composed_type.return_value = composed_backend
                 attach_project(window, project, None)

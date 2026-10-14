@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import math
+import multiprocessing
+import os
 import subprocess
 import threading
 from array import array
+from collections.abc import Callable, Sequence
+from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
+from multiprocessing.synchronize import Event as ProcessEvent
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -20,6 +25,7 @@ AUDIO_MEDIAN_STEP_DB = 0.01
 AUDIO_SAMPLE_RATE = 48000
 AUDIO_CHANNELS = 2
 _AUDIO_GAIN_THRESHOLD_DB = 0.01
+_worker_cancel_event: ProcessEvent | None = None
 
 
 class AudioAnalysisError(RuntimeError):
@@ -164,7 +170,7 @@ def analyze_audio(
     *,
     ffmpeg_path: str = "ffmpeg",
     policy: AudioPolicy = LEGACY_AUDIO_POLICY,
-    cancel_event: threading.Event | None = None,
+    cancel_event: threading.Event | ProcessEvent | None = None,
 ) -> AudioStats:
     """Measure PCM samples using the legacy mean/median histogram algorithm."""
     if cancel_event is not None and cancel_event.is_set():
@@ -177,6 +183,8 @@ def analyze_audio(
                 "-v",
                 "error",
                 "-nostdin",
+                "-threads",
+                "1",
                 "-i",
                 str(Path(path).expanduser()),
                 "-map",
@@ -346,7 +354,7 @@ def analyze_source_audio(
     *,
     ffmpeg_path: str = "ffmpeg",
     policy: AudioPolicy = LEGACY_AUDIO_POLICY,
-    cancel_event: threading.Event | None = None,
+    cancel_event: threading.Event | ProcessEvent | None = None,
 ) -> AudioDecision:
     if not _audio_present(source):
         return _decision(
@@ -386,6 +394,107 @@ def analyze_source_audio(
         gain_db=audio_gain_db(stats, policy=policy),
         measurements=stats,
     )
+
+
+def _initialize_audio_worker(cancel_event: ProcessEvent) -> None:
+    global _worker_cancel_event
+    _worker_cancel_event = cancel_event
+
+
+def _analyze_audio_worker(source: SourceReference, ffmpeg_path: str) -> AudioDecision:
+    return analyze_source_audio(
+        source,
+        ffmpeg_path=ffmpeg_path,
+        cancel_event=_worker_cancel_event,
+    )
+
+
+def audio_analysis_worker_count(source_count: int) -> int:
+    try:
+        cpu_count = (
+            len(os.sched_getaffinity(0))
+            if hasattr(os, "sched_getaffinity")
+            else (os.cpu_count() or 1)
+        )
+    except OSError as error:
+        raise AudioAnalysisError(
+            f"Could not determine available CPUs for audio analysis: {error}"
+        ) from error
+    return max(1, min(source_count, cpu_count))
+
+
+def analyze_sources_audio(
+    sources: Sequence[SourceReference],
+    *,
+    ffmpeg_path: str = "ffmpeg",
+    cancel_event: threading.Event | None = None,
+    result_callback: Callable[[SourceReference, AudioDecision], None] | None = None,
+    max_workers: int | None = None,
+) -> dict[str, AudioDecision]:
+    if max_workers is not None and max_workers < 1:
+        raise ValueError("Audio analysis worker count must be positive")
+    decisions: dict[str, AudioDecision] = {}
+
+    def check_cancelled() -> None:
+        if cancel_event is not None and cancel_event.is_set():
+            raise AudioAnalysisCancelled("Audio analysis was cancelled")
+
+    def record(source: SourceReference, decision: AudioDecision) -> None:
+        check_cancelled()
+        decisions[source.source_id] = decision
+        if result_callback is not None:
+            result_callback(source, decision)
+
+    check_cancelled()
+    pending: list[SourceReference] = []
+    for source in sources:
+        if _audio_present(source) and source.metadata.get("audio_codec") is not None:
+            pending.append(source)
+        else:
+            record(source, analyze_source_audio(source, ffmpeg_path=ffmpeg_path))
+    if not pending:
+        return decisions
+    workers = audio_analysis_worker_count(len(pending))
+    if max_workers is not None:
+        workers = min(workers, max_workers)
+    if workers == 1:
+        for source in pending:
+            check_cancelled()
+            record(
+                source,
+                analyze_source_audio(source, ffmpeg_path=ffmpeg_path, cancel_event=cancel_event),
+            )
+        return decisions
+
+    # Spawn clean workers rather than forking a GTK process with running threads.
+    context = multiprocessing.get_context("spawn")
+    worker_cancel = context.Event()
+    try:
+        with ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=context,
+            initializer=_initialize_audio_worker,
+            initargs=(worker_cancel,),
+        ) as executor:
+            futures: dict[Future[AudioDecision], SourceReference] = {}
+            try:
+                for source in pending:
+                    check_cancelled()
+                    futures[executor.submit(_analyze_audio_worker, source, ffmpeg_path)] = source
+                while futures:
+                    check_cancelled()
+                    completed, _pending = wait(futures, timeout=0.05, return_when=FIRST_COMPLETED)
+                    for future in completed:
+                        record(futures.pop(future), future.result())
+            finally:
+                worker_cancel.set()
+                for future in futures:
+                    future.cancel()
+    except AudioAnalysisCancelled:
+        raise
+    except (OSError, RuntimeError) as error:
+        raise AudioAnalysisError(f"Could not complete parallel audio analysis: {error}") from error
+    return decisions
 
 
 def audio_decision_is_stale(

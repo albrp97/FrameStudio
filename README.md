@@ -15,6 +15,8 @@ result without overwriting the original videos.
 ### Edit video
 
 - Load one or several local videos, including mixed dimensions and frame rates.
+- Import and append videos without a fixed per-project source-count limit.
+  Practical project size depends on available memory and processing resources.
 - Play, pause, seek, and step through frames in the editor.
 - Split clips at the playhead.
 - Delete, restore, move, copy, and paste timeline segments.
@@ -36,11 +38,15 @@ result without overwriting the original videos.
 
 ### Preview and audio
 
-The editor attaches media from metadata first, so a project becomes usable
-without waiting for a full audio scan. Source-level audio analysis continues
-in the background and is used when the export is prepared. Playback is
-optimized for responsive video seeking; final audio decisions are applied and
-validated during export.
+Import, adding clips, reopening, recovery, and preview do not run audio scans.
+Audio analysis starts only after **Start export** is confirmed, not while
+viewing the export plan. It scans only sources used by the selected outputs
+and reuses valid saved results. Sources without audio do not need a scan.
+Independent scans run in CPU-parallel processes using the available CPU
+affinity, with progress and cancellation during export preparation.
+Playback is paused for export. The export temporarily enables the available
+system performance profile and restores the previous profile afterward.
+Final audio decisions are applied and validated during export.
 
 ### Export safely
 

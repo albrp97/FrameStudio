@@ -223,7 +223,7 @@ class EditorPersistenceTests(unittest.TestCase):
                 self.assertEqual(recovered.timeline.timing_mode, "legacy-ripple")
                 self.assertEqual(recovered.duration_seconds, project.duration_seconds)
                 self.assertIsNone(attach.call_args.args[2])
-                analyze.assert_called_once()
+                analyze.assert_not_called()
                 self.assertEqual(
                     window.project_path,
                     Path("/tmp/user-selected.framestudio.json"),

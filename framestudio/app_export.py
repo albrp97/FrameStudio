@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Collection
 from copy import deepcopy
 from dataclasses import replace
 from functools import partial
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .app_helpers import format_export_progress_label
+from .audio import audio_decision_is_stale
 from .av_compositor import (
     AVCompositorExecutionError,
     AVCompositorPlanningError,
@@ -73,6 +75,7 @@ from .output_plan import (
     set_output_selection,
 )
 from .performance import PerformanceMode, PerformanceModeError
+from .playback import PlaybackState
 from .post_export import (
     POST_EXPORT_ACTIONS,
     PostExportActionError,
@@ -772,6 +775,13 @@ def run_export_job(
         )
 
     with PerformanceMode("on"):
+        _ensure_audio_analysis_with_lock(
+            project,
+            ffmpeg_path="ffmpeg",
+            cancel_event=cancel_event,
+            analysis_lock=analysis_lock,
+            progress_callback=progress_callback,
+        )
         plan = plan_export_job()
         output = execute_export(
             plan,
@@ -821,23 +831,25 @@ def _ensure_audio_analysis_with_lock(
     ffmpeg_path: str,
     cancel_event: threading.Event | None,
     analysis_lock: threading.Lock | None,
+    source_ids: Collection[str] | None = None,
+    progress_callback: ExportProgressCallback | None = None,
 ) -> None:
+    analyze = partial(
+        ensure_project_audio_analysis,
+        project,
+        ffmpeg_path=ffmpeg_path,
+        cancel_event=cancel_event,
+        source_ids=source_ids,
+        progress_callback=progress_callback,
+    )
     if analysis_lock is None:
-        ensure_project_audio_analysis(
-            project,
-            ffmpeg_path=ffmpeg_path,
-            cancel_event=cancel_event,
-        )
+        analyze()
         return
     while not analysis_lock.acquire(timeout=0.05):
         if cancel_event is not None and cancel_event.is_set():
             raise ExportPlanningError("Export cancelled")
     try:
-        ensure_project_audio_analysis(
-            project,
-            ffmpeg_path=ffmpeg_path,
-            cancel_event=cancel_event,
-        )
+        analyze()
     finally:
         analysis_lock.release()
 
@@ -878,15 +890,21 @@ def run_output_choice_job(
 
     with PerformanceMode("on"):
         output_plan = plan_project_outputs(project, destination, mode=output_mode)
+        _ensure_audio_analysis_with_lock(
+            project,
+            ffmpeg_path="ffmpeg",
+            cancel_event=cancel_event,
+            analysis_lock=analysis_lock,
+            source_ids={
+                source_id
+                for request in output_plan.output_requests
+                for source_id in request.source_ids
+            },
+            progress_callback=progress_callback,
+        )
         final_plan: ExportPlan | AVRenderPlan | None = None
         if output_plan.final_request is not None:
             if _needs_synchronized_final(project):
-                _ensure_audio_analysis_with_lock(
-                    project,
-                    ffmpeg_path="ffmpeg",
-                    cancel_event=cancel_event,
-                    analysis_lock=analysis_lock,
-                )
                 final_plan = plan_project_av(
                     project,
                     output_plan.final_request.destination,
@@ -1046,6 +1064,12 @@ def start_export(
     except PostExportActionError as error:
         window._show_error(str(error))
         return
+    controller = getattr(window, "controller", None)
+    if controller is not None and controller.snapshot().state == PlaybackState.PLAYING:
+        if not controller.pause():
+            window._show_error(controller.snapshot().error or "Could not pause playback for export")
+            return
+        window._update_playback_controls()
     project = window.project
     export_project = deepcopy(project)
     window._export_project_snapshot = export_project
@@ -1142,6 +1166,34 @@ def start_export(
     ).start()
 
 
+def _retain_export_audio_settings(window: Any) -> None:
+    snapshot = getattr(window, "_export_project_snapshot", None)
+    project = getattr(window, "project", None)
+    if not isinstance(snapshot, Project) or not isinstance(project, Project):
+        return
+    if snapshot.project_id != project.project_id:
+        return
+    changed = False
+    for source in project.sources or (project.source,):
+        settings = snapshot.source_audio_settings(source.source_id)
+        if settings.get("status") not in {
+            "ready",
+            "silent",
+            "unsupported",
+            "failed",
+            "not-applicable",
+        }:
+            continue
+        if audio_decision_is_stale(source, settings):
+            continue
+        if settings != project.source_audio_settings(source.source_id):
+            project.set_source_audio_settings(source.source_id, deepcopy(settings))
+            changed = True
+    autosave = getattr(window, "_autosave_current_project", None)
+    if changed and callable(autosave):
+        autosave()
+
+
 def finish_export(
     window: Any,
     output: Path | None,
@@ -1150,6 +1202,7 @@ def finish_export(
     upscale_policy: UpscalePolicy | None = None,
     batch_result: ExportBatchResult | None = None,
 ) -> bool:
+    _retain_export_audio_settings(window)
     post_export_action = normalize_post_export_action(
         getattr(window, "_export_post_export_action", None),
     )
