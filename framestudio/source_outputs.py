@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
@@ -28,6 +29,7 @@ from .export import (
     execute_export,
 )
 from .export_coordinator import child_resume_mode
+from .export_process import check_export_cancelled, report_preparation_progress
 from .fps_policy import (
     FrameRatePolicy,
     FrameRatePolicyError,
@@ -35,6 +37,7 @@ from .fps_policy import (
     policy_source_metadata,
     resolved_from_policy,
 )
+from .interpolation import RuntimeValidationCache
 from .media import MediaProbe, MediaProbeError, probe_media
 from .model_project import Project
 from .model_timeline import SegmentTimeline
@@ -69,6 +72,7 @@ class _SourcePlanningOptions(TypedDict, total=False):
     upscale_policy: _UpscalePolicyInput
     plan_project_export_fn: Callable[..., ExportPlan]
     cancel_event: threading.Event | None
+    runtime_cache: RuntimeValidationCache | None
 
 
 class SourceOutputPlanningError(ExportPlanningError):
@@ -236,14 +240,18 @@ def plan_source_output(
     upscale_policy: _UpscalePolicyInput = None,
     plan_project_export_fn: Callable[..., ExportPlan] = plan_project_export,
     cancel_event: threading.Event | None = None,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> SourceOutputPlan:
     """Create one source-output plan without rendering output media."""
+    check_export_cancelled(cancel_event)
     if request.output_kind != "source":
         raise SourceOutputPlanningError("Standalone source rendering requires a source request")
     source = _source_for_request(project, request)
     selected_frame_rate = _source_frame_rate_policy(project, source, frame_rate_policy)
     selected_upscale = _source_upscale_policy(project, source, upscale_policy)
-    selected_upscale = _fallback_unavailable_source_upscale(selected_upscale, source)
+    selected_upscale = _fallback_unavailable_source_upscale(
+        selected_upscale, source, runtime_cache=runtime_cache
+    )
     protected = _protected_source_paths(project)
     _ensure_destination_not_protected(request.destination, protected)
     derived = derive_standalone_source_project(
@@ -287,17 +295,20 @@ def plan_source_output(
 def plan_source_outputs(
     project: Project,
     requests: Sequence[OutputRequest],
+    *,
+    progress_callback: Callable[[ExportProgress], None] | None = None,
     **options: Unpack[_SourcePlanningOptions],
 ) -> tuple[SourceOutputPlan, ...]:
     """Plan all source outputs before any output is rendered."""
-    return tuple(
-        plan_source_output(
-            project,
-            request,
-            **options,
+    started = time.monotonic()
+    plans = []
+    for index, request in enumerate(requests):
+        check_export_cancelled(options.get("cancel_event"))
+        report_preparation_progress(
+            progress_callback, "Planning source outputs", index, len(requests), started
         )
-        for request in requests
-    )
+        plans.append(plan_source_output(project, request, **options))
+    return tuple(plans)
 
 
 def render_source_output(
@@ -632,6 +643,8 @@ def _source_upscale_policy(
 def _fallback_unavailable_source_upscale(
     policy: UpscalePolicy,
     source: SourceReference,
+    *,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> UpscalePolicy:
     if not policy.enhancement_enabled or not policy.backend.casefold().startswith("rve"):
         return policy
@@ -640,7 +653,10 @@ def _fallback_unavailable_source_upscale(
         policy=policy,
     )
     decision = resolved.decisions[0]
-    if not decision.eligible or _source_upscale_runtime_reason(policy, decision) is None:
+    if (
+        not decision.eligible
+        or _source_upscale_runtime_reason(policy, decision, runtime_cache=runtime_cache) is None
+    ):
         return policy
     return UpscalePolicy(
         enhancement_enabled=False,
@@ -655,10 +671,12 @@ def _fallback_unavailable_source_upscale(
 def _source_upscale_runtime_reason(
     policy: UpscalePolicy,
     decision: UpscaleDecision,
+    *,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> str | None:
     from .video_compositor import _upscale_runtime_status
 
-    status, reason = _upscale_runtime_status(policy, decision)
+    status, reason = _upscale_runtime_status(policy, decision, runtime_cache=runtime_cache)
     return None if status == "available" else reason
 
 

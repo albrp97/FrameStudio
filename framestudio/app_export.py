@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Collection
 from copy import deepcopy
 from dataclasses import replace
@@ -51,12 +52,15 @@ from .export_panel import (
     prepare_export_panel,
     upscale_panel_rows,
 )
+from .export_process import check_export_cancelled, report_preparation_progress
 from .export_session import (
     ExportSessionError,
     discard_export_session,
     discover_export_session,
+    session_root,
 )
 from .fps_policy import FrameRatePolicy, policy_source_metadata, rate_choice_labels
+from .interpolation import RuntimeValidationCache
 from .media import MediaProbeError
 from .model import Project, ProjectValidationError
 from .model_timeline import ABSOLUTE_TIMING_MODE
@@ -70,6 +74,7 @@ from .output_plan import (
     OutputPlanError,
     OutputRequest,
     OutputSelection,
+    active_export_sources,
     plan_project_outputs,
     resolve_output_selection,
     set_output_selection,
@@ -83,8 +88,10 @@ from .post_export import (
     normalize_post_export_action,
     write_export_failure_log,
 )
+from .render_preparations import RenderPreparations
 from .source_outputs import plan_source_outputs, render_source_output
 from .upscale_policy import UpscalePolicy
+from .video_compositor import SourceHashCache
 
 
 class ExportBatchExecutionError(ExportExecutionError):
@@ -151,34 +158,85 @@ def _export_panel_result_is_current(
     return not panel_state["closed"] and generation == panel_state["generation"]
 
 
+class ExportPanelPreparation:
+    """Keep one active request and only the latest pending panel refresh."""
+
+    def __init__(self, glib: Any) -> None:
+        self._glib = glib
+        self._lock = threading.Lock()
+        self._worker: threading.Thread | None = None
+        self._pending: (
+            tuple[Project, Path, Callable[[ExportPanelState], Any], dict[str, Any]] | None
+        ) = None
+        self._closed = False
+        self._runtime_cache: RuntimeValidationCache = {}
+
+    def submit(
+        self,
+        project: Project,
+        folder: Path,
+        callback: Callable[[ExportPanelState], Any],
+        **options: Any,
+    ) -> threading.Thread:
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("Export planner is closed")
+            self._pending = (project, folder, callback, options)
+            if self._worker is None:
+                self._worker = threading.Thread(
+                    target=self._prepare,
+                    name="framestudio-editor-export-planning",
+                    daemon=True,
+                )
+                self._worker.start()
+            return self._worker
+
+    def close(self) -> None:
+        with self._lock:
+            self._closed = True
+            self._pending = None
+
+    def _prepare(self) -> None:
+        while True:
+            with self._lock:
+                if self._closed or self._pending is None:
+                    self._worker = None
+                    return
+                project, folder, callback, options = self._pending
+                self._pending = None
+            try:
+                state = prepare_export_panel(
+                    deepcopy(project),
+                    folder,
+                    runtime_cache=self._runtime_cache,
+                    **options,
+                )
+            except (ImportError, OSError, RuntimeError, ValueError) as error:
+                state = _export_panel_error_state(
+                    str(options.get("filename") or ""),
+                    error,
+                )
+            with self._lock:
+                deliver = not self._closed and self._pending is None
+            if deliver:
+                self._glib.idle_add(callback, state)
+
+
 def start_export_panel_preparation(
     project: Project,
     folder: Path,
     glib: Any,
     callback: Callable[[ExportPanelState], Any],
+    *,
+    preparation: ExportPanelPreparation | None = None,
     **options: Any,
 ) -> threading.Thread:
-    def prepare() -> None:
-        try:
-            state = prepare_export_panel(
-                deepcopy(project),
-                folder,
-                **options,
-            )
-        except (ImportError, OSError, RuntimeError, ValueError) as error:
-            state = _export_panel_error_state(
-                str(options.get("filename") or ""),
-                error,
-            )
-        glib.idle_add(callback, state)
-
-    worker = threading.Thread(
-        target=prepare,
-        name="framestudio-editor-export-planning",
-        daemon=True,
+    return (preparation or ExportPanelPreparation(glib)).submit(
+        project,
+        folder,
+        callback,
+        **options,
     )
-    worker.start()
-    return worker
 
 
 def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
@@ -234,8 +292,16 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
 
     rate_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     rate_row.append(Gtk.Label(label="Output FPS", xalign=0.0))
+    rate_metadata = policy_source_metadata(active_export_sources(project))
     rate_model = Gtk.StringList.new(
-        list(rate_choice_labels(policy_source_metadata(project.sources or (project.source,))))
+        list(rate_choice_labels(rate_metadata))
+        if rate_metadata
+        else [
+            "Lowest input FPS (no active sources)",
+            "Highest input FPS (no active sources)",
+            "Custom FPS",
+            "60 FPS",
+        ]
     )
     rate_dropdown = Gtk.DropDown.new(rate_model, None)
     rate_row.append(rate_dropdown)
@@ -370,6 +436,7 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
         "output_rows": (),
         "output_error": initial_output_error,
         "render_guard": None,
+        "preparation": ExportPanelPreparation(GLib),
     }
 
     def _combined_final_supported() -> bool:
@@ -554,6 +621,7 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
                 upscale_enabled=upscale_enhancement.get_active(),
                 filename=filename,
                 project_path=window.project_path,
+                preparation=panel_state["preparation"],
             )
         except (OSError, RuntimeError, ValueError) as error:
             apply_state(_export_panel_error_state(filename or "", error))
@@ -694,6 +762,9 @@ def _clear_export_panel(window: Any, panel_state: dict[str, Any] | None = None) 
     if panel_state is not None:
         panel_state["closed"] = True
         panel_state["generation"] += 1
+        preparation = panel_state.get("preparation")
+        if preparation is not None:
+            preparation.close()
     window.export_planning_window = None
     return False
 
@@ -889,6 +960,10 @@ def run_output_choice_job(
     )
 
     with PerformanceMode("on"):
+        started = time.monotonic()
+        source_hash_cache: SourceHashCache = {}
+        runtime_cache: RuntimeValidationCache = {}
+        check_export_cancelled(cancel_event)
         output_plan = plan_project_outputs(project, destination, mode=output_mode)
         _ensure_audio_analysis_with_lock(
             project,
@@ -903,6 +978,14 @@ def run_output_choice_job(
             progress_callback=progress_callback,
         )
         final_plan: ExportPlan | AVRenderPlan | None = None
+        check_export_cancelled(cancel_event)
+        report_preparation_progress(
+            progress_callback,
+            "Planning export outputs",
+            0,
+            len(output_plan.output_requests),
+            started,
+        )
         if output_plan.final_request is not None:
             if _needs_synchronized_final(project):
                 final_plan = plan_project_av(
@@ -910,6 +993,10 @@ def run_output_choice_job(
                     output_plan.final_request.destination,
                     frame_rate_policy=frame_rate_policy,
                     upscale_policy=upscale_policy,
+                    cancel_event=cancel_event,
+                    progress_callback=progress_callback,
+                    source_hash_cache=source_hash_cache,
+                    runtime_cache=runtime_cache,
                 )
             else:
                 final_plan = plan_export_job(
@@ -926,7 +1013,11 @@ def run_output_choice_job(
             frame_rate_policy=frame_rate_policy,
             upscale_policy=upscale_policy,
             plan_project_export_fn=plan_export_job,
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            runtime_cache=runtime_cache,
         )
+        check_export_cancelled(cancel_event)
         source_by_key = {output_identity_key(plan.request.identity): plan for plan in source_plans}
         final_by_key: dict[str, ExportPlan | AVRenderPlan]
         request_by_key: dict[str, OutputRequest]
@@ -943,6 +1034,9 @@ def run_output_choice_job(
                     frame_rate_policy=frame_rate_policy,
                     upscale_policy=upscale_policy,
                     tool_identities=tool_identities,
+                    source_hash_cache=source_hash_cache,
+                    cancel_event=cancel_event,
+                    progress_callback=progress_callback,
                 )
             )
             for key, request in request_by_key.items()
@@ -973,6 +1067,12 @@ def run_output_choice_job(
                     replace(planned, destination=candidate),
                     cancel_event=event,
                     cancellation_lock=lock,
+                    progress_callback=progress_callback,
+                    preparations=RenderPreparations(
+                        session_root(destination) / "render-preparations",
+                        cancel_event=event,
+                        progress_callback=progress_callback,
+                    ),
                 )
                 return candidate
             rendered_path = execute_export(

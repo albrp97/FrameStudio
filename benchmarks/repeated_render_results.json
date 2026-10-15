@@ -1,0 +1,112 @@
+{
+  "fixture": {
+    "tracks": 3,
+    "blocks": 6,
+    "unique_source_ranges": 2,
+    "source": "generated moving testsrc2, 320x180, 30 FPS, one second, stereo AAC",
+    "output": "1920x1080, 60 FPS, 60 frames",
+    "upscale": false,
+    "scope": "core synchronized AV renderer; excludes planning, audio analysis, source reels and coordinator publication verification",
+    "baseline": "preserved pre-optimization video/AV renderer snapshots",
+    "cold_runs": "new preparation store per trial; existing RVE engines",
+    "gpu": "NVIDIA GeForce RTX 5070 Ti",
+    "driver": "615.78.08",
+    "ffmpeg": "n9.0.2",
+    "python": "3.14.8"
+  },
+  "decoded_frame_hashes": {
+    "ffmpeg-minterpolate": "5b617782006eb1bc5e7df7027fa5f69afd194dffd4137ec637496cfc913483ba",
+    "rve-4.26": "4bb5f313b8754afee3eeecc5b71a2b5cbbcbd7ccbcf1dcb58020dab2b78a71d6"
+  },
+  "checks": {
+    "same_decoded_frames_within_each_backend": true,
+    "all_source_hashes_preserved": true,
+    "all_output_frame_counts": 60
+  },
+  "additional_workloads": {
+    "within_and_across_track_copies": {
+      "tracks": 3,
+      "blocks": 24,
+      "unique_source_ranges": 2,
+      "output_frames": 240,
+      "backend": "ffmpeg-minterpolate",
+      "baseline": "standalone harness with content reuse disabled",
+      "baseline_seconds": [10.178585472000123, 10.167976873999578, 10.080939057999785],
+      "optimized_seconds": [3.945930739999312, 3.9021136240007763, 3.899101327999233],
+      "extraction_and_interpolation_jobs_before": 24,
+      "extraction_and_interpolation_jobs_after": 2,
+      "decoder_inputs_before": 24,
+      "decoder_inputs_after": 2,
+      "decoded_frame_hash": "6f1542a47fad2c6cb5f2cc6352aeb9c116ffabb88c0429be988bdc3bc4787314",
+      "all_sources_preserved": true,
+      "no_processing_fallbacks": true
+    },
+    "restoration_plus_fps_checkpoint": {
+      "purpose": "actual GPU restoration cancellation/resume acceptance, not a multi-trial speed estimate",
+      "backend": "rve-4.26",
+      "cold_seconds": 22.34184962099971,
+      "cancelled_attempt_seconds": 4.1821332779982185,
+      "remaining_seconds": 18.226488888998574,
+      "cancelled_after": "first upscaled segment",
+      "completed_restorations_before_cancel": 1,
+      "restorations_on_resume": 1,
+      "restorations_in_uninterrupted_render": 2,
+      "fps_jobs_on_resume": 2,
+      "decoded_frame_hash_cold_and_resumed": "c398de444be7b04e83d9d99e768a032a3807ee58dd67ea73a15ac183337da294",
+      "sources_preserved": true,
+      "no_processing_fallbacks": true
+    }
+  },
+  "strategies": [
+    {
+      "strategy": "baseline",
+      "extraction_jobs": 6,
+      "interpolation_jobs": 6,
+      "decoder_inputs": 6,
+      "cpu_seconds": [2.822326328998315, 2.8309275100000377, 2.8491482619974704],
+      "rve_seconds": [40.11031390700009, 40.431162107001, 40.15524343499783]
+    },
+    {
+      "strategy": "deduplicated",
+      "extraction_jobs": 2,
+      "interpolation_jobs": 2,
+      "decoder_inputs": 6,
+      "cpu_seconds": [1.66490443800285, 1.671429354002612, 1.6523412339993229],
+      "rve_seconds": [13.951815552998596, 14.289355715998681, 14.20369159799884]
+    },
+    {
+      "strategy": "shared-inputs",
+      "extraction_jobs": 2,
+      "interpolation_jobs": 2,
+      "decoder_inputs": 2,
+      "cpu_seconds": [1.639128802002233, 1.6436562730013975, 1.6469817199977115],
+      "rve_seconds": [13.997828515999572, 13.929478054000356, 14.088824796999688]
+    },
+    {
+      "strategy": "optimized",
+      "selected": true,
+      "extraction_jobs": 2,
+      "interpolation_jobs": 2,
+      "decoder_inputs": 2,
+      "cpu_seconds": [1.8640747360004752, 1.8494655540016538, 1.8732635909982491],
+      "rve_seconds": [14.329289965000498, 14.470192787000997, 14.443905165000615]
+    },
+    {
+      "strategy": "resume-after-video-composition",
+      "measurement": "remaining work only",
+      "extraction_jobs": 0,
+      "interpolation_jobs": 0,
+      "decoder_inputs": 0,
+      "cpu_seconds": [0.43093837200285634, 0.4368942920009431, 0.43410772399874986],
+      "rve_seconds": [0.473927533999813, 0.4614133420000144, 0.4466228380006214]
+    },
+    {
+      "strategy": "resume-after-verified-av-composition",
+      "measurement": "remaining work only",
+      "extraction_jobs": 0,
+      "interpolation_jobs": 0,
+      "decoder_inputs": 0,
+      "rve_seconds": [0.05592252499991446, 0.05611933700129157, 0.057162379001965746]
+    }
+  ]
+}

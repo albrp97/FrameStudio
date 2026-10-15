@@ -43,6 +43,8 @@ KEY_BINDINGS: tuple[tuple[str, str], ...] = (
     ("Horizontal wheel", "Scroll the timeline viewport"),
     ("Normal mouse wheel", "Move the playhead by 30 seconds per scroll unit"),
     ("Click/drag timeline", "Seek and preview while dragging"),
+    ("Click lighter clip start", "Snap the playhead to the clip start"),
+    ("Super+click", "Seek without clip-start snapping"),
     ("Focus controls: Up / Down", "Adjust the focused Zoom, X, or Y field"),
 )
 
@@ -97,6 +99,11 @@ def editing_is_locked(window: Any) -> bool:
         window._set_status("Editing is disabled while source is loading")
         return True
     return False
+
+
+def super_modifier_mask(Gdk: Any) -> int:
+    # X11 pointer events can report raw Mod4 instead of GDK's virtual Super bit.
+    return int(Gdk.ModifierType.SUPER_MASK) | (1 << 6)
 
 
 def validate_source_selection(
@@ -262,7 +269,7 @@ def format_key_bindings() -> str:
 
 
 def format_export_progress_label(progress: ExportProgress) -> str:
-    if progress.stage == "Analyzing export audio":
+    if progress.stage == "Analyzing export audio" or progress.stage.endswith("export sources"):
         return (
             f"{progress.stage} | {progress.percent:.1f}% | "
             f"sources {progress.frame}/{progress.total_frames} | "

@@ -1535,6 +1535,107 @@ class SegmentTimeline(_RuntimeContext):
             active_track_id=self.active_track_id,
         )
 
+    def plan_block_move(
+        self,
+        segment_ids: Sequence[str],
+        *,
+        anchor_segment_id: str,
+        timeline_start_ticks: int,
+        target_track_id: str,
+    ) -> tuple[tuple[str, int, str], ...]:
+        if self.tracks is None or self.timing_mode != ABSOLUTE_TIMING_MODE:
+            raise ProjectValidationError("Track movement requires synchronized tracks")
+        requested_start = _required_tick(timeline_start_ticks, "Timeline start ticks")
+        selected_ids = set(segment_ids)
+        if not selected_ids or len(selected_ids) != len(segment_ids):
+            raise ProjectValidationError("Move requires unique segment identifiers")
+        if anchor_segment_id not in selected_ids:
+            raise ProjectValidationError("The dragged clip must belong to the selected group")
+        blocks_by_id = {block.segment_id: block for block in self.segment_items}
+        for segment_id in segment_ids:
+            if segment_id not in blocks_by_id:
+                raise ProjectValidationError(f"Unknown segment_id: {segment_id}")
+        selected = tuple(blocks_by_id[segment_id] for segment_id in segment_ids)
+        anchor = blocks_by_id[anchor_segment_id]
+        self.track_by_id(target_track_id)
+        if anchor.track_id is None:
+            raise ProjectValidationError("The dragged clip must belong to a track")
+        track_delta = self.track_ids.index(target_track_id) - self.track_ids.index(anchor.track_id)
+        targets: list[tuple[Segment, str]] = []
+        for block in selected:
+            if block.track_id is None:
+                raise ProjectValidationError("Selected clips must belong to tracks")
+            index = self.track_ids.index(block.track_id) + track_delta
+            if not 0 <= index < len(self.tracks):
+                raise ProjectValidationError("Selected group would move outside available tracks")
+            targets.append((block, self.track_ids[index]))
+        occupied = {
+            track.track_id: tuple(
+                block for block in track.blocks if block.segment_id not in selected_ids
+            )
+            for track in self.tracks
+        }
+        delta = max(
+            requested_start - anchor.timeline_start_ticks,
+            -min(block.timeline_start_ticks for block in selected),
+        )
+        while True:
+            previous_delta = delta
+            for block, destination_id in targets:
+                start = block.timeline_start_ticks + delta
+                fitted = _earliest_fit(
+                    start,
+                    block.timeline_end_ticks - block.timeline_start_ticks,
+                    occupied[destination_id],
+                )
+                delta += fitted - start
+            if delta == previous_delta:
+                break
+        return tuple(
+            (block.segment_id, block.timeline_start_ticks + delta, destination_id)
+            for block, destination_id in targets
+        )
+
+    def move_blocks_to_track(
+        self,
+        segment_ids: Sequence[str],
+        *,
+        anchor_segment_id: str,
+        timeline_start_ticks: int,
+        target_track_id: str,
+    ) -> bool:
+        placements = self.plan_block_move(
+            segment_ids,
+            anchor_segment_id=anchor_segment_id,
+            timeline_start_ticks=timeline_start_ticks,
+            target_track_id=target_track_id,
+        )
+        moved: dict[str, Segment] = {}
+        blocks_by_id = {block.segment_id: block for block in self.segment_items}
+        for segment_id, start, track_id in placements:
+            original = blocks_by_id[segment_id]
+            moved[segment_id] = _segment_with_ticks(
+                original,
+                timeline_start_ticks=start,
+                timeline_end_ticks=start
+                + original.timeline_end_ticks
+                - original.timeline_start_ticks,
+                track_id=track_id,
+            )
+        if self.tracks is None:
+            raise ProjectValidationError("Track movement requires synchronized tracks")
+        candidate = tuple(
+            TimelineTrack(
+                track.track_id,
+                _sorted_blocks(
+                    tuple(block for block in track.blocks if block.segment_id not in moved)
+                    + tuple(block for block in moved.values() if block.track_id == track.track_id)
+                ),
+            )
+            for track in self.tracks
+        )
+        return self._replace_tracks(candidate, active_track_id=self.active_track_id)
+
     def copy_blocks(self, segment_ids: Sequence[str]) -> tuple[Segment, ...]:
         self.validate()
         requested = set(segment_ids)

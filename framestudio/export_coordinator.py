@@ -27,6 +27,11 @@ from urllib.parse import unquote, urlparse
 
 from .audio import AUDIO_POLICY_VERSION
 from .audio_compositor import AUDIO_CHANNELS, AUDIO_SAMPLE_RATE, fixed_pan_vector
+from .export_process import (
+    check_export_cancelled,
+    make_progress_heartbeat,
+    report_preparation_progress,
+)
 from .export_session import (
     ExportSession,
     ExportSessionError,
@@ -34,6 +39,7 @@ from .export_session import (
     ExportSessionNotFound,
     session_root,
 )
+from .export_types import ExportProgressCallback
 from .fps_policy import FPS_POLICY_VERSION, FrameRatePolicy, ResolvedFrameRatePolicy
 from .layout_plan import DEFAULT_CANVAS, TRIPLICATE_ROLES
 from .output_plan import OutputIdentity, OutputPlan, OutputRequest
@@ -42,6 +48,7 @@ from .upscale_policy import (
     ResolvedUpscalePolicy,
     UpscalePolicy,
 )
+from .video_compositor import SourceHashCache
 from .video_compositor import _sha256 as _video_file_sha256
 
 if TYPE_CHECKING:
@@ -172,6 +179,9 @@ def _source_record(
     source_id: str,
     *,
     metadata: Mapping[str, object] | None = None,
+    source_hash_cache: SourceHashCache | None = None,
+    cancel_event: threading.Event | None = None,
+    heartbeat_callback: Callable[[], None] | None = None,
 ) -> dict[str, JSONValue]:
     resolved = path.expanduser().resolve()
     value = resolved.stat()
@@ -183,7 +193,12 @@ def _source_record(
             "modified_time_ns": value.st_mtime_ns,
             "mode": stat.S_IMODE(value.st_mode),
         },
-        "sha256": _video_file_sha256(resolved),
+        "sha256": _video_file_sha256(
+            resolved,
+            source_hash_cache=source_hash_cache,
+            cancel_event=cancel_event,
+            heartbeat_callback=heartbeat_callback,
+        ),
     }
     if metadata is not None:
         record["metadata"] = _json_value(metadata)
@@ -454,17 +469,39 @@ def build_project_output_fingerprint_payload(
     tool_identities: Mapping[str, JSONValue] | None = None,
     compositor_version: str = COMPOSITOR_VERSION,
     schema_version: str | int = BATCH_SCHEMA_VERSION,
+    source_hash_cache: SourceHashCache | None = None,
+    cancel_event: threading.Event | None = None,
+    progress_callback: ExportProgressCallback | None = None,
 ) -> dict[str, JSONValue]:
     """Build the complete request payload used by app and CLI integrations."""
     sources = tuple(getattr(project, "sources", None) or (project.source,))
-    source_records = [
-        _source_record(
-            Path(source.path),
-            source.source_id,
-            metadata=source.metadata,
+    source_records = []
+    started = time.monotonic()
+    reported = started - 1.0
+    for index, source in enumerate(sources):
+        check_export_cancelled(cancel_event)
+        if time.monotonic() - reported >= 0.1:
+            report_preparation_progress(
+                progress_callback, "Fingerprinting export sources", index, len(sources), started
+            )
+            reported = time.monotonic()
+        source_records.append(
+            _source_record(
+                Path(source.path),
+                source.source_id,
+                metadata=source.metadata,
+                source_hash_cache=source_hash_cache,
+                cancel_event=cancel_event,
+                heartbeat_callback=make_progress_heartbeat(
+                    progress_callback,
+                    stage="Fingerprinting export sources",
+                    total_frames=len(sources),
+                    frame=index,
+                    started=started,
+                    percent=index * 100 / len(sources),
+                ),
+            )
         )
-        for source in sources
-    ]
     original_timeline = project.timeline
     canonical_project = project
     if original_timeline.tracks is None:

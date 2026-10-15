@@ -16,6 +16,7 @@ from .audio import (
     audio_decision_is_stale,
     pending_audio_decision,
 )
+from .audio_cache import load_audio_analysis, save_audio_analysis
 from .composition import VisualTransform
 from .export import (
     ExportPlan,
@@ -230,6 +231,22 @@ def move_segments(
     return project.timeline.move_blocks(segment_ids, direction)
 
 
+def move_segments_to_track(
+    project: Project,
+    segment_ids: Sequence[str],
+    *,
+    anchor_segment_id: str,
+    timeline_start_ticks: int,
+    target_track_id: str,
+) -> bool:
+    return project.timeline.move_blocks_to_track(
+        segment_ids,
+        anchor_segment_id=anchor_segment_id,
+        timeline_start_ticks=timeline_start_ticks,
+        target_track_id=target_track_id,
+    )
+
+
 def copy_segments(
     project: Project,
     segment_ids: Sequence[str],
@@ -393,15 +410,26 @@ def ensure_project_audio_analysis(
         if source.source_id in selected_ids
     )
     pending: list[SourceReference] = []
-    for source in sources:
-        settings = project.source_audio_settings(source.source_id)
-        status = settings.get("status")
-        if (
-            status not in {"ready", "silent", "unsupported", "failed", "not-applicable"}
-            or settings.get("policy_version") != AUDIO_POLICY_VERSION
-            or audio_decision_is_stale(source, settings)
-        ):
-            pending.append(source)
+    try:
+        for source in sources:
+            if cancel_event is not None and cancel_event.is_set():
+                raise ExportPlanningError("Export cancelled")
+            settings = project.source_audio_settings(source.source_id)
+            cached = load_audio_analysis(source, ffmpeg_path=ffmpeg_path)
+            status = settings.get("status")
+            if (
+                status not in {"ready", "silent", "unsupported", "failed", "not-applicable"}
+                or settings.get("policy_version") != AUDIO_POLICY_VERSION
+                or audio_decision_is_stale(source, settings)
+            ):
+                if cached is None:
+                    pending.append(source)
+                else:
+                    project.set_source_audio_settings(source.source_id, cached)
+            elif cached is None:
+                save_audio_analysis(source, settings, ffmpeg_path=ffmpeg_path)
+    except AudioAnalysisError as error:
+        raise ExportPlanningError(str(error)) from error
     started = time.monotonic()
     completed = 0
 
@@ -422,6 +450,7 @@ def ensure_project_audio_analysis(
     def record(source: SourceReference, decision: AudioDecision) -> None:
         nonlocal completed
         project.set_source_audio_settings(source.source_id, decision.to_dict())
+        save_audio_analysis(source, decision.to_dict(), ffmpeg_path=ffmpeg_path)
         completed += 1
         report_progress()
 

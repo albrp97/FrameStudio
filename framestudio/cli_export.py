@@ -55,8 +55,10 @@ from .export_session import (
     ExportSessionInfo,
     discard_export_session,
     discover_export_session,
+    session_root,
 )
 from .fps_policy import FrameRatePolicy, ResolvedFrameRatePolicy
+from .interpolation import RuntimeValidationCache
 from .media import MediaProbe, MediaProbeError
 from .model import Project
 from .model_timeline import ABSOLUTE_TIMING_MODE
@@ -66,6 +68,7 @@ from .output_plan import (
     OutputRequest,
     plan_project_outputs,
 )
+from .render_preparations import RenderPreparations
 from .source_outputs import (
     SourceOutputPlan,
     SourceOutputRenderResult,
@@ -75,6 +78,7 @@ from .source_outputs import (
     render_source_output,
 )
 from .upscale_policy import ResolvedUpscalePolicy, UpscalePolicy
+from .video_compositor import SourceHashCache
 
 
 def progress_payload(progress: ExportProgress) -> dict[str, Any]:
@@ -359,12 +363,15 @@ def _build_output_plans(
     plan_project_export_fn: Callable[..., ExportPlan],
     *,
     cancel_event: threading.Event | None = None,
+    progress_callback: Callable[[ExportProgress], None] | None = None,
+    source_hash_cache: SourceHashCache | None = None,
 ) -> tuple[
     dict[str, Any],
     ExportPlan | AVRenderPlan | None,
     tuple[SourceOutputPlan, ...],
 ]:
     plan_arguments = _plan_arguments(args)
+    runtime_cache: RuntimeValidationCache = {}
     ensure_project_audio_analysis(
         project,
         ffmpeg_path=plan_arguments["ffmpeg_path"],
@@ -372,6 +379,7 @@ def _build_output_plans(
         source_ids={
             source_id for request in output_plan.output_requests for source_id in request.source_ids
         },
+        progress_callback=progress_callback,
     )
     final_plan: ExportPlan | AVRenderPlan | None = None
     if output_plan.final_request is not None:
@@ -382,6 +390,10 @@ def _build_output_plans(
                 frame_rate_policy=plan_arguments.get("frame_rate_policy"),
                 upscale_policy=plan_arguments.get("upscale_policy"),
                 ffprobe_path=plan_arguments["ffprobe_path"],
+                cancel_event=cancel_event,
+                progress_callback=progress_callback,
+                source_hash_cache=source_hash_cache,
+                runtime_cache=runtime_cache,
             )
         else:
             final_plan = plan_project_export_fn(
@@ -397,6 +409,8 @@ def _build_output_plans(
             **plan_arguments,
             plan_project_export_fn=plan_project_export_fn,
             cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            runtime_cache=runtime_cache,
         )
     )
     return plan_arguments, final_plan, source_plans
@@ -647,12 +661,19 @@ def _handle_coordinated_output_plan(
             },
         )
 
+    report_preparation = ConsoleProgressReporter(
+        stream=sys.stderr if progress_output is None else progress_output,
+        force=bool(getattr(args, "human_progress", False)),
+    )
+    source_hash_cache: SourceHashCache = {}
     plan_arguments, final_plan, source_plans = _build_output_plans(
         args,
         project,
         output_plan,
         plan_project_export_fn,
         cancel_event=cancel_event,
+        progress_callback=report_preparation,
+        source_hash_cache=source_hash_cache,
     )
     tool_identities = build_tool_identities(
         ffmpeg_path=plan_arguments["ffmpeg_path"],
@@ -675,6 +696,9 @@ def _handle_coordinated_output_plan(
                 ffmpeg_path=plan_arguments["ffmpeg_path"],
                 ffprobe_path=plan_arguments["ffprobe_path"],
                 tool_identities=tool_identities,
+                source_hash_cache=source_hash_cache,
+                cancel_event=cancel_event,
+                progress_callback=report_preparation,
             )
         )
         for key in request_by_key
@@ -717,6 +741,12 @@ def _handle_coordinated_output_plan(
                     ffprobe_path=plan_arguments["ffprobe_path"],
                     cancel_event=event,
                     cancellation_lock=publication_lock,
+                    progress_callback=report_progress,
+                    preparations=RenderPreparations(
+                        session_root(args.output) / "render-preparations",
+                        cancel_event=event,
+                        progress_callback=report_progress,
+                    ),
                 )
                 return candidate
             execution_plan = replace(planned, destination=candidate)

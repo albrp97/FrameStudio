@@ -34,6 +34,7 @@ def _mock_child_results(
         actual_frames=plan.video_plan.expected_frames,
         expected_frames=plan.video_plan.expected_frames,
         source_hashes_unchanged=True,
+        processing_fallbacks=(),
     )
     audio_result = SimpleNamespace(
         output_path=audio_destination,

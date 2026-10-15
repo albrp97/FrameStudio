@@ -41,6 +41,9 @@ TIMELINE_ZOOM_LEVELS = (
     12.0,
 )
 TIMELINE_FIT_WINDOW_SECONDS = 30.0 * 60.0
+TIMELINE_START_SNAP_FRACTION = 0.1
+TIMELINE_START_SNAP_MAX_PIXELS = 16.0
+TIMELINE_CLIP_BADGE_RADIUS = 9.0
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,15 @@ class TimelineClipGeometry:
     track_index: int = 0
     y: float = TIMELINE_TRACK_Y + TIMELINE_TRACK_HEADER_HEIGHT + 2.0
     height: float = TIMELINE_TRACK_HEIGHT - TIMELINE_TRACK_HEADER_HEIGHT - 8.0
+    timeline_width: float | None = None
+
+    @property
+    def snap_width(self) -> float:
+        width = self.width if self.timeline_width is None else self.timeline_width
+        return min(
+            TIMELINE_START_SNAP_MAX_PIXELS,
+            max(0.0, min(self.width, width)) * TIMELINE_START_SNAP_FRACTION,
+        )
 
     @property
     def end_x(self) -> float:
@@ -68,6 +80,20 @@ class TimelineClipGeometry:
     @property
     def end_y(self) -> float:
         return self.y + self.height
+
+    @property
+    def badge_center(self) -> tuple[float, float] | None:
+        if self.width < 22.0:
+            return None
+        return min(self.x + 12.0, self.end_x - 11.0), self.y
+
+    def contains_point(self, x: float, y: float) -> bool:
+        if self.x <= x < self.end_x and self.y <= y < self.end_y:
+            return True
+        center = self.badge_center
+        return center is not None and (
+            (x - center[0]) ** 2 + (y - center[1]) ** 2 <= TIMELINE_CLIP_BADGE_RADIUS**2
+        )
 
 
 @dataclass(frozen=True)
@@ -330,6 +356,8 @@ def layout_timeline_segments(
                         1.0,
                         (segment.timeline_end - segment.timeline_start) * pixels_per_second,
                     ),
+                    timeline_width=(segment.timeline_end - segment.timeline_start)
+                    * pixels_per_second,
                     color_index=segment.color_slot,
                     track_id=row.track_id,
                     track_index=row.index,
@@ -418,7 +446,11 @@ def hit_test_timeline_segment(
 ) -> TimelineClipGeometry | None:
     position = float(x)
     for index, clip in enumerate(clips):
-        if clip.x <= position < clip.end_x and (y is None or clip.y <= float(y) < clip.end_y):
+        if (
+            clip.x <= position < clip.end_x
+            if y is None
+            else clip.contains_point(position, float(y))
+        ):
             return clip
         if (
             index == len(clips) - 1

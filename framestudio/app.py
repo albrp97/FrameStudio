@@ -560,12 +560,14 @@ def create_editor_application(
             segment_id: str,
             timeline_start_ticks: int,
             target_track_id: str,
+            segment_ids: tuple[str, ...] | None = None,
         ) -> None:
             on_timeline_segment_dropped(
                 self,
                 segment_id,
                 timeline_start_ticks,
                 target_track_id,
+                segment_ids,
             )
 
         def _on_timeline_invalid_drop(self, message: str) -> None:

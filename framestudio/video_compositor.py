@@ -11,22 +11,26 @@ import sys
 import threading
 import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from fractions import Fraction
+from functools import partial
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
 from .export_process import (
+    check_export_cancelled,
+    make_progress_heartbeat,
     partial_path,
     probe_frame_count,
     publish_verified_export,
     remove_partial,
+    report_preparation_progress,
     run_ffmpeg,
     validate_decoded_output,
 )
-from .export_types import ExportExecutionError
+from .export_types import ExportExecutionError, ExportProgressCallback
 from .fps_policy import (
     DEFAULT_FPS_BACKEND,
     DEFAULT_FPS_FALLBACK_BACKEND,
@@ -37,8 +41,10 @@ from .fps_policy import (
     resolve_frame_rate_policy,
 )
 from .interpolation import (
+    RuntimeValidationCache,
     run_source_interpolation,
     validate_interpolation_backend,
+    validate_rve_runtime,
 )
 from .layout_plan import (
     DEFAULT_CANVAS,
@@ -53,6 +59,8 @@ from .layout_plan import (
 )
 from .media import MediaProbe, MediaProbeError, probe_media
 from .model import Project, ProjectValidationError
+from .output_plan import active_export_sources
+from .render_preparations import PreparationCacheError, RenderPreparations
 from .upscale_policy import (
     ResolvedUpscalePolicy,
     UpscaleDecision,
@@ -62,6 +70,7 @@ from .upscale_policy import (
 )
 
 PROJECT_TIMEBASE = 1_000_000
+SourceHashCache = dict[tuple[Path, int, int, int, int, int], str]
 
 
 class VideoCompositorError(RuntimeError):
@@ -83,7 +92,7 @@ class VideoSourceProbe:
     media: MediaProbe
     geometry: SourceGeometry
     sample_aspect_ratio: tuple[int, int]
-    frame_count: int
+    frame_count: int | None
     source_hash: str
     source_stat: os.stat_result
 
@@ -127,14 +136,12 @@ class VideoPreparationIdentity:
     @property
     def cache_key(self) -> str:
         payload = {
-            "block_id": self.block_id,
-            "source_id": self.source_id,
+            "cache_version": 3,
             "source_hash": self.source_hash,
             "source_range_ticks": self.source_range_ticks,
             "target_rate": str(self.target_rate),
             "input_domain": self.input_domain,
             "output_domain": self.output_domain,
-            "modification_identity": self.modification_identity,
             "policy_identity": self.policy_identity,
         }
         return hashlib.sha256(
@@ -238,10 +245,15 @@ def plan_project_video(
     ) = None,
     upscale_policy: (UpscalePolicy | ResolvedUpscalePolicy | Mapping[str, object] | None) = None,
     ffprobe_path: str = "ffprobe",
+    cancel_event: threading.Event | None = None,
+    progress_callback: ExportProgressCallback | None = None,
+    source_hash_cache: SourceHashCache | None = None,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> VideoRenderPlan:
     """Plan the final-slot, video-only render without mutating the project."""
     if not isinstance(project, Project):
         raise VideoCompositorPlanningError("project must be a Project")
+    check_export_cancelled(cancel_event)
     if not isinstance(destination, Path):
         destination = Path(destination)
     destination = destination.expanduser().resolve()
@@ -258,11 +270,34 @@ def plan_project_video(
     except ProjectValidationError as error:
         raise VideoCompositorPlanningError(f"Project validation failed: {error}") from error
 
-    sources = tuple(project.sources) if project.sources is not None else (project.source,)
-    probes = tuple(
-        _probe_source(source.source_id, Path(source.path), ffprobe_path=ffprobe_path)
-        for source in sources
-    )
+    sources = active_export_sources(project)
+    started = time.monotonic()
+    probe_items = []
+    for index, source in enumerate(sources):
+        check_export_cancelled(cancel_event)
+        report_preparation_progress(
+            progress_callback, "Inspecting export sources", index, len(sources), started
+        )
+        probe_items.append(
+            _probe_source(
+                source.source_id,
+                Path(source.path),
+                ffprobe_path=ffprobe_path,
+                cancel_event=cancel_event,
+                source_hash_cache=source_hash_cache,
+                heartbeat_callback=make_progress_heartbeat(
+                    progress_callback,
+                    stage="Inspecting export sources",
+                    total_frames=len(sources),
+                    frame=index,
+                    started=started,
+                    percent=index * 100 / len(sources),
+                ),
+            )
+        )
+    probes = tuple(probe_items)
+    check_export_cancelled(cancel_event)
+    runtime_cache = {} if runtime_cache is None else runtime_cache
     source_geometries = {item.source_id: item.geometry for item in probes}
     try:
         layout = plan_project_layout(
@@ -281,6 +316,7 @@ def plan_project_video(
         project,
         target_rate=target_rate,
         frame_rate_policy=frame_rate_policy,
+        runtime_cache=runtime_cache,
     )
     resolved_upscale = _resolve_upscale_policy(
         metadata,
@@ -292,6 +328,7 @@ def plan_project_video(
             item,
             resolved_fps,
             resolved_upscale,
+            runtime_cache=runtime_cache,
         )
         for item in probes
     )
@@ -336,6 +373,8 @@ def render_project_video(
     ffprobe_path: str = "ffprobe",
     cancel_event: threading.Event | None = None,
     cancellation_lock: threading.Lock | None = None,
+    progress_callback: ExportProgressCallback | None = None,
+    preparations: RenderPreparations | None = None,
 ) -> VideoRenderResult:
     """Render, verify, and atomically publish a planned video-only composition."""
     if not isinstance(plan, VideoRenderPlan):
@@ -372,6 +411,9 @@ def render_project_video(
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
             fallbacks=fallbacks,
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            preparations=preparations,
         )
         command = _build_render_command(
             plan,
@@ -387,6 +429,7 @@ def render_project_video(
             command_total_frames=plan.expected_frames,
             progress_total_duration_seconds=plan.expected_duration_seconds,
             progress_total_frames=plan.expected_frames,
+            progress_callback=progress_callback,
         )
 
         _verify_rendered_output(
@@ -397,8 +440,10 @@ def render_project_video(
             cancel_event=cancel_event,
         )
         output_probe = probe_media(partial, ffprobe_path)
-        actual_frames = probe_frame_count(partial, ffprobe_path)
-        current_hashes = tuple(_sha256(path) for path in plan.source_paths)
+        actual_frames = probe_frame_count(partial, ffprobe_path, cancel_event=cancel_event)
+        current_hashes = tuple(
+            _sha256(path, cancel_event=cancel_event) for path in plan.source_paths
+        )
         if current_hashes != source_hashes:
             raise VideoCompositorExecutionError(
                 "A source changed during rendering; output was not published",
@@ -412,7 +457,7 @@ def render_project_video(
             destination,
             plan.source_paths,
             source_stats,
-            cancel_event=None,
+            cancel_event=cancel_event,
             progress_callback=None,
             expected_duration_seconds=plan.expected_duration_seconds,
             total_frames=plan.expected_frames,
@@ -467,6 +512,9 @@ def _probe_source(
     path: Path,
     *,
     ffprobe_path: str = "ffprobe",
+    cancel_event: threading.Event | None = None,
+    source_hash_cache: SourceHashCache | None = None,
+    heartbeat_callback: Callable[[], None] | None = None,
 ) -> VideoSourceProbe:
     resolved_path = Path(path).expanduser().resolve()
     try:
@@ -478,8 +526,12 @@ def _probe_source(
             f"Could not probe source {source_id}: {error}",
         ) from error
     try:
-        frame_count = probe_frame_count(resolved_path, ffprobe_path)
-        source_hash = _sha256(resolved_path)
+        source_hash = _sha256(
+            resolved_path,
+            cancel_event=cancel_event,
+            source_hash_cache=source_hash_cache,
+            heartbeat_callback=heartbeat_callback,
+        )
         geometry = SourceGeometry(
             source_id,
             media.width,
@@ -497,7 +549,7 @@ def _probe_source(
         media=media,
         geometry=geometry,
         sample_aspect_ratio=sample_aspect_ratio,
-        frame_count=frame_count,
+        frame_count=None,
         source_hash=source_hash,
         source_stat=source_stat,
     )
@@ -559,6 +611,7 @@ def _resolve_frame_rate_policy(
     *,
     target_rate: Fraction | int | float | str | None,
     frame_rate_policy: (FrameRatePolicy | ResolvedFrameRatePolicy | Mapping[str, object] | None),
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> ResolvedFrameRatePolicy:
     if target_rate is not None and frame_rate_policy is not None:
         raise VideoCompositorPlanningError(
@@ -616,8 +669,12 @@ def _resolve_frame_rate_policy(
         return resolved
     if not any(item.action in {"interpolate", "unsupported"} for item in resolved.decisions):
         return resolved
+    validate_backend = partial(
+        validate_interpolation_backend,
+        runtime_cache={} if runtime_cache is None else runtime_cache,
+    )
     validations = tuple(
-        validate_interpolation_backend(
+        validate_backend(
             resolved.policy.backend,
             source_rate=item.source_rate,
             target_rate=item.target_rate,
@@ -637,7 +694,7 @@ def _resolve_frame_rate_policy(
         backend=DEFAULT_FPS_FALLBACK_BACKEND,
     )
     fallback_validations = tuple(
-        validate_interpolation_backend(
+        validate_backend(
             fallback.policy.backend,
             source_rate=item.source_rate,
             target_rate=item.target_rate,
@@ -690,6 +747,8 @@ def _processing_route(
     source: VideoSourceProbe,
     frame_rate_policy: ResolvedFrameRatePolicy,
     upscale_policy: ResolvedUpscalePolicy,
+    *,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> VideoProcessingRoute:
     fps_decision = next(
         item for item in frame_rate_policy.decisions if item.source_id == source.source_id
@@ -708,6 +767,7 @@ def _processing_route(
         upscale_status, upscale_reason = _upscale_runtime_status(
             upscale_policy.policy,
             upscale_decision,
+            runtime_cache=runtime_cache,
         )
     return VideoProcessingRoute(
         source_id=source.source_id,
@@ -765,6 +825,8 @@ def _preparation_identity(
 def _upscale_runtime_status(
     policy: UpscalePolicy,
     decision: UpscaleDecision,
+    *,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> tuple[str, str]:
     if not policy.backend.casefold().strip().startswith("rve"):
         return "unavailable", f"Unsupported dynamic upscale backend: {policy.backend}"
@@ -776,10 +838,9 @@ def _upscale_runtime_status(
             DEFAULT_RVE_RESTORATION_MODEL,
             DEFAULT_RVE_ROOT,
             DEFAULT_RVE_SHIMS,
-            rve_unavailable_reason,
         )
 
-        reason = rve_unavailable_reason(
+        reason = validate_rve_runtime(
             argparse.Namespace(
                 python=DEFAULT_FPS_PYTHON,
                 site_packages=DEFAULT_FPS_SITE,
@@ -787,7 +848,7 @@ def _upscale_runtime_status(
                 rve_root=DEFAULT_RVE_ROOT,
                 rve_shims=DEFAULT_RVE_SHIMS,
             ),
-            announce=False,
+            runtime_cache,
         )
     except (ImportError, OSError, RuntimeError) as error:
         return "unavailable", str(error)
@@ -827,18 +888,36 @@ def _prepare_assets(
     ffmpeg_path: str,
     ffprobe_path: str,
     fallbacks: list[str],
+    cancel_event: threading.Event | None = None,
+    progress_callback: ExportProgressCallback | None = None,
+    preparations: RenderPreparations | None = None,
 ) -> dict[str, _PreparedAsset]:
     routes = {item.source_id: item for item in plan.processing_routes}
     probes = {item.source_id: item for item in plan.probed_metadata}
     renderable_block_ids = _renderable_block_ids(plan)
     assets: dict[str, _PreparedAsset] = {}
-    for block in plan.layout_plan.included_blocks:
+    prepared_by_content: dict[str, _PreparedAsset] = {}
+    started = time.monotonic()
+    blocks = plan.layout_plan.included_blocks
+    for index, block in enumerate(blocks):
+        check_export_cancelled(cancel_event)
+        report_preparation_progress(
+            progress_callback,
+            "Preparing video segments",
+            index,
+            len(blocks),
+            started,
+        )
         if block.block_id not in renderable_block_ids:
             continue
         route = routes[block.source_id]
         if not route.upscale_requested and route.fps_action != "interpolate":
             continue
         probe = probes[block.source_id]
+        identity = _preparation_identity(block, probe, route).cache_key
+        if identity in prepared_by_content:
+            assets[block.block_id] = prepared_by_content[identity]
+            continue
         source_frames = _round_half_up(
             Fraction(block.source_range.source_duration_ticks, PROJECT_TIMEBASE)
             * canonical_rate(probe.media.frame_rate),
@@ -846,13 +925,37 @@ def _prepare_assets(
         source_frames = max(1, source_frames)
         asset_stem = _asset_stem(block.block_id)
         raw = workspace / f"{asset_stem}-native.mp4"
-        _extract_block(
-            probe.path,
+        request: dict[str, Any] = {
+            "source_hash": probe.source_hash,
+            "source_range": (
+                block.source_range.source_start_tick,
+                block.source_range.source_end_tick,
+            ),
+            "source_frames": source_frames,
+            "source_rate": str(canonical_rate(probe.media.frame_rate)),
+            "runtime": (
+                preparations.runtime(ffmpeg_path, ffprobe_path)
+                if preparations is not None
+                else None
+            ),
+        }
+        raw = _materialize_video_stage(
+            preparations,
+            "native segment",
+            request,
             raw,
-            block.source_range.source_start_tick / PROJECT_TIMEBASE,
-            block.source_range.source_end_tick / PROJECT_TIMEBASE,
-            source_frames,
-            ffmpeg_path,
+            partial(
+                _extract_block,
+                probe.path,
+                start_seconds=block.source_range.source_start_tick / PROJECT_TIMEBASE,
+                end_seconds=block.source_range.source_end_tick / PROJECT_TIMEBASE,
+                expected_frames=source_frames,
+                ffmpeg_path=ffmpeg_path,
+                cancel_event=cancel_event,
+            ),
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            cancel_event=cancel_event,
         )
         current = raw
         if route.upscale_requested:
@@ -863,15 +966,42 @@ def _prepare_assets(
                         route.upscale_model or "SuperUltraCompact",
                         _default_restoration_model(),
                     )
-                    _run_rve_restoration(
-                        current,
+                    restored_request = {
+                        "input": request,
+                        "model": (
+                            preparations.model_identity(model_path)
+                            if preparations is not None
+                            else str(model_path)
+                        ),
+                        "runtime": (
+                            preparations.runtime(ffmpeg_path, ffprobe_path, neural=True)
+                            if preparations is not None
+                            else None
+                        ),
+                    }
+                    restored = _materialize_video_stage(
+                        preparations,
+                        "upscaled segment",
+                        restored_request,
                         restored,
-                        probe,
-                        source_frames,
-                        model_path,
+                        partial(
+                            _run_rve_restoration,
+                            current,
+                            probe=probe,
+                            source_frames=source_frames,
+                            model_path=model_path,
+                            cancel_event=cancel_event,
+                        ),
+                        ffmpeg_path=ffmpeg_path,
+                        ffprobe_path=ffprobe_path,
+                        cancel_event=cancel_event,
                     )
                     current = restored
+                    request = restored_request
+                except PreparationCacheError:
+                    raise
                 except (ExportExecutionError, OSError, RuntimeError, VideoCompositorError) as error:
+                    check_export_cancelled(cancel_event)
                     fallbacks.append(
                         f"{block.block_id}: RVE upscale unavailable at render time; "
                         f"native scaling fallback used ({error})",
@@ -888,35 +1018,64 @@ def _prepare_assets(
             )
             target_frames = max(1, target_frames)
             interpolated = workspace / f"{asset_stem}-fps.mp4"
-            try:
-                run_source_interpolation(
-                    current,
-                    interpolated,
-                    source_rate=canonical_rate(probe.media.frame_rate),
-                    source_frames=source_frames,
-                    target_rate=plan.target_rate,
-                    target_frames=target_frames,
-                    backend=route.fps_backend,
+            interpolation_source_rate = canonical_rate(probe.media.frame_rate)
+
+            def interpolate(
+                backend: str,
+                *,
+                input_request: Mapping[str, Any] = request,
+                input_path: Path = current,
+                destination: Path = interpolated,
+                source_rate: Fraction = interpolation_source_rate,
+                input_frames: int = source_frames,
+                output_frames: int = target_frames,
+            ) -> Path:
+                interpolation_request = {
+                    "input": input_request,
+                    "backend": backend,
+                    "target_rate": str(plan.target_rate),
+                    "target_frames": output_frames,
+                    "runtime": (
+                        preparations.runtime(
+                            ffmpeg_path, ffprobe_path, neural=backend.startswith("rve")
+                        )
+                        if preparations is not None
+                        else None
+                    ),
+                }
+                return _materialize_video_stage(
+                    preparations,
+                    "interpolated segment",
+                    interpolation_request,
+                    destination,
+                    partial(
+                        run_source_interpolation,
+                        input_path,
+                        source_rate=source_rate,
+                        source_frames=input_frames,
+                        target_rate=plan.target_rate,
+                        target_frames=output_frames,
+                        backend=backend,
+                        ffmpeg_path=ffmpeg_path,
+                        artifact_gate=False,
+                        cancel_event=cancel_event,
+                        progress_callback=progress_callback,
+                    ),
                     ffmpeg_path=ffmpeg_path,
-                    artifact_gate=False,
+                    ffprobe_path=ffprobe_path,
+                    cancel_event=cancel_event,
                 )
-                current = interpolated
+
+            try:
+                current = interpolate(route.fps_backend)
                 fps_converted = True
+            except PreparationCacheError:
+                raise
             except (ExportExecutionError, OSError, RuntimeError, VideoCompositorError) as error:
+                check_export_cancelled(cancel_event)
                 if route.fps_backend != DEFAULT_FPS_FALLBACK_BACKEND:
                     try:
-                        run_source_interpolation(
-                            current,
-                            interpolated,
-                            source_rate=canonical_rate(probe.media.frame_rate),
-                            source_frames=source_frames,
-                            target_rate=plan.target_rate,
-                            target_frames=target_frames,
-                            backend=DEFAULT_FPS_FALLBACK_BACKEND,
-                            ffmpeg_path=ffmpeg_path,
-                            artifact_gate=False,
-                        )
-                        current = interpolated
+                        current = interpolate(DEFAULT_FPS_FALLBACK_BACKEND)
                         fps_converted = True
                         fallbacks.append(
                             f"{block.block_id}: {route.fps_backend} failed; "
@@ -944,8 +1103,37 @@ def _prepare_assets(
             path=current,
             fps_converted=fps_converted,
         )
-        _verify_preparation(current, ffprobe_path, ffmpeg_path)
+        prepared_by_content[identity] = assets[block.block_id]
+        if preparations is None:
+            _verify_preparation(current, ffprobe_path, ffmpeg_path, cancel_event=cancel_event)
     return assets
+
+
+def _materialize_video_stage(
+    preparations: RenderPreparations | None,
+    stage: str,
+    request: Mapping[str, Any],
+    destination: Path,
+    produce: Callable[[Path], object],
+    *,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    cancel_event: threading.Event | None,
+) -> Path:
+    if preparations is None:
+        produce(destination)
+        return destination
+    return preparations.materialize(
+        stage,
+        request,
+        produce,
+        partial(
+            _verify_preparation,
+            ffprobe_path=ffprobe_path,
+            ffmpeg_path=ffmpeg_path,
+            cancel_event=cancel_event,
+        ),
+    )
 
 
 def _extract_block(
@@ -955,6 +1143,8 @@ def _extract_block(
     end_seconds: float,
     expected_frames: int,
     ffmpeg_path: str,
+    *,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     command = [
         ffmpeg_path,
@@ -978,7 +1168,9 @@ def _extract_block(
         "yuv420p",
         str(destination),
     ]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    from .export_process import run_command_with_cancellation
+
+    result = run_command_with_cancellation(command, cancel_event=cancel_event)
     if result.returncode != 0:
         raise VideoCompositorExecutionError(
             result.stderr.strip() or f"Could not extract {source.name}",
@@ -991,6 +1183,8 @@ def _run_rve_restoration(
     probe: VideoSourceProbe,
     source_frames: int,
     model_path: Path,
+    *,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     from framestudio_fps import (
         DEFAULT_FPS_PYTHON,
@@ -1016,6 +1210,7 @@ def _run_rve_restoration(
         source_frames,
         arguments,
         restoration_model=model_path,
+        cancel_event=cancel_event,
     )
 
 
@@ -1025,11 +1220,19 @@ def _default_restoration_model() -> Path:
     return DEFAULT_RVE_RESTORATION_MODEL
 
 
-def _verify_preparation(path: Path, ffprobe_path: str, ffmpeg_path: str) -> None:
+def _verify_preparation(
+    path: Path,
+    ffprobe_path: str,
+    ffmpeg_path: str,
+    *,
+    cancel_event: threading.Event | None = None,
+) -> None:
     try:
         probe_media(path, ffprobe_path)
-        probe_frame_count(path, ffprobe_path)
-        validate_decoded_output(path, ffmpeg_path, label=f"prepared clip {path.name}")
+        probe_frame_count(path, ffprobe_path, cancel_event=cancel_event)
+        validate_decoded_output(
+            path, ffmpeg_path, label=f"prepared clip {path.name}", cancel_event=cancel_event
+        )
     except (ExportExecutionError, OSError, MediaProbeError, VideoCompositorError) as error:
         raise VideoCompositorExecutionError(
             f"Prepared clip verification failed for {path.name}: {error}",
@@ -1056,8 +1259,10 @@ def _build_render_command(
     *,
     output: Path,
     ffmpeg_path: str,
+    reuse_inputs: bool = True,
 ) -> list[str]:
     inputs: list[Path] = []
+    input_indices: dict[Path, int] = {}
     filters: list[str] = []
     interval_labels: list[str] = []
     target_rate = str(plan.target_rate)
@@ -1081,11 +1286,19 @@ def _build_render_command(
             continue
         slot_labels: list[str] = []
         for slot_index, slot in enumerate(interval.slots):
-            input_index = len(inputs)
             asset = assets.get(slot.block.block_id)
-            inputs.append(
-                asset.path if asset is not None else _source_path(plan, slot.block.source_id),
+            input_path = (
+                asset.path if asset is not None else _source_path(plan, slot.block.source_id)
             )
+            if not reuse_inputs:
+                input_index = len(inputs)
+                inputs.append(input_path)
+            elif input_path not in input_indices:
+                input_indices[input_path] = len(inputs)
+                inputs.append(input_path)
+                input_index = input_indices[input_path]
+            else:
+                input_index = input_indices[input_path]
             prepared = asset is not None
             fps_ready = asset.fps_converted if asset is not None else False
             source_start = slot.block.source_range.source_start_tick / PROJECT_TIMEBASE
@@ -1289,13 +1502,50 @@ def _asset_stem(block_id: str) -> str:
     return f"{readable}-{identity}"
 
 
-def _sha256(path: Path) -> str:
+def _sha256(
+    path: Path,
+    *,
+    cancel_event: threading.Event | None = None,
+    source_hash_cache: SourceHashCache | None = None,
+    heartbeat_callback: Callable[[], None] | None = None,
+) -> str:
+    check_export_cancelled(cancel_event)
+    path = path.expanduser().resolve()
+    before = path.stat()
+    key = (
+        path,
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    if source_hash_cache is not None and key in source_hash_cache:
+        return source_hash_cache[key]
     digest = hashlib.sha256()
     buffer = bytearray(1024 * 1024)
+    reported = time.monotonic()
     with path.open("rb") as handle:
         while count := handle.readinto(buffer):
+            check_export_cancelled(cancel_event)
             digest.update(memoryview(buffer)[:count])
-    return digest.hexdigest()
+            if heartbeat_callback is not None and time.monotonic() - reported >= 0.25:
+                heartbeat_callback()
+                reported = time.monotonic()
+    check_export_cancelled(cancel_event)
+    after = path.stat()
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ):
+        raise ExportExecutionError("Source changed while computing its export identity")
+    value = digest.hexdigest()
+    if source_hash_cache is not None:
+        source_hash_cache[key] = value
+    return value
 
 
 __all__ = [

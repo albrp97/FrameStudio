@@ -29,6 +29,7 @@ from framestudio.app_tracks import (
 from framestudio.export_types import ExportPlanningError
 from framestudio.model import (
     Project,
+    ProjectValidationError,
     Segment,
     SegmentTimeline,
     TimelineTrack,
@@ -405,6 +406,100 @@ class EditorTrackDragTests(unittest.TestCase):
         )
         self.assertEqual(window.selected_segment_id, second.segment_id)
         self.assertEqual(window.refreshed_selection_id, second.segment_id)
+        self.assertEqual(project.timeline.find(first.segment_id).timeline_start_ticks, 5_000_000)
+        self.assertEqual(project.timeline.find(second.segment_id).timeline_start_ticks, 7_000_000)
+
+    def test_selected_group_preview_and_drop_include_every_selected_clip(self):
+        project = Project.create_synchronized(
+            Path(__file__), {"duration_seconds": 4, "frame_rate": "24/1"}
+        )
+        first, second = project.timeline.split(2)
+        project.timeline.add_track("track-2")
+        drops = []
+        canvas = create_timeline_canvas(FakeGtk)(
+            on_segment_dropped=lambda *arguments: drops.append(arguments)
+        )
+        canvas.set_timeline(
+            project.timeline, second.segment_id, (first.segment_id, second.segment_id)
+        )
+        before = project.timeline.to_dict()
+        clip = canvas._layout()[0]
+        rows = layout_timeline_tracks(project.timeline)
+        x, y = clip.x + clip.width / 2, clip.y + clip.height / 2
+        offset_y = rows[1].y - rows[0].y
+        canvas._on_drag_begin(FakeGesture(), x, y)
+        canvas._on_pressed(FakeGesture(), 1, x, y)
+        canvas._on_drag_update(FakeGesture(), 0, offset_y)
+        preview = canvas._clips_with_drag_preview(canvas._layout(), rows)
+        self.assertEqual({item.track_id for item in preview}, {"track-2"})
+        self.assertEqual(project.timeline.to_dict(), before)
+        canvas._set_selection((first.segment_id,), first.segment_id, notify=False)
+        canvas._on_drag_end(FakeGesture(), 0, offset_y)
+        self.assertEqual(drops[0][3], (first.segment_id, second.segment_id))
+
+    def test_group_move_fits_every_member_together_and_is_atomic_on_invalid_track(self):
+        project = Project.create_synchronized(
+            Path(__file__), {"duration_seconds": 6, "frame_rate": "24/1"}
+        )
+        project.timeline.split(2)
+        project.timeline.split(4)
+        first, middle, last = project.timeline.segment_items
+        project.timeline.add_track("track-2")
+        occupied = project.timeline.paste_blocks(
+            (middle,), at_ticks=3_000_000, target_track_id="track-2"
+        )[0]
+        project.timeline.set_deleted(occupied.segment_id, True)
+        occupied = project.timeline.find(occupied.segment_id)
+        selected = (first.segment_id, last.segment_id)
+        before = project.timeline.to_dict()
+        project.timeline.move_blocks_to_track(
+            selected,
+            anchor_segment_id=first.segment_id,
+            timeline_start_ticks=0,
+            target_track_id="track-2",
+        )
+        moved_first, moved_last = (project.timeline.find(item) for item in selected)
+        self.assertEqual(moved_first.timeline_start_ticks, 1_000_000)
+        self.assertEqual(moved_last.timeline_start_ticks, 5_000_000)
+        self.assertEqual(project.timeline.find(occupied.segment_id), occupied)
+        self.assertEqual(project.timeline.find(middle.segment_id), middle)
+        self.assertEqual(moved_first.source_start_ticks, first.source_start_ticks)
+        self.assertEqual(moved_last.source_end_ticks, last.source_end_ticks)
+        committed = project.timeline.to_dict()
+        self.assertNotEqual(committed, before)
+        with self.assertRaises(ProjectValidationError):
+            project.timeline.move_blocks_to_track(
+                (middle.segment_id, moved_first.segment_id),
+                anchor_segment_id=middle.segment_id,
+                timeline_start_ticks=0,
+                target_track_id="track-2",
+            )
+        self.assertEqual(project.timeline.to_dict(), committed)
+
+    def test_group_anchored_on_later_clip_keeps_time_and_track_offsets_at_zero(self):
+        project = Project.create_synchronized(
+            Path(__file__), {"duration_seconds": 4, "frame_rate": "24/1"}
+        )
+        first, second = project.timeline.split(2)
+        project.timeline.add_track("track-2")
+        project.timeline.add_track("track-3")
+        parallel = project.timeline.paste_blocks(
+            (first,), at_ticks=3_000_000, target_track_id="track-2"
+        )[0]
+        project.timeline.move_blocks_to_track(
+            (first.segment_id, parallel.segment_id),
+            anchor_segment_id=parallel.segment_id,
+            timeline_start_ticks=0,
+            target_track_id="track-3",
+        )
+        moved_first = project.timeline.find(first.segment_id)
+        moved_parallel = project.timeline.find(parallel.segment_id)
+        self.assertEqual((moved_first.track_id, moved_first.timeline_start_ticks), ("track-2", 0))
+        self.assertEqual(
+            (moved_parallel.track_id, moved_parallel.timeline_start_ticks), ("track-3", 3_000_000)
+        )
+        self.assertEqual(project.timeline.find(second.segment_id), second)
+        project.validate()
 
     def test_invalid_fps_confirmation_preserves_legacy_attachment_state(self):
         project = Project.create(

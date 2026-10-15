@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import math
 import os
@@ -8,8 +9,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from array import array
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from fractions import Fraction
 from pathlib import Path
 from typing import Any, Mapping
@@ -24,22 +26,30 @@ from .audio_compositor import (
     render_audio,
 )
 from .export_process import (
+    check_export_cancelled,
+    make_progress_heartbeat,
     probe_frame_count,
+    report_preparation_progress,
     run_command_with_cancellation,
     run_ffmpeg,
     validate_decoded_output,
 )
-from .export_types import ExportExecutionError
+from .export_types import ExportExecutionError, ExportProgressCallback
 from .fps_policy import FrameRatePolicy, ResolvedFrameRatePolicy
+from .interpolation import RuntimeValidationCache
 from .layout_plan import LayoutPlan
 from .media import MediaProbe, MediaProbeError, probe_media
 from .model import Project, ProjectValidationError
 from .model_types import SourceReference
+from .render_preparations import PreparationCacheError, RenderPreparations
 from .upscale_policy import ResolvedUpscalePolicy, UpscalePolicy
 from .video_compositor import (
+    SourceHashCache,
     VideoCompositorExecutionError,
     VideoCompositorPlanningError,
     VideoRenderPlan,
+    _default_restoration_model,
+    _restoration_model_path,
     plan_project_video,
     render_project_video,
 )
@@ -108,6 +118,7 @@ class AVRenderResult:
     audio_sample_count: int
     audio_peak: float
     source_hashes_unchanged: bool
+    processing_fallbacks: tuple[str, ...] = ()
 
     @property
     def sample_rate(self) -> int:
@@ -134,6 +145,7 @@ class _VerifiedMux:
     channels: int
     sample_count: int
     peak: float
+    processing_fallbacks: tuple[str, ...] = ()
 
 
 def plan_project_av(
@@ -144,17 +156,28 @@ def plan_project_av(
     frame_rate_policy: _FrameRatePolicyInput = None,
     upscale_policy: _UpscalePolicyInput = None,
     ffprobe_path: str = "ffprobe",
+    cancel_event: threading.Event | None = None,
+    progress_callback: ExportProgressCallback | None = None,
+    source_hash_cache: SourceHashCache | None = None,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> AVRenderPlan:
     """Plan one shared-layout video/audio composition without publishing output."""
     if not isinstance(project, Project):
         raise AVCompositorPlanningError("project must be a Project")
+    check_export_cancelled(cancel_event)
+    hashes: SourceHashCache = {} if source_hash_cache is None else source_hash_cache
     resolved_destination = Path(destination).expanduser().resolve()
     if not resolved_destination.name:
         raise AVCompositorPlanningError("A file destination is required")
     try:
         project.validate()
         _reject_destination_conflict(project, resolved_destination)
-        protected_sources = _capture_source_identities(project)
+        protected_sources = _capture_source_identities(
+            project,
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            source_hash_cache=hashes,
+        )
         video_plan = plan_project_video(
             project,
             resolved_destination,
@@ -162,6 +185,10 @@ def plan_project_av(
             frame_rate_policy=frame_rate_policy,
             upscale_policy=upscale_policy,
             ffprobe_path=ffprobe_path,
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            source_hash_cache=hashes,
+            runtime_cache=runtime_cache,
         )
         audio_plan = build_audio_plan(project, video_plan.layout_plan)
         return AVRenderPlan(
@@ -186,10 +213,12 @@ def plan_project_av(
 def render_project_av(
     plan: AVRenderPlan,
     *,
+    preparations: RenderPreparations | None = None,
     ffmpeg_path: str = "ffmpeg",
     ffprobe_path: str = "ffprobe",
     cancel_event: threading.Event | None = None,
     cancellation_lock: threading.Lock | None = None,
+    progress_callback: ExportProgressCallback | None = None,
 ) -> AVRenderResult:
     """Render child video/audio stages, verify the mux, then atomically publish it."""
     if not isinstance(plan, AVRenderPlan):
@@ -199,7 +228,9 @@ def render_project_av(
         plan.destination,
         planned_source_paths=_protected_source_paths(plan.protected_sources),
     )
-    _assert_sources_unchanged(plan.protected_sources)
+    _assert_sources_unchanged(
+        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+    )
     publication_stage: Path | None = None
     staging_directory: Path | None = None
     cleanup_attempted = False
@@ -227,13 +258,17 @@ def render_project_av(
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
             cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            preparations=preparations,
         )
         if cancel_event is not None and cancel_event.is_set():
             raise AVCompositorExecutionError("Export cancelled")
         publication_stage = _move_verified_mux(muxed_stage, plan, staging_directory)
         cleanup_attempted = True
         _clean_staging_before_publish(staging_directory)
-        _assert_sources_unchanged(plan.protected_sources)
+        _assert_sources_unchanged(
+            plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+        )
 
         result = AVRenderResult(
             destination=plan.destination,
@@ -245,6 +280,7 @@ def render_project_av(
             audio_sample_count=verified.sample_count,
             audio_peak=verified.peak,
             source_hashes_unchanged=True,
+            processing_fallbacks=verified.processing_fallbacks,
         )
 
         def publish() -> None:
@@ -353,10 +389,22 @@ def _protected_source_paths(
     return tuple(paths)
 
 
-def _capture_source_identities(project: Project) -> tuple[AVSourceIdentity, ...]:
+def _capture_source_identities(
+    project: Project,
+    *,
+    cancel_event: threading.Event | None = None,
+    progress_callback: ExportProgressCallback | None = None,
+    source_hash_cache: SourceHashCache | None = None,
+) -> tuple[AVSourceIdentity, ...]:
     identities: list[AVSourceIdentity] = []
     seen: set[tuple[Path, Path]] = set()
-    for source in _project_sources(project):
+    sources = tuple(_project_sources(project))
+    started = time.monotonic()
+    for index, source in enumerate(sources):
+        check_export_cancelled(cancel_event)
+        report_preparation_progress(
+            progress_callback, "Protecting export sources", index, len(sources), started
+        )
         for candidate in _source_candidates(source):
             resolved = candidate.resolve()
             key = (candidate, resolved)
@@ -365,7 +413,19 @@ def _capture_source_identities(project: Project) -> tuple[AVSourceIdentity, ...]
             seen.add(key)
             try:
                 stat = resolved.stat()
-                source_hash = _video_file_sha256(resolved)
+                source_hash = _video_file_sha256(
+                    resolved,
+                    cancel_event=cancel_event,
+                    source_hash_cache=source_hash_cache,
+                    heartbeat_callback=make_progress_heartbeat(
+                        progress_callback,
+                        stage="Protecting export sources",
+                        total_frames=len(sources),
+                        frame=index,
+                        started=started,
+                        percent=index * 100 / len(sources),
+                    ),
+                )
             except OSError as error:
                 raise AVCompositorPlanningError(
                     f"Could not inspect source {resolved.name}: {error}",
@@ -385,8 +445,18 @@ def _capture_source_identities(project: Project) -> tuple[AVSourceIdentity, ...]
     return tuple(identities)
 
 
-def _assert_sources_unchanged(identities: tuple[AVSourceIdentity, ...]) -> None:
-    for identity in identities:
+def _assert_sources_unchanged(
+    identities: tuple[AVSourceIdentity, ...],
+    *,
+    cancel_event: threading.Event | None = None,
+    progress_callback: ExportProgressCallback | None = None,
+) -> None:
+    started = time.monotonic()
+    for index, identity in enumerate(identities):
+        check_export_cancelled(cancel_event)
+        report_preparation_progress(
+            progress_callback, "Verifying export sources", index, len(identities), started
+        )
         current_path = identity.path.expanduser()
         try:
             if current_path.resolve() != identity.resolved_path:
@@ -394,7 +464,18 @@ def _assert_sources_unchanged(identities: tuple[AVSourceIdentity, ...]) -> None:
                     f"Source path changed during render: {current_path.name}",
                 )
             stat = identity.resolved_path.stat()
-            current_hash = _video_file_sha256(identity.resolved_path)
+            current_hash = _video_file_sha256(
+                identity.resolved_path,
+                cancel_event=cancel_event,
+                heartbeat_callback=make_progress_heartbeat(
+                    progress_callback,
+                    stage="Verifying export sources",
+                    total_frames=len(identities),
+                    frame=index,
+                    started=started,
+                    percent=index * 100 / len(identities),
+                ),
+            )
         except OSError as error:
             raise AVCompositorExecutionError(
                 f"Could not verify source preservation for {current_path.name}: {error}",
@@ -434,6 +515,8 @@ def _render_verified_stages(
     ffmpeg_path: str,
     ffprobe_path: str,
     cancel_event: threading.Event | None = None,
+    progress_callback: ExportProgressCallback | None = None,
+    preparations: RenderPreparations | None = None,
 ) -> tuple[Path, _VerifiedMux]:
     if not staging_directory.is_dir():
         raise AVCompositorExecutionError("AV staging directory is unavailable")
@@ -441,13 +524,29 @@ def _render_verified_stages(
         raise AVCompositorExecutionError(
             "Video child render must target the private AV staging directory",
         )
+    if preparations is not None:
+        muxed, verified = _render_checkpointed_stages(
+            plan,
+            video_plan,
+            preparations,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+        )
+        staged_mux = staging_directory / "muxed.mp4"
+        _stage_cached_mux(muxed, staged_mux, cancel_event)
+        return staged_mux, verified
     video_result = render_project_video(
         video_plan,
         ffmpeg_path=ffmpeg_path,
         ffprobe_path=ffprobe_path,
         cancel_event=cancel_event,
+        progress_callback=progress_callback,
     )
-    _assert_sources_unchanged(plan.protected_sources)
+    _assert_sources_unchanged(
+        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+    )
     audio_stage = staging_directory / "audio.wav"
     audio_result = render_audio(
         plan.project,
@@ -457,7 +556,9 @@ def _render_verified_stages(
         ffprobe_path=ffprobe_path,
         cancel_event=cancel_event,
     )
-    _assert_sources_unchanged(plan.protected_sources)
+    _assert_sources_unchanged(
+        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+    )
     muxed_stage = staging_directory / "muxed.mp4"
     _mux_stages(
         video_result.destination,
@@ -473,8 +574,160 @@ def _render_verified_stages(
         ffprobe_path=ffprobe_path,
         cancel_event=cancel_event,
     )
-    _assert_sources_unchanged(plan.protected_sources)
-    return muxed_stage, verified
+    _assert_sources_unchanged(
+        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+    )
+    return muxed_stage, replace(verified, processing_fallbacks=video_result.processing_fallbacks)
+
+
+def _stage_cached_mux(cached: Path, staged: Path, cancel_event: threading.Event | None) -> None:
+    check_export_cancelled(cancel_event)
+    try:
+        os.link(cached, staged)
+        return
+    except OSError as error:
+        if error.errno not in {errno.EXDEV, errno.EPERM, errno.EOPNOTSUPP}:
+            raise
+    with cached.open("rb") as source, staged.open("xb") as destination:
+        while chunk := source.read(1024 * 1024):
+            check_export_cancelled(cancel_event)
+            destination.write(chunk)
+    check_export_cancelled(cancel_event)
+
+
+def _render_checkpointed_stages(
+    plan: AVRenderPlan,
+    video_plan: VideoRenderPlan,
+    preparations: RenderPreparations,
+    *,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    cancel_event: threading.Event | None,
+    progress_callback: ExportProgressCallback | None,
+) -> tuple[Path, _VerifiedMux]:
+    request = {
+        "composition_version": 2,
+        "layout": asdict(video_plan.layout_plan),
+        "sources": plan.source_hashes,
+        "target_rate": str(video_plan.target_rate),
+        "frame_counts": video_plan.interval_frame_counts,
+        "routes": [asdict(route) for route in video_plan.processing_routes],
+        "restoration_models": [
+            preparations.model_identity(
+                _restoration_model_path(
+                    route.upscale_model or "SuperUltraCompact",
+                    _default_restoration_model(),
+                )
+            )
+            for route in video_plan.processing_routes
+            if route.upscale_requested and route.upscale_status == "available"
+        ],
+        "runtime": preparations.runtime(
+            ffmpeg_path,
+            ffprobe_path,
+            neural=any(
+                (route.upscale_requested and route.upscale_status == "available")
+                or (route.fps_action == "interpolate" and route.fps_backend.startswith("rve"))
+                for route in video_plan.processing_routes
+            ),
+        ),
+    }
+    video_validation: dict[str, Any] = {}
+
+    def render_video(destination: Path) -> None:
+        result = render_project_video(
+            replace(video_plan, destination=destination),
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            cancel_event=cancel_event,
+            progress_callback=progress_callback,
+            preparations=preparations,
+        )
+        video_validation["processing_fallbacks"] = list(result.processing_fallbacks)
+
+    video_stage = preparations.materialize(
+        "video composition",
+        request,
+        render_video,
+        lambda _path: video_validation,  # The child verifies before returning.
+    )
+    video_metadata = preparations.validation_data[video_stage]
+    if (
+        not isinstance(video_metadata, dict)
+        or not isinstance(video_metadata.get("processing_fallbacks"), list)
+        or not all(isinstance(item, str) for item in video_metadata["processing_fallbacks"])
+    ):
+        raise PreparationCacheError("Video checkpoint has invalid enhancement metadata")
+    fallbacks = tuple(video_metadata["processing_fallbacks"])
+    for fallback in fallbacks:
+        report_preparation_progress(
+            progress_callback, f"Video enhancement fallback: {fallback}", 1, 1, time.monotonic()
+        )
+    _assert_sources_unchanged(
+        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+    )
+    audio_request = {
+        "audio_plan": asdict(plan.audio_plan),
+        "sources": plan.source_hashes,
+        "runtime": preparations.runtime(ffmpeg_path, ffprobe_path),
+    }
+    audio_stage = preparations.materialize(
+        "audio composition",
+        audio_request,
+        lambda destination: render_audio(
+            plan.project,
+            video_plan.layout_plan,
+            destination,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            cancel_event=cancel_event,
+        ),
+        lambda _path: None,  # render_audio already verifies the exact PCM contract.
+        suffix=".wav",
+    )
+
+    def verify(path: Path) -> dict[str, float]:
+        result = _verify_muxed_output(
+            path,
+            plan,
+            ffmpeg_path=ffmpeg_path,
+            ffprobe_path=ffprobe_path,
+            cancel_event=cancel_event,
+        )
+        return {"peak": result.peak}
+
+    muxed = preparations.materialize(
+        "verified AV composition",
+        {"video": request, "audio": audio_request},
+        lambda destination: _mux_stages(
+            video_stage,
+            audio_stage,
+            destination,
+            ffmpeg_path=ffmpeg_path,
+            cancel_event=cancel_event,
+        ),
+        verify,
+    )
+    summary = preparations.validation_data[muxed]
+    if (
+        not isinstance(summary, dict)
+        or not isinstance(summary.get("peak"), (float, int))
+        or not math.isfinite(summary["peak"])
+        or not 0 <= summary["peak"] <= 1.0 + 1e-6
+    ):
+        raise PreparationCacheError("Verified composition checkpoint has invalid audio metadata")
+    _assert_sources_unchanged(
+        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+    )
+    return muxed, _VerifiedMux(
+        output_probe=probe_media(muxed, ffprobe_path),
+        actual_frames=video_plan.expected_frames,
+        sample_rate=AUDIO_SAMPLE_RATE,
+        channels=AUDIO_CHANNELS,
+        sample_count=plan.audio_plan.final_sample_count,
+        peak=float(summary["peak"]),
+        processing_fallbacks=fallbacks,
+    )
 
 
 def _move_verified_mux(

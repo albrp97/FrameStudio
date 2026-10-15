@@ -45,6 +45,80 @@ def performance_profile_commands():
 
 
 class EditorPerformanceModeTests(unittest.TestCase):
+    def test_export_preparation_coalesces_refreshes_and_shares_runtime_checks(self):
+        from framestudio.app_export import ExportPanelPreparation
+
+        release = threading.Event()
+        started = threading.Event()
+        callbacks = []
+        filenames = []
+        caches = []
+        glib = SimpleNamespace(idle_add=lambda callback, state: callback(state))
+        preparation = ExportPanelPreparation(glib)
+
+        def prepare(_project, _folder, **options):
+            filenames.append(options["filename"])
+            caches.append(options["runtime_cache"])
+            started.set()
+            self.assertTrue(release.wait(timeout=3))
+            return SimpleNamespace(filename=options["filename"])
+
+        with patch("framestudio.app_export.prepare_export_panel", side_effect=prepare):
+            worker = preparation.submit(
+                SimpleNamespace(), Path("/tmp"), callbacks.append, filename="first.mp4"
+            )
+            try:
+                self.assertTrue(started.wait(timeout=2))
+                for index in range(20):
+                    current = preparation.submit(
+                        SimpleNamespace(),
+                        Path("/tmp"),
+                        callbacks.append,
+                        filename=f"latest-{index}.mp4",
+                    )
+                    self.assertIs(current, worker)
+            finally:
+                release.set()
+                worker.join(timeout=5)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(filenames, ["first.mp4", "latest-19.mp4"])
+            self.assertEqual([state.filename for state in callbacks], ["latest-19.mp4"])
+            self.assertIs(caches[0], caches[1])
+            next_worker = preparation.submit(
+                SimpleNamespace(), Path("/tmp"), callbacks.append, filename="after.mp4"
+            )
+            next_worker.join(timeout=5)
+            self.assertFalse(next_worker.is_alive())
+            self.assertIs(caches[0], caches[2])
+        preparation.close()
+
+    def test_closing_export_panel_drops_pending_work_and_results(self):
+        from framestudio.app_export import ExportPanelPreparation
+
+        release = threading.Event()
+        started = threading.Event()
+        callbacks = []
+        glib = SimpleNamespace(idle_add=lambda callback, state: callback(state))
+        preparation = ExportPanelPreparation(glib)
+
+        def prepare(*_args, **_options):
+            started.set()
+            self.assertTrue(release.wait(timeout=3))
+            return SimpleNamespace(filename="unused.mp4")
+
+        with patch("framestudio.app_export.prepare_export_panel", side_effect=prepare) as run:
+            worker = preparation.submit(SimpleNamespace(), Path("/tmp"), callbacks.append)
+            try:
+                self.assertTrue(started.wait(timeout=2))
+                preparation.submit(SimpleNamespace(), Path("/tmp"), callbacks.append)
+                preparation.close()
+            finally:
+                release.set()
+                worker.join(timeout=5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(callbacks, [])
+
     def test_export_panel_rejects_stale_and_closed_results(self):
         panel_state = {"closed": False, "generation": 3}
 

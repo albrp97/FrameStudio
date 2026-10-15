@@ -278,7 +278,9 @@ editing. Export-preparation failures remain visible in the status area.
 | Control | Action |
 | --- | --- |
 | `Space` | Play or pause |
+| `Left` / `Right` | Move the playhead by one second |
 | `B` | Split at the playhead |
+| `Ctrl+Z` / `Super+Z` | Undo the latest split or removal |
 | `Delete` | Toggle the selected segment deleted/included |
 | `Backspace` | Remove selected segments and ripple later blocks on their tracks |
 | **Undo removal** | Restore the latest removal in the current editor session |
@@ -293,6 +295,27 @@ editing. Export-preparation failures remain visible in the status area.
 Seeking while playing keeps playback active. Enabling or disabling Triplicate
 keeps the current playhead and play/pause state.
 
+The selected clip follows playback and playhead seeks. With synchronized
+tracks, it follows the included clip on the active track; empty or excluded
+intervals have no playing selection. While paused, a manually selected deleted
+clip can stay selected independently of the playhead for moving or restoring it.
+Paused multi-selections also remain available for editing; starting playback
+returns to the single playing clip.
+Ctrl-click adds or removes clips without playhead-follow selection replacing the
+manual selection. A normal clip click or starting playback resumes automatic
+selection.
+
+Each clip has a lighter start zone: the first 10% of its displayed width,
+capped at 16 screen pixels. Clicking this zone snaps the playhead to the exact
+clip start. Hold `Super` while clicking to bypass snapping. The zone follows
+zoom and never extends beyond the clip's actual duration, including subpixel
+clips when zoomed out. Clicking the ruler or scrubbing does not use start
+snapping; actual drags use the track-movement rules below.
+Small pointer movement during a click uses GTK's configured drag threshold,
+so ordinary hand movement does not cancel snapping or accidentally move a clip.
+The numbered badges are part of each clip's clickable area, including their
+portion above the clip body; the same start-zone and Super-bypass rules apply.
+
 ### Synchronized tracks
 
 Use **Add track** to create up to four tracks. For an existing sequential
@@ -304,6 +327,11 @@ Drag clips within or between track rows. Clips cannot overlap on the same
 track, including excluded clips. A colliding drop snaps forward to the first
 available position. Framing, copies and Triplicate remain individual block
 settings.
+Dragging any selected clip moves the entire selection as one group, in both
+the live preview and the final drop. Relative timing, gaps, and track spacing
+are preserved. Collisions shift the whole group together to the first fitting
+position; a group cannot move before time zero or beyond the available tracks.
+Invalid drops leave every clip unchanged, and the moved group remains selected.
 
 Preview is silent. Simultaneously included clips determine the visible
 layout: one fills the canvas, two use vertical halves, three use vertical
@@ -342,6 +370,32 @@ The export panel shows the selected output frame rate, the number of sources
 that need frame-rate enhancement, the number eligible for upscale enhancement,
 and the expected work before rendering begins.
 
+Enhancement counts and FPS choices use only sources with included timeline
+segments. Planning shares one AI-runtime preflight across those sources and
+subsequent setting or filename changes within the same panel. Refreshes run
+serially and keep only the latest pending request, rather than launching
+competing CUDA/model-loading processes. Closing the panel drops pending work;
+an already-running check may finish, but its result is discarded. Reopening
+the panel starts a fresh validation session. Actual rendering still validates
+its prerequisites, and audio analysis remains deferred until **Start export**.
+
+Completed audio measurements are also saved atomically to
+`${XDG_CACHE_HOME:-~/.cache}/framestudio/audio-analysis/` as each source finishes.
+They survive cancellation and application restarts, including when the project
+file still contains pending audio settings. Reuse requires the same source
+identity, audio metadata, analysis policy, and FFmpeg identity. Changed sources
+or configuration invalidate the cache; interrupted or failed scans are not
+persisted as successful results.
+
+After audio analysis, export reports source inspection, source preservation,
+output planning, segment preparation, and video composition instead of leaving
+the audio stage at 100%. Synchronized planning inspects only included video
+sources and does not decode entire original videos to count frames that the
+planner never uses. Source hashes are shared within a planning batch, not
+between validation checkpoints: final source-preservation and rendered-output
+verification still run. Cancellation is checked while hashing and is forwarded
+to native segment extraction, enhancement, and composition subprocesses.
+
 The CLI supports the same export engine:
 
 ```sh
@@ -356,6 +410,109 @@ pair. The same source on two tracks produces two independent reels. Each
 reel preserves retained cuts, copies, framing and smart enhancement policies,
 but has no timeline gaps, split-screen layout or other tracks' audio.
 Empty and excluded-only tracks produce no reels.
+
+The synchronized final video uses one shared timeline: overlapping included
+blocks occupy their layout slots at the same time. Each enhanced block is
+extracted at its native resolution, optionally upscaled, then frame-rate
+enhanced before final cropping and placement. Copies of the same exact source
+range now share that native preparation, including across tracks, reimported
+copies of the same file content, and different final crop/zoom/Triplicate
+settings. Each block still receives its own final framing and timeline
+placement. Different source ranges, processing domains, models or rate policies
+are not treated as interchangeable. Adjacent cuts are not joined into one AI
+stream, avoiding interpolation across edit boundaries.
+
+The final compositor also shares identical input paths instead of opening a
+decoder for every occurrence. Blocks that need no enhancement still use their
+original source directly; caching does not introduce an extra lossy conversion.
+The selected combination removes duplicate work rather than launching competing
+GPU/model workers.
+
+Within a resumable batch, completed native extraction, upscale, FPS conversion,
+video composition, audio composition and verified AV mux are separate durable
+checkpoints. Each is recorded only after successful verification, with a content
+hash and a recipe/tool/runtime identity. Custom restoration models are
+content-fingerprinted too. Resume checks checkpoint integrity and reuses matching
+completed work even in a new application process. An interrupted step is not
+marked complete; it must run again, while earlier completed steps remain reusable.
+Checkpoint/storage errors are explicit failures, not reasons to silently
+downgrade the AI backend. Any permitted enhancement fallback is retained in the
+video checkpoint metadata and reported again on reuse.
+
+These preparation checkpoints live under the parent session's
+`render-preparations/` directory. Successful batch delivery, **Start over**, or
+**Discard** removes them through the existing session lifecycle. They are not
+a permanent cross-project library. Fresh source-preservation checks and final
+output-publication verification still run on resume.
+
+This reuse applies to the synchronized final video. Edited source reels still
+use their separate full-canvas processing route and its existing checkpoints;
+they do not share native AI preparations with the final compositor or with
+other reels. Sharing them blindly could change crop, scaling or audio semantics.
+
+#### Repeated-render measurements
+
+Controlled local trials used three tracks, six blocks containing two unique
+half-second ranges, a generated moving 320x180/30 FPS source with stereo audio,
+and a 1920x1080/60 FPS final video. Upscale was disabled to isolate FPS work.
+Each row is the median of three runs on an RTX 5070 Ti, with existing RVE
+TensorRT engines, FFmpeg n9.0.2 and Python 3.14.8. Each cold render used a new
+preparation store. The baseline used preserved pre-optimization renderers.
+
+| Strategy | FFmpeg interpolation | RVE 4.26 | Extraction / FPS jobs | Decoder inputs |
+| --- | ---: | ---: | ---: | ---: |
+| Before content reuse | 2.831 s | 40.155 s | 6 / 6 | 6 |
+| Content reuse only | 1.665 s | 14.204 s | 2 / 2 | 6 |
+| Content reuse + shared inputs | 1.644 s | 13.998 s | 2 / 2 | 2 |
+| Selected: reuse + shared inputs + checkpoints | 1.864 s | 14.444 s | 2 / 2 | 2 |
+| Resume after video composition: remaining work | 0.434 s | 0.461 s | 0 / 0 | 0 |
+
+The selected resumable RVE path took **64.03% less time (2.78x speedup)** than
+the baseline; the FFmpeg path took **34.15% less time (1.52x speedup)**.
+Without durable checkpoints the cold run was slightly faster, so checkpoint
+integrity/persistence is an explicit tradeoff, not a free optimization.
+Resuming an already verified RVE AV mux took a median **0.056 s** in this
+fixture, without extraction, interpolation, video/audio recomposition or muxing.
+These resume values measure remaining work, not a complete render from scratch.
+
+Decoded output frames were identical within each backend across strategies,
+with 60 output frames and unchanged source content. Timings cover the core
+synchronized AV renderer, not planning, audio analysis, optional source reels
+or the batch coordinator's final publication verification. This small fixture
+does not predict the exact speedup of an arbitrary long project, nor prove
+large-project memory bounds.
+
+Expanding the fixture to **24 blocks**, with repeated ranges both within and
+across tracks, reduced FFmpeg-render median time from **10.168 s to 3.902 s**
+(**61.62% less time, 2.61x speedup**, three trials). Extraction/FPS jobs and
+decoder inputs fell from 24 to 2, with identical 240-frame decoded output.
+Separate real-RVE cancellation checks confirmed reuse across fresh application
+processes at FPS, video, audio and mux checkpoints. A restoration-plus-FPS run
+also preserved a completed upscale checkpoint: only the other unique range was
+restored after resume, and its final frames matched the uninterrupted render.
+Exact trial data is recorded in
+[`benchmarks/repeated_render_results.json`](benchmarks/repeated_render_results.json).
+CPU/RVE absolute times are not a quality comparison: they use different
+interpolation algorithms, and model startup dominates this short RVE fixture.
+
+Reproduce the experiment without private media:
+
+```sh
+python3 benchmarks/repeated_render_benchmark.py \
+  --strategy baseline --backend rve-4.26 --trials 3 --report /tmp/repeat-before.json
+python3 benchmarks/repeated_render_benchmark.py \
+  --strategy optimized --backend rve-4.26 --trials 3 --report /tmp/repeat-after.json
+python3 benchmarks/repeated_render_benchmark.py \
+  --strategy resume --backend rve-4.26 --trials 3 --report /tmp/repeat-resume.json
+```
+
+The standalone `baseline` mode disables content reuse; optional paired
+`--baseline-video` / `--baseline-av` paths load preserved renderer snapshots.
+`deduplicated` and `shared-inputs` isolate the other candidates.
+`--resume-after "verified AV composition"` measures a completed mux checkpoint,
+`--repeats-per-track 4` adds within-track copies, and `--upscale` includes the
+restoration stage. Reports include trial times, job counts, decoded-frame hashes,
+source-preservation checks, and completed interpolation backends.
 
 Disable the final-video option to export only the reels. These choices also
 work with synchronized tracks:

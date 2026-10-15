@@ -5,7 +5,7 @@ from dataclasses import replace
 from typing import Any, Callable
 
 from .model import ProjectValidationError, Segment, SegmentTimeline
-from .model_timeline import TimelineTrack, _earliest_fit
+from .model_timeline import TimelineTrack
 from .model_types import ticks_to_seconds
 from .timeline_geometry import (
     SELECTED_CLIP_BORDER_COLOR,
@@ -92,11 +92,12 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             on_seek: Callable[[float], None] | None = None,
             on_segment_selected: Callable[[str], None] | None = None,
             on_selection_changed: Callable[[tuple[str, ...]], None] | None = None,
-            on_segment_dropped: Callable[[str, int, str], None] | None = None,
+            on_segment_dropped: Callable[[str, int, str, tuple[str, ...]], None] | None = None,
             on_invalid_drop: Callable[[str], None] | None = None,
             on_track_activated: Callable[[str], None] | None = None,
             selection_modifier_mask: int = 0,
             range_selection_modifier_mask: int = 0,
+            snap_bypass_modifier_mask: int = 0,
         ) -> None:
             super().__init__()
             self._timeline: SegmentTimeline | None = None
@@ -123,18 +124,25 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._on_track_activated = on_track_activated
             self._selection_modifier_mask = int(selection_modifier_mask)
             self._range_selection_modifier_mask = int(range_selection_modifier_mask)
+            self._snap_bypass_modifier_mask = int(snap_bypass_modifier_mask)
+            self._snap_bypassed = False
             self._drag_start_x: float | None = None
             self._drag_start_y: float | None = None
             self._drag_mode: str | None = None
             self._drag_last_seek_position: float | None = None
             self._drag_segment_id: str | None = None
+            self._drag_segment_ids: tuple[str, ...] = ()
+            self._drag_placements: tuple[tuple[str, int, str], ...] = ()
+            self._drag_error: str | None = None
             self._drag_pointer_offset_ticks = 0
             self._drag_preview: tuple[int, str | None] | None = None
             self._drag_happened = False
+            self._drag_moved = False
             self._drag_committed = False
             self._pressed_selection_additive = False
             self._pressed_selection_range = False
             self._pressed_selection_deferred = False
+            self._manual_selection = False
             self.set_focusable(True)
             self.set_hexpand(False)
             self.set_vexpand(False)
@@ -163,6 +171,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             selected_segment_ids: tuple[str, ...] | list[str] | None = None,
         ) -> None:
             self._timeline = timeline
+            self._manual_selection = False
             self._layout_key = None
             if timeline is None:
                 self._layout_segments = None
@@ -260,6 +269,52 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             )
             self.queue_draw()
 
+        def follow_playhead(self, position_seconds: float, *, playing: bool) -> None:
+            timeline = self._timeline
+            if timeline is None:
+                return
+            if playing:
+                self._manual_selection = False
+            self._layout()
+            primary = (
+                None
+                if self._selected_segment_id is None
+                else self._view_index.clip_for_segment(self._selected_segment_id)
+            )
+            if not playing and (
+                self._manual_selection
+                or (primary is not None and primary.deleted)
+                or len(self._selected_segment_ids) > 1
+            ):
+                return
+            pixels_per_second = timeline_pixels_per_second(
+                self._layout_duration, self._viewport_width, self._zoom
+            )
+            x = TIMELINE_HORIZONTAL_PADDING + position_seconds * pixels_per_second
+            candidates = self._view_index.query(x, -math.inf, x, math.inf)
+            active_track = timeline.active_track_id if timeline.tracks is not None else "track-1"
+            current = next(
+                (
+                    clip
+                    for clip in candidates
+                    if clip.track_id == active_track
+                    and not clip.deleted
+                    and (
+                        clip.timeline_start_seconds <= position_seconds < clip.timeline_end_seconds
+                        or (
+                            position_seconds == self._layout_duration
+                            and clip.timeline_end_seconds == position_seconds
+                        )
+                    )
+                ),
+                None,
+            )
+            selected = () if current is None else (current.segment_id,)
+            primary_id = None if current is None else current.segment_id
+            if selected != self._selected_segment_ids or primary_id != self._selected_segment_id:
+                self._set_selection(selected, primary_id, notify=True)
+                self.queue_draw()
+
         def set_selected_segments(
             self,
             segment_ids: tuple[str, ...] | list[str],
@@ -344,6 +399,10 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._drag_committed = False
             self._pressed_selection_additive = self._is_additive_selection(gesture)
             self._pressed_selection_range = self._is_range_selection(gesture)
+            self._manual_selection = (
+                self._pressed_selection_additive or self._pressed_selection_range
+            )
+            self._snap_bypassed = self._is_snap_bypassed(gesture)
             update_selection = True
             self._pressed_selection_deferred = False
             if (
@@ -373,11 +432,12 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
 
         def _on_released(
             self,
-            _gesture,
+            gesture,
             _n_press: int,
             x: float,
             y: float,
         ) -> None:
+            self._snap_bypassed = self._is_snap_bypassed(gesture)
             if not self._drag_happened and not self._drag_committed:
                 self._seek_from_x(
                     x,
@@ -391,6 +451,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._pressed_selection_additive = False
             self._pressed_selection_range = False
             self._pressed_selection_deferred = False
+            self._snap_bypassed = False
 
         def _on_drag_begin(
             self,
@@ -399,12 +460,22 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             start_y: float,
         ) -> None:
             self._drag_happened = True
+            self._drag_moved = False
+            self._pressed_selection_additive = self._is_additive_selection(gesture)
+            self._pressed_selection_range = self._is_range_selection(gesture)
+            self._manual_selection = (
+                self._pressed_selection_additive or self._pressed_selection_range
+            )
+            self._snap_bypassed = self._is_snap_bypassed(gesture)
             self._drag_committed = False
             self._drag_start_x = start_x
             self._drag_start_y = start_y
             self._drag_mode = None
             self._drag_last_seek_position = None
             self._drag_segment_id = None
+            self._drag_segment_ids = ()
+            self._drag_placements = ()
+            self._drag_error = None
             self._drag_preview = None
             if self._timeline is not None and self._timeline.timing_mode == "absolute":
                 clips = self._layout()
@@ -412,6 +483,11 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 if clip is not None:
                     self._drag_mode = "segment"
                     self._drag_segment_id = clip.segment_id
+                    self._drag_segment_ids = (
+                        self._selected_segment_ids
+                        if clip.segment_id in self._selected_segment_ids
+                        else (clip.segment_id,)
+                    )
                     pointer_ticks = timeline_drag_ticks_from_x(
                         start_x,
                         self._timeline_duration_seconds(),
@@ -423,8 +499,6 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                     )
                     self.queue_draw()
                     return
-            self._pressed_selection_additive = self._is_additive_selection(gesture)
-            self._pressed_selection_range = self._is_range_selection(gesture)
             self._drag_mode = "seek"
             self._seek_from_x(
                 start_x,
@@ -440,6 +514,10 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             offset_x: float,
             offset_y: float,
         ) -> None:
+            if self.drag_check_threshold(0, 0, round(offset_x), round(offset_y)):
+                self._drag_moved = True
+            if not self._drag_moved:
+                return
             if self._drag_mode == "segment" and self._drag_start_x is not None:
                 self._update_segment_drag(offset_x, offset_y)
             elif self._drag_start_x is not None:
@@ -453,13 +531,19 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
 
         def _on_drag_end(
             self,
-            _gesture,
+            gesture,
             offset_x: float,
             offset_y: float,
         ) -> None:
-            drag_committed = abs(offset_x) > 1.0 or abs(offset_y) > 1.0
+            drag_committed = self._drag_moved or self.drag_check_threshold(
+                0, 0, round(offset_x), round(offset_y)
+            )
+            self._drag_moved = drag_committed
             self._drag_committed = drag_committed
             self._drag_happened = drag_committed
+            if not drag_committed:
+                self._drag_mode = "seek"
+                self._snap_bypassed = self._is_snap_bypassed(gesture)
             if self._drag_mode == "segment":
                 if drag_committed:
                     self._update_segment_drag(offset_x, offset_y)
@@ -485,8 +569,12 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._drag_mode = None
             self._drag_last_seek_position = None
             self._drag_segment_id = None
+            self._drag_segment_ids = ()
+            self._drag_placements = ()
+            self._drag_error = None
             self._drag_preview = None
             self._drag_pointer_offset_ticks = 0
+            self._drag_moved = False
             self._pressed_selection_additive = False
             self._pressed_selection_range = False
             if reset_drag_happened:
@@ -512,25 +600,24 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 0,
                 target_pointer_ticks - self._drag_pointer_offset_ticks,
             )
+            self._drag_placements = ()
+            self._drag_error = None
             if target_track_id is not None and self._drag_segment_id is not None:
                 try:
-                    moving_segment = self._timeline.find(self._drag_segment_id)
-                    destination = self._timeline.track_by_id(target_track_id)
-                except ProjectValidationError:
+                    self._drag_placements = self._timeline.plan_block_move(
+                        self._drag_segment_ids,
+                        anchor_segment_id=self._drag_segment_id,
+                        timeline_start_ticks=requested_start_ticks,
+                        target_track_id=target_track_id,
+                    )
+                except ProjectValidationError as error:
+                    self._drag_error = str(error)
                     target_track_id = None
                 else:
-                    duration_ticks = (
-                        moving_segment.timeline_end_ticks - moving_segment.timeline_start_ticks
-                    )
-                    occupied = tuple(
-                        block
-                        for block in destination.blocks
-                        if block.segment_id != moving_segment.segment_id
-                    )
-                    requested_start_ticks = _earliest_fit(
-                        requested_start_ticks,
-                        duration_ticks,
-                        occupied,
+                    requested_start_ticks = next(
+                        start
+                        for segment_id, start, _track_id in self._drag_placements
+                        if segment_id == self._drag_segment_id
                     )
             return (
                 requested_start_ticks,
@@ -547,11 +634,13 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             segment_id = self._drag_segment_id
             if segment_id is None or target is None or target[1] is None:
                 if self._on_invalid_drop is not None:
-                    self._on_invalid_drop("Invalid drop: choose a timeline track row")
+                    self._on_invalid_drop(
+                        self._drag_error or "Invalid drop: choose a timeline track row"
+                    )
                 self.queue_draw()
                 return
             if self._on_segment_dropped is not None:
-                self._on_segment_dropped(segment_id, target[0], target[1])
+                self._on_segment_dropped(segment_id, target[0], target[1], self._drag_segment_ids)
             self.queue_draw()
 
         def _is_additive_selection(self, gesture) -> bool:
@@ -565,6 +654,10 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             if getter is None or self._range_selection_modifier_mask == 0:
                 return False
             return bool(int(getter()) & self._range_selection_modifier_mask)
+
+        def _is_snap_bypassed(self, gesture) -> bool:
+            getter = getattr(gesture, "get_current_event_state", None)
+            return getter is not None and bool(int(getter()) & self._snap_bypass_modifier_mask)
 
         def _set_selection(
             self,
@@ -655,11 +748,31 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 return
             self.grab_focus()
             clips = self._layout()
-            clip = hit_test_timeline_segment(
-                clips,
+            hit_y = y if self._timeline.timing_mode == "absolute" else None
+            candidates = self._view_index.query(
                 x,
-                y if self._timeline.timing_mode == "absolute" else None,
+                -math.inf if hit_y is None else hit_y,
+                x,
+                math.inf if hit_y is None else hit_y,
             )
+            clip = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if candidate.x
+                    <= x
+                    < candidate.x
+                    + (
+                        candidate.width
+                        if candidate.timeline_width is None
+                        else candidate.timeline_width
+                    )
+                    and (hit_y is None or candidate.contains_point(x, hit_y))
+                ),
+                None,
+            )
+            if clip is None:
+                clip = hit_test_timeline_segment(clips, x, hit_y)
             if clip is not None and update_selection:
                 self._select_clip(
                     clip.segment_id,
@@ -672,6 +785,15 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 self._viewport_width,
                 self._zoom,
             )
+            if (
+                (self._drag_mode is None or (self._drag_mode == "seek" and not self._drag_moved))
+                and not self._snap_bypassed
+                and clip is not None
+                and y is not None
+                and clip.contains_point(x, y)
+                and clip.x <= x < clip.x + clip.snap_width
+            ):
+                position = clip.timeline_start_seconds
             self.set_playhead(position)
             if notify and self._on_seek is not None:
                 if self._drag_mode != "seek" or position != self._drag_last_seek_position:
@@ -750,16 +872,17 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             left, top, right, bottom = context.clip_extents()
             clips = self._view_index.query(left, top, right, bottom)
             if self._drag_segment_id is not None and self._drag_preview is not None:
-                original = self._view_index.clip_for_segment(self._drag_segment_id)
-                if original is not None:
-                    preview = self._clips_with_drag_preview((original,), rows)[0]
-                    if preview is not original:
-                        clips = tuple(
-                            clip for clip in clips if clip.segment_id != original.segment_id
-                        )
-                        # A drag can bring an originally offscreen clip into view.
-                        # Reinsert it in its original paint position, not on top.
-                        clips = tuple(sorted((*clips, preview), key=lambda clip: clip.index))
+                originals = tuple(
+                    clip
+                    for segment_id in self._drag_segment_ids or (self._drag_segment_id,)
+                    if (clip := self._view_index.clip_for_segment(segment_id)) is not None
+                )
+                previews = self._clips_with_drag_preview(originals, rows)
+                if previews != originals:
+                    moving_ids = {clip.segment_id for clip in originals}
+                    clips = tuple(clip for clip in clips if clip.segment_id not in moving_ids)
+                    # Selected clips can enter the viewport from offscreen.
+                    clips = tuple(sorted((*clips, *previews), key=lambda clip: clip.index))
             for clip in clips:
                 if (
                     clip.end_x + 12 >= left
@@ -812,30 +935,39 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             target_ticks, target_track_id = self._drag_preview
             if target_track_id is None:
                 return clips
-            target_row = next(
-                (row for row in rows if row.track_id == target_track_id),
-                None,
-            )
-            if target_row is None:
-                return clips
+            placements = {
+                segment_id: (start, track_id)
+                for segment_id, start, track_id in self._drag_placements
+            }
+            if not placements:
+                placements = {self._drag_segment_id: (target_ticks, target_track_id)}
             pixels_per_second = timeline_pixels_per_second(
                 self._timeline_duration_seconds(),
                 self._viewport_width,
                 self._zoom,
             )
-            return tuple(
-                replace(
-                    clip,
-                    x=TIMELINE_HORIZONTAL_PADDING
-                    + ticks_to_seconds(target_ticks) * pixels_per_second,
-                    track_id=target_track_id,
-                    track_index=target_row.index,
-                    y=target_row.y + 20.0,
+            previews = []
+            for clip in clips:
+                target = placements.get(clip.segment_id)
+                target_row = (
+                    None
+                    if target is None
+                    else next((row for row in rows if row.track_id == target[1]), None)
                 )
-                if clip.segment_id == self._drag_segment_id
-                else clip
-                for clip in clips
-            )
+                if target is None or target_row is None:
+                    previews.append(clip)
+                else:
+                    previews.append(
+                        replace(
+                            clip,
+                            x=TIMELINE_HORIZONTAL_PADDING
+                            + ticks_to_seconds(target[0]) * pixels_per_second,
+                            track_id=target_row.track_id,
+                            track_index=target_row.index,
+                            y=target_row.y + 20.0,
+                        )
+                    )
+            return tuple(previews)
 
         @staticmethod
         def _rounded_rectangle(context, x, y, width, height, radius) -> None:

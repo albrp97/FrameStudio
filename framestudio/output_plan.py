@@ -408,6 +408,17 @@ def plan_project_outputs(
     return OutputPlan(selection, final_request, source_requests, output_root)
 
 
+def active_export_sources(project: Project) -> tuple[SourceReference, ...]:
+    """Return only sources referenced by included blocks, in import order."""
+    sources = _sources_by_id(project)
+    source_ids = {
+        _block_source_id(block, sources)
+        for block in project.timeline.segment_items
+        if not block.deleted
+    }
+    return tuple(source for source_id, source in sources.items() if source_id in source_ids)
+
+
 def _sources_by_id(project: Project) -> dict[str, SourceReference]:
     records = tuple(project.sources or (project.source,))
     result: dict[str, SourceReference] = {}
@@ -702,6 +713,7 @@ class _NameAllocator:
 
 
 __all__ = [
+    "active_export_sources",
     "COMBINED",
     "COMBINED_OUTPUT_MODE",
     "FINAL_AUDIO_INTENT",

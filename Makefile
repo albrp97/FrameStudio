@@ -12,13 +12,15 @@ QUALITY_PATHS = framestudio.py framestudio tests/test_editor_*.py \
 	tests/test_efficient_export_pipeline_benchmark.py \
 	benchmarks/playback_performance.py benchmarks/large_timeline_performance.py \
 	benchmarks/seek_performance.py benchmarks/large_project_preview.py \
+	benchmarks/repeated_render_benchmark.py \
 	tests/test_large_project_benchmark.py \
 	tools/check_dependencies.py tools/check_duplication.py
 COMPLEXITY_PATHS = framestudio.py framestudio/cli.py framestudio/operations.py \
 	benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py \
 	benchmarks/efficient_export_pipeline_benchmark.py \
 	benchmarks/playback_performance.py benchmarks/large_timeline_performance.py \
-	benchmarks/seek_performance.py benchmarks/large_project_preview.py
+	benchmarks/seek_performance.py benchmarks/large_project_preview.py \
+	benchmarks/repeated_render_benchmark.py
 
 .PHONY: help setup test compile diff-check check format-check lint type-check \
 	complexity duplication duplication-baseline dependency-check dependency-audit security churn \
@@ -82,6 +84,7 @@ type-check:
 		benchmarks/playback_performance.py benchmarks/large_timeline_performance.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/seek_performance.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/large_project_preview.py
+	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/repeated_render_benchmark.py
 	$(PYTHON) -m mypy --config-file pyproject.toml tools/check_dependencies.py
 	$(PYTHON) -m mypy --config-file pyproject.toml tools/check_duplication.py
 
@@ -121,6 +124,7 @@ security:
 		benchmarks/playback_performance.py benchmarks/large_timeline_performance.py \
 		benchmarks/seek_performance.py \
 		benchmarks/large_project_preview.py \
+		benchmarks/repeated_render_benchmark.py \
 		tools/check_dependencies.py tools/check_duplication.py \
 		--configfile pyproject.toml --format json \
 		--output $(STATIC_ANALYSIS_DIR)/bandit.json

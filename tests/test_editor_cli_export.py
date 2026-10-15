@@ -1,3 +1,4 @@
+import argparse
 import io
 import json
 import os
@@ -6,6 +7,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -69,6 +71,39 @@ def run_cli(*arguments: str):
 
 
 class EditorCliExportTests(unittest.TestCase):
+    def test_synchronized_planning_propagates_cancellation_to_every_output(self):
+        from framestudio.cli_export import _build_output_plans
+        from framestudio.output_plan import plan_project_outputs
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            legacy = make_project(root)
+            project = Project.create_synchronized_multi(
+                ((Path(legacy.source.path), legacy.source.metadata),)
+            )
+            outputs = plan_project_outputs(project, root / "out.mp4", mode="final-only")
+            event = threading.Event()
+            with (
+                patch("framestudio.cli_export.ensure_project_audio_analysis"),
+                patch("framestudio.cli_export.plan_project_av") as plan_final,
+                patch(
+                    "framestudio.cli_export.plan_source_outputs", return_value=()
+                ) as plan_sources,
+            ):
+                _build_output_plans(
+                    argparse.Namespace(),
+                    project,
+                    outputs,
+                    lambda *_a, **_k: None,
+                    cancel_event=event,
+                )
+            self.assertIs(plan_final.call_args.kwargs.get("cancel_event"), event)
+            self.assertIs(plan_sources.call_args.kwargs.get("cancel_event"), event)
+            self.assertIs(
+                plan_final.call_args.kwargs.get("runtime_cache"),
+                plan_sources.call_args.kwargs.get("runtime_cache"),
+            )
+
     def test_sigint_during_synchronized_audio_planning_is_structured_and_cleans_child(self):
         self._assert_audio_planning_cancellation(synchronized=True)
 

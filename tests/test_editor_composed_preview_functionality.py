@@ -446,9 +446,6 @@ class ComposedPreviewFunctionalityTests(unittest.TestCase):
     def test_real_gtk_preview_shows_synchronized_slots_boundaries_and_gap(self):
         self._open_project(self.fixture.project_path)
         self._require_preview_backend()
-        selected_segment_id = self.window.selected_segment_id
-        selected_segment_ids = self.window.selected_segment_ids
-
         samples = (
             (1.25, 2),
             (2.25, 4),
@@ -478,8 +475,12 @@ class ComposedPreviewFunctionalityTests(unittest.TestCase):
                 position_seconds,
                 delta=0.04,
             )
-        self.assertEqual(self.window.selected_segment_id, selected_segment_id)
-        self.assertEqual(self.window.selected_segment_ids, selected_segment_ids)
+            if interval.active_block_ids:
+                self.assertIn(self.window.selected_segment_id, interval.active_block_ids)
+                self.assertEqual(
+                    set(self.window.selected_segment_ids),
+                    {self.window.selected_segment_id},
+                )
         for source, expected_hash in self.fixture.source_hashes.items():
             self.assertEqual(_sha256(source), expected_hash)
 

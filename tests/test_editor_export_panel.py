@@ -125,6 +125,7 @@ def unavailable_rve_validation(
     source_rate,
     target_rate,
     ffmpeg_path,
+    runtime_cache=None,
 ):
     if backend.startswith("rve"):
         return BackendValidation(
@@ -146,6 +147,49 @@ def unavailable_rve_validation(
 
 
 class EditorExportPanelTests(unittest.TestCase):
+    def test_panel_counts_and_resolves_only_sources_used_by_active_segments(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            project = make_mixed_rate_project(root)
+            project.timeline.set_deleted(project.timeline.segment_items[2].segment_id, True)
+            state = prepare_export_panel(
+                project,
+                root,
+                choice="highest",
+                enhancement_enabled=False,
+                backend="ffmpeg-minterpolate",
+            )
+
+        self.assertTrue(state.valid, state.reason)
+        self.assertEqual(state.policy.target_rate, 60)
+        self.assertEqual(state.summary["fps"]["source_count"], 2)
+        self.assertEqual(state.summary["upscale"]["source_count"], 2)
+        self.assertEqual(state.estimate["input_count"], 2)
+
+    def test_pending_rows_exclude_deleted_sources(self):
+        with TemporaryDirectory() as temporary_directory:
+            project = make_multi_project(Path(temporary_directory))
+            project.timeline.set_deleted(project.timeline.segment_items[0].segment_id, True)
+            fps_rows = dict(fps_panel_rows(project, choice="60", enhancement_enabled=True))
+            upscale_rows = dict(upscale_panel_rows(project, enabled=True))
+
+        self.assertEqual(fps_rows["Videos to FPS enhance"], "2")
+        self.assertEqual(upscale_rows["Videos to upscale"], "1")
+
+    def test_identical_rates_share_backend_validation_without_losing_source_decisions(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            with patch(
+                "framestudio.export_panel.validate_interpolation_backend",
+                side_effect=unavailable_rve_validation,
+            ) as validate:
+                state = prepare_export_panel(make_multi_project(root), root)
+
+        self.assertTrue(state.valid, state.reason)
+        self.assertEqual(len(state.policy.decisions), 3)
+        self.assertEqual(len(state.backend_validation), 3)
+        self.assertEqual(validate.call_count, 2, "one RVE and one fallback check, not per source")
+
     def test_default_panel_policy_is_sixty_with_enhancement_enabled(self):
         with TemporaryDirectory() as temporary_directory:
             state = prepare_export_panel(

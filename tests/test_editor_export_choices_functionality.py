@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import unittest
 import uuid
 from copy import deepcopy
@@ -13,6 +14,7 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, cast
+from unittest.mock import patch
 
 from framestudio.app import create_editor_application
 from framestudio.fps_policy import FrameRatePolicy
@@ -679,6 +681,76 @@ class EditorExportChoiceGtkFunctionalityTests(unittest.TestCase):
             raise AssertionError(
                 f"{error}; panel text={_visible_widget_text(panel)!r}",
             ) from error
+
+    def test_native_planner_reuses_preflight_and_applies_latest_filename_and_active_counts(self):
+        project = self.window.project
+        project.set_frame_rate_policy(
+            FrameRatePolicy(
+                choice="60", target_rate=60, enhancement_enabled=True, backend="rve-4.26"
+            )
+        )
+        omitted_id = project.sources[2].source_id
+        for block in tuple(project.timeline.segment_items):
+            if block.source_id == omitted_id:
+                project.timeline.set_deleted(block.segment_id, True)
+        source_hashes = {path: _sha256(path) for path in self.source_paths}
+        before_outputs = set(self.root.rglob("*.mp4"))
+        model = self.root / "model.pkl"
+        model.touch()
+        defaults = {
+            "fps_python": Path(sys.executable),
+            "site_packages": self.root,
+            "rve_model": model,
+            "rve_root": self.root,
+            "rve_shims": self.root,
+        }
+        started = threading.Event()
+        release = threading.Event()
+
+        def preflight(*_args, **_kwargs):
+            started.set()
+            if not release.wait(timeout=10):
+                raise RuntimeError("Functionality fixture preflight was not released")
+            return None
+
+        with (
+            patch("framestudio.interpolation._rve_defaults", return_value=defaults),
+            patch("framestudio_fps.rve_unavailable_reason", side_effect=preflight) as check,
+        ):
+            panel = self._open_panel()
+            try:
+                self._wait_until(started.is_set, "planner did not start its runtime preflight")
+                entry = self._find_widget(
+                    panel,
+                    lambda current: (
+                        isinstance(current, self.Gtk.Entry) and current.get_text().endswith(".mp4")
+                    ),
+                )
+                self.assertIsNotNone(entry)
+                for index in range(20):
+                    entry.set_text(f"typing-{index}.mp4")
+            finally:
+                release.set()
+            self._wait_for_export_plan(panel)
+            self.assertEqual(check.call_count, 1)
+            self.assertEqual(self._export_filename(panel), "typing-19.mp4")
+            grid = self._find_widget(panel, lambda current: isinstance(current, self.Gtk.Grid))
+            rows = {}
+            index = 0
+            while grid.get_child_at(0, index) is not None:
+                rows[grid.get_child_at(0, index).get_text()] = grid.get_child_at(
+                    1, index
+                ).get_text()
+                index += 1
+            self.assertEqual(rows["Videos to FPS enhance"], "2")
+            self.assertEqual(rows["Videos to upscale"], "2")
+            self.assertTrue(self._required_render_button(panel).get_sensitive())
+            entry.set_text("final-choice.mp4")
+            self._wait_for_export_plan(panel)
+            self.assertEqual(check.call_count, 1)
+            self.assertTrue(self._required_render_button(panel).get_sensitive())
+        self.assertEqual(set(self.root.rglob("*.mp4")), before_outputs)
+        self.assertEqual({path: _sha256(path) for path in self.source_paths}, source_hashes)
 
     def test_native_output_controls_default_and_update_counts_for_one_to_four_tracks(self):
         expected_pairs = (2, 4, 5, 6)

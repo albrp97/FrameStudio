@@ -16,11 +16,203 @@ from framestudio.audio import (
     audio_analysis_worker_count,
 )
 from framestudio.media import probe_media
-from framestudio.model import SourceReference
-from framestudio.persistence import load_autosave
+from framestudio.model import Project, SourceReference
+from framestudio.persistence import load_autosave, save_project
 
 
 class ExportAudioAnalysisFunctionalityTests(unittest.TestCase):
+    def test_repeated_three_track_render_reports_progress_and_cancels_preparation(self):
+        from framestudio.app_export import ExportBatchExecutionError, run_output_choice_job
+        from framestudio.fps_policy import FrameRatePolicy
+        from framestudio.upscale_policy import UpscalePolicy
+        from tests.test_editor_layout_plan_functionality import make_block
+        from tests.test_editor_source_outputs_functionality import _make_constant_source
+
+        with TemporaryDirectory(prefix="framestudio-three-track-") as temporary:
+            root = Path(temporary)
+            source_path = root / "source.mp4"
+            _make_constant_source(
+                source_path,
+                color="red",
+                frame_rate=24,
+                width=320,
+                height=180,
+                frequencies=(440, 880),
+                duration=0.5,
+            )
+            original = source_path.read_bytes()
+            project = Project.create_synchronized_multi(
+                ((source_path, probe_media(source_path).metadata()),)
+            )
+            for track in ("track-2", "track-3"):
+                project.timeline.add_track(track)
+            for index, track in enumerate(project.timeline.tracks):
+                project.timeline.replace_track_blocks(
+                    track.track_id,
+                    (
+                        make_block(
+                            segment_id=f"copy-{index}",
+                            source_id=project.source.source_id,
+                            track_id=track.track_id,
+                            source_start=0.0,
+                            source_end=0.5,
+                            timeline_start=0.0,
+                            timeline_end=0.5,
+                        ),
+                    ),
+                )
+            project.validate()
+            options = {
+                "output_mode": "final-only",
+                "frame_rate_policy": FrameRatePolicy(
+                    choice="custom",
+                    target_rate=24,
+                    custom_rate=24,
+                    enhancement_enabled=False,
+                ),
+                "upscale_policy": UpscalePolicy(enhancement_enabled=False),
+            }
+            stages = []
+            destination = root / "combined.mp4"
+            with patch.dict("os.environ", {"XDG_CACHE_HOME": str(root / "cache")}):
+                run_output_choice_job(
+                    project,
+                    destination,
+                    **options,
+                    progress_callback=lambda progress: stages.append(progress.stage),
+                    cancel_event=threading.Event(),
+                )
+                media = probe_media(destination)
+                self.assertEqual((media.width, media.height), (1920, 1080))
+                self.assertTrue(media.has_audio_stream)
+                self.assertAlmostEqual(media.duration_seconds, 0.5, delta=0.1)
+                self.assertIn("Planning export outputs", stages)
+                self.assertIn("Inspecting export sources", stages)
+                self.assertIn("video composition", stages)
+                event = threading.Event()
+
+                def cancel_preparation(progress):
+                    if progress.stage == "Preparing video segments":
+                        event.set()
+
+                cancelled_destination = root / "cancelled.mp4"
+                with self.assertRaises(ExportBatchExecutionError):
+                    run_output_choice_job(
+                        project,
+                        cancelled_destination,
+                        **options,
+                        progress_callback=cancel_preparation,
+                        cancel_event=event,
+                    )
+            self.assertTrue(event.is_set())
+            self.assertFalse(cancelled_destination.exists())
+            self.assertEqual(source_path.read_bytes(), original)
+
+    def test_completed_audio_is_reused_by_a_fresh_export_process(self):
+        with TemporaryDirectory(prefix="framestudio-durable-audio-") as temporary:
+            root = Path(temporary)
+            tone = root / "tone.wav"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "sine=frequency=440:sample_rate=48000:duration=0.5",
+                    str(tone),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            source = self._audio_sources(root, tone, 1)[0]
+            project = Project.create_multi((source,))
+            project_path = root / "pending.framestudio.json"
+            save_project(project, project_path)
+            trace = root / "analysis-starts.txt"
+            wrapper = root / "ffmpeg-traced"
+            wrapper.write_text(
+                f"#!{sys.executable}\n"
+                "import os, sys\n"
+                f"with open({str(trace)!r}, 'a') as log: log.write('scan\\n')\n"
+                f"os.execv({shutil.which('ffmpeg')!r}, ['ffmpeg', *sys.argv[1:]])\n",
+                encoding="utf-8",
+            )
+            wrapper.chmod(0o755)
+            script = (
+                "import json, sys\n"
+                "from framestudio.persistence import load_project\n"
+                "from framestudio.operations import ensure_project_audio_analysis\n"
+                "project = load_project(sys.argv[1])\n"
+                "print(json.dumps(ensure_project_audio_analysis(project, ffmpeg_path=sys.argv[2])))\n"
+            )
+            with patch.dict("os.environ", {"XDG_CACHE_HOME": str(root / "cache")}):
+                results = [
+                    subprocess.run(
+                        [sys.executable, "-c", script, str(project_path), str(wrapper)],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    for _ in range(2)
+                ]
+            self.assertEqual(json.loads(results[0].stdout), json.loads(results[1].stdout))
+            self.assertEqual(trace.read_text().splitlines(), ["scan"])
+            self.assertEqual(json.loads(results[1].stdout)[source.source_id]["status"], "ready")
+
+    def test_cancelling_native_segment_extraction_terminates_the_owned_child(self):
+        from framestudio.export_types import ExportExecutionError
+        from framestudio.video_compositor import _extract_block
+
+        with TemporaryDirectory(prefix="framestudio-cancel-extraction-") as temporary:
+            root = Path(temporary)
+            trace = root / "pid.txt"
+            wrapper = root / "ffmpeg-blocking"
+            wrapper.write_text(
+                f"#!{sys.executable}\nimport os, time\n"
+                f"with open({str(trace)!r}, 'w') as log: log.write(str(os.getpid()))\n"
+                "time.sleep(60)\n",
+                encoding="utf-8",
+            )
+            wrapper.chmod(0o755)
+            event = threading.Event()
+            failures = []
+
+            def extract():
+                try:
+                    _extract_block(
+                        root / "source.mp4",
+                        root / "partial.mp4",
+                        0.0,
+                        1.0,
+                        30,
+                        str(wrapper),
+                        cancel_event=event,
+                    )
+                except ExportExecutionError as error:
+                    failures.append(error)
+
+            worker = threading.Thread(target=extract)
+            worker.start()
+            try:
+                deadline = time.monotonic() + 5
+                while (not trace.exists() or not trace.read_text()) and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(trace.exists(), "native extraction subprocess did not start")
+                pid = int(trace.read_text())
+            finally:
+                started = time.monotonic()
+                event.set()
+                worker.join(timeout=5)
+            self.assertFalse(worker.is_alive())
+            self.assertLess(time.monotonic() - started, 3)
+            self.assertEqual(len(failures), 1)
+            self.assertIn("cancelled", str(failures[0]).casefold())
+            self.assertFalse(Path(f"/proc/{pid}").exists())
+            self.assertFalse((root / "partial.mp4").exists())
+
     @unittest.skipUnless(audio_analysis_worker_count(2) > 1, "Two CPU cores are required")
     def test_parallel_scans_match_serial_measurements_and_use_distinct_workers(self):
         with TemporaryDirectory(prefix="framestudio-parallel-audio-") as temporary:

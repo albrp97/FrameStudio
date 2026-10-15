@@ -24,8 +24,8 @@ from .operations import (
     copy_visual_transform,
     disable_triplicate,
     enable_triplicate,
-    move_segment,
     move_segments,
+    move_segments_to_track,
     paste_segments,
     paste_segments_after_selection,
     split_segment,
@@ -90,6 +90,7 @@ def on_timeline_segment_dropped(
     segment_id: str,
     timeline_start_ticks: int,
     target_track_id: str,
+    segment_ids: tuple[str, ...] | None = None,
 ) -> None:
     if _editing_locked(window):
         return
@@ -98,13 +99,16 @@ def on_timeline_segment_dropped(
     if window.segment_timeline.timing_mode != "absolute":
         window._show_error("Track drops require synchronized timing")
         return
-    selected_segment_ids = tuple(getattr(window, "selected_segment_ids", ()))
+    selected_segment_ids = (
+        tuple(getattr(window, "selected_segment_ids", ())) if segment_ids is None else segment_ids
+    )
     focused_segment_id = getattr(window, "selected_segment_id", None)
     preserve_selection = segment_id in selected_segment_ids
     try:
-        move_segment(
+        move_segments_to_track(
             window.project,
-            segment_id,
+            selected_segment_ids if preserve_selection else (segment_id,),
+            anchor_segment_id=segment_id,
             timeline_start_ticks=timeline_start_ticks,
             target_track_id=target_track_id,
         )
@@ -120,7 +124,8 @@ def on_timeline_segment_dropped(
         window.selected_segment_id = segment_id
         window.selected_segment_ids = (segment_id,)
     window._refresh_timeline(window.selected_segment_id)
-    window._set_status("Moved clip on the absolute timeline")
+    count = len(window.selected_segment_ids)
+    window._set_status(f"Moved {count} selected clip(s) on the absolute timeline")
 
 
 def on_timeline_invalid_drop(window: Any, message: str) -> None:

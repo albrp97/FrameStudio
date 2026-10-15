@@ -10,6 +10,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,26 @@ from .fps_policy import (
     resolve_frame_rate_policy,
     supports_interpolation,
 )
+
+RuntimeValidationCache = dict[tuple[Path, ...], str | None]
+
+
+def validate_rve_runtime(
+    arguments: argparse.Namespace,
+    runtime_cache: RuntimeValidationCache | None = None,
+) -> str | None:
+    from framestudio_fps import rve_unavailable_reason
+
+    key = tuple(
+        Path(getattr(arguments, name)).expanduser().resolve()
+        for name in ("python", "site_packages", "rve_model", "rve_root", "rve_shims")
+    )
+    if runtime_cache is not None and key in runtime_cache:
+        return runtime_cache[key]
+    reason = rve_unavailable_reason(arguments, announce=False)
+    if runtime_cache is not None:
+        runtime_cache[key] = reason
+    return reason
 
 
 @dataclass(frozen=True)
@@ -83,6 +104,7 @@ def validate_interpolation_backend(
     graph: Path | None = None,
     trt_cache: Path | None = None,
     bestsource: Path | None = None,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> BackendValidation:
     source = canonical_rate(source_rate)
     target = canonical_rate(target_rate)
@@ -163,9 +185,7 @@ def validate_interpolation_backend(
             reason = f"RIFE model was not found: {rve_model}"
         else:
             try:
-                from framestudio_fps import rve_unavailable_reason
-
-                runtime_reason = rve_unavailable_reason(
+                runtime_reason = validate_rve_runtime(
                     argparse.Namespace(
                         python=fps_python,
                         site_packages=site_packages,
@@ -173,7 +193,7 @@ def validate_interpolation_backend(
                         rve_root=rve_root,
                         rve_shims=defaults["rve_shims"],
                     ),
-                    announce=False,
+                    runtime_cache,
                 )
                 if runtime_reason is not None:
                     reason = runtime_reason
@@ -214,7 +234,7 @@ def resolve_frame_rate_policy_with_fallback(
     enhancement_enabled: bool,
     backend: str,
     ffmpeg_path: str = "ffmpeg",
-    backend_validator: Callable[..., BackendValidation] = validate_interpolation_backend,
+    backend_validator: Callable[..., BackendValidation] | None = None,
 ) -> tuple[ResolvedFrameRatePolicy, tuple[BackendValidation, ...], str | None]:
     policy = resolve_frame_rate_policy(
         source_metadata,
@@ -225,16 +245,26 @@ def resolve_frame_rate_policy_with_fallback(
     )
     if not enhancement_enabled:
         return policy, (), None
-    validations = tuple(
-        backend_validator(
-            policy.policy.backend,
-            source_rate=decision.source_rate,
-            target_rate=decision.target_rate,
-            ffmpeg_path=ffmpeg_path,
-        )
-        for decision in policy.decisions
-        if decision.action in {"interpolate", "unsupported"}
-    )
+    validator = backend_validator or partial(validate_interpolation_backend, runtime_cache={})
+    checked: dict[tuple[str, Fraction, Fraction], BackendValidation] = {}
+
+    def validate(resolved: ResolvedFrameRatePolicy) -> tuple[BackendValidation, ...]:
+        validations = []
+        for decision in resolved.decisions:
+            if decision.action not in {"interpolate", "unsupported"}:
+                continue
+            key = (resolved.policy.backend, decision.source_rate, decision.target_rate)
+            if key not in checked:
+                checked[key] = validator(
+                    resolved.policy.backend,
+                    source_rate=decision.source_rate,
+                    target_rate=decision.target_rate,
+                    ffmpeg_path=ffmpeg_path,
+                )
+            validations.append(checked[key])
+        return tuple(validations)
+
+    validations = validate(policy)
     if (
         not validations
         or not backend.casefold().strip().startswith("rve")
@@ -254,16 +284,7 @@ def resolve_frame_rate_policy_with_fallback(
     )
     if fallback.has_unsupported_sources:
         return policy, validations, None
-    fallback_validations = tuple(
-        backend_validator(
-            fallback.policy.backend,
-            source_rate=decision.source_rate,
-            target_rate=decision.target_rate,
-            ffmpeg_path=ffmpeg_path,
-        )
-        for decision in fallback.decisions
-        if decision.action in {"interpolate", "unsupported"}
-    )
+    fallback_validations = validate(fallback)
     if not fallback_validations or not all(item.available for item in fallback_validations):
         return policy, validations, None
     return (

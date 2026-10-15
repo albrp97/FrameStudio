@@ -14,6 +14,7 @@ from .app_helpers import (
     is_split_key,
     playback_action_label,
     route_timeline_scroll,
+    super_modifier_mask,
     timeline_scroll_position,
 )
 from .app_project import _invalidate_audio_analysis
@@ -74,7 +75,7 @@ def on_key_pressed(
     shift_pressed = bool(state & int(Gdk.ModifierType.SHIFT_MASK))
     control_pressed = bool(state & int(Gdk.ModifierType.CONTROL_MASK))
     if keyval in (ord("z"), ord("Z")):
-        undo_modifier = int(Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SUPER_MASK)
+        undo_modifier = int(Gdk.ModifierType.CONTROL_MASK) | super_modifier_mask(Gdk)
         if state & undo_modifier and not shift_pressed:
             window._on_undo_clicked(None)
             return True
@@ -145,6 +146,7 @@ def seek_timeline(window: Any, position_seconds: float) -> bool:
         window.project.set_playhead(_timeline_position(window))
     window.timeline_canvas.set_playhead(_timeline_position(window))
     window._update_playback_controls()
+    _follow_playhead_selection(window)
     return True
 
 
@@ -174,6 +176,7 @@ def request_timeline_preview(window: Any, position_seconds: float) -> bool:
         )
     window.timeline_canvas.set_playhead(_timeline_position(window, actual_position))
     window._update_playback_controls()
+    _follow_playhead_selection(window, playing=was_playing)
     frame_lock = getattr(window, "_frame_lock", None)
     if frame_lock is not None:
         with frame_lock:
@@ -245,6 +248,17 @@ def update_playback_controls(window: Any) -> None:
     window.play_button.set_label(playback_action_label(snapshot.state))
     window.position_label.set_text(format_duration(snapshot.position_seconds))
     window.timeline_canvas.set_playhead(_timeline_position(window))
+    if snapshot.state == PlaybackState.PLAYING:
+        _follow_playhead_selection(window, playing=True)
+
+
+def _follow_playhead_selection(window: Any, *, playing: bool | None = None) -> None:
+    follow = getattr(window.timeline_canvas, "follow_playhead", None)
+    if window.controller is None or not callable(follow):
+        return
+    if playing is None:
+        playing = window.controller.snapshot().state == PlaybackState.PLAYING
+    follow(_timeline_position(window), playing=playing)
 
 
 def _timeline_position(window: Any, edited_position: float | None = None) -> float:

@@ -4,6 +4,7 @@ import math
 
 from .timeline_geometry import (
     SELECTED_CLIP_BORDER_COLOR,
+    TIMELINE_CLIP_BADGE_RADIUS,
     TIMELINE_HORIZONTAL_PADDING,
     TIMELINE_RULER_HEIGHT,
     TIMELINE_TRACK_HEIGHT,
@@ -151,6 +152,13 @@ def draw_clip(
     )
     context.set_source_rgba(*fill)
     context.fill_preserve()
+    context.save()
+    context.clip()
+    context.rectangle(clip.x, y, clip.snap_width, height)
+    context.set_source_rgba(1.0, 1.0, 1.0, 0.16)
+    context.fill()
+    context.restore()
+    rounded_rectangle(context, clip.x, y, clip.width, height, 5.0)
     context.set_source_rgba(*border)
     context.set_line_width(3.0 if selected else 1.0)
     context.stroke()
@@ -170,13 +178,11 @@ def draw_clip(
             offset += 10.0
         context.restore()
 
-    if clip.width >= 22.0:
-        bubble_x = min(
-            clip.x + 12.0,
-            clip.end_x - 11.0,
-        )
+    badge = clip.badge_center
+    if badge is not None:
+        bubble_x, bubble_y = badge
         context.set_source_rgba(0.08, 0.09, 0.14, 0.92)
-        context.arc(bubble_x, y, 9.0, 0.0, math.tau)
+        context.arc(bubble_x, bubble_y, TIMELINE_CLIP_BADGE_RADIUS, 0.0, math.tau)
         context.fill()
         draw_text(
             context,

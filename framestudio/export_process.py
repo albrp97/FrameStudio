@@ -39,6 +39,30 @@ class _ManagedProcess(Protocol):
 _PROCESS_TERMINATION_TIMEOUT_SECONDS = 5.0
 
 
+def check_export_cancelled(cancel_event: threading.Event | None) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise ExportExecutionError("Export cancelled")
+
+
+def report_preparation_progress(
+    callback: ExportProgressCallback | None,
+    stage: str,
+    completed: int,
+    total: int,
+    started: float,
+) -> None:
+    emit_export_progress(
+        callback,
+        stage=stage,
+        current_seconds=completed,
+        total_duration_seconds=total,
+        frame=completed,
+        total_frames=total,
+        fps=None,
+        started=started,
+    )
+
+
 def output_format(path: Path) -> str:
     return "matroska" if path.suffix.lower() in {".mkv", ".matroska"} else "mp4"
 

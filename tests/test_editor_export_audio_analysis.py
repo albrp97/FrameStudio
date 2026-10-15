@@ -1,11 +1,14 @@
 import threading
 import unittest
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from framestudio.audio import (
     AudioAnalysisCancelled,
+    AudioAnalysisError,
     AudioDecision,
     audio_analysis_worker_count,
     pending_audio_decision,
@@ -17,6 +20,77 @@ from tests.test_editor_audio import source_reference
 
 
 class ExportAudioAnalysisTests(unittest.TestCase):
+    def test_cache_errors_are_explicit_and_atomic_writes_preserve_old_records(self):
+        from framestudio.audio_cache import load_audio_analysis, save_audio_analysis
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = source_reference(root)
+            ready = {
+                **pending_audio_decision(source).to_dict(),
+                "status": "ready",
+                "gain_db": 0.0,
+            }
+            with patch.dict("os.environ", {"XDG_CACHE_HOME": str(root / "cache")}):
+                save_audio_analysis(source, ready, ffmpeg_path="ffmpeg")
+                cache_file = next((root / "cache").rglob("*.json"))
+                original = cache_file.read_bytes()
+                self.assertEqual(cache_file.stat().st_mode & 0o777, 0o600)
+                with patch(
+                    "framestudio.audio_cache.os.replace", side_effect=PermissionError("test")
+                ):
+                    with self.assertRaisesRegex(AudioAnalysisError, "Could not save"):
+                        save_audio_analysis(source, ready, ffmpeg_path="ffmpeg")
+                self.assertEqual(cache_file.read_bytes(), original)
+                self.assertEqual(list(cache_file.parent.glob(".audio-*")), [])
+                cache_file.write_text("{invalid")
+                with self.assertRaisesRegex(AudioAnalysisError, "Could not read"):
+                    load_audio_analysis(source, ffmpeg_path="ffmpeg")
+
+    def test_disk_cache_is_invalidated_when_source_metadata_or_tool_changes(self):
+        from framestudio.audio_cache import load_audio_analysis, save_audio_analysis
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = source_reference(root)
+            ready = replace(pending_audio_decision(source), status="ready", gain_db=0.0).to_dict()
+            with patch.dict("os.environ", {"XDG_CACHE_HOME": str(root / "cache")}):
+                save_audio_analysis(source, ready, ffmpeg_path="ffmpeg")
+                self.assertEqual(load_audio_analysis(source, ffmpeg_path="ffmpeg"), ready)
+                self.assertIsNone(load_audio_analysis(source, ffmpeg_path="/missing/ffmpeg"))
+                changed = replace(source, metadata={**source.metadata, "audio_codec": "flac"})
+                self.assertIsNone(load_audio_analysis(changed, ffmpeg_path="ffmpeg"))
+                Path(source.path).write_bytes(b"changed media")
+                with self.assertRaisesRegex(AudioAnalysisError, "Source changed"):
+                    load_audio_analysis(source, ffmpeg_path="ffmpeg")
+
+    def test_audio_cache_survives_cancel_and_a_fresh_project_instance(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = source_reference(root)
+            project = Project.create_multi((source,))
+            untouched = deepcopy(project)
+            ready = replace(pending_audio_decision(source), status="ready", gain_db=0.0)
+
+            def cancel_after_result(_sources, *, result_callback, **_options):
+                result_callback(source, ready)
+                raise AudioAnalysisCancelled("Audio analysis was cancelled")
+
+            with patch.dict("os.environ", {"XDG_CACHE_HOME": str(root / "cache")}):
+                with (
+                    patch(
+                        "framestudio.operations.analyze_sources_audio",
+                        side_effect=cancel_after_result,
+                    ),
+                    self.assertRaisesRegex(ExportPlanningError, "Export cancelled"),
+                ):
+                    ensure_project_audio_analysis(project)
+                with patch("framestudio.operations.analyze_sources_audio") as analyze:
+                    restored = ensure_project_audio_analysis(untouched)
+                analyze.assert_not_called()
+                self.assertEqual(restored[source.source_id], ready.to_dict())
+                self.assertTrue(list((root / "cache").rglob("*.json")))
+
     def test_sources_without_audio_do_not_start_decoder_or_process_pool(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

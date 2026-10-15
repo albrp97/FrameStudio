@@ -291,6 +291,7 @@ class TrackDragFunctionalityTests(unittest.TestCase):
         segment_id: str,
         *,
         control: bool = False,
+        fraction: float = 0.5,
     ) -> None:
         geometry = next(
             item
@@ -303,7 +304,7 @@ class TrackDragFunctionalityTests(unittest.TestCase):
         )
         self._pointer_click(
             canvas,
-            geometry.x + geometry.width / 2.0,
+            geometry.x + geometry.width * fraction,
             geometry.y + geometry.height / 2.0,
             control=control,
         )
@@ -824,16 +825,21 @@ class TrackDragFunctionalityTests(unittest.TestCase):
                 moving_geometry.x + moving_geometry.width / 2.0,
                 moving_geometry.y + moving_geometry.height / 2.0,
             ),
-            (free_gap_target, target_row.y + target_row.height / 2.0),
+            (free_gap_target, rows[0].y + rows[0].height / 2.0),
         )
-        self.assertEqual(window.project.timeline.find(moving.segment_id).timeline_start_ticks, 0)
+        self.assertEqual(
+            window.project.timeline.find(moving.segment_id).timeline_start_ticks, 2_000_000
+        )
+        self.assertEqual(window.project.timeline.find(chain_b.segment_id).timeline_start_ticks, 0)
+        self.assertEqual(window.project.timeline.find(moving.segment_id).track_id, "track-1")
+        self.assertEqual(window.project.timeline.find(chain_b.segment_id).track_id, "track-1")
         self.assertEqual(
             set(window.selected_segment_ids),
             {moving.segment_id, chain_b.segment_id},
         )
         self.assertEqual(window.project.timeline.find(unaffected.segment_id), original_unaffected)
 
-        self._pointer_click_segment(canvas, moving.segment_id)
+        self._pointer_click_segment(canvas, moving.segment_id, fraction=0.4)
         self.assertEqual(tuple(window.selected_segment_ids), (moving.segment_id,))
         self._xdotool("key", "ctrl+c")
         self._wait_until(
@@ -850,7 +856,7 @@ class TrackDragFunctionalityTests(unittest.TestCase):
         pasted_id = window.selected_segment_id
         self.assertIsNotNone(pasted_id)
         count_before_split = len(window.project.timeline.blocks)
-        self._pointer_click_segment(canvas, moving.segment_id)
+        self._pointer_click_segment(canvas, moving.segment_id, fraction=0.4)
         self.assertEqual(tuple(window.selected_segment_ids), (moving.segment_id,))
         self._xdotool("key", "b")
         self._wait_until(

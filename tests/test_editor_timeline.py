@@ -44,6 +44,9 @@ class FakeDrawingArea:
     def grab_focus(self):
         pass
 
+    def drag_check_threshold(self, start_x, start_y, current_x, current_y):
+        return abs(current_x - start_x) > 8 or abs(current_y - start_y) > 8
+
 
 class FakeGesture:
     def __init__(self, state=0):

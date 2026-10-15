@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from contextlib import contextmanager
 from dataclasses import replace
 from fractions import Fraction
@@ -23,6 +24,7 @@ from framestudio.video_compositor import (
     _asset_stem,
     _prepare_assets,
     _probe_source,
+    _sha256,
     _verify_rendered_output,
     cumulative_frame_boundaries,
     plan_project_video,
@@ -31,6 +33,61 @@ from framestudio.video_compositor import (
 
 
 class VideoCompositorUnitTests(TestCase):
+    def test_planning_hash_cache_is_batch_local_and_invalidates_changed_files(self):
+        import threading
+
+        with TemporaryDirectory() as temporary:
+            path = Path(temporary) / "source.bin"
+            path.write_bytes(b"first")
+            cache = {}
+            original = _sha256(path, source_hash_cache=cache)
+            with patch.object(Path, "open", side_effect=AssertionError("repeated file read")):
+                self.assertEqual(_sha256(path, source_hash_cache=cache), original)
+            path.write_bytes(b"second")
+            self.assertNotEqual(_sha256(path, source_hash_cache=cache), original)
+            event = threading.Event()
+            event.set()
+            with self.assertRaisesRegex(ExportExecutionError, "cancelled"):
+                _sha256(path, source_hash_cache=cache, cancel_event=event)
+
+    def test_planning_probes_only_included_sources_and_observes_cancellation(self):
+        import threading
+
+        source_path = Path(__file__).resolve()
+        other_path = source_path.with_name("test_editor_av_compositor.py")
+        project = Project.create_synchronized_multi(
+            tuple(
+                (path, {"duration_seconds": 2.0, "width": 720, "height": 720, "frame_rate": "30/1"})
+                for path in (source_path, other_path)
+            )
+        )
+        project.timeline.set_deleted(project.timeline.segment_items[1].segment_id, True)
+        probe = _fake_probe(
+            project.sources[0].source_id, source_path, width=720, height=720, frame_rate="30/1"
+        )
+        progress = []
+        event = threading.Event()
+        with patch("framestudio.video_compositor._probe_source", return_value=probe) as inspect:
+            plan = plan_project_video(
+                project,
+                source_path.with_name("included-only.mp4"),
+                target_rate=30,
+                cancel_event=event,
+                progress_callback=progress.append,
+            )
+        self.assertEqual(inspect.call_count, 1)
+        self.assertEqual(len(plan.probed_metadata), 1)
+        self.assertTrue(progress)
+        event.set()
+        with (
+            patch("framestudio.video_compositor._probe_source") as inspect,
+            self.assertRaisesRegex(
+                (VideoCompositorPlanningError, ExportExecutionError), "cancelled"
+            ),
+        ):
+            plan_project_video(project, source_path.with_name("cancelled.mp4"), cancel_event=event)
+        inspect.assert_not_called()
+
     def test_cumulative_frame_boundaries_use_half_up_rational_positions(self):
         ticks = (0, 500_000, 1_000_001, 1_500_000)
 
@@ -325,6 +382,7 @@ class VideoCompositorUnitTests(TestCase):
                 end_seconds: float,
                 expected_frames: int,
                 ffmpeg_path: str,
+                **_options,
             ) -> None:
                 destination.touch()
 
@@ -455,7 +513,7 @@ class VideoCompositorUnitTests(TestCase):
 
             self.assertIsInstance(raised.exception.__cause__, ExportExecutionError)
 
-    def test_source_frame_probe_export_error_is_normalized_for_planning(self):
+    def test_source_inspection_does_not_decode_entire_video_to_count_unused_frames(self):
         source_path = Path(__file__).resolve()
         media = MediaProbe(
             path=source_path,
@@ -476,13 +534,23 @@ class VideoCompositorUnitTests(TestCase):
                 side_effect=ExportExecutionError("frame probe failed"),
             ),
         ):
-            with self.assertRaisesRegex(
-                VideoCompositorPlanningError,
-                "frame probe failed",
-            ) as raised:
-                _probe_source("source", source_path)
+            inspected = _probe_source("source", source_path)
+        self.assertIsNone(inspected.frame_count)
 
-        self.assertIsInstance(raised.exception.__cause__, ExportExecutionError)
+    def test_publication_observes_the_same_cancellation_event_as_rendering(self):
+        with TemporaryDirectory() as directory:
+            destination = Path(directory) / "cancel-at-publication.mp4"
+            plan = _unit_render_plan(destination)
+            output = _output_probe(plan, destination)
+            event = threading.Event()
+            with (
+                patch("framestudio.video_compositor._prepare_assets", return_value={}),
+                patch("framestudio.video_compositor.run_ffmpeg"),
+                patch("framestudio.video_compositor.publish_verified_export") as publish,
+                _render_output_patches(plan, output),
+            ):
+                render_project_video(plan, cancel_event=event)
+            self.assertIs(publish.call_args.kwargs["cancel_event"], event)
 
     def test_source_preservation_failure_prevents_publication(self):
         with TemporaryDirectory() as directory:
@@ -581,6 +649,7 @@ def _make_native_asset(
     end_seconds: float,
     expected_frames: int,
     ffmpeg_path: str,
+    **_options,
 ) -> None:
     output.touch()
 

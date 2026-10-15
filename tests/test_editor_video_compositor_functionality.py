@@ -226,7 +226,8 @@ class VideoCompositorFunctionalityTests(unittest.TestCase):
             self.assertEqual(routes[source_ids[1]].fps_action, "passthrough")
             self.assertEqual(routes[source_ids[2]].fps_action, "interpolate")
             self.assertEqual(routes[source_ids[3]].fps_action, "passthrough")
-            self.assertEqual(routes[source_ids[4]].fps_action, "interpolate")
+            self.assertNotIn(source_ids[4], routes)
+            self.assertNotIn(source_ids[4], {probe.source_id for probe in plan.probed_metadata})
             self.assertFalse(routes[source_ids[3]].upscale_requested)
             for route in routes.values():
                 if route.upscale_requested and route.upscale_status == "unavailable":

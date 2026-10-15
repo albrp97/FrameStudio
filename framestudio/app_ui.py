@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .app_helpers import KEY_BINDINGS
+from .app_helpers import KEY_BINDINGS, super_modifier_mask
 from .composition import MAX_OFFSET_X, MAX_OFFSET_Y, MAX_ZOOM, MIN_ZOOM
 from .persistence import autosave_exists
 from .timeline import create_timeline_canvas
@@ -241,11 +241,13 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
         on_track_activated=window._on_track_activated,
         selection_modifier_mask=int(Gdk.ModifierType.CONTROL_MASK),
         range_selection_modifier_mask=int(Gdk.ModifierType.SHIFT_MASK),
+        snap_bypass_modifier_mask=super_modifier_mask(Gdk),
     )
     window.timeline_canvas.set_tooltip_text(
         "Click/drag to seek; normal wheel seeks 30 seconds per unit; Ctrl+wheel zooms; "
         "Alt/Shift/horizontal wheel scrolls; Ctrl-click selects multiple clips"
         "; Shift-click selects an inclusive range; drag clips between track rows"
+        "; lighter clip starts snap the playhead; hold Super to bypass snapping"
     )
     timeline_scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.BOTH_AXES)
     timeline_scroll.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)

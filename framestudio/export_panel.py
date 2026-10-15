@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -23,10 +24,11 @@ from .fps_policy import (
 )
 from .interpolation import (
     BackendValidation,
+    RuntimeValidationCache,
     resolve_frame_rate_policy_with_fallback,
     validate_interpolation_backend,
 )
-from .output_plan import OutputPlan
+from .output_plan import OutputPlan, active_export_sources
 from .upscale_policy import (
     DEFAULT_UPSCALE_BACKEND,
     DEFAULT_UPSCALE_MODEL,
@@ -132,7 +134,7 @@ class ExportPanelState:
 
 
 def _metadata(project: Any) -> tuple[dict[str, Any], ...]:
-    return policy_source_metadata(project.sources or (project.source,))
+    return policy_source_metadata(active_export_sources(project))
 
 
 def _upscale_display_rows(
@@ -311,6 +313,7 @@ def _resolve_panel_policy(
     enhancement_enabled: bool,
     backend: str,
     ffmpeg_path: str,
+    runtime_cache: RuntimeValidationCache,
 ) -> tuple[ResolvedFrameRatePolicy, tuple[BackendValidation, ...], str | None]:
     return resolve_frame_rate_policy_with_fallback(
         metadata,
@@ -319,7 +322,7 @@ def _resolve_panel_policy(
         enhancement_enabled=enhancement_enabled,
         backend=backend,
         ffmpeg_path=ffmpeg_path,
-        backend_validator=validate_interpolation_backend,
+        backend_validator=partial(validate_interpolation_backend, runtime_cache=runtime_cache),
     )
 
 
@@ -335,6 +338,7 @@ def prepare_export_panel(
     ffmpeg_path: str = "ffmpeg",
     project_path: str | Path | None = None,
     filename: str | None = None,
+    runtime_cache: RuntimeValidationCache | None = None,
 ) -> ExportPanelState:
     try:
         current = project.get_frame_rate_policy()
@@ -353,6 +357,7 @@ def prepare_export_panel(
             enhancement_enabled=selected_enhancement,
             backend=selected_backend,
             ffmpeg_path=ffmpeg_path,
+            runtime_cache={} if runtime_cache is None else runtime_cache,
         )
         upscale_policy = resolve_upscale_panel_policy(
             project,

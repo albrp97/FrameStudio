@@ -16,6 +16,57 @@ from framestudio.interpolation_artifacts import check_artifact_samples
 
 
 class EditorInterpolationTests(unittest.TestCase):
+    def test_rve_runtime_is_shared_across_rates_but_not_new_sessions_or_models(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            python = root / "python"
+            python.touch()
+            site = root / "site"
+            site.mkdir()
+            model = root / "model.pkl"
+            model.touch()
+            other_model = root / "other.pkl"
+            other_model.touch()
+            runtime_cache = {}
+            with patch("framestudio_fps.rve_unavailable_reason", return_value=None) as preflight:
+                for rate in (30, 24, 25):
+                    result = validate_interpolation_backend(
+                        "rve-4.26",
+                        source_rate=rate,
+                        target_rate=60,
+                        fps_python=python,
+                        site_packages=site,
+                        rve_model=model,
+                        rve_root=root,
+                        runtime_cache=runtime_cache,
+                    )
+                    self.assertTrue(result.available)
+                self.assertEqual(preflight.call_count, 1)
+                for selected_model, cache in ((other_model, runtime_cache), (model, {})):
+                    validate_interpolation_backend(
+                        "rve-4.26",
+                        source_rate=30,
+                        target_rate=60,
+                        fps_python=python,
+                        site_packages=site,
+                        rve_model=selected_model,
+                        rve_root=root,
+                        runtime_cache=cache,
+                    )
+                self.assertEqual(preflight.call_count, 3)
+                python.unlink()
+                missing = validate_interpolation_backend(
+                    "rve-4.26",
+                    source_rate=30,
+                    target_rate=60,
+                    fps_python=python,
+                    site_packages=site,
+                    rve_model=model,
+                    rve_root=root,
+                    runtime_cache=runtime_cache,
+                )
+                self.assertFalse(missing.available, "cached success must not hide missing tools")
+
     def test_artifact_gate_rejects_periodic_grid_samples(self):
         width = 64
         height = 36
