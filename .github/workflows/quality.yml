@@ -11,6 +11,10 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-24.04
+    env:
+      # Software Cairo rendering: the GL renderer aborts under Xvfb software GL
+      # (gsk_gl_driver_cache_texture texture_id > 0) and cannot be caught from Python.
+      GSK_RENDERER: cairo
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
