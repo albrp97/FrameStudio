@@ -112,6 +112,7 @@ from .app_timeline_actions import (
     on_timeline_viewport_changed,
     on_triplicate_clicked,
     paste_selected_segments,
+    undo_last_split,
     update_segment_controls,
     update_selected_clip_label,
     zoom_timeline,
@@ -244,6 +245,7 @@ def create_editor_application(
             self._updating_focus_controls = False
             self._playback_generation = 0
             self.removal_history = RemovalHistory()
+            self._split_history = ()
             self._smoke_test = smoke_test
             self._smoke_project_path = smoke_project_path
             self._Gtk = Gtk
@@ -290,6 +292,7 @@ def create_editor_application(
 
         def _clear_removal_history(self) -> None:
             self.removal_history.clear()
+            self._split_history = ()
             button = getattr(self, "undo_removal_button", None)
             if button is not None:
                 button.set_sensitive(False)
@@ -360,6 +363,16 @@ def create_editor_application(
             )
             self._update_removal_undo_sensitivity()
             self._set_status("Undid the latest timeline removal")
+
+        def _on_undo_clicked(self, _button) -> None:
+            if editing_is_locked(self):
+                return
+            if self._split_history:
+                undo_last_split(self)
+            elif self.removal_history.values():
+                self._on_undo_removal_clicked(None)
+            else:
+                self._set_status("No split or removal to undo")
 
         def _on_open_source_clicked(self, _button) -> None:
             if editing_is_locked(self):
@@ -526,6 +539,7 @@ def create_editor_application(
             *,
             preserve_removal_history: bool = False,
         ) -> None:
+            self._split_history = ()
             preserved_receipts = self.removal_history.values() if preserve_removal_history else ()
             if not preserve_removal_history:
                 self._clear_removal_history()

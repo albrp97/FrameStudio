@@ -1,7 +1,10 @@
+import configparser
 import importlib
 import os
+import shutil
 import subprocess
 import sys
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -18,6 +21,46 @@ from framestudio_media import (
 
 
 class FrameStudioCompatibilityTests(unittest.TestCase):
+    def test_desktop_launcher_runs_updated_checkout_without_terminal_or_reinstall(self):
+        import gi
+
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio
+
+        repository = Path(__file__).resolve().parents[1]
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            home = root / "home space $ \" ' ` \\ %"
+            checkout = root / "checkout space $ \" ' ` \\ %"
+            checkout.mkdir()
+            installer = checkout / "install.sh"
+            shutil.copy2(repository / "install.sh", installer)
+            environment = os.environ.copy()
+            environment["HOME"] = str(home)
+            environment["XDG_DATA_HOME"] = str(home / "app data")
+            result = subprocess.run(
+                [str(installer)], env=environment, capture_output=True, text=True, check=False
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            desktop_path = home / "app data/applications/io.github.framestudio.editor.desktop"
+            application = Gio.DesktopAppInfo.new_from_filename(str(desktop_path))
+            self.assertIsNotNone(application)
+            self.assertEqual(application.get_name(), "FrameStudio")
+            self.assertFalse(application.get_boolean("Terminal"))
+            record = root / "launched.txt"
+            for revision in ("first", "updated"):
+                (checkout / "framestudio.py").write_text(
+                    f"from pathlib import Path\nPath({str(record)!r}).write_text({revision!r})\n"
+                )
+                self.assertTrue(application.launch([], Gio.AppLaunchContext()))
+                deadline = time.monotonic() + 5.0
+                while time.monotonic() < deadline:
+                    if record.exists() and record.read_text() == revision:
+                        break
+                    time.sleep(0.01)
+                self.assertTrue(record.exists(), "Desktop application never ran")
+                self.assertEqual(record.read_text(), revision)
+
     def test_legacy_editor_namespace_forwards_to_canonical_modules(self):
         importlib.import_module("resolve_editor")
 
@@ -154,6 +197,7 @@ class FrameStudioCompatibilityTests(unittest.TestCase):
 
             environment = os.environ.copy()
             environment["HOME"] = str(home)
+            environment["XDG_DATA_HOME"] = str(home / "app data")
             result = subprocess.run(
                 [str(repository / "install.sh")],
                 cwd=repository,
@@ -178,3 +222,12 @@ class FrameStudioCompatibilityTests(unittest.TestCase):
             )
             self.assertEqual(version.returncode, 0, version.stderr)
             self.assertIn("framestudio", version.stdout.casefold())
+            desktop_path = home / "app data/applications/io.github.framestudio.editor.desktop"
+            self.assertTrue(desktop_path.is_file())
+            desktop = configparser.ConfigParser(interpolation=None)
+            desktop.read(desktop_path)
+            entry = desktop["Desktop Entry"]
+            self.assertEqual(entry["Name"], "FrameStudio")
+            self.assertEqual(entry["Terminal"], "false")
+            self.assertIn(str(bin_directory / "framestudio"), entry["Exec"])
+            self.assertNotIn("TryExec", entry)

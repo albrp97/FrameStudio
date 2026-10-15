@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
+from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -13,7 +15,7 @@ from .app_helpers import (
     format_output_duration_label,
 )
 from .composition import VisualTransform, focus_offset_bounds
-from .model import ProjectValidationError
+from .model import ProjectValidationError, SegmentTimeline
 from .model_types import seconds_to_ticks
 from .operations import (
     apply_visual_transform,
@@ -526,6 +528,10 @@ def on_split_clicked(window: Any, _button: Any) -> None:
             return
         playback_position = window.controller.snapshot().position_seconds
         position = window.segment_timeline.edited_to_timeline_position(playback_position)
+    before = deepcopy(window.segment_timeline.to_dict())
+    history = tuple(getattr(window, "_split_history", ()))
+    selection = tuple(window.selected_segment_ids)
+    focus = window.selected_segment_id
     try:
         segment_id = window.selected_segment_id
         coordinate = "source"
@@ -562,7 +568,42 @@ def on_split_clicked(window: Any, _button: Any) -> None:
     window.selected_segment_ids = (*selected_ids, second.segment_id)
     window.selected_segment_id = second.segment_id
     window._refresh_timeline(second.segment_id)
+    window._split_history = (
+        *history[-19:],
+        (before, deepcopy(window.segment_timeline.to_dict()), selection, focus),
+    )
     window._set_status(f"Split clip at {format_duration(position)}")
+
+
+def undo_last_split(window: Any) -> None:
+    if _editing_locked(window):
+        return
+    history = tuple(getattr(window, "_split_history", ()))
+    if window.project is None or not history:
+        window._set_status("No split to undo")
+        return
+    before, after, selection, focus = history[-1]
+    if window.project.timeline.to_dict() != after:
+        window._split_history = ()
+        window._show_error("Cannot undo a split after another timeline edit")
+        return
+    try:
+        timeline = SegmentTimeline.from_dict(deepcopy(before))
+        restored = replace(
+            window.project,
+            segment_timeline=timeline,
+            source_settings=deepcopy(window.project.source_settings),
+        )
+    except ProjectValidationError as error:
+        window._show_error(str(error))
+        return
+    window.project = restored
+    window.segment_timeline = restored.timeline
+    window.selected_segment_ids = selection
+    window.selected_segment_id = focus
+    window._refresh_timeline(focus)
+    window._split_history = history[:-1]
+    window._set_status("Undid the latest timeline split")
 
 
 def on_delete_segment_clicked(window: Any, _button: Any) -> None:

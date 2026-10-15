@@ -17,7 +17,7 @@ result without overwriting the original videos.
 - Load one or several local videos, including mixed dimensions and frame rates.
 - Import and append videos without a fixed per-project source-count limit.
   Practical project size depends on available memory and processing resources.
-- Play, pause, seek, and step through frames in the editor.
+- Play, pause, and seek through the editor timeline.
 - Split clips at the playhead.
 - Delete, restore, move, copy, and paste timeline segments.
 - Select individual segments with `Ctrl`-click or ranges with `Shift`-click.
@@ -161,7 +161,14 @@ cd FrameStudio
 ```
 
 The installer creates `~/bin/framestudio` and removes obsolete standalone
-workflow aliases. Ensure `~/bin` is on `PATH`, then verify the installation:
+workflow aliases. It also adds **FrameStudio** to desktop application launchers
+(including Noctalia) using an XDG application entry with `Terminal=false`.
+Press `Super+Space`, search for `FrameStudio`, and launch it without a terminal.
+Both the desktop entry and the command run this checkout directly, so restarting
+FrameStudio uses the latest code present here, with no reinstall after updates.
+This does not automatically download newer commits.
+
+Ensure `~/bin` is on `PATH`, then verify the installation:
 
 ```sh
 framestudio --version
@@ -238,7 +245,7 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
    adding a single video leaves it at the end.
 3. Wait for metadata probing to attach or append the clips. Audio analysis
    waits until export.
-4. Play, pause, seek, or use `Left` and `Right` for frame navigation.
+4. Play, pause, seek, or use `Left` and `Right` to move by one second.
 5. Press `B` to split at the playhead.
 6. Select segments with click, `Ctrl`-click, or `Shift`-click.
 7. Press `Delete` to toggle a selected segment between deleted and included.
@@ -252,6 +259,13 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 12. Use Recover autosave after an unexpected exit.
 13. Review the export plan, enhancement counts, and destination before
     starting the render.
+
+Use `Ctrl+Z` or `Super+Z` to undo the latest split or removal. Up to 20
+consecutive splits can be undone, including splits made with `B`. Split undo
+restores the original clips and selection. Other timeline edits or loading a
+project clear split history; this is not a general undo/redo stack. Text fields
+keep their own keyboard shortcuts. Arrow navigation stops at the first or last
+available frame rather than seeking past the video.
 
 The information strip shows only the focused selected video's filename,
 original dimensions, and original FPS. For a multi-selection, it follows the

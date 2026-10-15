@@ -7,7 +7,6 @@ from typing import Any
 from .app_export import request_close_after_export
 from .app_helpers import (
     frame_step_direction,
-    frame_step_position,
     is_delete_key,
     is_fit_zoom_key,
     is_frame_step_key,
@@ -74,6 +73,12 @@ def on_key_pressed(
     state = int(_state)
     shift_pressed = bool(state & int(Gdk.ModifierType.SHIFT_MASK))
     control_pressed = bool(state & int(Gdk.ModifierType.CONTROL_MASK))
+    if keyval in (ord("z"), ord("Z")):
+        undo_modifier = int(Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SUPER_MASK)
+        if state & undo_modifier and not shift_pressed:
+            window._on_undo_clicked(None)
+            return True
+        return False
     if is_fit_zoom_key(
         keyval,
         _state,
@@ -115,11 +120,15 @@ def step_playhead(window: Any, direction: int) -> None:
     snapshot = window.controller.snapshot()
     if snapshot.state == PlaybackState.PLAYING:
         window.controller.pause()
-    position = frame_step_position(
+    position = timeline_scroll_position(
         snapshot.position_seconds,
-        direction,
-        window.source_frame_rate,
+        -direction,
         snapshot.duration_seconds,
+        step_seconds=1.0,
+    )
+    position = min(
+        position,
+        max(0.0, snapshot.duration_seconds - 1.0 / window.source_frame_rate),
     )
     window._seek_timeline(position)
 

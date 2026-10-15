@@ -29,9 +29,10 @@ KEYCODE_SPACE = 65
 KEY_BINDINGS: tuple[tuple[str, str], ...] = (
     ("Space", "Play or pause playback"),
     ("B", "Split the selected clip at the playhead"),
+    ("Ctrl+Z / Super+Z", "Undo the latest split or removal"),
     ("Backspace", "Remove the selected clip(s) and enable bounded Undo"),
     ("Delete", "Toggle the selected clip between included and deleted"),
-    ("Left / Right", "Move the playhead by one output frame"),
+    ("Left / Right", "Move the playhead by one second"),
     ("Shift+Left / Shift+Right", "Move selected block(s) left or right"),
     ("Ctrl-click", "Add or remove clips from the multi-selection"),
     ("Shift-click", "Select the inclusive range from the current clip"),
