@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from typing import Any
 
 from .app_export import request_close_after_export
@@ -138,16 +139,16 @@ def seek_timeline(window: Any, position_seconds: float) -> bool:
     return True
 
 
-def request_timeline_preview(window: Any, position_seconds: float) -> None:
+def request_timeline_preview(window: Any, position_seconds: float) -> bool:
     if window.controller is None or window.backend is None:
-        return
+        return False
     was_playing = window.controller.snapshot().state == PlaybackState.PLAYING
     if was_playing:
         if not window.controller.pause():
             window._show_error(
                 window.controller.snapshot().error or "Could not pause source for preview",
             )
-            return
+            return False
     edited_position = position_seconds
     if (
         window.segment_timeline is not None
@@ -164,16 +165,32 @@ def request_timeline_preview(window: Any, position_seconds: float) -> None:
         )
     window.timeline_canvas.set_playhead(_timeline_position(window, actual_position))
     window._update_playback_controls()
+    frame_lock = getattr(window, "_frame_lock", None)
+    if frame_lock is not None:
+        with frame_lock:
+            # Invalidate queued UI frames before cancelling the previous backend request.
+            window._preview_request_generation = (
+                int(getattr(window, "_preview_request_generation", 0)) + 1
+            )
+            window._preview_dispatch_target = actual_position
+            window._latest_frame = None
+            window._latest_frame_generation = None
     try:
-        window.backend.request_preview(edited_position)
+        window.backend.request_preview(actual_position)
     except PlaybackBackendError as error:
         window.controller.report_error(str(error))
         window._show_error(str(error))
-        return
+        return False
+    finally:
+        if frame_lock is not None:
+            with frame_lock:
+                window._preview_dispatch_target = None
     if was_playing and not window.controller.play():
         window._show_error(
             window.controller.snapshot().error or "Could not resume source after preview seek",
         )
+        return False
+    return True
 
 
 def on_timeline_scroll(
@@ -245,8 +262,12 @@ def on_frame(
             window, "_playback_generation", generation
         ):
             return
+        target = getattr(window, "_preview_dispatch_target", None)
+        if target is not None and abs(frame.position_seconds - target) > 1e-6:
+            return
         window._latest_frame = frame
         window._latest_frame_generation = generation
+        window._latest_frame_request_generation = getattr(window, "_preview_request_generation", 0)
         if window._frame_delivery_scheduled:
             return
         window._frame_delivery_scheduled = True
@@ -257,13 +278,16 @@ def deliver_latest_frame(window: Any, Gdk: Any, GLib: Any) -> bool:
     with window._frame_lock:
         frame = window._latest_frame
         generation = getattr(window, "_latest_frame_generation", None)
+        request_generation = getattr(window, "_latest_frame_request_generation", 0)
         window._latest_frame = None
         window._latest_frame_generation = None
     if frame is None:
         with window._frame_lock:
             window._frame_delivery_scheduled = False
         return False
-    if generation is not None and generation != getattr(window, "_playback_generation", generation):
+    if (
+        generation is not None and generation != getattr(window, "_playback_generation", generation)
+    ) or request_generation != getattr(window, "_preview_request_generation", 0):
         with window._frame_lock:
             if window._latest_frame is not None:
                 return True
@@ -323,6 +347,11 @@ def handle_backend_warning(
 ) -> bool:
     if generation is not None and generation != getattr(window, "_playback_generation", generation):
         return False
+    window._last_playback_warning = message
+    label = getattr(window, "status_label", None)
+    current = "" if label is None else label.get_text()
+    if isinstance(current, str) and current.startswith("Error: "):
+        return False
     window._set_status(f"Warning: {message}")
     return False
 
@@ -352,16 +381,34 @@ def on_close_request(window: Any, _window: Any) -> bool:
 
 
 def start_smoke_test(window: Any, GLib: Any) -> bool:
-    if window.project is None or window.controller is None:
-        window._show_error("Smoke test could not open a source project")
-        window._finish_smoke_test()
+    if getattr(window, "_source_load_in_progress", False):
+        started = getattr(window, "_smoke_load_started", None)
+        if started is None:
+            started = time.monotonic()
+            window._smoke_load_started = started
+        if time.monotonic() - started >= 60.0:
+            _fail_smoke_test(window, "Smoke test timed out waiting for source loading")
+        GLib.timeout_add(50, window._start_smoke_test)
         return False
+    if window.project is None or window.controller is None:
+        _fail_smoke_test(window, "Smoke test could not open a source project")
     window._on_play_clicked(None)
+    error = window.controller.snapshot().error
+    if error:
+        _fail_smoke_test(window, error)
     GLib.timeout_add(300, window._finish_smoke_test)
     return False
 
 
+def _fail_smoke_test(window: Any, message: str) -> None:
+    window._stop_backend()
+    window.get_application().quit()
+    raise SystemExit(message)
+
+
 def finish_smoke_test(window: Any, GLib: Any) -> bool:
+    if window.project is None or window.controller is None:
+        _fail_smoke_test(window, "Smoke test lost its source project")
     if window.controller is not None:
         window.controller.pause()
         duration = window.controller.snapshot().duration_seconds
@@ -370,8 +417,14 @@ def finish_smoke_test(window: Any, GLib: Any) -> bool:
         if window.segment_timeline is not None and 0.0 < position < duration:
             window._on_split_clicked(None)
             window._on_delete_segment_clicked(None)
+            # The removed range may contain the saved playhead or the output end.
+            if not window._seek_timeline(0.0):
+                _fail_smoke_test(window, "Smoke test could not seek after its edits")
     if window._smoke_project_path is not None:
         window._save_to(window._smoke_project_path)
+        destination = window._smoke_project_path.expanduser()
+        if getattr(window, "project_path", None) != destination or not destination.is_file():
+            _fail_smoke_test(window, "Smoke test could not save its project")
     GLib.timeout_add(300, window._end_smoke_test)
     return False
 

@@ -248,10 +248,9 @@ class EditorTimelineTests(unittest.TestCase):
         canvas._on_drag_update(None, 20.0, 0.0)
         canvas._on_drag_end(None, 20.0, 0.0)
 
-        self.assertEqual(len(positions), 4)
+        self.assertEqual(len(positions), 3)
         self.assertLess(positions[0], positions[1])
         self.assertLess(positions[1], positions[2])
-        self.assertEqual(positions[2], positions[3])
 
     def test_control_click_tracks_multiple_selected_clips(self):
         TimelineCanvas = create_timeline_canvas(FakeGtk)

@@ -1274,7 +1274,7 @@ class EditorCompositionTests(unittest.TestCase):
             with (
                 patch("framestudio.operations.ensure_project_audio_analysis") as analyze,
                 patch("framestudio.app_project.FfmpegPlaybackBackend") as direct_type,
-                patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as composed_type,
+                patch("framestudio.app_project.FfmpegSequentialPlaybackBackend") as composed_type,
             ):
                 analyze.return_value = {
                     project.source.source_id: {"status": "not-applicable", "gain_db": 0.0},
@@ -2049,7 +2049,7 @@ class EditorCompositionTests(unittest.TestCase):
 
             with (
                 patch("framestudio.operations.ensure_project_audio_analysis") as analyze,
-                patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as backend_type,
+                patch("framestudio.app_project.FfmpegSequentialPlaybackBackend") as backend_type,
             ):
                 analyze.return_value = {
                     project.source.source_id: {"status": "not-applicable", "gain_db": 0.0},
@@ -2059,7 +2059,9 @@ class EditorCompositionTests(unittest.TestCase):
 
             call_args = backend_type.call_args.args
             self.assertEqual(call_args[1], active)
-            self.assertEqual(call_args[5], project.timeline.edited_duration_seconds)
+            self.assertEqual(
+                call_args[2].final_duration_seconds, project.timeline.edited_duration_seconds
+            )
             self.assertEqual(
                 window.controller.snapshot().duration_seconds,
                 project.timeline.edited_duration_seconds,
@@ -2080,7 +2082,7 @@ class EditorCompositionTests(unittest.TestCase):
 
             with (
                 patch("framestudio.app_project.FfmpegPlaybackBackend") as direct_type,
-                patch("framestudio.app_project.FfmpegComposedPlaybackBackend") as composed_type,
+                patch("framestudio.app_project.FfmpegSequentialPlaybackBackend") as composed_type,
             ):
                 direct_type.return_value = direct_backend
                 composed_type.return_value = composed_backend
@@ -2123,7 +2125,7 @@ class EditorCompositionTests(unittest.TestCase):
 
             with (
                 patch("framestudio.app_project.FfmpegPlaybackBackend") as backend_type,
-                patch("framestudio.app_project.FfmpegComposedPlaybackBackend"),
+                patch("framestudio.app_project.FfmpegSequentialPlaybackBackend"),
             ):
                 backend_type.return_value = refreshed_backend
                 refresh_playback_backend(window, force=True)

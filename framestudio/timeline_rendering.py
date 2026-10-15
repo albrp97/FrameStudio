@@ -37,10 +37,14 @@ def draw_ruler(
         duration_seconds,
         pixels_per_second,
     )
-    current = 0.0
+    left, _top, right, _bottom = context.clip_extents()
+    first_tick = max(
+        0, math.floor((left - TIMELINE_HORIZONTAL_PADDING - 90.0) / pixels_per_second / interval)
+    )
+    current = first_tick * interval
     while current <= duration_seconds + 1e-9:
         x = TIMELINE_HORIZONTAL_PADDING + current * pixels_per_second
-        if x > width + 1.0:
+        if x > min(width, right) + 1.0:
             break
         context.set_source_rgba(0.55, 0.60, 0.72, 0.55)
         context.set_line_width(1.0)
@@ -157,8 +161,9 @@ def draw_clip(
         context.clip()
         context.set_source_rgba(0.90, 0.34, 0.42, 0.48)
         context.set_line_width(1.0)
-        offset = -height
-        while offset < clip.width + height:
+        left, _top, right, _bottom = context.clip_extents()
+        offset = -height + max(0, math.floor((left - clip.x) / 10.0)) * 10.0
+        while offset < min(clip.width, right - clip.x) + height:
             context.move_to(clip.x + offset, y + height)
             context.line_to(clip.x + offset + height, y)
             context.stroke()

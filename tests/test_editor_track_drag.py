@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 try:
     from test_editor_timeline import (
@@ -33,6 +34,7 @@ from framestudio.model import (
     TimelineTrack,
     VisualTransform,
 )
+from framestudio.playback import PlaybackController
 from framestudio.timeline import (
     TIMELINE_HORIZONTAL_PADDING,
     TIMELINE_TRACK_HEIGHT,
@@ -496,6 +498,8 @@ class EditorTrackDragTests(unittest.TestCase):
 
         adjustment = Adjustment()
         positions: list[float] = []
+        backend = MagicMock()
+        backend.request_preview.side_effect = positions.append
         window = SimpleNamespace(
             project=project,
             segment_timeline=project.timeline,
@@ -504,7 +508,8 @@ class EditorTrackDragTests(unittest.TestCase):
             ),
             position_label=Label(),
             timeline_canvas=Canvas(),
-            controller=SimpleNamespace(seek=lambda position: positions.append(position) or True),
+            backend=backend,
+            controller=PlaybackController(backend, project.timeline.timeline_duration_seconds),
             _set_status=lambda _message: None,
             _zoom_timeline=lambda _direction: None,
             _update_playback_controls=lambda: None,

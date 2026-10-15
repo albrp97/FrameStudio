@@ -75,7 +75,7 @@ from .output_plan import (
     set_output_selection,
 )
 from .performance import PerformanceMode, PerformanceModeError
-from .playback import PlaybackState
+from .playback import PlaybackBackendError, PlaybackState
 from .post_export import (
     POST_EXPORT_ACTIONS,
     PostExportActionError,
@@ -1071,6 +1071,7 @@ def start_export(
             return
         window._update_playback_controls()
     project = window.project
+    preview_backend = getattr(window, "backend", None)
     export_project = deepcopy(project)
     window._export_project_snapshot = export_project
     window._export_project_path = window.project_path
@@ -1096,6 +1097,9 @@ def start_export(
             GLib.idle_add(update_export_progress, window, progress)
 
         try:
+            release_preview = getattr(preview_backend, "release_preview_resources", None)
+            if callable(release_preview):
+                release_preview()
             analysis_lock = getattr(window, "_audio_analysis_worker_lock", None)
             output, output_plan, final_plan, source_count = run_output_choice_job(
                 export_project,
@@ -1132,6 +1136,7 @@ def start_export(
             ExportPlanningError,
             MediaProbeError,
             PerformanceModeError,
+            PlaybackBackendError,
         ) as error:
             if isinstance(error, ExportBatchExecutionError):
                 GLib.idle_add(

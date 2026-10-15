@@ -49,6 +49,8 @@ from .persistence import (
     load_autosave as load_autosave_project,
 )
 from .playback import PlaybackBackendError, PlaybackController, PlaybackState
+from .precise_preview import preview_backend_setting
+from .sequential_playback import FfmpegSequentialPlaybackBackend
 from .timeline_order import randomize_clip_order
 from .ui import format_duration
 
@@ -539,11 +541,27 @@ def _create_composed_preview_backend(
     callbacks: tuple[Any, Any, Any, Any],
     audio_decisions: Mapping[str, Any],
     audio_preview_enabled: bool = False,
-) -> FfmpegComposedPlaybackBackend:
+    *,
+    layout: LayoutPlan | None = None,
+) -> FfmpegPlaybackBackend:
     on_frame, on_error, on_end, on_warning = callbacks
     source_ids = {segment.source_id for segment in active_segments if segment.source_id is not None}
     if len(sources) > 1 and source_ids:
         sources = tuple(source for source in sources if source.source_id in source_ids)
+    if layout is not None and not audio_preview_enabled:
+        return FfmpegSequentialPlaybackBackend(
+            tuple((source.source_id, Path(source.path)) for source in sources),
+            active_segments,
+            layout,
+            policy.width,
+            policy.height,
+            frame_rate,
+            on_frame,
+            on_error,
+            on_end,
+            on_warning=on_warning,
+            preview_backend=preview_backend_setting(),
+        )
     return FfmpegComposedPlaybackBackend(
         tuple((source.source_id, Path(source.path)) for source in sources),
         active_segments,
@@ -581,6 +599,7 @@ def _create_synchronized_preview_backend(
         on_error,
         on_end,
         on_warning=on_warning,
+        preview_backend=preview_backend_setting(),
     )
 
 
@@ -841,6 +860,7 @@ def attach_project(
                 callbacks,
                 audio_decisions,
                 False,
+                layout=plan_project_layout(project),
             )
             playback_duration = timeline.edited_duration_seconds
         else:
@@ -952,7 +972,7 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
         and window.backend is not None
         and not isinstance(
             window.backend,
-            FfmpegComposedPlaybackBackend,
+            (FfmpegComposedPlaybackBackend, FfmpegSequentialPlaybackBackend),
         )
     ):
         return
@@ -1021,6 +1041,7 @@ def refresh_playback_backend(window: Any, *, force: bool = False) -> None:
             (on_frame, on_error, on_end, on_warning),
             audio_decisions,
             False,
+            layout=plan_project_layout(window.project),
         )
         playback_duration = window.segment_timeline.edited_duration_seconds
     else:

@@ -11,7 +11,7 @@ from .app_helpers import (
     route_timeline_scroll,
     timeline_scroll_position,
 )
-from .app_playback import stop_backend_nonblocking
+from .app_playback import request_timeline_preview, stop_backend_nonblocking
 from .app_project import (
     _invalidate_audio_analysis,
     _validate_project_sources,
@@ -134,17 +134,7 @@ def seek_editing_only(window: Any, position_seconds: float) -> bool:
         return False
     timeline = window.project.timeline
     position = max(0.0, min(timeline.timeline_duration_seconds, float(position_seconds)))
-    if window.controller is None:
-        return False
-    if not window.controller.seek(position):
-        window._show_error(
-            window.controller.snapshot().error or "Could not seek synchronized preview",
-        )
-        return False
-    window.project.set_playhead(position)
-    _update_editing_position(window)
-    window._update_playback_controls()
-    return True
+    return request_timeline_preview(window, position)
 
 
 def on_timeline_scroll_editing_only(

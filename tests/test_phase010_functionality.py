@@ -963,11 +963,9 @@ class Phase010FunctionalityTests(unittest.TestCase):
             side_effect=trace_preview_process,
         ):
             silent_pixels, _, _ = seek_preview(3.2)
-            self._wait_until(
-                lambda: bool(preview_process_commands),
-                "silent preview did not launch an FFmpeg process",
-                rounds=3000,
-            )
+        stats_getter = getattr(window.backend, "precise_preview_stats", None)
+        native_preview = stats_getter() if callable(stats_getter) else {}
+        native_engine = native_preview.get("selected_engine")
         preview_video_commands = [
             command for command in preview_process_commands if Path(command[0]).name == "ffmpeg"
         ]
@@ -976,7 +974,11 @@ class Phase010FunctionalityTests(unittest.TestCase):
             json.dumps([list(command) for command in preview_process_commands], indent=2) + "\n",
             encoding="utf-8",
         )
-        self.assertTrue(preview_video_commands)
+        if native_engine in {"cpu", "cuda", "mixed"}:
+            self.assertIsInstance(native_preview.get("helper_pid"), int)
+            self.assertTrue(native_preview.get("physical_frames"))
+        else:
+            self.assertTrue(preview_video_commands)
         self.assertFalse(
             any(Path(command[0]).name == "ffplay" for command in preview_process_commands),
         )
@@ -1010,6 +1012,7 @@ class Phase010FunctionalityTests(unittest.TestCase):
                 "preview_size": (preview_width, preview_height),
                 "sampled_positions": (0.73, 3.2, 1.87, 2.25),
                 "preview_video_only_commands": len(preview_video_commands),
+                "native_preview_engine": native_engine,
                 "preview_audio_process_launched": any(
                     Path(command[0]).name == "ffplay" for command in preview_process_commands
                 ),
@@ -2143,6 +2146,22 @@ class Phase010FunctionalityTests(unittest.TestCase):
             rounds=6000,
         )
         start_button = planner_button(panel, "Start export")
+        playback_block = max(
+            window.segment_timeline.active_blocks(),
+            key=lambda item: item.timeline_end_seconds - item.timeline_start_seconds,
+        )
+        seek_preview(playback_block.timeline_start_seconds + 0.01)
+        self.assertTrue(window.controller.play())
+        self._wait_until(
+            lambda: getattr(window.backend, "_realtime_decode_process", None) is not None,
+            "GUI export resource test did not start a continuous preview decoder",
+            rounds=3000,
+        )
+        stream_before_export = window.backend._realtime_decode_process
+        self.assertIsNone(stream_before_export.poll())
+        export_backend = window.backend
+        export_stats_getter = getattr(export_backend, "precise_preview_stats", None)
+        preview_before_export = export_stats_getter() if callable(export_stats_getter) else {}
         panel_click(start_button)
         self._wait_until(
             lambda: bool(
@@ -2154,6 +2173,17 @@ class Phase010FunctionalityTests(unittest.TestCase):
             "GTK source-only export did not expose a live owned media child and session",
             rounds=12000,
         )
+        self.assertIs(window.backend, export_backend)
+        self.assertIsNotNone(stream_before_export.poll())
+        self.assertFalse(Path(f"/proc/{stream_before_export.pid}").exists())
+        self.assertIsNone(getattr(window.backend, "_realtime_decode_process", None))
+        if callable(export_stats_getter):
+            preview_during_export = export_stats_getter()
+            self.assertIsNone(preview_during_export.get("helper_pid"))
+            self.assertEqual(preview_during_export.get("contexts"), 0)
+            previous_helper = preview_before_export.get("helper_pid")
+            if previous_helper is not None:
+                self.assertFalse(Path(f"/proc/{previous_helper}").exists())
         gui_processes_before_cancel = owned_ffmpeg_commands()
         gui_running_snapshot = self.artifact_root / "changed-gui-export-running.png"
         _snapshot_widget(window, gui_running_snapshot, self.Gtk)

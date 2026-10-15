@@ -16,6 +16,7 @@ from framestudio.app_export import (
 from framestudio.export import ExportExecutionError, ExportPlanningError
 from framestudio.export_panel import ExportPanelState
 from framestudio.performance import PerformanceMode
+from framestudio.playback import PlaybackState
 
 
 def fake_performance_mode_factory(events):
@@ -94,6 +95,12 @@ class EditorPerformanceModeTests(unittest.TestCase):
         self.assertEqual(callback_states[0].reason, "not ready")
 
     def test_start_export_passes_an_immutable_project_snapshot_to_worker(self):
+        events = []
+
+        def pause_playback():
+            events.append("playback-paused")
+            return True
+
         project = SimpleNamespace(segment_timeline=SimpleNamespace(segments=["before"]))
         destination = Path("output.mp4")
         window = SimpleNamespace(
@@ -105,20 +112,32 @@ class EditorPerformanceModeTests(unittest.TestCase):
             _export_cancel_event=None,
             _export_project_snapshot=None,
             _update_segment_controls=MagicMock(),
+            _update_playback_controls=MagicMock(),
             _set_status=MagicMock(),
             export_progress_panel=MagicMock(),
             export_progress_bar=MagicMock(),
             export_progress_label=MagicMock(),
             cancel_export_button=MagicMock(),
+            backend=SimpleNamespace(
+                release_preview_resources=lambda: events.append("preview-released"),
+            ),
+            controller=SimpleNamespace(
+                snapshot=lambda: SimpleNamespace(state=PlaybackState.PLAYING),
+                pause=pause_playback,
+            ),
         )
         glib = SimpleNamespace(idle_add=MagicMock())
         plan = SimpleNamespace(route="stream-copy", reason="test")
         output_plan = SimpleNamespace(mode="final-only")
 
+        def export_job(*_args, **_kwargs):
+            events.append("export-started")
+            return destination, output_plan, plan, 0
+
         with (
             patch(
                 "framestudio.app_export.run_output_choice_job",
-                return_value=(destination, output_plan, plan, 0),
+                side_effect=export_job,
             ) as run_job,
             patch("framestudio.app_export.threading.Thread") as thread,
         ):
@@ -134,6 +153,7 @@ class EditorPerformanceModeTests(unittest.TestCase):
             run_job.call_args.kwargs["analysis_lock"],
             window._audio_analysis_worker_lock,
         )
+        self.assertEqual(events, ["playback-paused", "preview-released", "export-started"])
 
     def test_failed_export_writes_failure_log_before_post_export_action(self):
         events = []
@@ -263,6 +283,7 @@ class EditorPerformanceModeTests(unittest.TestCase):
 
                 with (
                     patch("framestudio.app_export.PerformanceMode", fake_performance_mode),
+                    patch("framestudio.app_export.ensure_project_audio_analysis") as analyze,
                     patch("framestudio.app_export.plan_project_export", return_value="plan"),
                     patch(
                         "framestudio.app_export.execute_export",
@@ -301,6 +322,7 @@ class EditorPerformanceModeTests(unittest.TestCase):
                 else:
                     self.assertIs(events[1][1], ExportExecutionError)
                 self.assertEqual(execute.call_count, 1)
+                analyze.assert_called_once()
 
     def test_export_planning_serializes_with_background_audio_analysis(self):
         analysis_lock = threading.Lock()
@@ -335,6 +357,7 @@ class EditorPerformanceModeTests(unittest.TestCase):
 
         with (
             patch("framestudio.app_export.PerformanceMode", fake_performance_mode_factory(events)),
+            patch("framestudio.app_export.ensure_project_audio_analysis") as analyze,
             patch("framestudio.app_export.plan_project_export", side_effect=plan_export),
             patch(
                 "framestudio.app_export.execute_export",
@@ -345,6 +368,7 @@ class EditorPerformanceModeTests(unittest.TestCase):
             worker.start()
             self.assertTrue(worker.is_alive())
             self.assertFalse(planned.is_set())
+            analyze.assert_not_called()
             analysis_lock.release()
             worker.join(timeout=2)
 
@@ -352,6 +376,7 @@ class EditorPerformanceModeTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(result, [(Path("output.mp4"), plan)])
         self.assertTrue(planned.is_set())
+        analyze.assert_called_once()
 
     def test_export_planning_cancels_while_waiting_for_audio_analysis(self):
         analysis_lock = threading.Lock()

@@ -1,3 +1,4 @@
+-r requirements-preview.txt
 bandit==1.9.4
 mypy==1.17.1
 pip-audit==2.9.0

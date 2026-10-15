@@ -4,7 +4,7 @@ import math
 from dataclasses import replace
 from typing import Any, Callable
 
-from .model import ProjectValidationError, SegmentTimeline
+from .model import ProjectValidationError, Segment, SegmentTimeline
 from .model_timeline import TimelineTrack, _earliest_fit
 from .model_types import ticks_to_seconds
 from .timeline_geometry import (
@@ -22,6 +22,7 @@ from .timeline_geometry import (
     TIMELINE_ZOOM_LEVELS,
     TimelineClipGeometry,
     TimelineTrackGeometry,
+    TimelineViewIndex,
     clamp_timeline_zoom,
     hit_test_timeline_segment,
     layout_timeline_segments,
@@ -105,6 +106,15 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._zoom = TIMELINE_DEFAULT_ZOOM
             self._fit_window_seconds: float | None = None
             self._viewport_width = 800.0
+            self._layout_key: tuple[object, ...] | None = None
+            self._layout_segments: tuple[Segment, ...] | None = None
+            self._layout_tracks: tuple[TimelineTrack, ...] | None = None
+            self._layout_clips: tuple[TimelineClipGeometry, ...] = ()
+            self._view_index = TimelineViewIndex.from_clips(())
+            self._layout_rows: tuple[TimelineTrackGeometry, ...] = ()
+            self._layout_duration = 0.0
+            self._viewport_signals: list[tuple[Any, int]] = []
+            self._viewport_parent = None
             self._on_seek = on_seek
             self._on_segment_selected = on_segment_selected
             self._on_selection_changed = on_selection_changed
@@ -116,6 +126,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._drag_start_x: float | None = None
             self._drag_start_y: float | None = None
             self._drag_mode: str | None = None
+            self._drag_last_seek_position: float | None = None
             self._drag_segment_id: str | None = None
             self._drag_pointer_offset_ticks = 0
             self._drag_preview: tuple[int, str | None] | None = None
@@ -141,6 +152,8 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._drag_gesture.connect("drag-end", self._on_drag_end)
             self._drag_gesture.connect("cancel", self._on_drag_cancel)
             self.add_controller(self._drag_gesture)
+            if hasattr(self, "connect"):
+                self.connect("unrealize", self._disconnect_viewport)
             self._recalculate_content_size()
 
         def set_timeline(
@@ -150,6 +163,14 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             selected_segment_ids: tuple[str, ...] | list[str] | None = None,
         ) -> None:
             self._timeline = timeline
+            self._layout_key = None
+            if timeline is None:
+                self._layout_segments = None
+                self._layout_tracks = None
+                self._layout_clips = ()
+                self._view_index = TimelineViewIndex.from_clips(())
+                self._layout_rows = ()
+                self._layout_duration = 0.0
             selected_ids: tuple[str, ...]
             if selected_segment_ids is None:
                 selected_ids = () if selected_segment_id is None else (selected_segment_id,)
@@ -160,7 +181,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 self._playhead_seconds = max(
                     0.0,
                     min(
-                        timeline.timeline_duration_seconds,
+                        self._timeline_duration_seconds(),
                         self._playhead_seconds,
                     ),
                 )
@@ -171,10 +192,43 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
         def get_track_ids(self) -> tuple[str, ...]:
             if self._timeline is None:
                 return ()
-            return tuple(row.track_id for row in layout_timeline_tracks(self._timeline))
+            self._layout()
+            return tuple(row.track_id for row in self._layout_rows)
 
         def get_playhead_seconds(self) -> float:
             return self._playhead_seconds
+
+        def _layout(self) -> tuple[TimelineClipGeometry, ...]:
+            timeline = self._timeline
+            if timeline is None:
+                return ()
+            key = (
+                timeline.runtime_identity,
+                timeline.runtime_epoch,
+                timeline.revision,
+                timeline.active_track_id,
+                timeline.source_duration_seconds,
+                self._viewport_width,
+                self._zoom,
+            )
+            if (
+                key != self._layout_key
+                or timeline.segments is not self._layout_segments
+                or timeline.tracks is not self._layout_tracks
+            ):
+                clips = layout_timeline_segments(timeline, self._viewport_width, self._zoom)
+                self._layout_rows = layout_timeline_tracks(timeline)
+                self._layout_duration = timeline.timeline_duration_seconds
+                self._layout_clips = clips
+                self._view_index = TimelineViewIndex.from_clips(clips)
+                self._layout_segments = timeline.segments
+                self._layout_tracks = timeline.tracks
+                self._layout_key = key
+            return self._layout_clips
+
+        def _timeline_duration_seconds(self) -> float:
+            self._layout()
+            return self._layout_duration if self._timeline is not None else 0.0
 
         def set_viewport_width(self, width: float) -> None:
             parsed = max(1.0, float(width))
@@ -184,17 +238,19 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._recalculate_content_size()
 
         def set_playhead(self, position_seconds: float) -> None:
+            previous = self._playhead_seconds
             if self._timeline is None:
                 self._playhead_seconds = max(0.0, float(position_seconds))
             else:
                 self._playhead_seconds = max(
                     0.0,
                     min(
-                        self._timeline.timeline_duration_seconds,
+                        self._timeline_duration_seconds(),
                         float(position_seconds),
                     ),
                 )
-            self.queue_draw()
+            if self._playhead_seconds != previous:
+                self.queue_draw()
 
         def set_selected_segment(self, segment_id: str | None) -> None:
             self._set_selection(
@@ -244,7 +300,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             if self._timeline is None:
                 return
             self._zoom = timeline_zoom_for_window(
-                self._timeline.timeline_duration_seconds,
+                self._timeline_duration_seconds(),
                 window_seconds,
             )
             self._fit_window_seconds = float(window_seconds)
@@ -257,7 +313,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             if self._timeline is None:
                 return self._viewport_width
             width = timeline_content_width(
-                self._timeline.timeline_duration_seconds,
+                self._timeline_duration_seconds(),
                 self._viewport_width,
                 self._zoom,
             )
@@ -269,9 +325,8 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             return self.get_content_width() > self._viewport_width + 1.0
 
         def _recalculate_content_size(self) -> None:
-            track_count = (
-                len(layout_timeline_tracks(self._timeline)) if self._timeline is not None else 1
-            )
+            self._layout()
+            track_count = len(self._layout_rows) if self._timeline is not None else 1
             self.set_size_request(
                 max(1, math.ceil(self.get_content_width())),
                 math.ceil(timeline_content_height(track_count)),
@@ -298,11 +353,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 and not self._pressed_selection_range
             ):
                 clip = hit_test_timeline_segment(
-                    layout_timeline_segments(
-                        self._timeline,
-                        self._viewport_width,
-                        self._zoom,
-                    ),
+                    self._layout(),
                     x,
                     y,
                 )
@@ -352,21 +403,18 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._drag_start_x = start_x
             self._drag_start_y = start_y
             self._drag_mode = None
+            self._drag_last_seek_position = None
             self._drag_segment_id = None
             self._drag_preview = None
             if self._timeline is not None and self._timeline.timing_mode == "absolute":
-                clips = layout_timeline_segments(
-                    self._timeline,
-                    self._viewport_width,
-                    self._zoom,
-                )
+                clips = self._layout()
                 clip = hit_test_timeline_segment(clips, start_x, start_y)
                 if clip is not None:
                     self._drag_mode = "segment"
                     self._drag_segment_id = clip.segment_id
                     pointer_ticks = timeline_drag_ticks_from_x(
                         start_x,
-                        self._timeline.timeline_duration_seconds,
+                        self._timeline_duration_seconds(),
                         self._viewport_width,
                         self._zoom,
                     )
@@ -435,6 +483,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._drag_start_x = None
             self._drag_start_y = None
             self._drag_mode = None
+            self._drag_last_seek_position = None
             self._drag_segment_id = None
             self._drag_preview = None
             self._drag_pointer_offset_ticks = 0
@@ -455,7 +504,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             target_track_id = timeline_track_id_at_y(self._timeline, target_y)
             target_pointer_ticks = timeline_drag_ticks_from_x(
                 target_x,
-                self._timeline.timeline_duration_seconds,
+                self._timeline_duration_seconds(),
                 self._viewport_width,
                 self._zoom,
             )
@@ -605,11 +654,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             if self._timeline is None:
                 return
             self.grab_focus()
-            clips = layout_timeline_segments(
-                self._timeline,
-                self._viewport_width,
-                self._zoom,
-            )
+            clips = self._layout()
             clip = hit_test_timeline_segment(
                 clips,
                 x,
@@ -623,16 +668,54 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 )
             position = timeline_position_from_x(
                 x,
-                self._timeline.timeline_duration_seconds,
+                self._timeline_duration_seconds(),
                 self._viewport_width,
                 self._zoom,
             )
             self.set_playhead(position)
             if notify and self._on_seek is not None:
-                self._on_seek(position)
+                if self._drag_mode != "seek" or position != self._drag_last_seek_position:
+                    self._on_seek(position)
+                    if self._drag_mode == "seek":
+                        self._drag_last_seek_position = position
             self.queue_draw()
 
         def _draw(self, _area, context, width: int, height: int) -> None:
+            context.save()
+            self._clip_to_viewport(context)
+            self._draw_contents(context, width, height)
+            context.restore()
+
+        def _disconnect_viewport(self, *_args) -> None:
+            for adjustment, signal_id in self._viewport_signals:
+                adjustment.disconnect(signal_id)
+            self._viewport_signals.clear()
+            self._viewport_parent = None
+
+        def _on_viewport_changed(self, _adjustment) -> None:
+            self.queue_draw()
+
+        def _clip_to_viewport(self, context) -> None:
+            getter = getattr(self, "get_parent", None)
+            parent = None if getter is None else getter()
+            if parent is None or not hasattr(parent, "get_hadjustment"):
+                return
+            if parent is not self._viewport_parent:
+                self._disconnect_viewport()
+                self._viewport_parent = parent
+                for adjustment in (parent.get_hadjustment(), parent.get_vadjustment()):
+                    for signal in ("value-changed", "changed"):
+                        signal_id = adjustment.connect(signal, self._on_viewport_changed)
+                        self._viewport_signals.append((adjustment, signal_id))
+            context.rectangle(
+                parent.get_hadjustment().get_value(),
+                parent.get_vadjustment().get_value(),
+                parent.get_width(),
+                parent.get_height(),
+            )
+            context.clip()
+
+        def _draw_contents(self, context, width: int, height: int) -> None:
             context.set_source_rgb(0.055, 0.063, 0.10)
             context.paint()
             if self._timeline is None:
@@ -649,29 +732,42 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 return
 
             pixels_per_second = timeline_pixels_per_second(
-                self._timeline.timeline_duration_seconds,
+                self._timeline_duration_seconds(),
                 self._viewport_width,
                 self._zoom,
             )
             self._draw_ruler(
                 context,
                 max(
-                    self._timeline.timeline_duration_seconds,
+                    self._timeline_duration_seconds(),
                     self._fit_window_seconds or 0.0,
                 ),
                 pixels_per_second,
                 width,
             )
-            rows = layout_timeline_tracks(self._timeline)
+            rows = self._layout_rows
             self._draw_track(context, width, rows)
-            clips = layout_timeline_segments(
-                self._timeline,
-                self._viewport_width,
-                self._zoom,
-            )
-            clips = self._clips_with_drag_preview(clips, rows)
+            left, top, right, bottom = context.clip_extents()
+            clips = self._view_index.query(left, top, right, bottom)
+            if self._drag_segment_id is not None and self._drag_preview is not None:
+                original = self._view_index.clip_for_segment(self._drag_segment_id)
+                if original is not None:
+                    preview = self._clips_with_drag_preview((original,), rows)[0]
+                    if preview is not original:
+                        clips = tuple(
+                            clip for clip in clips if clip.segment_id != original.segment_id
+                        )
+                        # A drag can bring an originally offscreen clip into view.
+                        # Reinsert it in its original paint position, not on top.
+                        clips = tuple(sorted((*clips, preview), key=lambda clip: clip.index))
             for clip in clips:
-                self._draw_clip(context, clip)
+                if (
+                    clip.end_x + 12 >= left
+                    and clip.x - 12 <= right
+                    and clip.end_y + 12 >= top
+                    and clip.y - 12 <= bottom
+                ):
+                    self._draw_clip(context, clip)
             self._draw_playhead(context, pixels_per_second, rows)
 
         def _draw_ruler(
@@ -723,7 +819,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             if target_row is None:
                 return clips
             pixels_per_second = timeline_pixels_per_second(
-                self._timeline.timeline_duration_seconds,
+                self._timeline_duration_seconds(),
                 self._viewport_width,
                 self._zoom,
             )

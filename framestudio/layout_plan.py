@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
 from dataclasses import dataclass
 from enum import Enum
 from fractions import Fraction
@@ -340,8 +341,13 @@ class LayoutPlan:
             or timeline_tick >= self.final_duration_ticks
         ):
             return None
-        for interval in self.intervals:
-            if interval.start_tick <= timeline_tick < interval.end_tick:
+        index = (
+            bisect_right(self.intervals, timeline_tick, key=lambda interval: interval.start_tick)
+            - 1
+        )
+        if index >= 0:
+            interval = self.intervals[index]
+            if timeline_tick < interval.end_tick:
                 return interval
         return None
 

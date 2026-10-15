@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import math
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Mapping
 
 from .model import SegmentTimeline
 from .model_types import seconds_to_ticks, ticks_to_seconds
@@ -78,6 +81,83 @@ class TimelineTrackGeometry:
     @property
     def end_y(self) -> float:
         return self.y + self.height
+
+
+@dataclass(frozen=True)
+class _TimelineViewRow:
+    top: float
+    bottom: float
+    entries: tuple[tuple[int, TimelineClipGeometry], ...]
+    starts: tuple[float, ...]
+    prefix_ends: tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class TimelineViewIndex:
+    """Immutable viewport lookup retaining the layout's original paint order."""
+
+    rows: tuple[_TimelineViewRow, ...]
+    tops: tuple[float, ...]
+    prefix_bottoms: tuple[float, ...]
+    _clips_by_segment: Mapping[str, TimelineClipGeometry]
+
+    @classmethod
+    def from_clips(cls, clips: tuple[TimelineClipGeometry, ...]) -> TimelineViewIndex:
+        grouped: dict[tuple[float, float], list[tuple[int, TimelineClipGeometry]]] = {}
+        by_segment: dict[str, TimelineClipGeometry] = {}
+        for ordinal, clip in enumerate(clips):
+            # Index the same expanded bounds used by the existing draw culling,
+            # including one-pixel minimum widths, badges, and selected borders.
+            grouped.setdefault((clip.y - 12, clip.end_y + 12), []).append((ordinal, clip))
+            by_segment[clip.segment_id] = clip
+        rows = []
+        for (top, bottom), entries in sorted(grouped.items()):
+            entries.sort(key=lambda entry: entry[1].x - 12)
+            prefix_ends = []
+            end = -math.inf
+            for _ordinal, clip in entries:
+                end = max(end, clip.end_x + 12)
+                prefix_ends.append(end)
+            rows.append(
+                _TimelineViewRow(
+                    top,
+                    bottom,
+                    tuple(entries),
+                    tuple(clip.x - 12 for _ordinal, clip in entries),
+                    tuple(prefix_ends),
+                )
+            )
+        prefix_bottoms = []
+        bottom = -math.inf
+        for row in rows:
+            bottom = max(bottom, row.bottom)
+            prefix_bottoms.append(bottom)
+        return cls(
+            tuple(rows),
+            tuple(row.top for row in rows),
+            tuple(prefix_bottoms),
+            MappingProxyType(by_segment),
+        )
+
+    def clip_for_segment(self, segment_id: str) -> TimelineClipGeometry | None:
+        return self._clips_by_segment.get(segment_id)
+
+    def query(
+        self, left: float, top: float, right: float, bottom: float
+    ) -> tuple[TimelineClipGeometry, ...]:
+        visible = []
+        first_row = bisect_left(self.prefix_bottoms, top)
+        last_row = bisect_right(self.tops, bottom)
+        for row in self.rows[first_row:last_row]:
+            if row.bottom < top:
+                continue
+            first = bisect_left(row.prefix_ends, left)
+            last = bisect_right(row.starts, right)
+            for ordinal, clip in row.entries[first:last]:
+                if clip.end_x + 12 >= left:
+                    visible.append((ordinal, clip))
+        visible.sort(key=lambda entry: entry[0])
+        return tuple(clip for _ordinal, clip in visible)
 
 
 def _positive_float(value: float, label: str) -> float:

@@ -1,0 +1,2 @@
+# Optional exact-preview runtime; older application interpreters keep FFmpeg.
+av==19.0.1; python_version >= "3.12"

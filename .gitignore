@@ -1,5 +1,7 @@
 __pycache__/
 *.py[cod]
+.playback-benchmark.lock
+.phase010-ticket109-artifacts/
 .pytest_cache/
 .venv/
 .mypy_cache/

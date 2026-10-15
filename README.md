@@ -38,13 +38,57 @@ result without overwriting the original videos.
 
 ### Preview and audio
 
+Composited timeline playback keeps an FFmpeg decoder running for each active
+layout interval rather than restarting it for every frame. Seeking or changing
+the active layout restarts the decoder as needed. Preview keeps the same canvas,
+framing, and triplicate behavior; this is not a lower-resolution proxy or an
+export-quality change.
+
+Ordinary sequential imports now open only the source contributing at the
+playhead, not every video in the project. They keep the original sequential
+scale/pad/fps graph. Uncached paused seeks on this path use exact FFmpeg;
+the native CPU/CUDA composition path is not substituted because its pixels
+do not match the sequential renderer.
+
+Cursor seeks run asynchronously, keeping the interface responsive while the
+exact frame is decoded. Rapid cursor changes retain the latest target rather
+than rendering a backlog; repeated positions reuse the bounded preview cache.
+For absolute/synchronized timelines, the optional preview runtime retains
+decoder state in an isolated helper instead of reopening FFmpeg for every
+image. Supported H.264 footage uses NVIDIA decoding when available; other eligible footage uses
+CPU decoding, with explicit FFmpeg fallback for unsupported capabilities.
+Run-up frames stay on the GPU and only the selected frame is downloaded.
+Nearby forward moves continue decoding instead of repeatedly seeking back to
+a keyframe. Distant or backward long-GOP seeks still need that run-up. No
+proxies, background indexing, or lower-quality previews are added.
+Opaque full-canvas native previews also reuse bounded source-aware color/scale
+pipelines, rebuilding when input metadata or framing changes. With the normal
+helper RSS budget, all-CUDA working sets can retain five demand-loaded decoders
+and pipelines; post-render RSS retirement still applies. CPU/mixed working sets
+stay at two. Lower helper budgets
+also restrict CUDA residency to two. No adjacent videos are eagerly decoded
+in the background. This avoids repeated filter setup without changing the
+exact color-conversion path.
+
+The timeline reuses validated layout geometry until the model changes and uses
+an indexed visible-viewport lookup rather than scanning all cached clips.
+Scrolling, zooming, selection, and edits still invalidate the relevant view.
+See [preview optimization guide](docs/specs/preview-optimization.md) for the
+current design, measured results, and rejected alternatives. Detailed records:
+[preview strategy and measurements](docs/specs/preview-responsiveness-strategy.md),
+[exact-preview research](docs/specs/instant-preview-research.md), and
+[large-project strategy comparisons](docs/specs/large-project-preview-research.md)
+for measured gains, compared alternatives, and remaining limits.
+
 Import, adding clips, reopening, recovery, and preview do not run audio scans.
 Audio analysis starts only after **Start export** is confirmed, not while
 viewing the export plan. It scans only sources used by the selected outputs
 and reuses valid saved results. Sources without audio do not need a scan.
 Independent scans run in CPU-parallel processes using the available CPU
 affinity, with progress and cancellation during export preparation.
-Playback is paused for export. The export temporarily enables the available
+Playback is paused for export, and retained native and streaming preview resources are
+released before export preparation. They reopen lazily on the next uncached
+preview after export. The export temporarily enables the available
 system performance profile and restores the previous profile afterward.
 Final audio decisions are applied and validated during export.
 
@@ -100,6 +144,12 @@ runtime is unavailable, eligible exports use the validated FFmpeg
 interpolation fallback. The original media workflows also support CPU-only
 operation.
 
+Faster uncached exact seeking optionally uses **PyAV 19.0.1 with Python 3.12
+or newer** in a separate preview worker. The editor itself still supports
+Python 3.10. The worker keeps a bounded set of decoder contexts open and can
+use supported NVIDIA hardware without changing export or preview resolution.
+Missing optional capabilities retain the FFmpeg preview path with a diagnostic.
+
 ## Install
 
 Clone the repository and install the single canonical command:
@@ -123,6 +173,32 @@ The repository entrypoint can always be used directly:
 ```sh
 python3 framestudio.py --help
 ```
+
+To install the optional faster preview runtime without changing system Python:
+
+```sh
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install --requirement requirements-preview.txt
+```
+
+Use Python 3.12 or newer for that environment. `make setup` includes the same
+optional runtime alongside the development tools. The editor can discover the
+repository's `.venv` for its preview worker even when the canonical command
+uses system Python.
+
+The default `FRAMESTUDIO_PREVIEW_BACKEND=auto` selects supported acceleration
+and reports capability fallback. To compare CPU decoding or restore the
+reference path:
+
+```sh
+FRAMESTUDIO_PREVIEW_BACKEND=cpu framestudio
+FRAMESTUDIO_PREVIEW_BACKEND=ffmpeg framestudio
+```
+
+`cuda` requests hardware decoding where supported, with diagnostic CPU
+fallback otherwise. `FRAMESTUDIO_PREVIEW_PYTHON=/absolute/path/to/python`
+selects another helper interpreter with the pinned optional runtime installed.
+Initial helper/device startup is separate from retained-decoder seek latency.
 
 ## Open the editor
 
@@ -160,8 +236,8 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
    segments, focus settings, or triplicate settings.
    Selecting multiple videos in one batch randomizes their timeline order;
    adding a single video leaves it at the end.
-3. Wait for metadata probing to attach or append the clips. Audio analysis continues
-   in the background.
+3. Wait for metadata probing to attach or append the clips. Audio analysis
+   waits until export.
 4. Play, pause, seek, or use `Left` and `Right` for frame navigation.
 5. Press `B` to split at the playhead.
 6. Select segments with click, `Ctrl`-click, or `Shift`-click.
@@ -180,8 +256,8 @@ make editor ARGS="--project /absolute/path/to/project.framestudio.json"
 The information strip shows only the focused selected video's filename,
 original dimensions, and original FPS. For a multi-selection, it follows the
 last focused segment. Clearing the selection shows **No video selected**.
-Background audio analysis continues without listing routine audio decisions
-in that strip. Analysis failures remain visible in the status area.
+Audio analysis remains deferred until confirmed export and does not run while
+editing. Export-preparation failures remain visible in the status area.
 
 ### Timeline controls
 
