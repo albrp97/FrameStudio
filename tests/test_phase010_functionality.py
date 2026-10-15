@@ -66,8 +66,27 @@ def _visible_widget_text(widget: Any) -> list[str]:
 
 
 def _snapshot_widget(widget: Any, destination: Path, Gtk: Any) -> None:
-    from gi.repository import GLib
+    from gi.repository import GLib, Gsk
 
+    # The software Cairo renderer avoids GL texture uploads, which abort the
+    # process under the software GL stack used by CI.
+    renderer = Gsk.CairoRenderer()
+    if not renderer.realize(None):
+        renderer = None
+    try:
+        _snapshot_widget_with_renderer(widget, destination, Gtk, GLib, renderer)
+    finally:
+        if renderer is not None:
+            renderer.unrealize()
+
+
+def _snapshot_widget_with_renderer(
+    widget: Any,
+    destination: Path,
+    Gtk: Any,
+    GLib: Any,
+    renderer: Any,
+) -> None:
     snapshot_widgets = [widget]
     child = getattr(widget, "get_child", lambda: None)()
     if child is not None:
@@ -86,8 +105,6 @@ def _snapshot_widget(widget: Any, destination: Path, Gtk: Any) -> None:
                 snapshot = Gtk.Snapshot.new()
                 paintable.snapshot(snapshot, width, height)
                 node = snapshot.to_node()
-                native = snapshot_widget.get_native()
-                renderer = None if native is None else native.get_renderer()
                 if node is not None and renderer is not None:
                     texture = renderer.render_texture(node, None)
                     if texture is not None and texture.save_to_png(str(destination)):
