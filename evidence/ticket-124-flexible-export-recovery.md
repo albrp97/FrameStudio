@@ -463,3 +463,47 @@ No user render was started, source files changed, checkpoints deleted, or
 commit/push performed. This records raw deterministic results only. The
 previous exact-profile automaticValidation blocker remains unresolved;
 no new formal readiness decision or lifecycle closure is claimed.
+
+## 2026-10-16 - FFmpeg version gate for shared audio inputs
+
+CI installs FFmpeg 6.1 and failed the quality suite. On FFmpeg 6.1.3, the
+shared-input audio graph (one input fanned out with `asplit` to many track
+branches) drops a branch with a later offset and pans the mix to the other
+branch's ratio. The legacy one-input-per-clip graph is correct there. On
+FFmpeg 9.0.2 both graphs match. The 6.1 root cause was not isolated.
+
+Decision (user-approved): input reuse is enabled only when the detected
+FFmpeg major version is at least 9. Unknown or unparseable builds, and
+versions 7 and 8 (untested), use the legacy graph. The gate is
+`_shared_input_reuse_supported` in `framestudio/audio_compositor.py`.
+
+Tradeoff: on FFmpeg below 9, each clip is decoded once per use instead of
+shared, so multitrack audio export does more decode work. The user's 9.0.2
+machine keeps reuse.
+
+Tests gated to FFmpeg 9 or newer, with skip reasons naming FFmpeg 6.1:
+- shared-vs-legacy PCM comparison and the mapping tests in
+  `tests/test_editor_audio_input_reuse_functionality.py`. A new test asserts
+  reuse is off on FFmpeg 6.
+- VFR seek case in `tests/test_editor_multitrack_render_optimization.py`
+  (raw 14 vs decoded 17 frames on 6.1; this exercises FFmpeg's own
+  `-ss -noaccurate_seek -copyts` behavior, not FrameStudio code).
+- two real-multisource cases in `tests/test_multitrack_render_benchmark.py`.
+  On 6.1 the AAC decoder returns 29696 PCM samples for a 0.6 s file, where
+  9.0.2 returns 28800. The benchmark's decoded-length gate therefore cannot
+  pass on 6.1. This is a decoder difference, not an export defect.
+
+Verified raw results:
+- `tests.test_editor_audio_input_reuse_functionality`,
+  `tests.test_editor_multitrack_render_optimization`,
+  `tests.test_multitrack_render_benchmark` on FFmpeg 6.1.3:
+  28 tests, OK, 6 skipped.
+- Same modules on FFmpeg 9.0.2: 28 tests, OK.
+- Full suite on FFmpeg 6.1.3 with `make quality`: 1042 tests, 733 s. Two
+  failures remain, both X11-only and environmental here (session is
+  Wayland): `NativeRemovalControlsFunctionalityTests` setUpClass and
+  `test_complete_edit_and_delivery_journey`. CI runs them under `xvfb-run`
+  with `GDK_BACKEND=x11`.
+- Static analysis (`make compile diff-check static-analysis`) passed: ruff
+  format and lint, mypy, complexity, duplication, dependency check and audit,
+  and security.

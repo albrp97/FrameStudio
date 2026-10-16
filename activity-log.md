@@ -5,6 +5,7 @@
 - :rocket: - Resumable export recovery - Per-track audio checkpoints and cached source hashes ([evidence](evidence/ticket-124-flexible-export-recovery.md))
 - :bug: - Large multitrack export memory - Bounded interval composition avoids out-of-memory kills ([evidence](evidence/ticket-124-flexible-export-recovery.md))
 - :bug: - UI export resume - Sessions created by the CLI resume from the editor ([evidence](evidence/ticket-124-flexible-export-recovery.md))
+- :bug: - FFmpeg 6.1 audio mix - Shared audio input reuse is enabled only on FFmpeg 9 or newer; older builds use the legacy graph ([evidence](evidence/ticket-124-flexible-export-recovery.md))
 
 ## 2026-10-09
 

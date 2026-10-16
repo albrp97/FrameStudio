@@ -3,11 +3,13 @@ import unittest
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from framestudio.audio_compositor import (
     AUDIO_SAMPLE_RATE,
     AudioPlan,
     _render_command,
+    _shared_input_reuse_supported,
     build_audio_plan,
 )
 from framestudio.layout_plan import LayoutPlan, plan_project_layout
@@ -141,7 +143,35 @@ def _render_pcm(
     return sha256(raw).hexdigest(), len(raw) // frame_bytes
 
 
+_REUSE_SUPPORTED = _shared_input_reuse_supported("ffmpeg")
+_REUSE_SKIP_REASON = (
+    "shared audio input reuse is gated to FFmpeg >= 9; older builds mis-render asplit graphs"
+)
+
+
 class AudioInputReuseFunctionalityTests(unittest.TestCase):
+    def test_reuse_is_disabled_when_ffmpeg_is_older_than_nine(self):
+        with TemporaryDirectory(dir=str(_REPOSITORY_ROOT)) as temporary_directory:
+            root = Path(temporary_directory)
+            project, layout = _fixture(root, _MANY_BRANCH_BLOCKS)
+            plan = build_audio_plan(project, layout)
+            branches = _audible_branch_count(plan)
+
+            with patch(
+                "framestudio.audio_compositor._ffmpeg_major_version",
+                return_value=6,
+            ):
+                gated, gated_filter = _render_command(
+                    project,
+                    plan,
+                    root / "gated.wav",
+                    "ffmpeg",
+                )
+
+            self.assertEqual(_input_count(gated), branches)
+            self.assertNotIn("asplit=", gated_filter)
+
+    @unittest.skipUnless(_REUSE_SUPPORTED, _REUSE_SKIP_REASON)
     def test_repeated_source_across_tracks_and_intervals_maps_to_one_input(self):
         with TemporaryDirectory(dir=str(_REPOSITORY_ROOT)) as temporary_directory:
             root = Path(temporary_directory)
@@ -168,6 +198,7 @@ class AudioInputReuseFunctionalityTests(unittest.TestCase):
             self.assertEqual(_input_count(shared), 3)
             self.assertIn("asplit=", shared_filter)
 
+    @unittest.skipUnless(_REUSE_SUPPORTED, _REUSE_SKIP_REASON)
     def test_single_source_repeated_across_staggered_tracks_maps_to_one_input(self):
         with TemporaryDirectory(dir=str(_REPOSITORY_ROOT)) as temporary_directory:
             root = Path(temporary_directory)
@@ -188,6 +219,7 @@ class AudioInputReuseFunctionalityTests(unittest.TestCase):
             self.assertEqual(_input_count(legacy), branches)
             self.assertEqual(_input_count(shared), 1)
 
+    @unittest.skipUnless(_REUSE_SUPPORTED, _REUSE_SKIP_REASON)
     def test_shared_inputs_render_identical_decoded_pcm_to_legacy_inputs(self):
         cases = (
             ("many-branch", _MANY_BRANCH_BLOCKS),

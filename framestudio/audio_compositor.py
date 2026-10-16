@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import math
+import re
+import subprocess
 import threading
 import uuid
 from array import array
 from collections import deque
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Mapping
 
@@ -575,6 +578,32 @@ def _balance_factors(pan_percent: float) -> tuple[float, float]:
     return 1.0, 1.0
 
 
+_SHARED_INPUT_MIN_FFMPEG_MAJOR = 9
+
+
+@lru_cache(maxsize=8)
+def _ffmpeg_major_version(ffmpeg_path: str) -> int | None:
+    try:
+        result = subprocess.run(
+            [ffmpeg_path, "-hide_banner", "-version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    match = re.search(r"ffmpeg version n?(\d+)\.", result.stdout)
+    return int(match.group(1)) if match else None
+
+
+def _shared_input_reuse_supported(ffmpeg_path: str) -> bool:
+    # FFmpeg 6.1 drops one of two same-file audio blocks when they share an
+    # asplit output (verified with 6.1.3 vs 9.0.2); use separate inputs there.
+    major = _ffmpeg_major_version(ffmpeg_path)
+    return major is not None and major >= _SHARED_INPUT_MIN_FFMPEG_MAJOR
+
+
 def _render_command(
     project: Project,
     plan: AudioPlan,
@@ -585,6 +614,7 @@ def _render_command(
     contribution_segments: frozenset[str] | None = None,
     prepared_tracks: Mapping[str, Path] | None = None,
 ) -> tuple[list[str], str]:
+    reuse_inputs = reuse_inputs and _shared_input_reuse_supported(ffmpeg_path)
     input_paths: list[Path] = []
     input_indexes: dict[Path, int] = {}
     input_uses: list[int] = []

@@ -8,6 +8,7 @@ from fractions import Fraction
 from pathlib import Path
 from unittest.mock import patch
 
+from framestudio.audio_compositor import _ffmpeg_major_version
 from framestudio.media import probe_media
 from framestudio.model import Project, TriplicateGroup, VisualTransform
 from framestudio.upscale_policy import UpscalePolicy
@@ -452,6 +453,10 @@ class TriplicateFactoringMediaTests(unittest.TestCase):
             )
             self.assertEqual(source.read_bytes(), original)
 
+    @unittest.skipUnless(
+        (_ffmpeg_major_version(shutil.which("ffmpeg") or "") or 0) >= 9,
+        "FFmpeg 6.1 trims VFR B-frame seeks differently (14 raw vs 17 decoded frames); requires FFmpeg 9+",
+    )
     def test_experimental_original_pts_seek_matches_bframes_vfr_and_timestamp_offsets(self):
         def ffmpeg(arguments):
             return subprocess.run(
