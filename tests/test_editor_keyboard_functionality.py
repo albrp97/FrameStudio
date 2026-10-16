@@ -422,6 +422,19 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
             )
             return result.stdout.strip()
 
+        def move_pointer(x, y):
+            xdotool("mousemove", str(x), str(y))
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                _pump_events(self.GLib, 1)
+                location = dict(
+                    line.split("=", 1)
+                    for line in xdotool("getmouselocation", "--shell").splitlines()
+                )
+                if (int(location["X"]), int(location["Y"])) == (int(x), int(y)):
+                    return
+            self.fail(f"pointer did not reach {x},{y}")
+
         window_id = xdotool("search", "--onlyvisible", "--name", self.window.get_title())
         xdotool("windowfocus", "--sync", window_id)
         for inside, bypass in ((True, False), (False, False), (True, True)):
@@ -438,8 +451,7 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
                 relative,
                 surface_transform=self.window.get_surface_transform(),
             )
-            xdotool("mousemove", str(point[0]), str(point[1]))
-            _pump_events(self.GLib, 5)
+            move_pointer(point[0], point[1])
             playhead_before_click = self.window.project.playhead_seconds
             if bypass:
                 xdotool("keydown", "Super_L")
@@ -447,8 +459,7 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
                 if jitter:
                     xdotool("mousedown", "1")
                     _pump_events(self.GLib, 2)
-                    xdotool("mousemove", str(point[0] + jitter), str(point[1]))
-                    _pump_events(self.GLib, 2)
+                    move_pointer(point[0] + jitter, point[1])
                     xdotool("mouseup", "1")
                 else:
                     xdotool("click", "1")
