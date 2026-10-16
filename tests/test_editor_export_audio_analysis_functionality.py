@@ -88,7 +88,8 @@ class ExportAudioAnalysisFunctionalityTests(unittest.TestCase):
                 self.assertAlmostEqual(media.duration_seconds, 0.5, delta=0.1)
                 self.assertIn("Planning export outputs", stages)
                 self.assertIn("Inspecting export sources", stages)
-                self.assertIn("video composition", stages)
+                self.assertIn("video composition interval 1/1", stages)
+                self.assertIn("Verified video composition", stages)
                 event = threading.Event()
 
                 def cancel_preparation(progress):

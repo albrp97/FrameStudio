@@ -19,6 +19,45 @@ def sample(percent=50.0, stage="interpolation"):
 
 
 class ExportRecoveryTests(unittest.TestCase):
+    def test_journal_finds_worker_thread_children_and_their_memory(self):
+        from framestudio.export_journal import ExportJournal
+
+        started = threading.Event()
+        finish = threading.Event()
+        processes = []
+
+        def worker():
+            process = subprocess.Popen(
+                [sys.executable, "-c", "import time; print('ready', flush=True); time.sleep(10)"],
+                stdout=subprocess.PIPE,
+            )
+            processes.append(process)
+            process.stdout.readline()
+            started.set()
+            try:
+                finish.wait(timeout=10)
+            finally:
+                process.terminate()
+                process.communicate(timeout=5)
+
+        thread = threading.Thread(target=worker)
+        thread.start()
+        try:
+            self.assertTrue(started.wait(timeout=5))
+            with TemporaryDirectory() as directory:
+                journal = ExportJournal(Path(directory) / "output.mp4")
+                children = journal._children()
+                child = next(
+                    (child for child in children if child["pid"] == processes[0].pid), None
+                )
+                self.assertIsNotNone(child, "Export worker's child was missing from diagnostics")
+                self.assertGreater(child["memory"]["rss_kib"], 0)
+                self.assertIn("swap_kib", child["memory"])
+        finally:
+            finish.set()
+            thread.join(timeout=10)
+            self.assertFalse(thread.is_alive())
+
     def test_heartbeat_callback_failure_is_propagated_and_retains_journal(self):
         from framestudio.export_journal import ExportJournal, journal_path
 

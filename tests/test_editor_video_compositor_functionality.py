@@ -37,6 +37,176 @@ def isolated_directory():
 
 
 class VideoCompositorFunctionalityTests(unittest.TestCase):
+    def test_prepared_subframe_and_tail_slots_produce_a_real_composite_frame(self):
+        from framestudio.fps_policy import resolve_frame_rate_policy
+        from framestudio.render_preparations import RenderPreparations
+
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("FFmpeg and ffprobe are required")
+        with isolated_directory() as root:
+            source = _make_marker_source(root, "source.mp4", 320, 180, "30", "red")
+            source_hash = _sha256(source)
+            metadata = probe_media(source).metadata()
+            project = Project.create_synchronized(source, metadata)
+            project.timeline.add_track("track-2")
+            project.timeline.add_track("track-3")
+            for track, start, end in (
+                ("track-1", 1.968, 2.468),
+                ("track-2", 0.0, 1.979322),
+                ("track-3", 1.969294, 2.468),
+            ):
+                project.timeline.replace_track_blocks(
+                    track,
+                    (
+                        make_block(
+                            segment_id=track,
+                            source_id=project.source.source_id,
+                            track_id=track,
+                            source_start=0.0,
+                            source_end=end - start,
+                            timeline_start=start,
+                            timeline_end=end,
+                        ),
+                    ),
+                )
+            project.duration_seconds = project.timeline.timeline_duration_seconds
+            policy = resolve_frame_rate_policy(
+                ({**metadata, "source_id": project.source.source_id},),
+                backend="ffmpeg-minterpolate",
+            )
+            plan = plan_project_video(
+                project,
+                root / "subframe.mp4",
+                frame_rate_policy=policy,
+                upscale_policy=UpscalePolicy(enabled=False),
+            )
+            index = plan.interval_frame_counts.index(1)
+            self.assertEqual(len(plan.layout_plan.intervals[index].slots), 3)
+            result = render_project_video(plan, preparations=RenderPreparations(root / "cache"))
+            self.assertEqual(result.actual_frames, plan.expected_frames)
+            self.assertTrue(result.source_hashes_unchanged)
+            frame = _decode_frame(plan.destination, plan.frame_boundaries[index])
+            self.assertEqual(len(frame), 384 * 216 * 3)
+            for x in (64, 192, 320):
+                pixel = frame[(50 * 384 + x) * 3 : (50 * 384 + x) * 3 + 3]
+                self.assertGreater(pixel[0], 150)
+                self.assertLess(pixel[1], 80)
+            self.assertEqual(_sha256(source), source_hash)
+
+    def test_bounded_composition_resumes_lossless_intervals_without_changing_frames(self):
+        from framestudio.export_types import ExportExecutionError
+        from framestudio.fps_policy import resolve_frame_rate_policy
+        from framestudio.render_preparations import RenderPreparations
+
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("FFmpeg and ffprobe are required")
+        with isolated_directory() as root:
+            source = _make_marker_source(root, "source.mp4", 320, 180, "30000/1001", "red")
+            source_hash = _sha256(source)
+            project = Project.create_synchronized(
+                source, probe_media(source).metadata(), project_id="bounded-composition"
+            )
+            source_id = project.source.source_id
+            project.timeline.replace_track_blocks(
+                "track-1",
+                tuple(
+                    make_block(
+                        segment_id=f"clip-{index}",
+                        source_id=source_id,
+                        track_id="track-1",
+                        source_start=index * 0.1,
+                        source_end=index * 0.1 + (0.033367 if index == 0 else 0.11),
+                        timeline_start=index * 0.21,
+                        timeline_end=index * 0.21 + (0.033367 if index == 0 else 0.11),
+                    )
+                    for index in range(10)
+                ),
+            )
+            project.duration_seconds = project.timeline.timeline_duration_seconds
+            policy = resolve_frame_rate_policy(
+                ({**probe_media(source).metadata(), "source_id": source_id},),
+                choice="custom",
+                custom_rate="30000/1001",
+                enhancement_enabled=False,
+            )
+            plan = plan_project_video(
+                project,
+                root / "bounded.mp4",
+                frame_rate_policy=policy,
+                upscale_policy=UpscalePolicy(enabled=False),
+            )
+            baseline = root / "baseline.mp4"
+            with mock.patch.object(
+                video_compositor, "_needs_bounded_composition", return_value=False, create=True
+            ):
+                render_project_video(replace(plan, destination=baseline))
+            intervals = sum(count > 0 for count in plan.interval_frame_counts)
+            self.assertGreater(intervals, 8)
+            self.assertIn(1, plan.interval_frame_counts)
+            original_run = video_compositor.run_ffmpeg
+            calls = []
+
+            def interrupted(command, **options):
+                if "ffv1" in command:
+                    calls.append(command)
+                    if len(calls) == 3:
+                        raise ExportExecutionError("simulated interruption")
+                return original_run(command, **options)
+
+            checkpoint_root = root / "checkpoints"
+            with (
+                mock.patch.object(video_compositor, "run_ffmpeg", side_effect=interrupted),
+                self.assertRaisesRegex(VideoCompositorExecutionError, "simulated interruption"),
+            ):
+                render_project_video(plan, preparations=RenderPreparations(checkpoint_root))
+            self.assertFalse(plan.destination.exists())
+            completed_commands = {tuple(command[:-1]) for command in calls[:2]}
+            calls.clear()
+
+            def resumed(command, **options):
+                if "ffv1" in command:
+                    calls.append(command)
+                    self.assertNotIn(tuple(command[:-1]), completed_commands)
+                    if "-i" in command:
+                        self.assertEqual(command[command.index("-threads") + 1], "1")
+                    self.assertIn("concat=n=1:", command[command.index("-filter_complex") + 1])
+                return original_run(command, **options)
+
+            with mock.patch.object(video_compositor, "run_ffmpeg", side_effect=resumed):
+                result = render_project_video(
+                    plan, preparations=RenderPreparations(checkpoint_root)
+                )
+            self.assertGreater(len(calls), 0)
+            self.assertLessEqual(len(calls), intervals - 2)
+            self.assertEqual(result.actual_frames, plan.expected_frames)
+
+            def frame_hashes(path):
+                completed = subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-v",
+                        "error",
+                        "-i",
+                        str(path),
+                        "-map",
+                        "0:v:0",
+                        "-f",
+                        "framemd5",
+                        "-",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                return [
+                    line.split(",")[-1].strip()
+                    for line in completed.stdout.splitlines()
+                    if not line.startswith("#")
+                ]
+
+            self.assertEqual(frame_hashes(plan.destination), frame_hashes(baseline))
+            self.assertEqual(_sha256(source), source_hash)
+
     def test_dynamic_sections_render_with_real_ffmpeg_and_preserve_sources(self):
         if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
             self.skipTest("FFmpeg and ffprobe are required")

@@ -420,6 +420,7 @@ def _capture_source_identities(
                 stat = resolved.stat()
                 source_hash = _video_file_sha256(
                     resolved,
+                    persistent=True,
                     cancel_event=cancel_event,
                     source_hash_cache=source_hash_cache,
                     heartbeat_callback=make_progress_heartbeat(
@@ -471,6 +472,7 @@ def _assert_sources_unchanged(
             stat = identity.resolved_path.stat()
             current_hash = _video_file_sha256(
                 identity.resolved_path,
+                persistent=True,
                 cancel_event=cancel_event,
                 heartbeat_callback=make_progress_heartbeat(
                     progress_callback,
@@ -699,6 +701,8 @@ def _render_checkpointed_stages(
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
             cancel_event=cancel_event,
+            preparations=preparations,
+            progress_callback=progress_scope(progress_callback, 88, 94),
         ),
         lambda _path: None,  # render_audio already verifies the exact PCM contract.
         suffix=".wav",

@@ -711,6 +711,44 @@ class FlexibleOutputRecoveryUnitTests(unittest.TestCase):
                 self.module.build_output_fingerprint(changed_tools),
             )
 
+    def test_production_fingerprint_normalizes_ui_and_cli_policy_representations(self):
+        from framestudio.fps_policy import policy_source_metadata, resolved_from_policy
+        from framestudio.output_plan import active_export_sources
+        from framestudio.upscale_policy import resolved_from_policy as resolve_upscale
+        from tests.test_editor_source_outputs import _project
+
+        with TemporaryDirectory(dir=str(REPOSITORY_ROOT / "tests")) as temporary_directory:
+            root = Path(temporary_directory)
+            project, _ = _project(root)
+            request = plan_project_outputs(project, root / "edited.mp4").output_requests[0]
+            metadata = policy_source_metadata(active_export_sources(project))
+            fps = project.get_frame_rate_policy()
+            upscale = project.get_upscale_policy()
+            resolved_fps = resolved_from_policy(metadata, fps)
+            resolved_upscale = resolve_upscale(metadata, upscale)
+
+            def payload(frame_rate_policy, upscale_policy):
+                return self.module.build_project_output_fingerprint_payload(
+                    project,
+                    request,
+                    frame_rate_policy=frame_rate_policy,
+                    upscale_policy=upscale_policy,
+                    tool_identities={},
+                )
+
+            legacy_cli = payload(resolved_fps, resolved_upscale)
+            self.assertEqual(legacy_cli["render"]["resolved_fps"], resolved_fps.to_dict())
+            self.assertEqual(legacy_cli["render"]["upscale"], resolved_upscale.to_dict())
+            self.assertIsNone(legacy_cli["render"]["rve_route"])
+            for label, selected_fps, selected_upscale in (
+                ("UI", fps, upscale),
+                ("mapping", fps.to_dict(), upscale.to_dict()),
+                ("resolved mapping", resolved_fps.to_dict(), resolved_upscale.to_dict()),
+                ("defaults", None, None),
+            ):
+                with self.subTest(representation=label):
+                    self.assertEqual(payload(selected_fps, selected_upscale), legacy_cli)
+
     def test_canonical_fingerprint_rejects_unsupported_and_nonfinite_values(self):
         with self.assertRaises(TypeError):
             self.module.build_output_fingerprint({"unsupported": object()})

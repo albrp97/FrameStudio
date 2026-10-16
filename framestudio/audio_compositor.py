@@ -17,10 +17,13 @@ from .export_process import (
 from .export_process import (
     run_ffmpeg as run_managed_ffmpeg,
 )
-from .export_types import ExportExecutionError
+from .export_progress import progress_scope
+from .export_types import ExportExecutionError, ExportProgressCallback
 from .layout_plan import LayoutPlan
 from .model_project import Project
 from .model_types import SourceReference
+from .render_preparations import RenderPreparations
+from .source_hash_cache import file_sha256
 
 AUDIO_SAMPLE_RATE = 48_000
 AUDIO_CHANNELS = 2
@@ -280,6 +283,8 @@ def render_audio(
     ffmpeg_path: str = "ffmpeg",
     ffprobe_path: str = "ffprobe",
     cancel_event: threading.Event | None = None,
+    preparations: RenderPreparations | None = None,
+    progress_callback: ExportProgressCallback | None = None,
 ) -> AudioRenderResult:
     plan = build_audio_plan(project, layout_plan)
     output = Path(destination).expanduser()
@@ -294,8 +299,30 @@ def render_audio(
     partial = output.with_name(f".{output.name}.{uuid.uuid4().hex}.partial")
     published = False
     try:
-        command, filter_graph = _render_command(project, plan, partial, ffmpeg_path)
-        _run_ffmpeg(command, filter_graph, cancel_event=cancel_event)
+        tracks = (
+            _prepare_audio_tracks(
+                project,
+                layout_plan,
+                plan,
+                preparations,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+                cancel_event=cancel_event,
+                progress_callback=progress_callback,
+            )
+            if preparations is not None
+            else None
+        )
+        command, filter_graph = _render_command(
+            project, plan, partial, ffmpeg_path, prepared_tracks=tracks
+        )
+        _run_ffmpeg(
+            command,
+            filter_graph,
+            cancel_event=cancel_event,
+            progress_callback=progress_scope(progress_callback, 90 if tracks else 0, 100),
+            duration_seconds=plan.final_sample_count / plan.sample_rate,
+        )
         sample_count, peak = _verify_pcm_output(
             partial,
             ffprobe_path=ffprobe_path,
@@ -319,6 +346,95 @@ def render_audio(
                 partial.unlink(missing_ok=True)
             except OSError:
                 pass
+
+
+def _prepare_audio_tracks(
+    project: Project,
+    layout_plan: LayoutPlan,
+    plan: AudioPlan,
+    preparations: RenderPreparations,
+    *,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    cancel_event: threading.Event | None,
+    progress_callback: ExportProgressCallback | None,
+) -> dict[str, Path]:
+    audible_ids = {
+        block.segment_id for interval in plan.intervals for block in interval.audible_blocks
+    }
+    groups: dict[str, set[str]] = {}
+    for block in layout_plan.included_blocks:
+        if block.segment_id in audible_ids:
+            groups.setdefault(block.track_id, set()).add(block.segment_id)
+    tracks: dict[str, Path] = {}
+    for index, (track_id, segments) in enumerate(groups.items()):
+        command, graph = _render_command(
+            project,
+            plan,
+            Path("track.wav"),
+            ffmpeg_path,
+            contribution_segments=frozenset(segments),
+        )
+        sources = {
+            block.source_id
+            for interval in plan.intervals
+            for block in interval.audible_blocks
+            if block.segment_id in segments
+        }
+        request = {
+            "audio_track_version": 1,
+            "track_id": track_id,
+            "command": command,
+            "sources": {
+                source_id: file_sha256(
+                    Path(project.source_by_id(source_id).path),
+                    persistent=True,
+                    cancel_event=cancel_event,
+                )
+                for source_id in sorted(sources)
+            },
+            "runtime": preparations.runtime(ffmpeg_path, ffprobe_path),
+        }
+        callback = progress_scope(
+            progress_callback, 90 * index / len(groups), 90 * (index + 1) / len(groups)
+        )
+
+        def produce(
+            path: Path,
+            command: list[str] = command,
+            graph: str = graph,
+            stage: str = f"audio track {index + 1}/{len(groups)}",
+            callback: ExportProgressCallback | None = callback,
+        ) -> None:
+            _run_ffmpeg(
+                [*command[:-1], str(path)],
+                graph,
+                cancel_event=cancel_event,
+                stage=stage,
+                progress_callback=callback,
+                duration_seconds=plan.final_sample_count / plan.sample_rate,
+            )
+
+        def validate(path: Path) -> tuple[int, float]:
+            return _verify_pcm_output(
+                path,
+                ffprobe_path=ffprobe_path,
+                ffmpeg_path=ffmpeg_path,
+                expected_samples=plan.final_sample_count,
+                cancel_event=cancel_event,
+                allow_over_unity=True,
+            )
+
+        path = preparations.materialize(
+            "audio track",
+            request,
+            produce,
+            validate,
+            suffix=".wav",
+            progress_callback=callback,
+        )
+        tracks.update((segment, path) for segment in segments)
+    return tracks
 
 
 def _source_plan(project: Project, source_id: str) -> AudioSourcePlan:
@@ -466,15 +582,37 @@ def _render_command(
     ffmpeg_path: str,
     *,
     reuse_inputs: bool = True,
+    contribution_segments: frozenset[str] | None = None,
+    prepared_tracks: Mapping[str, Path] | None = None,
 ) -> tuple[list[str], str]:
     input_paths: list[Path] = []
     input_indexes: dict[Path, int] = {}
     input_uses: list[int] = []
     block_inputs: list[list[int]] = []
-    for interval in plan.intervals:
+    selected_blocks = tuple(
+        tuple(
+            block
+            for block in interval.audible_blocks
+            if contribution_segments is None or block.segment_id in contribution_segments
+        )
+        for interval in plan.intervals
+    )
+    floating_contributions = contribution_segments is not None and any(
+        len(interval.audible_blocks) > 1
+        or any(
+            block.gain_db != 0.0 or ((bound := _safety_bound(block)) is not None and bound > 1.0)
+            for block in interval.audible_blocks
+        )
+        for interval in plan.intervals
+    )
+    for audio_blocks in selected_blocks:
         interval_inputs: list[int] = []
-        for block in interval.audible_blocks:
-            path = Path(project.source_by_id(block.source_id).path)
+        for block in audio_blocks:
+            path = (
+                prepared_tracks[block.segment_id]
+                if prepared_tracks is not None
+                else Path(project.source_by_id(block.source_id).path)
+            )
             if reuse_inputs and path in input_indexes:
                 input_index = input_indexes[path]
             else:
@@ -499,8 +637,9 @@ def _render_command(
         split_refs[input_index] = deque(f"[{label}]" for label in split_labels)
 
     interval_labels: list[str] = []
-    for interval_index, interval in enumerate(plan.intervals):
-        audio_blocks = interval.audible_blocks
+    for interval_index, (interval, audio_blocks) in enumerate(
+        zip(plan.intervals, selected_blocks, strict=True)
+    ):
         mapped_labels: list[str] = []
         for block_index, block in enumerate(audio_blocks):
             input_index = block_inputs[interval_index][block_index]
@@ -508,13 +647,22 @@ def _render_command(
                 input_ref = split_refs[input_index].popleft()
             else:
                 input_ref = f"[{input_index}:a:0]"
+            if floating_contributions:
+                # Match the original mix graph's format negotiation before downmixing.
+                input_ref += "aformat=sample_fmts=fltp,"
             label = f"src_{interval_index}_{block_index}"
             legacy_center = (
-                len(audio_blocks) == 1
+                len(interval.audible_blocks) == 1
                 and block.pan_percent == 0.0
                 and block.channel_layout in {"mono", "stereo"}
             )
-            if legacy_center:
+            if prepared_tracks is not None:
+                filters.append(
+                    f"{input_ref}atrim=start_sample={interval.start_sample}:"
+                    f"end_sample={interval.end_sample},"
+                    f"asetpts=PTS-STARTPTS[{label}]",
+                )
+            elif legacy_center:
                 source_filter = _legacy_center_source_filter(block)
                 filters.append(
                     f"{input_ref}{source_filter},"
@@ -546,7 +694,7 @@ def _render_command(
             label = mapped_labels[0]
             block = audio_blocks[0]
             safety_bound = _safety_bound(block)
-            if safety_bound is not None and safety_bound > 1.0:
+            if contribution_segments is None and safety_bound is not None and safety_bound > 1.0:
                 attenuation = min(1.0, PREENCODE_HEADROOM / safety_bound)
                 filters.append(
                     f"{label}volume={_number(attenuation)},"
@@ -564,7 +712,11 @@ def _render_command(
                 sum(block.effective_row_abs_sums[0] for block in audio_blocks),
                 sum(block.effective_row_abs_sums[1] for block in audio_blocks),
             )
-            mix_gain = 1.0 if p_bound <= 1.0 else min(1.0, PREENCODE_HEADROOM / p_bound)
+            mix_gain = (
+                1.0
+                if contribution_segments is not None or p_bound <= 1.0
+                else min(1.0, PREENCODE_HEADROOM / p_bound)
+            )
             mix_label = f"mixed_{interval_index}"
             filters.append(
                 f"{''.join(mapped_labels)}amix=inputs={len(mapped_labels)}:"
@@ -572,8 +724,12 @@ def _render_command(
             )
             filters.append(
                 f"[{mix_label}]volume={_number(mix_gain)},"
-                "alimiter=limit=0.90:level=false:latency=true,"
-                f"atrim=end_sample={interval.duration_samples},"
+                + (
+                    "alimiter=limit=0.90:level=false:latency=true,"
+                    if contribution_segments is None
+                    else ""
+                )
+                + f"atrim=end_sample={interval.duration_samples},"
                 f"asetpts=PTS-STARTPTS[{interval_label}]",
             )
         interval_labels.append(f"[{interval_label}]")
@@ -699,12 +855,17 @@ def _run_ffmpeg(
     filter_graph: str,
     *,
     cancel_event: threading.Event | None = None,
+    stage: str = "audio composition",
+    progress_callback: ExportProgressCallback | None = None,
+    duration_seconds: float = 0.0,
 ) -> None:
     try:
         run_managed_ffmpeg(
             command,
             cancel_event=cancel_event,
-            stage="audio composition",
+            stage=stage,
+            progress_callback=progress_callback,
+            command_duration_seconds=duration_seconds,
         )
     except FileNotFoundError as error:
         raise AudioRenderError(f"FFmpeg is unavailable: {command[0]}") from error
@@ -723,6 +884,7 @@ def _verify_pcm_output(
     ffmpeg_path: str,
     expected_samples: int,
     cancel_event: threading.Event | None = None,
+    allow_over_unity: bool = False,
 ) -> tuple[int, float]:
     try:
         probe = run_command_with_cancellation(
@@ -806,6 +968,6 @@ def _verify_pcm_output(
     if any(not math.isfinite(value) for value in samples):
         raise AudioRenderError("Rendered PCM contains a non-finite sample")
     peak = max((abs(value) for value in samples), default=0.0)
-    if peak > 1.0 + 1e-6:
+    if not allow_over_unity and peak > 1.0 + 1e-6:
         raise AudioRenderError(f"Rendered PCM clips above unity: {peak:.9f}")
     return sample_count, peak

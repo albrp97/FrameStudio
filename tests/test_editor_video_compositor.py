@@ -22,6 +22,8 @@ from framestudio.video_compositor import (
     VideoRenderPlan,
     VideoSourceProbe,
     _asset_stem,
+    _build_render_command,
+    _needs_bounded_composition,
     _prepare_assets,
     _probe_source,
     _sha256,
@@ -33,6 +35,70 @@ from framestudio.video_compositor import (
 
 
 class VideoCompositorUnitTests(TestCase):
+    def test_prepared_subframe_interval_keeps_a_frame_instead_of_emptying_xstack(self):
+        source = Path(__file__).resolve()
+        project = Project.create_synchronized(
+            source,
+            {"duration_seconds": 6.538272, "width": 1920, "height": 1080, "frame_rate": "60/1"},
+        )
+        probe = _fake_probe(
+            project.source.source_id, source, width=1920, height=1080, frame_rate="60/1"
+        )
+        with patch("framestudio.video_compositor._probe_source", return_value=probe):
+            plan = plan_project_video(project, source.with_name("subframe.mp4"), target_rate=60)
+        for start, end, expected in (
+            (1294, 11322, "trim=start_frame=0:end_frame=1"),
+            (6528244, 6538272, "trim=start_frame=391:end_frame=392"),
+            (20000, 40000, "trim=start=0.020000000:end=0.040000000"),
+        ):
+            with self.subTest(start=start):
+                original = plan.layout_plan.intervals[0]
+                slot = original.slots[0]
+                block = slot.block
+                interval = replace(
+                    original,
+                    start_tick=start,
+                    end_tick=end,
+                )
+                sample = replace(
+                    plan,
+                    layout_plan=replace(plan.layout_plan, intervals=(interval,)),
+                    interval_frame_counts=(1,),
+                    frame_boundaries=(0, 1),
+                    expected_frames=1,
+                )
+                assets = {block.block_id: SimpleNamespace(path=source, fps_converted=True)}
+                command = _build_render_command(
+                    sample,
+                    assets,
+                    output=Path("interval.avi"),
+                    ffmpeg_path="ffmpeg",
+                    lossless=True,
+                )
+                self.assertIn(expected, command[command.index("-filter_complex") + 1])
+
+    def test_bounded_composition_detects_shared_ranges_and_excess_inputs(self):
+        def plan_for(block_ids, counts=None):
+            return SimpleNamespace(
+                layout_plan=SimpleNamespace(
+                    intervals=tuple(
+                        SimpleNamespace(
+                            slots=(SimpleNamespace(block=SimpleNamespace(block_id=block_id)),)
+                        )
+                        for block_id in block_ids
+                    )
+                ),
+                interval_frame_counts=counts or (60,) * len(block_ids),
+            )
+
+        assets = {
+            str(index): SimpleNamespace(path=Path(f"/input-{index}.mp4")) for index in range(5)
+        }
+        self.assertFalse(_needs_bounded_composition(plan_for(("0", "1", "2", "3")), assets))
+        self.assertTrue(_needs_bounded_composition(plan_for(("0", "1", "2", "3", "4")), assets))
+        self.assertTrue(_needs_bounded_composition(plan_for(("0", "1", "0")), assets))
+        self.assertFalse(_needs_bounded_composition(plan_for(("0", "0"), (60, 0)), assets))
+
     def test_planning_hash_cache_is_batch_local_and_invalidates_changed_files(self):
         import threading
 

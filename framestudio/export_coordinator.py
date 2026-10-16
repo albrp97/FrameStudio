@@ -42,13 +42,22 @@ from .export_session import (
     session_root,
 )
 from .export_types import ExportProgressCallback
-from .fps_policy import FPS_POLICY_VERSION, FrameRatePolicy, ResolvedFrameRatePolicy
+from .fps_policy import (
+    FPS_POLICY_VERSION,
+    FrameRatePolicy,
+    ResolvedFrameRatePolicy,
+    policy_source_metadata,
+    resolved_from_policy,
+)
 from .layout_plan import DEFAULT_CANVAS, TRIPLICATE_ROLES
-from .output_plan import OutputIdentity, OutputPlan, OutputRequest
+from .output_plan import OutputIdentity, OutputPlan, OutputRequest, active_export_sources
 from .upscale_policy import (
     UPSCALE_POLICY_VERSION,
     ResolvedUpscalePolicy,
     UpscalePolicy,
+)
+from .upscale_policy import (
+    resolved_from_policy as resolved_upscale_from_policy,
 )
 from .video_compositor import SourceHashCache
 from .video_compositor import _sha256 as _video_file_sha256
@@ -197,6 +206,7 @@ def _source_record(
         },
         "sha256": _video_file_sha256(
             resolved,
+            persistent=True,
             source_hash_cache=source_hash_cache,
             cancel_event=cancel_event,
             heartbeat_callback=heartbeat_callback,
@@ -559,6 +569,19 @@ def build_project_output_fingerprint_payload(
                 ),
             }
         )
+    metadata = policy_source_metadata(active_export_sources(canonical_project))
+    if frame_rate_policy is None:
+        frame_rate_policy = canonical_project.get_frame_rate_policy()
+    if isinstance(frame_rate_policy, Mapping) and "decisions" not in frame_rate_policy:
+        frame_rate_policy = FrameRatePolicy.from_dict(frame_rate_policy)
+    if isinstance(frame_rate_policy, FrameRatePolicy):
+        frame_rate_policy = resolved_from_policy(metadata, frame_rate_policy)
+    if upscale_policy is None:
+        upscale_policy = canonical_project.get_upscale_policy()
+    if isinstance(upscale_policy, Mapping) and "decisions" not in upscale_policy:
+        upscale_policy = UpscalePolicy.from_dict(upscale_policy)
+    if isinstance(upscale_policy, UpscalePolicy):
+        upscale_policy = resolved_upscale_from_policy(metadata, upscale_policy)
     resolved_fps = _policy_payload(frame_rate_policy)
     resolved_upscale = _policy_payload(upscale_policy)
     resolved_tool_identities = (

@@ -63,6 +63,8 @@ from .media import MediaProbe, MediaProbeError, probe_media
 from .model import Project, ProjectValidationError
 from .output_plan import active_export_sources
 from .render_preparations import PreparationCacheError, RenderPreparations
+from .source_hash_cache import SourceHashCache
+from .source_hash_cache import file_sha256 as _sha256
 from .upscale_policy import (
     ResolvedUpscalePolicy,
     UpscaleDecision,
@@ -72,7 +74,6 @@ from .upscale_policy import (
 )
 
 PROJECT_TIMEBASE = 1_000_000
-SourceHashCache = dict[tuple[Path, int, int, int, int, int], str]
 
 
 class VideoCompositorError(RuntimeError):
@@ -425,22 +426,36 @@ def render_project_video(
             progress_callback=progress_scope(progress_callback, 0, preparation_end),
             preparations=preparations,
         )
-        command = _build_render_command(
-            plan,
-            assets,
-            output=partial,
-            ffmpeg_path=ffmpeg_path,
-        )
-        run_ffmpeg(
-            command,
-            cancel_event=cancel_event,
-            stage="video composition",
-            command_duration_seconds=plan.expected_duration_seconds,
-            command_total_frames=plan.expected_frames,
-            progress_total_duration_seconds=plan.expected_duration_seconds,
-            progress_total_frames=plan.expected_frames,
-            progress_callback=progress_scope(progress_callback, preparation_end, 98),
-        )
+        composition_progress = progress_scope(progress_callback, preparation_end, 98)
+        if _needs_bounded_composition(plan, assets):
+            _render_bounded_composition(
+                plan,
+                assets,
+                output=partial,
+                workspace=workspace,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+                cancel_event=cancel_event,
+                progress_callback=composition_progress,
+                preparations=preparations,
+            )
+        else:
+            command = _build_render_command(
+                plan,
+                assets,
+                output=partial,
+                ffmpeg_path=ffmpeg_path,
+            )
+            run_ffmpeg(
+                command,
+                cancel_event=cancel_event,
+                stage="video composition",
+                command_duration_seconds=plan.expected_duration_seconds,
+                command_total_frames=plan.expected_frames,
+                progress_total_duration_seconds=plan.expected_duration_seconds,
+                progress_total_frames=plan.expected_frames,
+                progress_callback=composition_progress,
+            )
         report_preparation_progress(
             progress_scope(progress_callback, 98, 100),
             "Verifying video composition",
@@ -458,7 +473,7 @@ def render_project_video(
         output_probe = probe_media(partial, ffprobe_path)
         actual_frames = probe_frame_count(partial, ffprobe_path, cancel_event=cancel_event)
         current_hashes = tuple(
-            _sha256(path, cancel_event=cancel_event) for path in plan.source_paths
+            _sha256(path, cancel_event=cancel_event, persistent=True) for path in plan.source_paths
         )
         if current_hashes != source_hashes:
             raise VideoCompositorExecutionError(
@@ -551,6 +566,7 @@ def _probe_source(
     try:
         source_hash = _sha256(
             resolved_path,
+            persistent=True,
             cancel_event=cancel_event,
             source_hash_cache=source_hash_cache,
             heartbeat_callback=heartbeat_callback,
@@ -1348,6 +1364,7 @@ def _build_render_command(
     ffmpeg_path: str,
     reuse_inputs: bool = True,
     factor_triplicate: bool = True,
+    lossless: bool = False,
 ) -> list[str]:
     inputs: list[Path] = []
     input_indices: dict[Path, int] = {}
@@ -1410,8 +1427,26 @@ def _build_render_command(
             crop_plans = _crop_plans_for_slot(slot)
             first_crop = crop_plans[0]
             crop_labels: list[str] = []
+            trim = f"trim=start={sample_start:.9f}:end={sample_end:.9f}"
+            if fps_ready and frame_count == 1:
+                start_position = Fraction(f"{sample_start:.9f}") * plan.target_rate
+                end_position = Fraction(f"{sample_end:.9f}") * plan.target_rate
+                prepared_frames = max(
+                    1,
+                    _round_half_up(
+                        Fraction(slot.block.source_range.source_duration_ticks, PROJECT_TIMEBASE)
+                        * plan.target_rate
+                    ),
+                )
+                if (
+                    math.ceil(start_position) >= math.ceil(end_position)
+                    or math.ceil(start_position) >= prepared_frames
+                ):
+                    # Quantization can leave a one-frame interval between timestamps or at EOF.
+                    covering_frame = min(math.floor(start_position), prepared_frames - 1)
+                    trim = f"trim=start_frame={covering_frame}:end_frame={covering_frame + 1}"
             trim_prefix = (
-                f"[{input_index}:v]trim=start={sample_start:.9f}:end={sample_end:.9f},"
+                f"[{input_index}:v]{trim},"
                 f"setpts=PTS-STARTPTS,"
                 f"{'' if fps_ready else f'fps={target_rate},'}"
                 "setsar=1,"
@@ -1496,7 +1531,7 @@ def _build_render_command(
         f"settb=expr={plan.target_rate.denominator}/{plan.target_rate.numerator},"
         "setpts=N[vout]",
     )
-    budgeted_composition = len(set(inputs)) >= 3
+    budgeted_composition = lossless or len(set(inputs)) >= 3
     decoder_options = ["-threads", "1"] if budgeted_composition else []
     return [
         ffmpeg_path,
@@ -1516,16 +1551,181 @@ def _build_render_command(
         target_rate,
         "-frames:v",
         str(plan.expected_frames),
-        "-c:v",
-        "libx264",
-        "-preset",
-        "ultrafast",
+        *(
+            ["-c:v", "ffv1", "-level", "3", "-threads", "2"]
+            if lossless
+            else ["-c:v", "libx264", "-preset", "ultrafast"]
+        ),
         "-pix_fmt",
         "yuv420p",
-        "-movflags",
-        "+faststart",
+        *([] if lossless else ["-movflags", "+faststart"]),
         str(output),
     ]
+
+
+def _needs_bounded_composition(plan: VideoRenderPlan, assets: Mapping[str, _PreparedAsset]) -> bool:
+    inputs: set[Path] = set()
+    for interval, count in zip(plan.layout_plan.intervals, plan.interval_frame_counts, strict=True):
+        if count == 0:
+            continue
+        for slot in interval.slots:
+            asset = assets.get(slot.block.block_id)
+            path = asset.path if asset is not None else _source_path(plan, slot.block.source_id)
+            # Shared decoders can buffer entire future ranges behind concat/xstack.
+            if path in inputs:
+                return True
+            inputs.add(path)
+    return len(inputs) > 4
+
+
+def _render_bounded_composition(
+    plan: VideoRenderPlan,
+    assets: Mapping[str, _PreparedAsset],
+    *,
+    output: Path,
+    workspace: Path,
+    ffmpeg_path: str,
+    ffprobe_path: str,
+    cancel_event: threading.Event | None,
+    progress_callback: ExportProgressCallback | None,
+    preparations: RenderPreparations | None,
+) -> None:
+    parts: list[Path] = []
+    completed_frames = 0
+    runtime = preparations.runtime(ffmpeg_path, ffprobe_path) if preparations else None
+    for index, (interval, count) in enumerate(
+        zip(plan.layout_plan.intervals, plan.interval_frame_counts, strict=True)
+    ):
+        check_export_cancelled(cancel_event)
+        if count == 0:
+            continue
+        interval_plan = replace(
+            plan,
+            layout_plan=replace(
+                plan.layout_plan,
+                intervals=(interval,),
+                boundaries=(interval.start_tick, interval.end_tick),
+                included_blocks=interval.active_blocks,
+            ),
+            frame_boundaries=(0, count),
+            interval_frame_counts=(count,),
+            expected_frames=count,
+        )
+        callback = progress_scope(
+            progress_callback,
+            85 * completed_frames / plan.expected_frames,
+            85 * (completed_frames + count) / plan.expected_frames,
+        )
+        command = _build_render_command(
+            interval_plan,
+            assets,
+            output=Path("interval.avi"),
+            ffmpeg_path=ffmpeg_path,
+            reuse_inputs=False,
+            lossless=True,
+        )
+
+        def produce(
+            path: Path,
+            command: list[str] = command,
+            interval_plan: VideoRenderPlan = interval_plan,
+            index: int = index,
+            callback: ExportProgressCallback | None = callback,
+        ) -> None:
+            run_ffmpeg(
+                [*command[:-1], str(path)],
+                cancel_event=cancel_event,
+                stage=f"video composition interval {index + 1}/{len(plan.interval_frame_counts)}",
+                command_duration_seconds=interval_plan.expected_duration_seconds,
+                command_total_frames=interval_plan.expected_frames,
+                progress_total_duration_seconds=interval_plan.expected_duration_seconds,
+                progress_total_frames=interval_plan.expected_frames,
+                progress_callback=callback,
+            )
+
+        def validate(path: Path, interval_plan: VideoRenderPlan = interval_plan) -> None:
+            _verify_rendered_output(
+                path,
+                interval_plan,
+                ffprobe_path=ffprobe_path,
+                ffmpeg_path=ffmpeg_path,
+                cancel_event=cancel_event,
+            )
+
+        if preparations is None:
+            path = workspace / f"interval-{index}.avi"
+            produce(path)
+            validate(path)
+        else:
+            request = {
+                "interval_version": 1,
+                "command": command,
+                "sources": tuple(probe.source_hash for probe in plan.probed_metadata),
+                "runtime": runtime,
+                "assets": {
+                    str(asset.path): (asset.path.stat().st_size, asset.path.stat().st_mtime_ns)
+                    for slot in interval.slots
+                    if (asset := assets.get(slot.block.block_id)) is not None
+                },
+            }
+            path = preparations.materialize(
+                "video composition interval",
+                request,
+                produce,
+                validate,
+                suffix=".avi",
+                progress_callback=callback,
+            )
+        parts.append(path)
+        completed_frames += count
+    listing = workspace / "composition-intervals.txt"
+    listing.write_text(
+        "".join("file '" + str(path.resolve()).replace("'", "'\\''") + "'\n" for path in parts),
+        encoding="utf-8",
+    )
+    run_ffmpeg(
+        [
+            ffmpeg_path,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-y",
+            "-threads",
+            "1",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(listing),
+            "-map",
+            "0:v:0",
+            "-an",
+            "-vf",
+            f"settb=expr={plan.target_rate.denominator}/{plan.target_rate.numerator},setpts=N",
+            "-r",
+            str(plan.target_rate),
+            "-frames:v",
+            str(plan.expected_frames),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(output),
+        ],
+        cancel_event=cancel_event,
+        stage="video composition assembly",
+        command_duration_seconds=plan.expected_duration_seconds,
+        command_total_frames=plan.expected_frames,
+        progress_total_duration_seconds=plan.expected_duration_seconds,
+        progress_total_frames=plan.expected_frames,
+        progress_callback=progress_scope(progress_callback, 85, 100),
+    )
 
 
 def _verify_rendered_output(
@@ -1613,52 +1813,6 @@ def _asset_stem(block_id: str) -> str:
     readable = _safe_name(block_id) or "block"
     identity = hashlib.sha256(block_id.encode("utf-8")).hexdigest()[:12]
     return f"{readable}-{identity}"
-
-
-def _sha256(
-    path: Path,
-    *,
-    cancel_event: threading.Event | None = None,
-    source_hash_cache: SourceHashCache | None = None,
-    heartbeat_callback: Callable[[], None] | None = None,
-) -> str:
-    check_export_cancelled(cancel_event)
-    path = path.expanduser().resolve()
-    before = path.stat()
-    key = (
-        path,
-        before.st_dev,
-        before.st_ino,
-        before.st_size,
-        before.st_mtime_ns,
-        before.st_ctime_ns,
-    )
-    if source_hash_cache is not None and key in source_hash_cache:
-        return source_hash_cache[key]
-    digest = hashlib.sha256()
-    buffer = bytearray(1024 * 1024)
-    reported = time.monotonic()
-    with path.open("rb") as handle:
-        while count := handle.readinto(buffer):
-            check_export_cancelled(cancel_event)
-            digest.update(memoryview(buffer)[:count])
-            if heartbeat_callback is not None and time.monotonic() - reported >= 0.25:
-                heartbeat_callback()
-                reported = time.monotonic()
-    check_export_cancelled(cancel_event)
-    after = path.stat()
-    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
-        after.st_dev,
-        after.st_ino,
-        after.st_size,
-        after.st_mtime_ns,
-        after.st_ctime_ns,
-    ):
-        raise ExportExecutionError("Source changed while computing its export identity")
-    value = digest.hexdigest()
-    if source_hash_cache is not None:
-        source_hash_cache[key] = value
-    return value
 
 
 __all__ = [

@@ -116,6 +116,7 @@ class ExportJournal:
                 "event": event,
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "owner_pid": os.getpid(),
+                "memory": self._memory(os.getpid()),
                 "progress": self._progress,
                 **details,
             }
@@ -132,32 +133,60 @@ class ExportJournal:
 
     def _children(self) -> list[dict[str, Any]]:
         pending = [os.getpid()]
+        seen = set(pending)
         processes = []
         while pending:
             parent = pending.pop()
             try:
-                children = Path(f"/proc/{parent}/task/{parent}/children").read_text().split()
+                tasks = tuple(Path(f"/proc/{parent}/task").iterdir())
             except FileNotFoundError:
                 continue
             except OSError as error:
                 processes.append({"pid": parent, "inspection_error": str(error)})
                 continue
-            for child in children:
-                pid = int(child)
-                pending.append(pid)
+            for task in tasks:
                 try:
-                    processes.append(
-                        {
-                            "pid": pid,
-                            "parent_pid": parent,
-                            "executable": Path(f"/proc/{pid}/comm").read_text().strip(),
-                        }
-                    )
+                    children = (task / "children").read_text().split()
                 except FileNotFoundError:
                     continue
                 except OSError as error:
-                    processes.append({"pid": pid, "inspection_error": str(error)})
+                    processes.append({"pid": parent, "inspection_error": str(error)})
+                    continue
+                for child in children:
+                    pid = int(child)
+                    if pid in seen:
+                        continue
+                    seen.add(pid)
+                    pending.append(pid)
+                    try:
+                        processes.append(
+                            {
+                                "pid": pid,
+                                "parent_pid": parent,
+                                "executable": Path(f"/proc/{pid}/comm").read_text().strip(),
+                                "memory": self._memory(pid),
+                            }
+                        )
+                    except FileNotFoundError:
+                        continue
+                    except OSError as error:
+                        processes.append({"pid": pid, "inspection_error": str(error)})
         return processes
+
+    @staticmethod
+    def _memory(pid: int) -> dict[str, Any]:
+        try:
+            lines = Path(f"/proc/{pid}/status").read_text().splitlines()
+        except OSError as error:
+            return {"inspection_error": str(error)}
+        fields = {"VmRSS": "rss_kib", "VmHWM": "peak_rss_kib", "VmSwap": "swap_kib"}
+        return {
+            fields[key]: int(value.split()[0])
+            for line in lines
+            if ":" in line
+            for key, value in (line.split(":", 1),)
+            if key in fields
+        }
 
     def progress(self, progress: ExportProgress) -> None:
         self._progress = asdict(progress)

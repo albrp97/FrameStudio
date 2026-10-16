@@ -391,10 +391,17 @@ After audio analysis, export reports source inspection, source preservation,
 output planning, segment preparation, and video composition instead of leaving
 the audio stage at 100%. Synchronized planning inspects only included video
 sources and does not decode entire original videos to count frames that the
-planner never uses. Source hashes are shared within a planning batch, not
-between validation checkpoints: final source-preservation and rendered-output
-verification still run. Cancellation is checked while hashing and is forwarded
-to native segment extraction, enhancement, and composition subprocesses.
+planner never uses. Source hashes persist in
+`$XDG_CACHE_HOME/framestudio/source-hashes/` (default
+`~/.cache/framestudio/source-hashes/`), across failed exports and application
+restarts. Each completed hash is saved atomically, keyed by resolved path,
+size and nanosecond mtime, plus device, inode and ctime to detect replacement
+or same-size edits with a restored mtime. Changed identities are rehashed;
+unchanged sources avoid another complete read during planning and preservation
+checks. Cache reuse relies on filesystem metadata, not a fresh byte-for-byte
+scan. Rendered outputs and checkpoint files still receive full content checks.
+Cancellation is checked while hashing and is forwarded to native segment
+extraction, enhancement, and composition subprocesses.
 
 The CLI supports the same export engine:
 
@@ -422,21 +429,32 @@ placement. Different source ranges, processing domains, models or rate policies
 are not treated as interchangeable. Adjacent cuts are not joined into one AI
 stream, avoiding interpolation across edit boundaries.
 
-The final compositor also shares identical input paths instead of opening a
-decoder for every occurrence. Blocks that need no enhancement still use their
-original source directly; caching does not introduce an extra lossy conversion.
-The selected combination removes duplicate work rather than launching competing
-GPU/model workers.
+The final compositor avoids opening an entire large timeline as one filter
+graph. Graphs with repeated input paths or more than four input paths render
+one layout interval at a time to verified lossless FFV1/AVI checkpoints, then
+perform one final H.264 encode. This bounds simultaneous decoders and prevents
+shared-input branches from buffering future intervals until memory is exhausted.
+Simple independent graphs retain the direct path. Blocks that need no enhancement
+still use their original source directly; caching adds no lossy intermediate.
+Single-frame intervals between prepared-frame timestamps, or at a rounded clip
+tail, retain the covering available frame instead of creating an empty layout.
 
 Within a resumable batch, completed native extraction, upscale, FPS conversion,
-video composition, audio composition and verified AV mux are separate durable
-checkpoints. Each is recorded only after successful verification, with a content
+video composition intervals, final video composition, individual audible audio
+tracks, final audio composition and
+verified AV mux are separate durable checkpoints. Each is recorded only after
+successful verification, with a content
 hash and a recipe/tool/runtime identity. Custom restoration models are
 content-fingerprinted too. Resume checks checkpoint integrity and reuses matching
 completed work even in a new application process. Each unique segment is saved
 individually, not only at the end of an entire interpolation batch: stopping
 after 20 of 40 completed segments preserves those 20. A completed verified
 fallback is reused before retrying an AI backend that failed on the same range.
+Audio tracks retain their timeline placement, gain and pan in floating-point
+PCM checkpoints. Shared headroom and limiting are applied only in the final
+mix. If another track or the final mix fails, completed matching tracks are
+reused; an unfinished track must still restart. Silent and excluded tracks do
+not trigger source-audio rendering.
 An operation that finished writing but was interrupted before validation retains
 its pending file for validation on resume. Incomplete or invalid files are
 rebuilt; they are never accepted as completed work. An interruption inside an
@@ -449,8 +467,9 @@ video checkpoint metadata and reported again on reuse.
 These preparation checkpoints live under the parent session's
 `render-preparations/` directory. Successful batch delivery, **Start over**, or
 **Discard** removes them through the existing session lifecycle. They are not
-a permanent cross-project library. Fresh source-preservation checks and final
-output-publication verification still run on resume.
+a permanent cross-project library. The separate source-hash cache survives
+session cleanup. Source identity checks and final output-publication
+verification still run on resume.
 
 This reuse applies to the synchronized final video. Edited source reels still
 use their separate full-canvas processing route and its existing checkpoints;
@@ -544,7 +563,12 @@ Inputs were generated 320x180 media; output remained 1920x1080. These
 workstation-specific results do not predict the full duration of a real
 high-resolution/RVE export. Lossless per-track/chunk intermediates were also
 tested, but added overhead rather than winning on the tested static workload.
-No GPU scaler/encoder substitution or reduced-quality intermediate was adopted.
+These timings describe the earlier monolithic graph, not the bounded interval
+path. A subsequent real-project run exhausted RAM/swap during composition, so
+risky graphs now use the lossless interval path described above even when the
+small synthetic graph was faster. The interval path does not rerender preceding
+timeline prefixes or encode each interval lossily. No GPU scaler/encoder
+substitution or reduced-quality intermediate was adopted.
 
 Completed native, upscale, FPS and audio checkpoints remain reusable. A
 composition-clock correction invalidates only old video/mux preparation
@@ -570,6 +594,9 @@ Source-only mode does not render `edited.mp4` or start the final compositor.
 If the optional RVE restoration runtime or model is unavailable, source reels
 use normal full-canvas scaling and report AI upscale enhancement as disabled.
 An available RVE runtime retains the configured enhancement policy.
+
+The UI and CLI use the same resolved enhancement settings when identifying an
+export session, so the same project and export options can resume across both.
 
 Export sessions are scoped to the destination and keep compatible checkpoints
 in adjacent working directories:
@@ -611,7 +638,9 @@ Discard removes recovery state, never original media or published outputs.
 During an actual export, an adjacent hidden diagnostic journal is kept at
 `.<destination-name>.framestudio-export.log`. It records operations, output
 position, percentages, subprocess PIDs and exit diagnostics, chained errors,
-and a heartbeat every five seconds even when no frames advance. It survives
+and a heartbeat every five seconds even when no frames advance. Memory snapshots
+include the editor and children launched by its worker threads, with resident,
+peak resident, and swap usage. It survives
 cancellation, failure, or a killed application and appends new attempts. A
 subsequent attempt identifies an unfinished previous run. It is removed only
 after the entire requested output set has been verified and delivered.

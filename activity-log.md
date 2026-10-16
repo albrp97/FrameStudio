@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-10-16
+
+- :rocket: - Resumable export recovery - Per-track audio checkpoints and cached source hashes ([evidence](evidence/ticket-124-flexible-export-recovery.md))
+- :bug: - Large multitrack export memory - Bounded interval composition avoids out-of-memory kills ([evidence](evidence/ticket-124-flexible-export-recovery.md))
+- :bug: - UI export resume - Sessions created by the CLI resume from the editor ([evidence](evidence/ticket-124-flexible-export-recovery.md))
+
 ## 2026-10-09
 
 - :rocket: - Synchronized editing and exports - Four tracks, ripple Undo and source reels ([evidence](evidence/ticket-125-phase010-functionality.md))

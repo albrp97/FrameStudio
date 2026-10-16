@@ -236,3 +236,230 @@ the pending Root decision above, releasing the declared dependency for T125.
 T124 remains open/verifying until configured delivery is satisfied. This
 does not close the phase, turn the historical full-suite failures into passes,
 or claim remote CI/publication evidence.
+
+## 2026-10-16 - UI resume policy representation repair
+
+Focused maintenance scope under the existing PHASE-010 / FEAT-038 recovery
+contract. Given identical project, sources, destination and export settings,
+the UI should accept the session produced by the CLI rather than report a
+stale request. Genuine project/content/policy changes must still be rejected.
+No renderer, publication policy, user project or checkpoint artifacts are
+changed by this repair.
+
+Diagnosis: the UI supplies plain FPS/upscale policy objects, while the CLI
+supplies resolved policies containing per-source decisions. The fingerprint
+also recorded a backend in `rve_route` for plain FPS policies but `None` for
+resolved policies. Identical export choices therefore produced different
+session identities. Shared fingerprint construction now resolves plain,
+mapping and default policies against the same active sources, preserving
+the existing resolved CLI representation.
+
+Fail-first evidence: the new representation regression failed for UI,
+mapping and default inputs. The real-media functionality test completed a
+CLI export, then failed through `run_output_choice_job(..., resume_mode="resume")`
+with a receipt mismatch. After normalization, both pass.
+
+Technical evidence:
+- `python3 -m unittest tests.test_editor_flexible_output_recovery
+  tests.test_editor_export_session tests.test_editor_cli_policy_sources
+  tests.test_editor_source_outputs
+  tests.test_editor_flexible_output_recovery_functionality.FlexibleOutputRecoveryCliFunctionalityTests`:
+  46 tests passed.
+- Scoped Ruff lint and formatting checks using `.venv/bin/python`: passed.
+  The system interpreter lacked Ruff; the existing virtual environment was
+  used without installing dependencies.
+- `.venv/bin/python -m mypy --config-file pyproject.toml
+  framestudio/export_coordinator.py`: passed.
+- `git diff --check`: passed.
+
+Automated functionality evidence: the new CLI-to-UI resume test uses actual
+FFmpeg output and persisted receipts, requires a skipped verified output,
+and checks unchanged destination hash/mtime, receipt fingerprint, decoded
+video/audio and original source hashes. The protected CLI functionality
+class also passed in the 46-test run.
+
+Local project diagnosis independently matched all 72 saved output
+fingerprints and the exact parent session request key using the corrected
+UI representation. Fresh diagnostic content hashes were reused only after
+checking source stat equality. The session manifest remained byte-for-byte
+unchanged. The user's render was not restarted.
+
+This is raw technical/functionality evidence, not a new automaticValidation
+decision or lifecycle closeout. The configured exact-profile validator has
+not been invoked for this repair; no new commit, push or remote readiness
+claim is made. Existing unrelated deleted test fixtures were left untouched.
+
+## 2026-10-16 - UI shutdown during large multitrack composition
+
+Focused repair under the same recovery contract, on local `main` at
+`f02bd86`. Given a large synchronized export, composition should not buffer
+the entire future timeline in shared decoder branches. Completed interval
+work should survive interruption without a lossy intermediate or resetting
+native extraction/interpolation checkpoints.
+
+Diagnosis: the export journal stopped during video composition at frame
+1239/29581. The workstation system journal identified `systemd-oomd` killing
+the editor service at 11:10:54 local time, with SIGKILL / `oom-kill`,
+18.2G peak RAM and 17.9G peak swap; system RAM and swap exceeded 90%.
+The older export-failure text described the preceding fingerprint mismatch,
+not this shutdown. A SIGKILL cannot execute a Python error handler.
+
+Implementation: repeated-input graphs and graphs with more than four unique
+input paths now render independent layout intervals to verified FFV1/AVI
+checkpoints, followed by one final H.264 encode. Each interval uses the
+existing atomic/checksummed preparation protocol, a single decoder thread
+per input, and two filter/FFV1 threads. Simple independent graphs retain
+their existing direct route. Native, interpolation, upscale and shared
+triplicate-scale reuse remain intact. Final media and original-source
+verification remain mandatory. Journal heartbeats now inspect children
+launched from every worker thread and retain RSS, peak RSS and swap for
+the editor and discovered children.
+
+Failures retained during development:
+- Matroska did not preserve exact fractional-rate metadata for the lossless
+  checkpoint; NUT subsequently failed one-frame duration verification. AVI
+  supersedes both candidates; verification requirements were not relaxed.
+- Real-project verification exposed a one-frame interval whose first
+  prepared slot had no timestamp inside its narrow trim, and whose other
+  slot trimmed beyond the last prepared timestamp. Both produced empty
+  inputs. A CFR one-frame interval now selects the covering available frame
+  only when its ordinary time trim would be empty, including rounded EOF.
+  Ordinary nonempty time trims are unchanged.
+- The expanded unit fixture initially changed source duration without the
+  corresponding timeline duration and correctly failed the no-speed-change
+  model invariant. The fixture now starts with the required duration.
+
+Terminal deterministic command evidence, agent-owned:
+
+```sh
+.venv/bin/python -m ruff check framestudio/video_compositor.py framestudio/export_journal.py framestudio/export_coordinator.py tests/test_editor_video_compositor.py tests/test_editor_video_compositor_functionality.py tests/test_editor_export_recovery.py tests/test_editor_flexible_output_recovery.py tests/test_editor_flexible_output_recovery_functionality.py
+.venv/bin/python -m ruff format --check framestudio/video_compositor.py framestudio/export_journal.py framestudio/export_coordinator.py tests/test_editor_video_compositor.py tests/test_editor_video_compositor_functionality.py tests/test_editor_export_recovery.py tests/test_editor_flexible_output_recovery.py tests/test_editor_flexible_output_recovery_functionality.py
+.venv/bin/python -m mypy --config-file pyproject.toml framestudio/video_compositor.py framestudio/export_journal.py framestudio/export_coordinator.py
+python3 -m unittest tests.test_editor_video_compositor tests.test_editor_export_recovery tests.test_editor_video_compositor_functionality tests.test_multitrack_render_benchmark tests.test_editor_av_compositor tests.test_editor_av_compositor_functionality tests.test_editor_flexible_output_recovery tests.test_editor_export_session tests.test_editor_flexible_output_recovery_functionality.FlexibleOutputRecoveryCliFunctionalityTests
+git diff --check
+```
+
+Observed: scoped lint/format/type/diff commands exited zero; 92 tests
+completed with `OK` in 105.263 seconds. These are raw tool results, not an
+exact-profile automatic validation decision or a whole-repository-suite claim.
+
+Executable automated functionality requirements:
+- `VideoCompositorFunctionalityTests.test_bounded_composition_resumes_lossless_intervals_without_changing_frames`:
+  actual FFmpeg render interrupted after two interval encodes; resume must
+  avoid encoding those intervals again, publish all planned frames, match
+  decoded monolithic-reference frame hashes at fractional FPS, and preserve
+  original source bytes.
+- `VideoCompositorFunctionalityTests.test_prepared_subframe_and_tail_slots_produce_a_real_composite_frame`:
+  actual extraction, FFmpeg interpolation, three-track interval composition,
+  lossless checkpoints and final encoding. The planned one-frame interval
+  includes an early subframe slot and a rounded-tail slot; its final decoded
+  frame must contain visible content in all three columns, with exact total
+  frame count and unchanged source hash.
+- `ExportRecoveryTests` worker-thread subprocess coverage records actual
+  descendant process identity and memory. Existing hard-interruption,
+  export-session, CLI/UI recovery and A/V functionality controls are included
+  in the terminal runner above.
+
+Real-project verification: original one-frame layout interval 37 and the
+following interval 38 rendered through the final FFV1/AVI path, reusing
+four native/interpolation preparations and checkpointing two new composition
+intervals. The final sample verified 733 frames / 12.216667 seconds, unchanged
+original source hashes, and peak summed child RSS of 1258.2 MiB. The charter
+cancelled if child RSS exceeded 2 GiB; it did not trigger. Elapsed time was
+137.1 seconds including verification. The private temporary sample was
+removed after verification; reusable checkpoints were retained. The earlier
+six-interval NUT experiment verified 2153 frames with peak child RSS
+1346.9 MiB, but is not evidence for the final checkpoint container.
+These sample child-RSS measurements are not a full-service or full-project
+memory guarantee.
+
+Private session artifacts: `real-bounded-avi-verification.json`,
+`real-bounded-composition-verification.json`, and
+`bounded-benchmark-regression.json` (retained failed NUT experiment).
+Original user media, completed enhancement checkpoints, and unrelated fixture
+deletions were not altered. No full final video/source-reel batch was run,
+no commit/push occurred, and no ticket was closed. Configured
+`rubber-duck / gpt-5.6-luna / high / all-validation` remains a separate
+unfulfilled gate; no substitute validation or user-validation claim is made.
+
+## 2026-10-16 - Persistent source hashes and audio-track checkpoints
+
+User-authorized continuation of the recovery repair. Given an unchanged
+source, subsequent exports and application processes should reuse its
+completed hash rather than reread the entire file. Given completed audible
+timeline tracks, interruption in another track or final mixing should reuse
+those tracks, without applying headroom/limiting twice.
+
+Source hashing is now shared through `source_hash_cache.py`, with the
+existing video `_sha256` import retained for compatibility. Source identity
+calls in fingerprinting, video planning/preservation and AV
+planning/preservation explicitly opt into the on-disk cache. Its identity
+includes resolved path, size and nanosecond mtime, strengthened with device,
+inode and ctime. Entries are independently atomically replaced after stable
+pre/post hash stats, fsync and cancellation checks. Corrupt/unreadable cache
+records are explicit errors. Published output, tool and preparation-content
+hashes do not opt in and still read actual content. Reuse depends on
+filesystem stat identity; it is not a fresh content scan.
+
+Audible timeline tracks now materialize independently through the existing
+owned `RenderPreparations` protocol, keyed by track identity, source hashes,
+exact command and FFmpeg/ffprobe runtime identity. Verified float32 PCM tracks
+retain placement, gap silence, original-context pan and gain. The final mix
+uses the original complete audio plan for shared attenuation/limiting; raw
+track contributions may exceed unity but must have exact sample count and
+finite samples. Final mixed PCM still enforces the existing unity ceiling.
+Silent/excluded sources do not acquire unnecessary track renders. Existing
+completed final-audio checkpoints remain usable without invalidating video
+or enhancement preparations.
+
+Fail-first evidence: four source-cache cases and the interrupted-track
+functionality case failed before implementation, including a second fresh
+export-planning process attempting to reread the original source. During
+implementation, PCM parity exposed FFmpeg format negotiation rounding mono
+contributions to 16-bit before the final mix. Contribution graphs now match
+the original mix's floating-format requirements; the safe single-mono case
+retains its original conversion semantics. The sample-difference assertion
+remains below `1e-6`, not weakened to accept quantization drift.
+
+Terminal raw technical/functionality command:
+
+```sh
+python3 -m unittest tests.test_editor_source_hash_cache tests.test_editor_audio_compositor tests.test_editor_audio_compositor_functionality tests.test_editor_av_compositor tests.test_editor_av_compositor_functionality tests.test_editor_video_compositor tests.test_editor_video_compositor_functionality tests.test_editor_flexible_output_recovery tests.test_editor_export_session tests.test_editor_export_recovery tests.test_editor_cli_contract tests.test_editor_flexible_output_recovery_functionality.FlexibleOutputRecoveryCliFunctionalityTests
+```
+
+Observed: **106 tests, OK, 105.054 seconds**.
+
+Acceptance-level executable evidence:
+- `SourceHashCacheFunctionalityTests.test_export_planning_reuses_hashes_across_fresh_processes`
+  creates real FFmpeg media and a persisted project, runs `plan_project_av`
+  in two independent Python processes, and forbids source-content reads in
+  the second process. Hashes match the original bytes.
+- Source-cache regressions require invalidation of a same-size modification
+  with restored mtime, rejection of corrupt cache records, cancellation
+  without persistence, and rejection of a source modified mid-hash. The
+  default uncached output/content-hash path must still open actual bytes.
+- `AudioCompositorFunctionalityTests.test_audio_track_checkpoints_resume_without_repeating_completed_tracks`
+  performs real PCM rendering, interrupts the second audible track, and
+  resumes with a fresh cache object. The first track's hash and mtime remain
+  unchanged and its render command cannot run again. An interruption in final
+  mixing preserves the previously published output and then resumes without
+  rendering either completed track. Changing only the first track's gain
+  rebuilds only that track. Decoded PCM matches the direct reference within
+  `1e-6`, with exact 48 kHz stereo sample count.
+- `AudioCompositorFunctionalityTests.test_checkpointed_audio_preserves_safe_unsafe_and_silent_track_behavior`
+  compares actual cached/direct decoded PCM for centered mono/stereo,
+  no-audio silence and an over-unity raw contribution requiring final
+  attenuation. All final peaks remain within the existing bound.
+
+Scoped Ruff lint and formatting checks passed for the five changed production
+modules and two affected test modules. Whole-package Mypy passed for 78 source
+files after correcting a progress-duration annotation. The repository-native
+dependency check exited zero; `git diff --check` exited zero. No dependencies,
+thresholds or validation policies were changed. README now documents cache
+location/invalidation, stat-trust boundary, per-track reuse, and the need to
+repeat only an unfinished track.
+
+No user render was started, source files changed, checkpoints deleted, or
+commit/push performed. This records raw deterministic results only. The
+previous exact-profile automaticValidation blocker remains unresolved;
+no new formal readiness decision or lifecycle closure is claimed.

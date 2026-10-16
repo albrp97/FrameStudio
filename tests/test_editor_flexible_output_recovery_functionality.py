@@ -435,6 +435,68 @@ class FlexibleOutputRecoveryCliFunctionalityTests(unittest.TestCase):
             self.source_hashes,
         )
 
+    def test_ui_resumes_cli_export_without_rerendering_verified_output(self):
+        from fractions import Fraction
+
+        from framestudio.app_export import run_output_choice_job
+        from framestudio.export_coordinator import RECEIPT_SUFFIX
+        from framestudio.fps_policy import FrameRatePolicy
+        from framestudio.upscale_policy import UpscalePolicy
+
+        destination = self.root / "published" / "cross-interface.mp4"
+        result = _run(
+            [
+                sys.executable,
+                str(REPOSITORY_ROOT / "framestudio.py"),
+                "export",
+                str(self.project_path),
+                "--output",
+                str(destination),
+                "--output-mode",
+                "final-only",
+                "--fps-choice",
+                "custom",
+                "--custom-fps",
+                "10",
+                "--no-enhance-fps",
+                "--no-upscale-enhancement",
+            ]
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        before = destination.stat()
+        output_hash = _sha256(destination)
+        receipt_path = destination.parent / f".{destination.name}{RECEIPT_SUFFIX}"
+        fingerprint = json.loads(receipt_path.read_text())["batch_fingerprint"]
+        holder = {}
+        output, _, _, _ = run_output_choice_job(
+            self.project,
+            destination,
+            output_mode=FINAL_ONLY_OUTPUT_MODE,
+            frame_rate_policy=FrameRatePolicy(
+                choice="custom",
+                target_rate=Fraction(10),
+                custom_rate=Fraction(10),
+                enhancement_enabled=False,
+            ),
+            upscale_policy=UpscalePolicy(enabled=False),
+            progress_callback=None,
+            cancel_event=None,
+            resume_mode="resume",
+            batch_result_holder=holder,
+            project_path=self.project_path,
+        )
+        self.assertEqual(output, destination)
+        self.assertTrue(holder["result"].complete)
+        self.assertEqual(holder["result"].results[0].state.value, "skipped")
+        self.assertEqual(json.loads(receipt_path.read_text())["batch_fingerprint"], fingerprint)
+        self.assertEqual(destination.stat().st_mtime_ns, before.st_mtime_ns)
+        self.assertEqual(_sha256(destination), output_hash)
+        _assert_real_reel(self, destination, expected_tones=(440, 660, 990))
+        self.assertEqual(
+            {path: _sha256(path) for path in self.source_paths},
+            self.source_hashes,
+        )
+
     def test_public_cli_source_only_emits_four_standalone_full_canvas_results(self):
         destination = self.root / "published" / "source-only.mp4"
         result = self._run_cli(SOURCE_ONLY_OUTPUT_MODE, destination)

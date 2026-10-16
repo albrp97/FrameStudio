@@ -450,6 +450,128 @@ def _render_channel_marker_fixture(root: Path, channel_layout: str) -> list[floa
     "FFmpeg and ffprobe are required",
 )
 class AudioCompositorFunctionalityTests(unittest.TestCase):
+    def test_audio_track_checkpoints_resume_without_repeating_completed_tracks(self):
+        from unittest.mock import patch
+
+        from framestudio import audio_compositor
+        from framestudio.render_preparations import RenderPreparations
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sources = (
+                _source(root, "left", frequency=440),
+                _source(root, "right", frequency=880, channels=2, layout="stereo"),
+                _source(root, "silent", frequency=None, audio=False),
+            )
+            project = _project(root, sources)
+            layout = plan_project_layout(project)
+            baseline = root / "baseline.wav"
+            render_audio(project, layout, baseline)
+            original_run = audio_compositor._run_ffmpeg
+            calls = []
+
+            def interrupted(command, graph, **options):
+                if options.get("stage", "").startswith("audio track"):
+                    calls.append(options["stage"])
+                    if len(calls) == 2:
+                        raise AudioRenderError("simulated track interruption")
+                return original_run(command, graph, **options)
+
+            cache = root / "checkpoints"
+            destination = root / "resumed.wav"
+            with (
+                patch.object(audio_compositor, "_run_ffmpeg", side_effect=interrupted),
+                self.assertRaisesRegex(AudioRenderError, "simulated track interruption"),
+            ):
+                render_audio(project, layout, destination, preparations=RenderPreparations(cache))
+            self.assertFalse(destination.exists())
+            self.assertEqual(len(calls), 2)
+            checkpoint = next(cache.rglob("audio-track.wav"))
+            proof = (_sha256(checkpoint), checkpoint.stat().st_mtime_ns)
+            completed = calls[0]
+            calls.clear()
+
+            def resumed(command, graph, **options):
+                if options.get("stage", "").startswith("audio track"):
+                    calls.append(options["stage"])
+                    self.assertNotEqual(options["stage"], completed)
+                return original_run(command, graph, **options)
+
+            with patch.object(audio_compositor, "_run_ffmpeg", side_effect=resumed):
+                result = render_audio(
+                    project, layout, destination, preparations=RenderPreparations(cache)
+                )
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(proof, (_sha256(checkpoint), checkpoint.stat().st_mtime_ns))
+            actual, rate, channels = _decoded_pcm(destination)
+            expected, _, _ = _decoded_pcm(baseline)
+            self.assertEqual((rate, channels, result.sample_count), (48000, 2, 120000))
+            self.assertEqual(len(actual), len(expected))
+            self.assertLess(max(abs(a - b) for a, b in zip(actual, expected, strict=True)), 1e-6)
+            published_hash = _sha256(destination)
+            calls.clear()
+            with (
+                patch.object(
+                    audio_compositor,
+                    "_run_ffmpeg",
+                    side_effect=AudioRenderError("simulated final mix interruption"),
+                ),
+                self.assertRaisesRegex(AudioRenderError, "final mix interruption"),
+            ):
+                render_audio(project, layout, destination, preparations=RenderPreparations(cache))
+            self.assertEqual(_sha256(destination), published_hash)
+            with patch.object(audio_compositor, "_run_ffmpeg", side_effect=resumed):
+                render_audio(project, layout, destination, preparations=RenderPreparations(cache))
+            self.assertEqual(calls, [])
+            self.assertEqual(_sha256(destination), published_hash)
+
+            project.set_source_audio_settings(
+                sources[0].source_id, _audio_settings(sources[0], gain_db=3.0)
+            )
+            with patch.object(audio_compositor, "_run_ffmpeg", wraps=original_run) as runner:
+                render_audio(project, layout, destination, preparations=RenderPreparations(cache))
+            rebuilt_tracks = [
+                call.kwargs["stage"]
+                for call in runner.call_args_list
+                if call.kwargs.get("stage", "").startswith("audio track")
+            ]
+            self.assertEqual(rebuilt_tracks, [completed])
+            self.assertNotEqual(_sha256(destination), published_hash)
+
+    def test_checkpointed_audio_preserves_safe_unsafe_and_silent_track_behavior(self):
+        from framestudio.render_preparations import RenderPreparations
+
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            mono = _source(root, "mono", frequency=440)
+            stereo = _source(root, "stereo", frequency=440, channels=2, layout="stereo")
+            silent = _source(root, "silence", frequency=None, audio=False)
+            unsafe, _, _ = _sole_panned_project(root, amplitude=7.6, gain_db=6.0)
+            for name, project in (
+                ("mono", _single_source_project(mono)),
+                ("stereo", _single_source_project(stereo)),
+                ("silence", _single_source_project(silent)),
+                ("unsafe", unsafe),
+            ):
+                with self.subTest(name=name):
+                    layout = plan_project_layout(project)
+                    baseline = root / f"{name}-baseline.wav"
+                    destination = root / f"{name}-cached.wav"
+                    render_audio(project, layout, baseline)
+                    result = render_audio(
+                        project,
+                        layout,
+                        destination,
+                        preparations=RenderPreparations(root / f"{name}-cache"),
+                    )
+                    expected, _, _ = _decoded_pcm(baseline)
+                    actual, _, _ = _decoded_pcm(destination)
+                    self.assertEqual(len(actual), len(expected))
+                    self.assertLess(
+                        max(abs(a - b) for a, b in zip(actual, expected, strict=True)), 1e-6
+                    )
+                    self.assertLessEqual(result.peak, 1.0)
+
     def test_public_audio_boundary_preserves_safe_centered_stereo_without_mix_or_limiter(self):
         with TemporaryDirectory(dir=str(_REPOSITORY_ROOT)) as temporary_directory:
             root = Path(temporary_directory)
