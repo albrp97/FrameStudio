@@ -13,6 +13,49 @@ from framestudio.post_export import (
 
 
 class EditorPostExportTests(unittest.TestCase):
+    def test_batch_failure_preserves_the_output_error_for_ui_and_failure_log(self):
+        from framestudio.app_export import ExportBatchExecutionError
+        from framestudio.export_coordinator import (
+            ExportBatchResult,
+            ExportOutputResult,
+            ExportResultState,
+        )
+        from framestudio.output_plan import OutputIdentity
+
+        detail = "Rendered output verification failed: empty interval"
+        failed = ExportOutputResult(
+            identity=OutputIdentity(
+                mode="final-only",
+                output_kind="final",
+                track_id=None,
+                source_id=None,
+                framing="dynamic",
+                audio_intent="timeline",
+                render_profile="project",
+            ),
+            destination=Path("output.mp4"),
+            fingerprint="fixture",
+            state=ExportResultState.FAILED,
+            error={"code": "render-failed", "message": detail},
+        )
+        batch = ExportBatchResult(
+            results=(failed,),
+            mode="final-only",
+            complete=False,
+            partial_success=False,
+        )
+        error = ExportBatchExecutionError(batch)
+        self.assertIn(detail, str(error))
+        self.assertIs(error.result, batch)
+        with TemporaryDirectory() as temporary:
+            log = write_export_failure_log(
+                project_path=Path(temporary) / "edit.framestudio.json",
+                destination=failed.destination,
+                message=str(error),
+                action="nothing",
+            )
+            self.assertIn(detail, log.read_text())
+
     def test_failure_log_prefers_the_saved_project_directory(self):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

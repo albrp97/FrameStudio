@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .app_helpers import KEY_BINDINGS, super_modifier_mask
-from .composition import MAX_OFFSET_X, MAX_OFFSET_Y, MAX_ZOOM, MIN_ZOOM
+from .app_helpers import FOCUS_OFFSET_SCROLL_STEP, KEY_BINDINGS, super_modifier_mask
+from .composition import DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM
 from .persistence import autosave_exists
 from .timeline import create_timeline_canvas
+
+FOCUS_OFFSET_LIMIT = 1_000_000.0
+FOCUS_OFFSET_STEP = 30.0
+FOCUS_OFFSET_PAGE = FOCUS_OFFSET_STEP * 10
 
 
 def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
@@ -78,7 +82,7 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     composition_controls.append(Gtk.Label(label="Focus", xalign=0.0))
 
     zoom_adjustment = Gtk.Adjustment.new(
-        MIN_ZOOM,
+        DEFAULT_ZOOM,
         MIN_ZOOM,
         MAX_ZOOM,
         0.1,
@@ -87,7 +91,7 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     )
     window.focus_zoom_spin = Gtk.SpinButton.new(zoom_adjustment, 0.1, 2)
     window.focus_zoom_spin.set_tooltip_text(
-        "Selected clip zoom (1.00x to 8.00x); scroll up/down to adjust by 0.10x"
+        "Selected clip zoom (0.10x to 8.00x); scroll up/down to adjust by 0.10x"
     )
     window.focus_zoom_spin.connect("value-changed", window._on_focus_control_changed)
     composition_controls.append(Gtk.Label(label="Zoom"))
@@ -95,15 +99,15 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
 
     offset_x_adjustment = Gtk.Adjustment.new(
         0.0,
-        -MAX_OFFSET_X,
-        MAX_OFFSET_X,
-        10.0,
-        100.0,
+        -FOCUS_OFFSET_LIMIT,
+        FOCUS_OFFSET_LIMIT,
+        FOCUS_OFFSET_STEP,
+        FOCUS_OFFSET_PAGE,
         0.0,
     )
-    window.focus_offset_x_spin = Gtk.SpinButton.new(offset_x_adjustment, 10.0, 0)
+    window.focus_offset_x_spin = Gtk.SpinButton.new(offset_x_adjustment, FOCUS_OFFSET_STEP, 0)
     window.focus_offset_x_spin.set_tooltip_text(
-        "Selected clip horizontal focus offset; scroll up/down by 10 pixels"
+        f"Selected clip horizontal focus offset; scroll up/down by {FOCUS_OFFSET_SCROLL_STEP:g} pixels"
     )
     window.focus_offset_x_spin.connect("value-changed", window._on_focus_control_changed)
     composition_controls.append(Gtk.Label(label="X"))
@@ -111,15 +115,15 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
 
     offset_y_adjustment = Gtk.Adjustment.new(
         0.0,
-        -MAX_OFFSET_Y,
-        MAX_OFFSET_Y,
-        10.0,
-        100.0,
+        -FOCUS_OFFSET_LIMIT,
+        FOCUS_OFFSET_LIMIT,
+        FOCUS_OFFSET_STEP,
+        FOCUS_OFFSET_PAGE,
         0.0,
     )
-    window.focus_offset_y_spin = Gtk.SpinButton.new(offset_y_adjustment, 10.0, 0)
+    window.focus_offset_y_spin = Gtk.SpinButton.new(offset_y_adjustment, FOCUS_OFFSET_STEP, 0)
     window.focus_offset_y_spin.set_tooltip_text(
-        "Selected clip vertical focus offset; scroll up/down by 10 pixels"
+        f"Selected clip vertical focus offset; scroll up/down by {FOCUS_OFFSET_SCROLL_STEP:g} pixels"
     )
     window.focus_offset_y_spin.connect("value-changed", window._on_focus_control_changed)
     composition_controls.append(Gtk.Label(label="Y"))

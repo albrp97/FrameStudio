@@ -10,6 +10,7 @@ from .composition import (
     TriplicateGroup,
     VisualTransform,
 )
+from .crop_window import crop_window_filter_string, crop_window_filters
 from .model_types import Segment
 
 
@@ -32,17 +33,21 @@ def _frame_rate_text(frame_rate: float | str | None) -> str | None:
     return _filter_number(float(frame_rate))
 
 
-def _crop_expression(
-    transform: VisualTransform,
-    *,
-    x_scale: float = 1.0,
-    y_scale: float = 1.0,
-) -> tuple[str, str]:
-    offset_x = _filter_number(transform.offset_x * x_scale)
-    offset_y = _filter_number(transform.offset_y * y_scale)
-    x = f"'clip((in_w-out_w)/2+{offset_x},0,in_w-out_w)'"
-    y = f"'clip((in_h-out_h)/2+{offset_y},0,in_h-out_h)'"
-    return x, y
+def _crop_origin(scaled: int, window: int, offset: float, scale: float = 1.0) -> int:
+    return round((scaled - window) / 2 + offset * scale)
+
+
+def _window_filter(
+    scaled_width: int,
+    scaled_height: int,
+    crop_x: int,
+    crop_y: int,
+    width: int,
+    height: int,
+) -> str:
+    return crop_window_filter_string(
+        crop_window_filters(scaled_width, scaled_height, crop_x, crop_y, width, height)
+    )
 
 
 def _normal_branch(
@@ -58,25 +63,26 @@ def _normal_branch(
     if preserve_resolution:
         if content_width is None or content_height is None:
             raise ValueError("Preserve-resolution rendering requires content dimensions")
-        scaled_width = max(content_width, int(math.ceil(content_width * transform.zoom)))
-        scaled_height = max(content_height, int(math.ceil(content_height * transform.zoom)))
-        crop_width = min(scaled_width, width)
-        crop_height = min(scaled_height, height)
-        x, y = _crop_expression(transform)
+        scaled_width = math.ceil(content_width * transform.zoom)
+        scaled_height = math.ceil(content_height * transform.zoom)
+        crop_x = _crop_origin(scaled_width, width, transform.offset_x)
+        crop_y = _crop_origin(scaled_height, height, transform.offset_y)
+        window = _window_filter(scaled_width, scaled_height, crop_x, crop_y, width, height)
         return (
             f"{input_label}scale={content_width}:{content_height},"
             f"scale={scaled_width}:{scaled_height},"
-            f"crop={crop_width}:{crop_height}:x={x}:y={y},"
-            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+            f"{window},setsar=1"
         )
-    scaled_width = max(width, int(math.ceil(width * transform.zoom)))
-    scaled_height = max(height, int(math.ceil(height * transform.zoom)))
-    x, y = _crop_expression(transform)
+    scaled_width = math.ceil(width * transform.zoom)
+    scaled_height = math.ceil(height * transform.zoom)
+    crop_x = _crop_origin(scaled_width, width, transform.offset_x)
+    crop_y = _crop_origin(scaled_height, height, transform.offset_y)
+    window = _window_filter(scaled_width, scaled_height, crop_x, crop_y, width, height)
     return (
         f"{input_label}scale={width}:{height}:force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
         f"scale={scaled_width}:{scaled_height},"
-        f"crop={width}:{height}:x={x}:y={y},setsar=1"
+        f"{window},setsar=1"
     )
 
 
@@ -95,34 +101,36 @@ def _triplicate_branch(
     if preserve_resolution:
         if content_width is None or content_height is None:
             raise ValueError("Preserve-resolution rendering requires content dimensions")
-        scaled_width = max(content_width, int(math.ceil(content_width * zoom)))
-        scaled_height = max(content_height, int(math.ceil(content_height * zoom)))
-        crop_width = min(scaled_width, slot_width)
-        crop_height = min(scaled_height, height)
-        x, y = _crop_expression(transform)
+        scaled_width = math.ceil(content_width * zoom)
+        scaled_height = math.ceil(content_height * zoom)
+        crop_x = _crop_origin(scaled_width, slot_width, transform.offset_x)
+        crop_y = _crop_origin(scaled_height, height, transform.offset_y)
+        window = _window_filter(scaled_width, scaled_height, crop_x, crop_y, slot_width, height)
         return (
             f"{input_label}scale={content_width}:{content_height},"
             f"scale={scaled_width}:{scaled_height},"
-            f"crop={crop_width}:{crop_height}:x={x}:y={y},"
-            f"pad={slot_width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
+            f"{window},setsar=1"
         )
-    scaled_width = max(width, int(math.ceil(width * zoom)))
-    scaled_height = max(height, int(math.ceil(height * zoom)))
-    if math.isclose(zoom, 1.0):
+    scaled_width = math.ceil(width * zoom)
+    scaled_height = math.ceil(height * zoom)
+    if zoom <= 1.0:
         triplicate_x_scale = 1.0
     else:
         triplicate_x_scale = (width * zoom - slot_width) / (width * (zoom - 1.0))
-    x, y = _crop_expression(
-        transform,
-        x_scale=(width / CANVAS_WIDTH) * triplicate_x_scale,
-        y_scale=height / CANVAS_HEIGHT,
+    crop_x = _crop_origin(
+        scaled_width,
+        slot_width,
+        transform.offset_x,
+        (width / CANVAS_WIDTH) * triplicate_x_scale,
     )
+    crop_y = _crop_origin(scaled_height, height, transform.offset_y, height / CANVAS_HEIGHT)
+    window = _window_filter(scaled_width, scaled_height, crop_x, crop_y, slot_width, height)
     return (
         f"{input_label}scale={width}:{height}:"
         "force_original_aspect_ratio=decrease,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
         f"scale={scaled_width}:{scaled_height},"
-        f"crop={slot_width}:{height}:x={x}:y={y},setsar=1"
+        f"{window},setsar=1"
     )
 
 

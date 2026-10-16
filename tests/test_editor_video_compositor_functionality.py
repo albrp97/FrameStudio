@@ -37,6 +37,129 @@ def isolated_directory():
 
 
 class VideoCompositorFunctionalityTests(unittest.TestCase):
+    def test_unprepared_subframe_intervals_export_visible_frames_and_resume(self):
+        from framestudio.export_types import ExportExecutionError
+        from framestudio.fps_policy import resolve_frame_rate_policy
+        from framestudio.render_preparations import RenderPreparations
+
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("FFmpeg and ffprobe are required")
+        for rate, start, duration in (
+            ("60", 0.0, 0.012208),
+            ("60", 0.001294, 0.012208),
+            ("60", 3.987792, 0.012208),
+            ("30000/1001", 3.987792, 0.012208),
+            ("24", 0.001294, 0.03),
+        ):
+            with self.subTest(rate=rate, start=start), isolated_directory() as root:
+                source = _make_marker_source(root, "source.mp4", 320, 180, rate, "red")
+                if rate == "60" and start > 3:
+                    tail_source = root / "audio-tail.mp4"
+                    _run(
+                        [
+                            "ffmpeg",
+                            "-v",
+                            "error",
+                            "-i",
+                            str(source),
+                            "-f",
+                            "lavfi",
+                            "-i",
+                            "sine=frequency=440:duration=4",
+                            "-vf",
+                            "trim=end_frame=237,setpts=PTS-STARTPTS+0.033333/TB",
+                            "-c:v",
+                            "libx264",
+                            "-preset",
+                            "ultrafast",
+                            "-c:a",
+                            "aac",
+                            str(tail_source),
+                        ]
+                    )
+                    source = tail_source
+                source_hash = _sha256(source)
+                metadata = probe_media(source).metadata()
+                project = Project.create_synchronized(source, metadata)
+                project.timeline.add_track("track-2")
+                for track_id in ("track-1", "track-2"):
+                    project.timeline.replace_track_blocks(
+                        track_id,
+                        tuple(
+                            make_block(
+                                segment_id=f"{track_id}-{index}",
+                                source_id=project.source.source_id,
+                                track_id=track_id,
+                                source_start=source_start,
+                                source_end=source_start + length,
+                                timeline_start=timeline_start,
+                                timeline_end=timeline_start + length,
+                            )
+                            for index, (source_start, timeline_start, length) in enumerate(
+                                ((start, 0.0, duration), (0.0, 0.1, 0.1))
+                            )
+                        ),
+                    )
+                project.duration_seconds = project.timeline.timeline_duration_seconds
+                policy = resolve_frame_rate_policy(
+                    ({**metadata, "source_id": project.source.source_id},),
+                    choice="custom",
+                    custom_rate="60",
+                    enhancement_enabled=False,
+                )
+                plan = plan_project_video(
+                    project,
+                    root / "subframe.mp4",
+                    frame_rate_policy=policy,
+                    upscale_policy=UpscalePolicy(enabled=False),
+                )
+                self.assertEqual(plan.interval_frame_counts[0], 2 if rate == "24" else 1)
+                original_run = video_compositor.run_ffmpeg
+                completed_commands = []
+
+                def interrupted(
+                    command,
+                    original_run=original_run,
+                    completed_commands=completed_commands,
+                    **options,
+                ):
+                    if options["stage"] == "video composition interval 2/3":
+                        raise ExportExecutionError("simulated interruption")
+                    result = original_run(command, **options)
+                    completed_commands.append(tuple(command[:-1]))
+                    return result
+
+                cache = root / "checkpoints"
+                with (
+                    mock.patch.object(video_compositor, "run_ffmpeg", side_effect=interrupted),
+                    self.assertRaisesRegex(VideoCompositorExecutionError, "simulated interruption"),
+                ):
+                    render_project_video(plan, preparations=RenderPreparations(cache))
+                self.assertFalse(plan.destination.exists())
+                self.assertEqual(len(completed_commands), 1)
+
+                def resumed(
+                    command,
+                    original_run=original_run,
+                    completed_commands=completed_commands,
+                    **options,
+                ):
+                    self.assertNotIn(tuple(command[:-1]), completed_commands)
+                    return original_run(command, **options)
+
+                with mock.patch.object(video_compositor, "run_ffmpeg", side_effect=resumed):
+                    result = render_project_video(plan, preparations=RenderPreparations(cache))
+                self.assertEqual(result.actual_frames, plan.expected_frames)
+                output = probe_media(plan.destination)
+                self.assertAlmostEqual(output.duration_seconds, 0.2, delta=1 / 60)
+                for index in range(plan.interval_frame_counts[0]):
+                    frame = _decode_frame(plan.destination, index)
+                    for x in (96, 288):
+                        pixel = frame[(60 * 384 + x) * 3 : (60 * 384 + x) * 3 + 3]
+                        self.assertGreater(pixel[0], 150)
+                        self.assertLess(pixel[1], 80)
+                self.assertEqual(_sha256(source), source_hash)
+
     def test_prepared_subframe_and_tail_slots_produce_a_real_composite_frame(self):
         from framestudio.fps_policy import resolve_frame_rate_policy
         from framestudio.render_preparations import RenderPreparations

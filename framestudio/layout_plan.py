@@ -407,16 +407,8 @@ def plan_crop(
     scaled_width, scaled_height = _cover_dimensions(source, target, transform.zoom)
     mapped_x = _fraction(transform.offset_x) * Fraction(target.width, CANVAS_WIDTH)
     mapped_y = _fraction(transform.offset_y) * Fraction(target.height, CANVAS_HEIGHT)
-    crop_x = _clamp(
-        _round_half_up(Fraction(scaled_width - target.width, 2) + mapped_x),
-        0,
-        scaled_width - target.width,
-    )
-    crop_y = _clamp(
-        _round_half_up(Fraction(scaled_height - target.height, 2) + mapped_y),
-        0,
-        scaled_height - target.height,
-    )
+    crop_x = _round_half_up(Fraction(scaled_width - target.width, 2) + mapped_x)
+    crop_y = _round_half_up(Fraction(scaled_height - target.height, 2) + mapped_y)
     return _build_crop_plan(
         source=source,
         target=target,
@@ -441,7 +433,7 @@ def plan_triplicate(
     _validate_output_domain(source, normalized_output_domain)
     scaled_width, scaled_height = _cover_dimensions(source, slot, transform.zoom)
     zoom = _fraction(transform.zoom)
-    if zoom == 1:
+    if zoom <= 1:
         triplicate_scale = Fraction(1)
     else:
         triplicate_scale = (Fraction(slot.width) * zoom - Fraction(slot.width, 3)) / (
@@ -454,16 +446,8 @@ def plan_triplicate(
     x = slot.x
     for role, width in zip(TRIPLICATE_ROLES, widths, strict=True):
         target = PixelRect(x, slot.y, width, slot.height)
-        crop_x = _clamp(
-            _round_half_up(Fraction(scaled_width - width, 2) + mapped_x),
-            0,
-            scaled_width - width,
-        )
-        crop_y = _clamp(
-            _round_half_up(Fraction(scaled_height - slot.height, 2) + mapped_y),
-            0,
-            scaled_height - slot.height,
-        )
+        crop_x = _round_half_up(Fraction(scaled_width - width, 2) + mapped_x)
+        crop_y = _round_half_up(Fraction(scaled_height - slot.height, 2) + mapped_y)
         crops.append(
             _build_crop_plan(
                 source=source,
@@ -778,14 +762,8 @@ def _cover_dimensions(
         Fraction(target.width, 1) / source.display_width,
         Fraction(target.height, source.height),
     )
-    scaled_width = max(
-        target.width,
-        _ceil_fraction(source.display_width * cover * zoom_fraction),
-    )
-    scaled_height = max(
-        target.height,
-        _ceil_fraction(Fraction(source.height, 1) * cover * zoom_fraction),
-    )
+    scaled_width = _ceil_fraction(source.display_width * cover * zoom_fraction)
+    scaled_height = _ceil_fraction(Fraction(source.height, 1) * cover * zoom_fraction)
     return scaled_width, scaled_height
 
 
@@ -823,10 +801,6 @@ def _ceil_fraction(value: Fraction) -> int:
 
 def _round_half_up(value: Fraction) -> int:
     return math.floor(value + Fraction(1, 2))
-
-
-def _clamp(value: int, lower: int, upper: int) -> int:
-    return max(lower, min(upper, value))
 
 
 __all__ = [

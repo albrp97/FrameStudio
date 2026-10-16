@@ -4,8 +4,7 @@ from .composition import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
     COMPOSITION_SCHEMA_VERSION,
-    MAX_OFFSET_X,
-    MAX_OFFSET_Y,
+    DEFAULT_ZOOM,
     MAX_ZOOM,
     MIN_ZOOM,
     TRIPLICATE_BACKGROUND,
@@ -15,7 +14,6 @@ from .composition import (
     TriplicateGroup,
     TriplicateInstance,
     VisualTransform,
-    focus_offset_bounds,
 )
 from .model_project import Project
 from .model_timeline import (
@@ -59,8 +57,7 @@ __all__ = [
     "CANVAS_HEIGHT",
     "CANVAS_WIDTH",
     "COMPOSITION_SCHEMA_VERSION",
-    "MAX_OFFSET_X",
-    "MAX_OFFSET_Y",
+    "DEFAULT_ZOOM",
     "MAX_ZOOM",
     "MIN_ZOOM",
     "TRIPLICATE_BACKGROUND",
@@ -86,7 +83,6 @@ __all__ = [
     "UpscalePolicy",
     "UpscalePolicyError",
     "VisualTransform",
-    "focus_offset_bounds",
     "seconds_to_ticks",
     "ticks_to_seconds",
 ]

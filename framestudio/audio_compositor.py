@@ -700,7 +700,7 @@ def _render_command(
                     f"end_sample={block.source_end_sample},"
                     f"apad=pad_len={interval.duration_samples},"
                     f"atrim=end_sample={interval.duration_samples},"
-                    f"asetpts=PTS-STARTPTS[{label}]",
+                    f"asetpts=N/SR/TB[{label}]",
                 )
             else:
                 filters.append(
@@ -838,7 +838,8 @@ def _composed_source_filter(
             _pan_filter(block.channel_layout, block.pan_percent),
             f"apad=pad_len={interval_samples}",
             f"atrim=end_sample={interval_samples}",
-            "asetpts=PTS-STARTPTS",
+            # An empty trim gives apad no starting PTS; sample counts still start at zero.
+            "asetpts=N/SR/TB",
         ],
     )
     return ",".join(filters) + f"[{label}]"

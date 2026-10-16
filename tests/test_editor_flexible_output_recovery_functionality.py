@@ -848,6 +848,80 @@ class FlexibleOutputRecoveryGtkFunctionalityTests(unittest.TestCase):
         )
         return self.window.status_label.get_text().lower()
 
+    def test_recovery_label_shows_previous_overall_progress_not_zero_completed_stages(self):
+        from framestudio.export_journal import ExportJournal, journal_path
+        from framestudio.export_session import ExportSession
+        from framestudio.export_types import ExportExecutionError, ExportProgress
+
+        destination = self.root / "gtk-previous-progress.mp4"
+        with ExportSession.open(destination, {"test": "previous-progress"}, ("batch",)) as session:
+            manifest = session.root / "manifest.json"
+        with self.assertRaisesRegex(ExportExecutionError, "simulated failure"):
+            with ExportJournal(destination) as journal:
+                journal.progress(
+                    ExportProgress(
+                        "audio track 2/2",
+                        99,
+                        0,
+                        0,
+                        None,
+                        1.0,
+                        None,
+                        overall_percent=89.2935,
+                    )
+                )
+                raise ExportExecutionError("simulated failure")
+        paths = (manifest, journal_path(destination))
+        proofs = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths}
+        panel = self._open_panel()
+        self._set_filename(panel, destination.name)
+        self._wait_until(
+            lambda: "Previous run reached 89.3%." in " ".join(_visible_widget_text(panel)),
+            "GTK recovery label did not show historical overall progress",
+            rounds=6000,
+        )
+        text = " ".join(_visible_widget_text(panel))
+        self.assertIn("Resume checks and reuses saved checkpoints.", text)
+        self.assertNotIn("0 completed stage", text)
+        self.assertNotIn("no completed stage", text)
+        self.assertTrue(self._button(panel, "Resume export").get_visible())
+        self.assertEqual(
+            proofs, {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in paths}
+        )
+
+    def test_recovery_label_without_history_or_with_read_error_preserves_resume(self):
+        from unittest.mock import patch
+
+        from framestudio.export_session import ExportSession
+        from framestudio.export_types import ExportExecutionError
+
+        destination = self.root / "gtk-missing-progress.mp4"
+        with ExportSession.open(destination, {"test": "missing-progress"}, ("batch",)):
+            pass
+        panel = self._open_panel()
+        self._set_filename(panel, destination.name)
+        fallback = "Pending export. Resume checks and reuses saved checkpoints."
+        self._wait_until(
+            lambda: fallback in " ".join(_visible_widget_text(panel)),
+            "GTK recovery label did not explain a session without progress history",
+            rounds=6000,
+        )
+        self.assertTrue(self._button(panel, "Resume export").get_visible())
+        with patch(
+            "framestudio.app_export.previous_export_overall_percent",
+            side_effect=ExportExecutionError("history read denied"),
+        ):
+            self._set_filename(panel, "different-output.mp4")
+            self._set_filename(panel, destination.name)
+            self._wait_until(
+                lambda: "Previous progress unavailable (history read denied)."
+                in " ".join(_visible_widget_text(panel)),
+                "GTK recovery label did not surface its history read error",
+                rounds=6000,
+            )
+            self.assertTrue(self._button(panel, "Resume export").get_visible())
+            self.assertNotIn("0 completed stage", " ".join(_visible_widget_text(panel)))
+
     def test_native_final_only_export_reports_mode_and_completes_job(self):
         panel = self._open_panel()
         self._wait_until(

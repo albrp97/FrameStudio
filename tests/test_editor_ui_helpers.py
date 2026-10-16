@@ -202,9 +202,10 @@ class EditorUiHelperTests(unittest.TestCase):
 
     def test_focus_scroll_uses_field_specific_direction_and_increment(self):
         self.assertEqual(focus_scroll_value("zoom", 1.0, -1.0), 1.1)
-        self.assertEqual(focus_scroll_value("zoom", 1.0, 1.0), 1.0)
-        self.assertEqual(focus_scroll_value("offset_x", 0.0, -1.0), 10.0)
-        self.assertEqual(focus_scroll_value("offset_y", 0.0, 1.0), -10.0)
+        self.assertEqual(focus_scroll_value("zoom", 1.0, 1.0), 0.9)
+        self.assertEqual(focus_scroll_value("zoom", 0.1, 1.0), 0.1)
+        self.assertEqual(focus_scroll_value("offset_x", 0.0, -1.0), 30.0)
+        self.assertEqual(focus_scroll_value("offset_y", 0.0, 1.0), -30.0)
         self.assertEqual(set(FOCUS_SCROLL_FIELDS), {"zoom", "offset_x", "offset_y"})
 
     def test_focus_control_keyboard_focus_is_not_captured_by_global_shortcuts(self):

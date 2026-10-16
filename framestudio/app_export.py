@@ -44,7 +44,7 @@ from .export_coordinator import (
     resolve_output_plan,
     verify_planned_output,
 )
-from .export_journal import ExportJournal
+from .export_journal import ExportJournal, previous_export_overall_percent
 from .export_naming import smart_export_name
 from .export_panel import (
     ExportPanelState,
@@ -106,6 +106,13 @@ class ExportBatchExecutionError(ExportExecutionError):
             if result.error is not None
             else "One or more export outputs did not complete"
         )
+        details = [
+            f"{output.identity.output_kind}: {output.error['message']}"
+            for output in result.results
+            if output.error is not None and output.error.get("message")
+        ]
+        if details:
+            message = f"{message}; {'; '.join(details)}"
         super().__init__(message)
 
 
@@ -545,10 +552,17 @@ def open_export_planning_panel(window: Any, Gtk: Any, GLib: Any) -> None:
             return
         session_frame.set_visible(True)
         if info.valid:
-            stage = info.last_completed_stage or "no completed stage"
-            session_label.set_text(
-                f"Pending session: {stage}; {info.completed_stage_count} completed stage(s)"
-            )
+            try:
+                percent = previous_export_overall_percent(destination)
+            except ExportExecutionError as error:
+                history = f"Pending export. Previous progress unavailable ({error})."
+            else:
+                history = (
+                    "Pending export."
+                    if percent is None
+                    else f"Previous run reached {percent:.1f}%."
+                )
+            session_label.set_text(f"{history} Resume checks and reuses saved checkpoints.")
         else:
             session_label.set_text(f"Pending session is invalid: {info.reason}")
         resume_session.set_visible(info.resumable)
@@ -1399,7 +1413,8 @@ def finish_export(
             completed = sum(result.verified for result in batch_result.results)
             total = len(batch_result.results)
             state_summary = ", ".join(
-                f"{result.identity.output_kind}:{result.state}" for result in batch_result.results
+                f"{result.identity.output_kind}:{result.state.value}"
+                for result in batch_result.results
             )
             window.export_progress_label.set_text(
                 f"Export {completed}/{total} outputs complete: {state_summary}",

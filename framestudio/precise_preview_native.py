@@ -13,6 +13,7 @@ from typing import Any
 
 import av
 
+from .crop_window import crop_window_filters
 from .preview_acceleration import supported_color
 
 
@@ -383,13 +384,20 @@ def _source_buffer(graph: Any, frame: Any, slot: dict[str, Any]) -> Any:
 def _cropped(graph: Any, source: Any, crop: dict[str, int], output: int = 0) -> Any:
     scale = graph.add("scale", f"{crop['scaled_width']}:{crop['scaled_height']}:flags=lanczos")
     source.link_to(scale, output, 0)
-    clip = graph.add(
-        "crop",
-        f"{crop['width']}:{crop['height']}:{crop['crop_x']}:{crop['crop_y']}",
-    )
+    window_nodes = [
+        graph.add(name, args)
+        for name, args in crop_window_filters(
+            crop["scaled_width"],
+            crop["scaled_height"],
+            crop["crop_x"],
+            crop["crop_y"],
+            crop["width"],
+            crop["height"],
+        )
+    ]
     sar = graph.add("setsar", "1")
     rgba = graph.add("format", "rgba")
-    graph.link_nodes(scale, clip, sar, rgba)
+    graph.link_nodes(scale, *window_nodes, sar, rgba)
     return rgba
 
 

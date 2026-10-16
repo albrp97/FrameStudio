@@ -42,12 +42,10 @@ from framestudio.cli import cli_main
 from framestudio.composition import (
     CANVAS_HEIGHT,
     CANVAS_WIDTH,
-    MAX_OFFSET_X,
-    MAX_OFFSET_Y,
     MAX_ZOOM,
+    MIN_ZOOM,
     TriplicateGroup,
     VisualTransform,
-    focus_offset_bounds,
 )
 from framestudio.composition_render import segment_video_filters
 from framestudio.export import execute_export
@@ -1166,7 +1164,7 @@ class EditorCompositionTests(unittest.TestCase):
             self.assertTrue(handled)
             self.assertEqual(
                 project.timeline.find(segment_id).visual_transform,
-                VisualTransform(zoom=2.0, offset_x=110.0, offset_y=-50.0),
+                VisualTransform(zoom=2.0, offset_x=130.0, offset_y=-50.0),
             )
             window._refresh_timeline.assert_called_once_with(segment_id)
             window._show_error.assert_not_called()
@@ -1349,43 +1347,38 @@ class EditorCompositionTests(unittest.TestCase):
 
             self.assertTrue(close_finished.wait(timeout=1.0))
 
-    def test_transform_contract_clamps_interactive_values_and_rejects_invalid_state(self):
+    def test_transform_contract_clamps_zoom_and_keeps_offsets_unbounded(self):
         transform = VisualTransform.clamped(
             zoom=MAX_ZOOM + 10,
-            offset_x=MAX_OFFSET_X + 10,
-            offset_y=-MAX_OFFSET_Y - 10,
+            offset_x=1_000_000.0,
+            offset_y=-1_000_000.0,
         )
 
         self.assertEqual(transform.zoom, MAX_ZOOM)
-        self.assertEqual(transform.offset_x, MAX_OFFSET_X)
-        self.assertEqual(transform.offset_y, -MAX_OFFSET_Y)
+        self.assertEqual(transform.offset_x, 1_000_000.0)
+        self.assertEqual(transform.offset_y, -1_000_000.0)
+        self.assertEqual(VisualTransform.clamped(zoom=0.01).zoom, MIN_ZOOM)
+        self.assertEqual(VisualTransform.clamped(zoom=MIN_ZOOM).zoom, MIN_ZOOM)
 
         with self.assertRaisesRegex(ValueError, "zoom"):
-            VisualTransform(zoom=0.5)
+            VisualTransform(zoom=0.05)
         with self.assertRaisesRegex(ValueError, "version"):
             VisualTransform.from_dict({"version": 99})
 
-    def test_zoom_dependent_focus_bounds_reach_all_canvas_edges(self):
-        self.assertEqual(focus_offset_bounds(1.0), ((-640.0, 640.0), (0.0, 0.0)))
-        self.assertEqual(focus_offset_bounds(2.0), ((-960.0, 960.0), (-540.0, 540.0)))
-        self.assertEqual(focus_offset_bounds(4.0), ((-2880.0, 2880.0), (-1620.0, 1620.0)))
-        default_clamped = VisualTransform.clamped(zoom=1.0, offset_x=99999.0)
-        self.assertEqual(default_clamped.offset_x, 640.0)
-        transform = VisualTransform.clamped(
-            zoom=4.0,
-            offset_x=99999.0,
-            offset_y=-99999.0,
-        )
-        self.assertEqual(transform.offset_x, 2880.0)
-        self.assertEqual(transform.offset_y, -1620.0)
-        with self.assertRaisesRegex(ValueError, "for zoom 1"):
-            VisualTransform(zoom=1.0, offset_x=641.0)
-        with self.assertRaisesRegex(ValueError, "for zoom 2"):
-            VisualTransform(zoom=2.0, offset_x=961.0)
+    def test_zoom_below_one_is_accepted(self):
+        transform = VisualTransform(zoom=0.5, offset_x=-2500.0)
+
+        self.assertEqual(transform.zoom, 0.5)
+        self.assertEqual(transform.offset_x, -2500.0)
+
+        far = VisualTransform(zoom=1.0, offset_x=641.0, offset_y=-1_000_000.0)
+        self.assertEqual(far.offset_x, 641.0)
+        self.assertEqual(far.offset_y, -1_000_000.0)
 
     def test_triplicate_default_zoom_accepts_horizontal_focus_offsets(self):
         timeline = SegmentTimeline(10.0)
-        for offset_x in (-640.0, 640.0):
+        expected_origin_x = {-640.0: 0, 640.0: 1280}
+        for offset_x, origin_x in expected_origin_x.items():
             transform = VisualTransform(zoom=1.0, offset_x=offset_x)
             segment = timeline.segments[0].with_triplicate(TriplicateGroup.create(transform))
 
@@ -1397,7 +1390,7 @@ class EditorCompositionTests(unittest.TestCase):
                 "[outv]",
             )
 
-            self.assertIn(f"{offset_x:g}", grouped[1])
+            self.assertIn(f"crop=640:1080:{origin_x}:0", grouped[1])
 
     def test_default_zoom_triplicate_focus_control_updates_shared_transform(self):
         with TemporaryDirectory() as temporary_directory:
@@ -1435,7 +1428,7 @@ class EditorCompositionTests(unittest.TestCase):
             self.assertEqual(segment.triplicate.shared_transform, segment.visual_transform)
             window._show_error.assert_not_called()
 
-    def test_default_zoom_triplicate_focus_controls_expose_horizontal_range(self):
+    def test_default_zoom_triplicate_focus_controls_keep_window_range(self):
         with TemporaryDirectory() as temporary_directory:
             project = make_project(Path(temporary_directory))
             segment_id = project.timeline.segments[0].segment_id
@@ -1490,6 +1483,10 @@ class EditorCompositionTests(unittest.TestCase):
                 _update_selected_clip_label=MagicMock(),
             )
             window.timeline_canvas.get_zoom.return_value = 1.0
+            window.focus_offset_x_spin.adjustment.set_lower(-1_000_000.0)
+            window.focus_offset_x_spin.adjustment.set_upper(1_000_000.0)
+            window.focus_offset_y_spin.adjustment.set_lower(-1_000_000.0)
+            window.focus_offset_y_spin.adjustment.set_upper(1_000_000.0)
 
             app_timeline_actions.update_segment_controls(window)
 
@@ -1498,14 +1495,14 @@ class EditorCompositionTests(unittest.TestCase):
                     window.focus_offset_x_spin.adjustment.lower,
                     window.focus_offset_x_spin.adjustment.upper,
                 ),
-                (-640.0, 640.0),
+                (-1_000_000.0, 1_000_000.0),
             )
             self.assertEqual(
                 (
                     window.focus_offset_y_spin.adjustment.lower,
                     window.focus_offset_y_spin.adjustment.upper,
                 ),
-                (0.0, 0.0),
+                (-1_000_000.0, 1_000_000.0),
             )
 
     def test_transform_values_apply_to_selected_segments_without_timing_changes(self):
@@ -1723,8 +1720,7 @@ class EditorCompositionTests(unittest.TestCase):
             grouped[1],
         )
         self.assertIn("scale=3840:2160", grouped[1])
-        self.assertIn("+1600", grouped[1])
-        self.assertIn("+540", grouped[1])
+        self.assertIn("crop=640:1080:3200:1080", grouped[1])
 
     def test_preserve_resolution_mode_crops_or_pads_without_downscaling(self):
         timeline = SegmentTimeline(10.0)

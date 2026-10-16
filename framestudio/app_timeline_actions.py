@@ -14,7 +14,7 @@ from .app_helpers import (
     focus_scroll_value,
     format_output_duration_label,
 )
-from .composition import VisualTransform, focus_offset_bounds
+from .composition import VisualTransform
 from .model import ProjectValidationError, SegmentTimeline
 from .model_types import seconds_to_ticks
 from .operations import (
@@ -312,15 +312,6 @@ def update_segment_controls(window: Any) -> None:
             was_updating = getattr(window, "_updating_focus_controls", False)
             window._updating_focus_controls = True
             try:
-                (min_x, max_x), (min_y, max_y) = focus_offset_bounds(transform.zoom)
-                for control, lower, upper in (
-                    (window.focus_offset_x_spin, min_x, max_x),
-                    (window.focus_offset_y_spin, min_y, max_y),
-                ):
-                    adjustment = getattr(control, "get_adjustment", lambda: None)()
-                    if adjustment is not None:
-                        adjustment.set_lower(lower)
-                        adjustment.set_upper(upper)
                 window.focus_zoom_spin.set_value(transform.zoom)
                 window.focus_offset_x_spin.set_value(transform.offset_x)
                 window.focus_offset_y_spin.set_value(transform.offset_y)

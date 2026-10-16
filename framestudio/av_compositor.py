@@ -710,13 +710,16 @@ def _render_checkpointed_stages(
     )
 
     def verify(path: Path) -> dict[str, float]:
-        result = _verify_muxed_output(
-            path,
-            plan,
-            ffmpeg_path=ffmpeg_path,
-            ffprobe_path=ffprobe_path,
-            cancel_event=cancel_event,
-        )
+        try:
+            result = _verify_muxed_output(
+                path,
+                plan,
+                ffmpeg_path=ffmpeg_path,
+                ffprobe_path=ffprobe_path,
+                cancel_event=cancel_event,
+            )
+        except AVCompositorExecutionError as error:
+            raise ExportExecutionError(str(error)) from error
         return {"peak": result.peak}
 
     muxed = preparations.materialize(
@@ -816,7 +819,6 @@ def _mux_stages(
         str(AUDIO_SAMPLE_RATE),
         "-ac",
         str(AUDIO_CHANNELS),
-        "-shortest",
         "-movflags",
         "+faststart",
         str(destination),

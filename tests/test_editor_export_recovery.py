@@ -19,6 +19,80 @@ def sample(percent=50.0, stage="interpolation"):
 
 
 class ExportRecoveryTests(unittest.TestCase):
+    def test_previous_progress_reads_only_overall_progress_from_the_latest_run(self):
+        from framestudio.export_journal import journal_path, previous_export_overall_percent
+
+        with TemporaryDirectory() as directory:
+            destination = Path(directory) / "output.mp4"
+            self.assertIsNone(previous_export_overall_percent(destination))
+            events = [
+                {"event": "started"},
+                {"event": "progress", "progress": {"overall_percent": 98.0}},
+                {"event": "failed"},
+                {"event": "started"},
+                {"event": "progress", "progress": {"percent": 100, "current_percent": 100}},
+            ]
+            path = journal_path(destination)
+            path.write_text("".join(json.dumps(event) + "\n" for event in events))
+            self.assertIsNone(previous_export_overall_percent(destination))
+            events.extend(
+                [
+                    {"event": "progress", "progress": {"overall_percent": 89.2935}},
+                    {"event": "failed", "progress": {"overall_percent": 89.2935}},
+                ]
+            )
+            path.write_text("".join(json.dumps(event) + "\n" for event in events))
+            proof = (path.read_bytes(), path.stat().st_mtime_ns)
+            self.assertEqual(previous_export_overall_percent(destination), 89.2935)
+            self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), proof)
+
+    def test_previous_progress_tolerates_partial_tail_and_invalid_records(self):
+        from framestudio.export_journal import journal_path, previous_export_overall_percent
+
+        with TemporaryDirectory() as directory:
+            destination = Path(directory) / "output.mp4"
+            path = journal_path(destination)
+            for invalid in (True, False, -1, 101, "99", None, float("nan"), float("inf"), 10**400):
+                with self.subTest(invalid=invalid):
+                    records = [
+                        {"event": "started", "padding": "x" * 70000},
+                        {"event": "progress", "progress": {"overall_percent": 89.3}},
+                        [],
+                        {"progress": "not an object"},
+                        {"progress": {"overall_percent": invalid}},
+                    ]
+                    path.write_bytes(
+                        b"\n".join(json.dumps(record).encode() for record in records)
+                        + b"\n"
+                        + b"[" * 2000
+                        + b"]" * 2000
+                        + b'\n{"progress":{"overall_percent":'
+                        + b"9" * 5000
+                        + b'}}\n\xff\n{"event":"failed",'
+                    )
+                    self.assertEqual(previous_export_overall_percent(destination), 89.3)
+            for percent in (0, 100):
+                path.write_text(json.dumps({"progress": {"overall_percent": percent}}) + "\n")
+                self.assertEqual(previous_export_overall_percent(destination), percent)
+            path.write_text(json.dumps({"progress": {"overall_percent": 90}}) + "\n")
+            with path.open("a") as stream:
+                stream.write("x" * 70000)
+            self.assertIsNone(previous_export_overall_percent(destination))
+
+    def test_previous_progress_surfaces_read_failures_and_rejects_nonregular_files(self):
+        from framestudio.export_journal import journal_path, previous_export_overall_percent
+
+        with TemporaryDirectory() as directory:
+            destination = Path(directory) / "output.mp4"
+            with patch(
+                "framestudio.export_journal.os.open", side_effect=PermissionError(13, "denied")
+            ):
+                with self.assertRaisesRegex(ExportExecutionError, "denied"):
+                    previous_export_overall_percent(destination)
+            os.mkfifo(journal_path(destination))
+            with self.assertRaisesRegex(ExportExecutionError, "regular file"):
+                previous_export_overall_percent(destination)
+
     def test_journal_finds_worker_thread_children_and_their_memory(self):
         from framestudio.export_journal import ExportJournal
 

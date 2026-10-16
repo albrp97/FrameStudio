@@ -9,10 +9,9 @@ COMPOSITION_SCHEMA_VERSION = 1
 CANVAS_WIDTH = 1920
 CANVAS_HEIGHT = 1080
 TRIPLICATE_SLOT_WIDTH = CANVAS_WIDTH // 3
-MIN_ZOOM = 1.0
+MIN_ZOOM = 0.1
+DEFAULT_ZOOM = 1.0
 MAX_ZOOM = 8.0
-MAX_OFFSET_X = CANVAS_WIDTH * (MAX_ZOOM - 1.0) / 2.0
-MAX_OFFSET_Y = CANVAS_HEIGHT * (MAX_ZOOM - 1.0) / 2.0
 TRIPLICATE_LAYOUT = "three-column"
 TRIPLICATE_BACKGROUND = "black"
 TRIPLICATE_ROLES = ("center", "left", "right")
@@ -31,39 +30,15 @@ def _bounded(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
 
 
-def focus_offset_bounds(
-    zoom: Any,
-    *,
-    canvas_width: float = CANVAS_WIDTH,
-    canvas_height: float = CANVAS_HEIGHT,
-) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Return valid fixed-canvas focus offsets for a zoom level.
-
-    At the default zoom, the triplicate renderer crops one third of the
-    canvas width for each role, so horizontal source selection remains
-    available even though the normal full-canvas crop has no offset range.
-    """
-    parsed_zoom = _finite_number(zoom, "Visual transform zoom")
-    if not MIN_ZOOM <= parsed_zoom <= MAX_ZOOM:
-        raise ValueError(f"Visual transform zoom must be between {MIN_ZOOM:g} and {MAX_ZOOM:g}")
-    parsed_width = _finite_number(canvas_width, "Focus canvas width")
-    parsed_height = _finite_number(canvas_height, "Focus canvas height")
-    if parsed_width <= 0 or parsed_height <= 0:
-        raise ValueError("Focus canvas dimensions must be positive")
-    if math.isclose(parsed_zoom, MIN_ZOOM):
-        half_width = (parsed_width - parsed_width / 3.0) / 2.0
-        half_height = 0.0
-    else:
-        half_width = parsed_width * (parsed_zoom - 1.0) / 2.0
-        half_height = parsed_height * (parsed_zoom - 1.0) / 2.0
-    return ((-half_width, half_width), (-half_height, half_height))
-
-
 @dataclass(frozen=True)
 class VisualTransform:
-    """Validated focus values in fixed project-canvas pixel coordinates."""
+    """Validated focus values in fixed project-canvas pixel coordinates.
 
-    zoom: float = MIN_ZOOM
+    Zoom is limited to MIN_ZOOM..MAX_ZOOM. Offsets are unbounded; source
+    regions that fall outside the canvas render as black.
+    """
+
+    zoom: float = DEFAULT_ZOOM
     offset_x: float = 0.0
     offset_y: float = 0.0
     version: int = COMPOSITION_SCHEMA_VERSION
@@ -76,17 +51,6 @@ class VisualTransform:
         offset_y = _finite_number(self.offset_y, "Visual transform Y offset")
         if not MIN_ZOOM <= zoom <= MAX_ZOOM:
             raise ValueError(f"Visual transform zoom must be between {MIN_ZOOM:g} and {MAX_ZOOM:g}")
-        (min_x, max_x), (min_y, max_y) = focus_offset_bounds(zoom)
-        if not min_x <= offset_x <= max_x:
-            raise ValueError(
-                f"Visual transform X offset must be between {min_x:g} and {max_x:g} "
-                f"for zoom {zoom:g}"
-            )
-        if not min_y <= offset_y <= max_y:
-            raise ValueError(
-                f"Visual transform Y offset must be between {min_y:g} and {max_y:g} "
-                f"for zoom {zoom:g}"
-            )
         object.__setattr__(self, "zoom", zoom)
         object.__setattr__(self, "offset_x", offset_x)
         object.__setattr__(self, "offset_y", offset_y)
@@ -95,19 +59,17 @@ class VisualTransform:
     def clamped(
         cls,
         *,
-        zoom: Any = MIN_ZOOM,
+        zoom: Any = DEFAULT_ZOOM,
         offset_x: Any = 0.0,
         offset_y: Any = 0.0,
     ) -> VisualTransform:
         parsed_zoom = _finite_number(zoom, "Visual transform zoom")
         parsed_x = _finite_number(offset_x, "Visual transform X offset")
         parsed_y = _finite_number(offset_y, "Visual transform Y offset")
-        parsed_zoom = _bounded(parsed_zoom, MIN_ZOOM, MAX_ZOOM)
-        (min_x, max_x), (min_y, max_y) = focus_offset_bounds(parsed_zoom)
         return cls(
-            zoom=parsed_zoom,
-            offset_x=_bounded(parsed_x, min_x, max_x),
-            offset_y=_bounded(parsed_y, min_y, max_y),
+            zoom=_bounded(parsed_zoom, MIN_ZOOM, MAX_ZOOM),
+            offset_x=parsed_x,
+            offset_y=parsed_y,
         )
 
     @classmethod
@@ -133,7 +95,7 @@ class VisualTransform:
             offset_x = value.get("offset_x", 0.0)
             offset_y = value.get("offset_y", 0.0)
         return cls(
-            zoom=value.get("zoom", MIN_ZOOM),
+            zoom=value.get("zoom", DEFAULT_ZOOM),
             offset_x=offset_x,
             offset_y=offset_y,
             version=version,
@@ -319,7 +281,7 @@ def coerce_legacy_transform(state: Mapping[str, Any]) -> VisualTransform:
     if not isinstance(raw_offset, Mapping):
         raise ValueError("Legacy visual transform offset must be an object")
     return VisualTransform.clamped(
-        zoom=state.get("zoom", MIN_ZOOM),
+        zoom=state.get("zoom", DEFAULT_ZOOM),
         offset_x=raw_offset.get("x", 0.0),
         offset_y=raw_offset.get("y", 0.0),
     )
@@ -335,11 +297,9 @@ __all__ = [
     "CANVAS_HEIGHT",
     "CANVAS_WIDTH",
     "COMPOSITION_SCHEMA_VERSION",
-    "MAX_OFFSET_X",
-    "MAX_OFFSET_Y",
+    "DEFAULT_ZOOM",
     "MAX_ZOOM",
     "MIN_ZOOM",
-    "focus_offset_bounds",
     "TRIPLICATE_BACKGROUND",
     "TRIPLICATE_LAYOUT",
     "TRIPLICATE_ROLES",

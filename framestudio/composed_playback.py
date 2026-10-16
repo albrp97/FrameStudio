@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .crop_window import crop_window_filter
 from .ffmpeg_playback import (
     FfmpegPlaybackBackend,
     FrameCallback,
@@ -645,7 +646,7 @@ class FfmpegSynchronizedPlaybackBackend(FfmpegPlaybackBackend):
     ) -> str:
         return (
             f"{input_label}scale={crop.scaled_width}:{crop.scaled_height}:flags=lanczos,"
-            f"crop={crop.target.width}:{crop.target.height}:{crop.crop_x}:{crop.crop_y},"
+            f"{crop_window_filter(crop)},"
             f"setsar=1,format=rgba{output_label}"
         )
 

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from .crop_window import crop_window_filter
 from .export_journal import record_export_error
 from .export_process import (
     check_export_cancelled,
@@ -1451,14 +1452,29 @@ def _build_render_command(
                 f"{'' if fps_ready else f'fps={target_rate},'}"
                 "setsar=1,"
             )
+            if not fps_ready and (
+                frame_count == 1
+                or sample_end - sample_start
+                < 1 / _source_probe(plan, slot.block.source_id).media.frame_rate_value
+            ):
+                # A subframe trim can be empty, and fps cannot create a frame from nothing.
+                # Sample the covering frame on the target grid before cutting the interval.
+                first_frame = math.floor(Fraction(f"{sample_start:.9f}") * plan.target_rate)
+                trim_prefix = (
+                    f"[{input_index}:v]setpts=PTS-STARTPTS,"
+                    f"fps={target_rate}:eof_action=pass,"
+                    # Container audio may outlast video; cover its tail with the last frame.
+                    f"tpad=stop_mode=clone:stop={first_frame + frame_count},"
+                    f"trim=start_frame={first_frame}:end_frame={first_frame + frame_count},"
+                    "setpts=PTS-STARTPTS,setsar=1,"
+                )
             if len(crop_plans) == 1:
                 crop = first_crop
                 crop_label = f"i{interval_index}s{slot_index}c0"
                 filters.append(
                     f"{trim_prefix}scale={crop.scaled_width}:{crop.scaled_height}:"
                     f"flags=lanczos,format=yuv444p,"
-                    f"crop={crop.target.width}:{crop.target.height}:"
-                    f"{crop.crop_x}:{crop.crop_y},setsar=1[{crop_label}]",
+                    f"{crop_window_filter(crop)},setsar=1[{crop_label}]",
                 )
                 crop_labels.append(crop_label)
             else:
@@ -1494,8 +1510,7 @@ def _build_render_command(
                     )
                     filters.append(
                         f"[{split_labels[crop_index]}]{branch_scale}"
-                        f"crop={crop.target.width}:{crop.target.height}:"
-                        f"{crop.crop_x}:{crop.crop_y},setsar=1[{crop_label}]",
+                        f"{crop_window_filter(crop)},setsar=1[{crop_label}]",
                     )
                     crop_labels.append(crop_label)
             if len(crop_labels) == 1:

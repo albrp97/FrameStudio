@@ -422,6 +422,93 @@ def _assert_pan_ratio(
     "FFmpeg and ffprobe are required",
 )
 class AVCompositorFunctionalityTests(unittest.TestCase):
+    def test_resume_rebuilds_shortened_mux_without_repeating_video_or_audio(self):
+        from unittest.mock import patch
+
+        from framestudio import av_compositor
+        from framestudio.render_preparations import RenderPreparations
+
+        with isolated_directory() as root:
+            source = _make_av_source(root, "source", duration=1.0, color="red", frequency=440)
+            original_hash = _sha256(source)
+            metadata = {**probe_media(source).metadata(), "audio_channel_layout": "mono"}
+            project = Project.create_synchronized(source, metadata)
+            project.set_source_audio_settings(
+                project.source.source_id, _create_audio_settings(project.source)
+            )
+            project.timeline.replace_track_blocks(
+                "track-1",
+                (
+                    make_block(
+                        segment_id="fractional-tail",
+                        source_id=project.source.source_id,
+                        track_id="track-1",
+                        source_start=0.0,
+                        source_end=0.994208,
+                        timeline_start=0.0,
+                        timeline_end=0.994208,
+                    ),
+                ),
+            )
+            project.duration_seconds = project.timeline.timeline_duration_seconds
+            plan = av_compositor.plan_project_av(
+                project,
+                root / "resumed.mp4",
+                frame_rate_policy=FrameRatePolicy(
+                    choice="custom",
+                    custom_rate=60,
+                    target_rate=60,
+                    enhancement_enabled=False,
+                ),
+                upscale_policy=UpscalePolicy(enhancement_enabled=False),
+            )
+            self.assertEqual(plan.video_plan.expected_frames, 60)
+            self.assertEqual(plan.audio_plan.final_sample_count, 47722)
+            original_run = av_compositor.run_ffmpeg
+
+            def legacy_shortest_mux(command, **options):
+                if options.get("stage") == "audio/video mux":
+                    command = [*command[:-1], "-shortest", command[-1]]
+                return original_run(command, **options)
+
+            cache = root / "checkpoints"
+            with (
+                patch.object(av_compositor, "run_ffmpeg", side_effect=legacy_shortest_mux),
+                self.assertRaisesRegex(
+                    av_compositor.AVCompositorExecutionError, "59 frames; expected 60"
+                ),
+            ):
+                av_compositor.render_project_av(plan, preparations=RenderPreparations(cache))
+            self.assertFalse(plan.destination.exists())
+            children = tuple(
+                path
+                for name in ("video-composition.mp4", "audio-composition.wav")
+                for path in cache.rglob(name)
+            )
+            self.assertEqual(len(children), 2)
+            proofs = {path: (_sha256(path), path.stat().st_mtime_ns) for path in children}
+            with (
+                patch.object(
+                    av_compositor,
+                    "render_project_video",
+                    side_effect=AssertionError("Completed video must be reused"),
+                ),
+                patch.object(
+                    av_compositor,
+                    "render_audio",
+                    side_effect=AssertionError("Completed audio must be reused"),
+                ),
+            ):
+                result = av_compositor.render_project_av(
+                    plan, preparations=RenderPreparations(cache)
+                )
+            self.assertEqual(result.actual_frames, 60)
+            self.assertEqual(
+                proofs, {path: (_sha256(path), path.stat().st_mtime_ns) for path in children}
+            )
+            self.assertGreater(_mean_luma(_decode_frame(plan.destination, 59)), 25)
+            self.assertEqual(_sha256(source), original_hash)
+
     def test_controlled_fixture_builds_pcm_mp4_sources_and_ready_audio_plan(self):
         with isolated_directory() as root:
             project, sources, _ = _build_dynamic_project(root / "fixtures")

@@ -540,3 +540,276 @@ Full suite on FFmpeg 9.0.2 (`discover -s tests`): 1043 tests, 789 s, 13 skipped.
 The two failures are Wayland-only and environmental: `NativeRemovalControlsFunctionalityTests`
 setUpClass requires X11, and `test_complete_edit_and_delivery_journey` fails on
 the same `xdotool search` call.
+
+## 2026-10-16: Empty raw-source interval and hidden UI error
+
+Corrective scope linked to TICKET-121/TICKET-124, PHASE-010, FEAT-036/FEAT-038.
+This is follow-up implementation evidence, not a reopening or closeout claim
+for the historical completed records. The current request authorizes fixing
+the render failure; the pre-existing uncommitted focus-control edits remain
+separate. No source media or user checkpoint was changed.
+
+Requirement: given a positive planned frame count for a raw-source subframe
+interval or a short container tail after video EOF, should produce the planned
+visible frames, verify them, and retain compatible checkpoints across failure.
+Given another output failure, should preserve its underlying message through
+the UI worker exception and saved failure log. Non-goals include changing
+source duration metadata, bypassing output verification, or restarting the
+entire user render during diagnosis.
+
+Diagnosis from the saved journal: interval 22/88, duration 0.012208 seconds,
+expected one frame. FFmpeg returned zero but wrote a header-only 5,806-byte
+FFV1 AVI. FFprobe found no decoded frames and no container duration.
+One source's container/audio duration exceeded its available normalized video
+frames. The UI discarded the per-output error and showed only a generic batch
+failure. The failure was not an out-of-memory termination.
+
+Fail-first results:
+- The generated raw-source functionality regression reproduced empty intervals
+  between timestamps and at fractional-rate EOF before the fix.
+- The detailed-error regression failed because `ExportBatchExecutionError`
+  contained only the generic message.
+- An initial target-grid sampling fix passed generated fixtures but still
+  failed on the actual two-source interval. A new fixture with nonzero video
+  start time and audio longer than video reproduced this remaining failure.
+
+Fix: for raw branches with one output frame or less than one source-frame
+duration, convert to the target grid before selecting frames. Extend the final
+valid video frame before selection so short audio/container tails cannot empty
+an xstack input. Prepared FPS branches and ordinary longer raw interval graphs
+keep their existing behavior. Frame-count, decode, dimensions, FPS, duration,
+source protection, and atomic publication checks remain enabled. Changed
+commands invalidate only their own preparation keys; unchanged verified
+interval commands retain their cache identities.
+
+Raw technical results, not an automatic-readiness decision:
+- `.venv/bin/python -m unittest tests.test_editor_video_compositor
+  tests.test_editor_video_compositor_functionality tests.test_editor_post_export
+  tests.test_editor_flexible_output_recovery tests.test_editor_render_preparations`
+  ran 55 tests successfully after the final fix.
+- `GDK_BACKEND=x11 DISPLAY=:0 .venv/bin/python -m unittest
+  tests.test_editor_flexible_output_recovery_functionality
+  tests.test_editor_av_compositor tests.test_editor_av_compositor_functionality`
+  ran 21 tests successfully. This protected-flow run preceded the final
+  raw-tail padding addition.
+- Focused Ruff lint/format checks succeeded on the four changed Python files.
+  `.venv/bin/python -m mypy --config-file pyproject.toml framestudio`
+  found no issues in 79 source files. `git diff --check` succeeded.
+
+Executable automated functionality:
+- Test ID
+  `tests.test_editor_video_compositor_functionality.VideoCompositorFunctionalityTests.test_unprepared_subframe_intervals_export_visible_frames_and_resume`.
+  Run `.venv/bin/python -m unittest <test ID>` with system FFmpeg 9.0.2 or
+  with FFmpeg 6.1.3 on PATH. Both completed successfully after the final fix.
+  The real public video-render boundary exports two-track generated media at
+  60 FPS, including 60/29.97/24 FPS sources, a between-frame trim, a video EOF
+  tail with later audio and nonzero video start, and a two-frame interval.
+  It interrupts after the first verified interval, resumes using a new
+  preparation instance, rejects rerendering that completed command, and
+  asserts exact frame count, duration, visible red pixels in both slots,
+  no premature publication, and unchanged source hashes.
+- `test_batch_failure_preserves_the_output_error_for_ui_and_failure_log` in
+  `tests.test_editor_post_export` verifies the structured error and actual
+  persisted failure-log contents. All seven post-export tests succeeded.
+- A local real-media smoke reconstructed the exact failed interval from its
+  retained request, passed its two original inputs through the production
+  planner/command builder and FFmpeg, and ran the normal compositor verifier.
+  Result: one decoded 1920x1080 frame at 60 FPS, duration 0.016667 seconds.
+  Source stat identities were unchanged, the failed session remained untouched,
+  and the temporary output was removed.
+
+Latest regression log is in the session workspace as
+`files/render-subframe-regression.log`. Private source paths/content are not
+copied into this evidence. Full-project export and new remote CI were not run.
+The running editor needs a restart to load changed Python code; choose Resume,
+not Restart, to retain compatible completed work.
+
+Delivery gate remains blocked: no configured
+`rubber-duck / gpt-5.6-luna / high / all-validation` decision was obtained.
+The user's no-delegation preference remains in force. Raw tool results above
+are not `automaticValidation`, user confirmation, or lifecycle closeout.
+No commit or push was performed.
+
+## 2026-10-16: Audio EOF silence timestamps and late export recovery
+
+Corrective follow-up under PHASE-010 / TICKET-122 / TICKET-123 / TICKET-124.
+Given an interval whose source audio trim is empty, should produce correctly
+timestamped silence of the planned sample count, continue subsequent intervals,
+and support per-track recovery without touching completed video artifacts.
+Non-goals are skipping verification, modifying sources, deleting the failed
+session, or rerendering the user's video as part of diagnosis.
+
+The latest real failure occurred in audio track 2/2 after video composition
+was completely checkpointed. The second track's interval 21 requested 586
+samples beyond available source audio. FFmpeg's `apad` generated silence
+without a starting PTS, and subtracting `STARTPTS` preserved that undefined
+timestamp. Verbose reproduction showed concat finishing a segment with a
+large negative/undefined PTS immediately before error 183 (`Invalid data found
+when processing input`). This was not a failed video render or source decode.
+
+Fail-first evidence: the new public-boundary functionality test reproduced
+error 183 for both centered/legacy and composed/panned empty-tail branches.
+The unmodified saved 38-input audio-track command also reproduced error 183.
+Replacing padded-source timestamp expressions in a diagnostic temporary copy
+made that command complete, isolating the timestamp cause.
+
+Fix: both source branches assign timestamps after padding and trimming using
+`asetpts=N/SR/TB`. This anchors even initially empty audio at zero using the
+actual emitted sample count. Gain, pan, mixing, decoded PCM verification,
+exact sample count, source protection and publication behavior are unchanged.
+Only audio preparation commands change; video preparation identities do not.
+Previously verified audio tracks built with the old command can be rebuilt,
+but the completed video composition remains compatible.
+
+Raw technical results:
+- `.venv/bin/python -m unittest tests.test_editor_audio_compositor
+  tests.test_editor_audio_compositor_functionality
+  tests.test_editor_audio_input_reuse_functionality
+  tests.test_editor_av_compositor tests.test_editor_av_compositor_functionality`
+  ran 34 tests successfully. Raw log:
+  session `files/audio-tail-regression.log`.
+- Ruff lint/format checks and Python compilation succeeded for
+  `framestudio/audio_compositor.py` and
+  `tests/test_editor_audio_compositor_functionality.py`.
+  `.venv/bin/python -m mypy --config-file pyproject.toml framestudio`
+  found no issues in 79 source files; `git diff --check` succeeded.
+
+Executable automated functionality:
+- Test ID
+  `tests.test_editor_audio_compositor_functionality.AudioCompositorFunctionalityTests.test_empty_audio_tail_keeps_silence_timestamps_and_resumes_tracks`.
+  Its public `render_audio` boundary generates actual stereo tone media,
+  declares a container tail after audio EOF, exports centered and panned cases,
+  checks exact 48 kHz stereo sample count, silent tail/gap, and audible content
+  before and after the tail. It interrupts the second track, verifies there is
+  no published incomplete output, resumes with a new preparation instance,
+  rejects any rerender of completed track 1, compares decoded PCM with the
+  uncached render, and checks unchanged source/checkpoint hashes and mtime.
+  Run `.venv/bin/python -m unittest <test ID>`.
+- With FFmpeg 6.1.3 on PATH, that new test plus
+  `test_audio_track_checkpoints_resume_without_repeating_completed_tracks`
+  completed successfully (2 tests).
+- Real-media smoke rebuilt the exact failed command through production
+  `_render_command`, using the retained serialized audio plan, source paths
+  and track selection. An assertion verified that only the intended
+  post-padding timestamp expressions differed from the original failed graph.
+  The corrected track rendered and passed `_verify_pcm_output` with the exact
+  planned sample count/duration. Original source stat identities and the
+  user's existing checkpoint manifests/artifacts were untouched. Diagnostic
+  temporary audio outputs were removed.
+
+Read-only session discovery confirmed the user's latest destination session
+exists, is valid and resumable, and contains a complete video composition
+artifact. GUI recovery requires the same project, destination and export
+settings. Restart the editor to load the changed module, keep the failed
+output filename, and choose **Resume export**, not **Restart** or discard.
+Revalidate/reuse the composed video, render audio, then mix/mux/verify/publish
+the remainder. No full-project export or remote CI was run in this repair.
+
+Configured `rubber-duck / gpt-5.6-luna / high / all-validation` approval
+remains unavailable under the user's no-delegation preference. These are raw
+technical/functionality observations, not terminal `automaticValidation` or
+lifecycle closeout. Changes remain local; no commit or push was performed.
+
+## 2026-10-16 - Final mux frame preservation and truthful recovery history
+
+Context: local repairs to the delivered recovery behavior, linked to
+TICKET-124 / FEAT-038 / PHASE-010. This entry does not reopen or close historical
+planning records or claim delivery approval. Existing unrelated focus-control
+changes remain intact and unstaged.
+
+Requirements:
+- Given audio ends just before the frame-quantized video endpoint, the final
+  mux should retain every planned video frame and exact verification.
+- Given an invalid completed-but-unverified mux checkpoint, Resume should
+  rebuild only that mux and reuse the verified video/audio compositions.
+- Given nested saved render work but zero completed top-level batch stages,
+  the GTK recovery panel should show historical overall progress when
+  available, never imply that no internal work was saved, and preserve the
+  existing resume/fingerprint safeguards.
+
+Observed real failure: the retained video checkpoint contained 49,716 frames
+at 60 FPS, duration 828.600000 seconds. The audio checkpoint contained
+39,772,522 samples at 48 kHz, duration 828.594208 seconds. The failed final mux
+contained only 49,715 frames. A generated-media reproduction demonstrated that
+`-shortest` dropped the final video frame even when PCM audio was only one
+sample shorter than video. The public-boundary regression first failed on
+Resume with `59 frames; expected 60`.
+
+Fix: final muxing no longer uses `-shortest`; both child compositions already
+have verified finite planned lengths. Exact frame count, stream/container
+duration, decoded audio sample count and full decode checks remain unchanged.
+The mux-checkpoint validator now translates `AVCompositorExecutionError` to
+the `ExportExecutionError` contract used by pending checkpoint recovery.
+This lets Resume reject and rebuild the existing invalid pending mux instead
+of failing repeatedly on that file. Video/audio cache keys are unchanged.
+
+Recovery UI: read at most the last 64 KiB of the existing export journal and
+use only a finite numeric `overall_percent` from the latest run. Stop at its
+`started` event, tolerate partial/malformed records, reject nonregular files
+without blocking, and surface read errors explicitly. The label says
+`Previous run reached 89.3%. Resume checks and reuses saved checkpoints.`
+When history is unavailable, it says `Pending export` rather than claiming
+zero reusable work. Reading does not modify journals or checkpoint manifests.
+
+Raw technical observations:
+- `.venv/bin/python -m unittest tests.test_editor_audio_compositor
+  tests.test_editor_audio_compositor_functionality
+  tests.test_editor_audio_input_reuse_functionality
+  tests.test_editor_video_compositor
+  tests.test_editor_video_compositor_functionality
+  tests.test_editor_av_compositor
+  tests.test_editor_av_compositor_functionality
+  tests.test_editor_export_recovery tests.test_editor_post_export`
+  completed 80 tests without failure. Artifact:
+  session `files/final-render-repairs-regression.log`.
+- With FFmpeg 6.1.3 first on PATH, `.venv/bin/python -m unittest
+  tests.test_editor_av_compositor_functionality.AVCompositorFunctionalityTests.test_resume_rebuilds_shortened_mux_without_repeating_video_or_audio
+  tests.test_editor_export_recovery` completed 16 tests without failure.
+  Artifact: session `files/final-mux-ff61.log`.
+- Focused Ruff lint and format checks completed for the six changed mux,
+  journal, panel and test files. `.venv/bin/python -m mypy --config-file
+  pyproject.toml framestudio` reported no issues in 79 source files.
+  `make compile PYTHON=.venv/bin/python` and `git diff --check` completed.
+  This is focused local coverage, not full static-analysis/PR parity.
+
+Executable automated functionality:
+- `tests.test_editor_av_compositor_functionality.AVCompositorFunctionalityTests.test_resume_rebuilds_shortened_mux_without_repeating_video_or_audio`
+  exercises public `plan_project_av` / `render_project_av` with actual generated
+  media and persistent `RenderPreparations`. It creates the legacy truncated
+  mux, asserts no invalid destination is published, resumes with a new cache
+  instance, rejects any repeated video/audio rendering, checks all 60 decoded
+  frames including visible last-frame pixels, and verifies unchanged source
+  hashes and child checkpoint hashes/mtime. Run with
+  `.venv/bin/python -m unittest <test ID>`.
+- `GDK_BACKEND=x11 DISPLAY=:0 GSK_RENDERER=cairo .venv/bin/python -m unittest
+  tests.test_editor_flexible_output_recovery_functionality.FlexibleOutputRecoveryGtkFunctionalityTests`
+  completed five real GTK functionality cases, including final/combined
+  export, running cancellation/recovery, persisted previous-percentage label,
+  missing history and visible history read errors. The two new label tests are
+  `test_recovery_label_shows_previous_overall_progress_not_zero_completed_stages`
+  and `test_recovery_label_without_history_or_with_read_error_preserves_resume`.
+  They verify visible historical-versus-checkpoint wording, available Resume,
+  absent zero-stage claims, and unchanged saved manifest/journal on discovery.
+  Artifact: session `files/recovery-label-gtk-suite.log`. The installed
+  PyGObject emitted existing Python 3.14 deprecation warnings.
+- Target-workstation real-media smoke used the user's retained completed
+  video and audio as read-only inputs to production `_mux_stages`, writing
+  only a temporary diagnostic output. Unchanged `_verify_muxed_output` fully
+  decoded it and confirmed 49,716 video frames, 39,772,522 decoded audio
+  samples, 48 kHz stereo, correct stream/container durations and valid peak.
+  Input checkpoint size/mtime identities were preserved. Elapsed time was
+  86.88 seconds; the diagnostic output was removed automatically.
+  Artifact: session `files/final-mux-real-media.json`.
+
+UI continuation: restart FrameStudio to load the repaired modules, reopen the
+same project and retain the failed destination filename/settings, then choose
+**Resume export**, not Restart or Discard. The invalid pending mux is rebuilt;
+compatible completed video/audio compositions stay reusable. No original
+media, user checkpoint or existing final output was modified by diagnostics.
+
+Configured automatic validation remains blocked on the exact
+`rubber-duck / gpt-5.6-luna / high / all-validation` capability under the user's
+no-delegation preference. The results above are raw agent-owned technical and
+automated-functionality observations, not terminal `automaticValidation`,
+`userValidation`, formal review readiness or lifecycle closeout. No full-suite,
+full-static-analysis, remote CI, commit or push was performed for this repair.

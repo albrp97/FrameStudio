@@ -450,6 +450,117 @@ def _render_channel_marker_fixture(root: Path, channel_layout: str) -> list[floa
     "FFmpeg and ffprobe are required",
 )
 class AudioCompositorFunctionalityTests(unittest.TestCase):
+    def test_empty_audio_tail_keeps_silence_timestamps_and_resumes_tracks(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+
+        from framestudio import audio_compositor
+        from framestudio.render_preparations import RenderPreparations
+        from tests.test_editor_audio_compositor import _set_tracks
+
+        for composed in (False, True):
+            with self.subTest(composed=composed), TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                tone = _source(root, "tone", frequency=440, channels=2, layout="stereo", duration=1)
+                tone = replace(tone, metadata={**tone.metadata, "duration_seconds": 1.012208})
+                silent = _source(root, "silent", frequency=None, audio=False, duration=1.12)
+                original_hash = _sha256(Path(tone.path))
+                project = Project.create_multi((tone, silent))
+                project.set_source_audio_settings(tone.source_id, _audio_settings(tone))
+                project.set_source_audio_settings(silent.source_id, {"status": "not-applicable"})
+                blocks = (
+                    Segment.create(
+                        0.0,
+                        1.0,
+                        segment_id="first-track",
+                        source_id=tone.source_id,
+                        track_id="track-1",
+                        timeline_start_seconds=0.0,
+                        timeline_end_seconds=1.0,
+                    ),
+                    Segment.create(
+                        0.0,
+                        1.012208,
+                        segment_id="audio-tail",
+                        source_id=tone.source_id,
+                        track_id="track-2",
+                        timeline_start_seconds=0.0,
+                        timeline_end_seconds=1.012208,
+                    ),
+                    Segment.create(
+                        0.0,
+                        0.1,
+                        segment_id="after-tail",
+                        source_id=tone.source_id,
+                        track_id="track-2",
+                        timeline_start_seconds=1.02,
+                        timeline_end_seconds=1.12,
+                    ),
+                )
+                tracks = [
+                    TimelineTrack("track-1", (blocks[0],)),
+                    TimelineTrack("track-2", blocks[1:]),
+                ]
+                if composed:
+                    tracks.append(
+                        TimelineTrack(
+                            "track-3",
+                            (
+                                Segment.create(
+                                    0.0,
+                                    1.12,
+                                    segment_id="silent-track",
+                                    source_id=silent.source_id,
+                                    track_id="track-3",
+                                    timeline_start_seconds=0.0,
+                                    timeline_end_seconds=1.12,
+                                ),
+                            ),
+                        )
+                    )
+                _set_tracks(project, tuple(tracks), 1.12)
+                layout = plan_project_layout(project)
+                baseline = root / "baseline.wav"
+                render_audio(project, layout, baseline)
+                pcm, rate, channels = _decoded_pcm(baseline)
+                self.assertEqual((rate, channels, len(pcm)), (48000, 2, 53760 * 2))
+                self.assertGreater(max(abs(value) for value in pcm[: 48000 * 2]), 0.001)
+                self.assertEqual(max(abs(value) for value in pcm[48000 * 2 : 48960 * 2]), 0)
+                self.assertGreater(max(abs(value) for value in pcm[48960 * 2 :]), 0.001)
+
+                original_run = audio_compositor._run_ffmpeg
+
+                def interrupted(command, graph, original_run=original_run, **options):
+                    if options.get("stage") == "audio track 2/2":
+                        raise AudioRenderError("simulated second-track interruption")
+                    return original_run(command, graph, **options)
+
+                cache = root / "checkpoints"
+                destination = root / "resumed.wav"
+                with (
+                    patch.object(audio_compositor, "_run_ffmpeg", side_effect=interrupted),
+                    self.assertRaisesRegex(AudioRenderError, "second-track interruption"),
+                ):
+                    render_audio(
+                        project, layout, destination, preparations=RenderPreparations(cache)
+                    )
+                self.assertFalse(destination.exists())
+                completed = next(cache.rglob("audio-track.wav"))
+                proof = (_sha256(completed), completed.stat().st_mtime_ns)
+
+                def resumed(command, graph, original_run=original_run, **options):
+                    self.assertNotEqual(options.get("stage"), "audio track 1/2")
+                    return original_run(command, graph, **options)
+
+                with patch.object(audio_compositor, "_run_ffmpeg", side_effect=resumed):
+                    result = render_audio(
+                        project, layout, destination, preparations=RenderPreparations(cache)
+                    )
+                self.assertEqual(result.sample_count, 53760)
+                self.assertEqual(_decoded_pcm(destination)[0], pcm)
+                self.assertEqual(proof, (_sha256(completed), completed.stat().st_mtime_ns))
+                self.assertEqual(original_hash, _sha256(Path(tone.path)))
+
     def test_audio_track_checkpoints_resume_without_repeating_completed_tracks(self):
         from unittest.mock import patch
 

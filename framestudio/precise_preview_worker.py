@@ -123,8 +123,11 @@ def validate_request(request: dict[str, Any]) -> None:
         if not isinstance(slot.get("crops"), list) or len(slot["crops"]) not in (1, 3):
             raise ValueError("Invalid preview crop count")
         for crop in slot["crops"]:
-            for field in ("scaled_width", "scaled_height", "width", "height", "crop_x", "crop_y"):
+            for field in ("scaled_width", "scaled_height", "width", "height"):
                 if type(crop.get(field)) is not int or crop[field] < 0:
+                    raise ValueError("Invalid preview crop geometry")
+            for field in ("crop_x", "crop_y"):
+                if type(crop.get(field)) is not int:
                     raise ValueError("Invalid preview crop geometry")
             if (
                 min(crop["scaled_width"], crop["scaled_height"], crop["width"], crop["height"]) <= 0

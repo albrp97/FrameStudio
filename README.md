@@ -104,7 +104,18 @@ Final audio decisions are applied and validated during export.
 - Show numbered export stages in the terminal.
 - Preserve validated intermediate work after cancellation or failure.
 - Resume a compatible export without repeating completed stages.
-- Write failure logs before an optional sleep or shutdown action.
+- Show the previous run's overall percentage when available, not a misleading
+  count of top-level stages. Historical progress is not a promise that every
+  operation at that percentage was checkpointed; Resume validates saved work.
+- Preserve frames in subframe composition intervals, holding the last video
+  frame when a short interval reaches an audio/container tail.
+- Fill cuts beyond the available audio samples with correctly timestamped
+  silence, preserving exact duration through concatenation and track recovery.
+- Keep every planned video frame in the final audio/video merge, even when
+  audio ends a fraction of a frame earlier. Resume rebuilds an invalid merge
+  without repeating the verified video and audio compositions.
+- Show the underlying per-output error and write failure logs before an
+  optional sleep or shutdown action.
 - Publish the final file only after FFmpeg and FFprobe verification.
 
 Original source files are never overwritten or deleted by editor operations.

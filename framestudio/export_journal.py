@@ -23,6 +23,50 @@ def journal_path(destination: Path) -> Path:
     return destination.with_name(f".{destination.name}.framestudio-export.log")
 
 
+def previous_export_overall_percent(destination: Path) -> float | None:
+    """Read bounded historical progress, not a measure of reusable checkpoint work."""
+    try:
+        fd = os.open(
+            journal_path(destination.expanduser()),
+            os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
+        )
+        with os.fdopen(fd, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ExportExecutionError("Export progress journal must be a regular file")
+            offset = max(0, metadata.st_size - 65536)
+            stream.seek(offset)
+            lines = stream.read(65536).splitlines()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise ExportExecutionError(
+            f"Could not read previous export progress: {error.strerror}"
+        ) from error
+    if offset:
+        lines = lines[1:]
+    for line in reversed(lines):
+        try:
+            event = json.loads(line)
+        except (ValueError, RecursionError):
+            continue
+        if not isinstance(event, dict):
+            continue
+        if event.get("event") == "started":
+            break
+        progress = event.get("progress")
+        if not isinstance(progress, dict):
+            continue
+        percent = progress.get("overall_percent")
+        if (
+            isinstance(percent, (int, float))
+            and not isinstance(percent, bool)
+            and 0 <= percent <= 100
+        ):
+            return float(percent)
+    return None
+
+
 def record_export_process(event: str, pid: int, command: str, **details: Any) -> None:
     journal = _active.get()
     if journal is not None:
