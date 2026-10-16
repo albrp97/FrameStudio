@@ -438,7 +438,8 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
                 relative,
                 surface_transform=self.window.get_surface_transform(),
             )
-            xdotool("mousemove", "--sync", str(point[0]), str(point[1]))
+            xdotool("mousemove", str(point[0]), str(point[1]))
+            _pump_events(self.GLib, 5)
             playhead_before_click = self.window.project.playhead_seconds
             if bypass:
                 xdotool("keydown", "Super_L")
@@ -446,7 +447,7 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
                 if jitter:
                     xdotool("mousedown", "1")
                     _pump_events(self.GLib, 2)
-                    xdotool("mousemove", "--sync", str(point[0] + jitter), str(point[1]))
+                    xdotool("mousemove", str(point[0] + jitter), str(point[1]))
                     _pump_events(self.GLib, 2)
                     xdotool("mouseup", "1")
                 else:

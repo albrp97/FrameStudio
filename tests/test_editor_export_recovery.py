@@ -101,6 +101,27 @@ class ExportRecoveryTests(unittest.TestCase):
             tracker.heartbeat()
             self.assertEqual(len(updates), count)
 
+    def test_heartbeat_never_replays_a_checkpoint_milestone(self):
+        from framestudio.export_progress import ExportProgressTracker
+
+        def sample(stage, percent):
+            return ExportProgress(stage, percent, 0, 0, None, 0.0, None)
+
+        updates = []
+        tracker = ExportProgressTracker(updates.append)
+        tracker.configure((1,))
+        tracker.begin_output(0)
+        tracker(sample("interpolated segment", 50))
+        tracker(sample("Checkpointed interpolated segment", 100))
+        checkpoints = len([u for u in updates if u.stage.startswith("Checkpointed")])
+        tracker.heartbeat()
+        self.assertEqual(
+            len([u for u in updates if u.stage.startswith("Checkpointed")]), checkpoints
+        )
+        tracker(sample("interpolated segment", 10))
+        tracker.heartbeat()
+        self.assertEqual(updates[-1].stage, "interpolated segment")
+
     def test_journal_does_not_modify_sources_through_path_or_hardlink_aliases(self):
         from framestudio.export_journal import ExportJournal, journal_path
 

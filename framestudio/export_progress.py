@@ -8,6 +8,16 @@ from dataclasses import replace
 
 from .export_types import ExportProgress, ExportProgressCallback
 
+# Discrete milestones are never replayed by heartbeat; replaying one would
+# duplicate a completed event (for example a checkpoint) in the progress stream.
+_MILESTONE_STAGE_PREFIXES = (
+    "Checkpointed ",
+    "Starting output",
+    "Verified output",
+    "Reusing verified",
+    "complete",
+)
+
 
 def progress_scope(
     callback: ExportProgressCallback | None, start: float, end: float
@@ -87,7 +97,8 @@ class ExportProgressTracker:
                 self._report(self._last)
 
     def _report(self, progress: ExportProgress) -> None:
-        self._last = progress
+        if not progress.stage.startswith(_MILESTONE_STAGE_PREFIXES):
+            self._last = progress
         if self.index is None:
             overall = min(5.0, progress.percent * 0.05)
         else:

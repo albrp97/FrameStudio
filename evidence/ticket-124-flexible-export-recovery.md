@@ -507,3 +507,36 @@ Verified raw results:
 - Static analysis (`make compile diff-check static-analysis`) passed: ruff
   format and lint, mypy, complexity, duplication, dependency check and audit,
   and security.
+
+## 2026-10-16: CI follow-up (heartbeat milestone replay and X11 pointer tests)
+
+CI for `f08bfbc` failed with one interpolation-restart failure and two X11
+pointer errors.
+
+Interpolation restart (`test_twenty_of_forty_interpolations_survive_process_restart`):
+- Cause: `ExportJournal` heartbeat (`framestudio/export_journal.py`) called
+  `ExportProgressTracker.heartbeat()`, which re-sent the last progress event.
+  When that event was `Checkpointed interpolated segment`, the duplicate was
+  counted as a 20th checkpoint and the first run cancelled after 19 real
+  interpolations. The 19-versus-20 count matches this exactly; the trace was
+  inferred, not captured.
+- Fix: `framestudio/export_progress.py` no longer records milestone stages
+  (`Checkpointed `, `Starting output`, `Verified output`, `Reusing verified`,
+  `complete`) as the replayable last stage. Heartbeats only refresh in-progress
+  stages.
+- Regression: `test_heartbeat_never_replays_a_checkpoint_milestone` in
+  `tests/test_editor_export_recovery.py`.
+- Verified: the restart test passes twice on FFmpeg 6.1.3 (28.7 s and 31.3 s).
+
+X11 pointer errors (`test_real_pointer_click_with_small_hand_movement_still_snaps_at_extreme_zoom`):
+- Cause: `xdotool mousemove --sync` blocks until the server sends a motion
+  event. It never returns when the pointer is already at the target under Xvfb.
+- Fix: `tests/test_editor_keyboard_functionality.py` drops `--sync` and pumps
+  GTK events (5 iterations) after the move. Assertions are unchanged.
+- Not verified locally: Xvfb is not installed and sudo needs a password. CI is
+  the only X11 verification.
+
+Full suite on FFmpeg 9.0.2 (`discover -s tests`): 1043 tests, 789 s, 13 skipped.
+The two failures are Wayland-only and environmental: `NativeRemovalControlsFunctionalityTests`
+setUpClass requires X11, and `test_complete_edit_and_delivery_journey` fails on
+the same `xdotool search` call.
