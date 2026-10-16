@@ -29,6 +29,7 @@ from .export_process import (
     partial_path,
     prepare_export_sources,
     probe_frame_count,
+    probe_source_frame_count,
     publish_verified_export,
     remove_partial,
     run_ffmpeg,
@@ -366,6 +367,9 @@ def _forward_interpolation_progress(
             progress,
             stage=stage,
             percent=start_percent + (end_percent - start_percent) * local_fraction,
+            current_percent=progress.percent
+            if progress.current_percent is None
+            else progress.current_percent,
         )
     )
 
@@ -1303,7 +1307,7 @@ def _interpolate_probe(
     if cancel_event is not None and cancel_event.is_set():
         raise ExportExecutionError("Export cancelled")
     backend_kwargs.pop("pipeline_strategy", None)
-    source_frames = probe_frame_count(probe.path, ffprobe_path)
+    source_frames = probe_source_frame_count(probe.path, ffprobe_path)
     if target_frames is None:
         target_frames = target_frame_count(
             decision.source_rate,

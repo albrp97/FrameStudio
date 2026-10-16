@@ -302,6 +302,10 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     export_progress_bar.set_show_text(True)
     export_progress_bar.set_text("0.0%")
     export_progress_panel.append(export_progress_bar)
+    export_current_progress_bar = Gtk.ProgressBar()
+    export_current_progress_bar.set_show_text(True)
+    export_current_progress_bar.set_text("Current operation 0.0%")
+    export_progress_panel.append(export_current_progress_bar)
     export_progress_label = Gtk.Label(label="")
     export_progress_label.set_xalign(0.0)
     export_progress_label.set_wrap(True)
@@ -315,6 +319,7 @@ def build_editor_ui(window: Any, Gtk: Any, Gdk: Any) -> None:
     root.append(export_progress_panel)
     window.export_progress_panel = export_progress_panel
     window.export_progress_bar = export_progress_bar
+    window.export_current_progress_bar = export_current_progress_bar
     window.export_progress_label = export_progress_label
     window.cancel_export_button = cancel_export
 

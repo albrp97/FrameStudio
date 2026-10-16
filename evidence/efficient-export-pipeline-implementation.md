@@ -361,3 +361,377 @@ worktree, so those delivery gates remain outstanding.
   been committed, pushed, or merged.
 - Readiness: `blocked`; the export is complete, but the aggregate delivery
   gates for the authorized worktree are not terminal.
+
+## MULTITRACK-20261016-RESEARCH-AND-BASELINE
+
+- Context: PHASE-009 / FEAT-030, FEAT-031 / TICKET-102 through TICKET-104,
+  current dirty baseline at `5f69d5441de9969450a1ac425e2693bc28bff85c`.
+  The older aggregate readiness statements above are historical, not a
+  current-worktree pass.
+- Authorization: The current user explicitly requests four parallel research
+  workers, subsequent individual and combined implementations, benchmarks,
+  and adoption of the fastest acceptable route. The integration owner retains
+  all production-selection, shared verification and delivery responsibilities.
+  Historical planning-only PHASE-010 wording is superseded by its subsequent
+  execution authorization and this current bounded optimization request;
+  protected output semantics are not superseded.
+- Research: Two GPT-6.1 Sol and two Haiku 5.5 high-reasoning workers completed
+  the initial investigation. Verified findings, source links, inaccessible
+  sources, workload shape and candidate matrix are appended to
+  `efficient-export-pipeline-benchmark.md`.
+- Validation owner: `rubber-duck / gpt-5.6-luna / high / all-validation`,
+  confirmed available by actual successful task execution. Initial and
+  refined planning reviews permit isolated experiments; they do not certify
+  any unmeasured candidate or final readiness.
+- Baseline: The exact command recorded in the benchmark report completed
+  31 generated-media/recovery/progress/multioutput tests in 209.362 seconds,
+  raw log `/tmp/multitrack-baseline.log`. New production code had not been
+  integrated. The pre-existing dirty worktree and six untracked source/test
+  files were preserved.
+- Provenance: A 37-file SHA256 manifest fingerprints the current dirty
+  baseline. Three disjoint video/audio/benchmark experiment worktrees plus a
+  separate architecture experiment worktree were created from that snapshot.
+  Workers cannot edit the integration worktree, shared plans, evidence,
+  configuration, or another worker's files.
+- Prototype boundaries: Exact-pixel triplicate graph factoring, exact-PCM
+  audio input sharing, bounded filter/input decoder threads, and guarded
+  source-window seek experiments are separate from lossless per-track/chunk
+  architecture comparisons. Codec/quality changes and unsafe sample-phase
+  changes cannot win on speed alone. Production adoption requires fresh
+  TICKET-102 comparison and TICKET-104 integrity evidence.
+- Planning repair: PHASE-009 now points to the reopened PHASE-008/FEAT-028
+  records and explicitly depends on their previously delivered export
+  baseline, not closure of independent CHG-011 follow-ups.
+- Safety: The private full export is still paused and excluded. Representative
+  shape was inspected read-only; generated sources, cache and outputs belong
+  to experiments. Timed comparisons must not compete concurrently. The
+  original system power profile must be restored after each measured batch.
+- Current status: experiments in progress; no new implementation benchmark
+  winner, production adoption, commit, push or lifecycle closure is claimed.
+
+## MULTITRACK-20261016-MEASURED-INTEGRATION
+
+- Context: PHASE-009 / FEAT-030, FEAT-031 / TICKET-102 through TICKET-104.
+  The integration branch is `perf/multitrack-export-20261016`. All prior dirty
+  changes remain preserved; no commit, push, PR or closed-record move occurred.
+- Validation profile for the decisions in this entry:
+  `rubber-duck / gpt-5.6-luna / high / all-validation`, successfully executed.
+  A bounded review approved the clock repair/corrected baseline, and another
+  approved the actual measured combination for integration. Neither is a
+  final delivery-readiness decision or human confirmation.
+- Baseline failure and fix: the original controlled screen's untouched
+  renderer emitted 45 of 56 expected frames. Concat's single-frame interval
+  durations overlapped PTS. Final `settb=<reciprocal rate>,setpts=N` retains
+  all ordered pre-encode pixels with the expected CFR frame lattice. Original
+  failure data remains retained, not overwritten or used as a speed baseline.
+- Implementation: equal triplicate scale/format is shared before split;
+  equal audio paths use explicit `asplit` with independent branch DSP;
+  video graphs with at least three distinct consumed input paths use two
+  complex-filter threads and one decoder thread per input. One/two-path
+  behavior, final encoder settings, native processing, mux and validation
+  settings remain unchanged.
+- Cache migration: only AV video/mux preparation recipe version changes from
+  2 to 3. Native/upscale/FPS and independent audio keys are unchanged.
+  `COMPOSITOR_VERSION` stays unchanged; existing final receipt revalidation
+  still checks the strict output contract.
+- Measured implementation: three sequential counterbalanced trials without
+  harness thread overrides. The large 35-source/114-block/116-interval fixture
+  improves 11.468 s to 8.027 s (30.0% less time); triplicate improves 2.525 s to
+  1.776 s (29.7%). Enhanced/recovery gains are small. Source fixtures are
+  generated 320x180 media; output remains 1920x1080. These are not measurements
+  of the private full project or of source-reel batch completion.
+- Selection scope: existing native range reuse is baseline behavior, not a
+  new gain. Audio input count falls 342 to 35, but audio sharing alone is not
+  a standalone speed winner. Video-only lossless track/chunk combinations
+  were slower; seek/NVDEC remain experimental. No encoder-quality change,
+  GPU scaler/encoder or lossy intermediate was selected.
+- Artifacts: `multitrack-render-results.json` contains individual trial
+  times, medians/ranges, sampled process-tree RSS, stage/input observations,
+  candidate hashes, raw-report hashes and supplemental contract checks.
+  Full raw reports, fixture outputs and the preserved correction-only baseline
+  remain under the session's `files/multitrack-*` artifacts.
+- Additional contract review: the bounded validator requested explicit codec,
+  layout, SAR/time-base and planned PCM-count gates. Every retained final
+  output was subsequently probed and its decoded artifacts rehashed. All
+  planned frame/sample counts and baseline/candidate contracts agree.
+  The harness now records these extra fields and independently rejects wrong
+  decoded counts, rather than allowing two equally wrong outputs to qualify.
+  An all-ineligible comparison now exits nonzero while retaining diagnostics.
+
+### Observed technical and automated functionality evidence
+
+These are agent-run results; terminal automatic validation of the final
+integrated evidence remains pending below.
+
+| Category / protected outcome | Executable command or test | Observed result |
+| --- | --- | --- |
+| Corrected baseline / dynamic layouts | `.venv/bin/python -m unittest tests.test_multitrack_render_benchmark tests.test_multitrack_architecture_benchmark tests.test_editor_video_compositor tests.test_editor_av_compositor` | Initial combined run had 45 passing tests and one architecture-parser incompatibility with the new final clock. The parser was corrected; its real comparator/restart test then passed. |
+| Recipe invalidation / retained completed work | `.venv/bin/python -m unittest tests.test_editor_render_preparations_functionality.RenderPreparationFunctionalityTests.test_clock_recipe_invalidates_video_and_mux_but_reuses_native_and_audio` | Real FFmpeg AV exports pass in 2.130 s; zero repeated extraction/interpolation/audio jobs, one new video and mux, identical decoded frames and unchanged source SHA256. |
+| Prior full-suite environment failures | `env GDK_BACKEND=x11 GSK_RENDERER=cairo .venv/bin/python -m unittest tests.test_editor_precise_preview_functionality.ForwardDecoderStateTests tests.test_editor_removal_controls_functionality.NativeRemovalControlsFunctionalityTests tests.test_phase010_functionality.Phase010FunctionalityTests.test_complete_edit_and_delivery_journey` | 11 tests pass in 59.497 s using existing Xwayland and the quality environment's PyAV. The system-Python/Wayland baseline's missing-PyAV/X11 failures were environmental; `xvfb-run` is absent and was not falsely reported as run. |
+| Partial batch failure / truthful progress | `.venv/bin/python -m unittest tests.test_editor_source_outputs.EditorSourceOutputTests.test_cli_partial_success_includes_final_and_source_results` | Passes both partial-failure subcases. The stale empty-stdout assertion now permits only `export.progress` JSON Lines, never a terminal export-success response. |
+| Selected graph equivalence | Final production large/triplicate/recovery benchmark commands in `efficient-export-pipeline-benchmark.md` and recorded JSON groups | All 42 final production-policy rows preserve exact ordered decoded video and signed 32-bit PCM, counts, metadata and source inputs. Recovery rows include fresh, warm and controlled cancellation/reopen boundaries. |
+| Experimental alternatives | `benchmarks/multitrack_architecture_benchmark.py --duration 5 --tracks 3 --segments 3 --workers 1,2,3 --trials 3 --combined --recovery-demo` and late-window render harness | All 30 architecture rows and 15 late-window rows complete their equality gates. Their distinct timing scopes/limits are recorded; they are not production routes. |
+
+### Static findings and final verification state
+
+- New benchmark/test files are included in Makefile format/lint/type,
+  complexity, duplication and Bandit scopes so CI consumes the same scope.
+- Format, configured types/complexity, dependency graph/audit, compilation
+  and diff checks ran. The audit found no known vulnerabilities.
+- Two introduced benchmark hash-helper clones were removed using the existing
+  production hasher for the architecture harness and a bounded-buffer
+  implementation for the isolated-runtime harness. The approved baseline was
+  copied unchanged to the session report directory, never inflated:
+  41 total clones, 0.644%, **zero new clones**.
+- Bandit findings were addressed with resolved executable paths and clearer
+  CLI-argument names. The shared-temp-root rejection guard's B108 false
+  positive is annotated narrowly; it rejects `/tmp` and `/var/tmp`, rather
+  than using them as artifact roots. Original raw findings remain in the
+  first static log. Final Bandit reports zero findings.
+- Full-scope Ruff still exits nonzero for the pre-existing B905 at
+  `tests/test_editor_precise_preview_functionality.py:263`; that file is not
+  modified by this task. This finding is preserved, not claimed fixed.
+- Raw static artifacts: session `files/multitrack-final-static/`;
+  `/tmp/multitrack-final-static.log` and
+  `/tmp/multitrack-final-static-rerun.log`.
+- Final full integrated suite is running under the quality Python/X11
+  environment. Its result, real-media workstation charter and final
+  exact-profile automatic review must be appended before a terminal claim.
+- Required local/PR runtime parity remains a separate delivery gate: the
+  available host is Python 3.14/FFmpeg 9/Xwayland, whereas configured CI uses
+  Ubuntu 24.04 system Python/media tools and Xvfb. Matching Makefile scopes do
+  not prove matching runtimes or remote check results. Tickets remain open
+  in `verifying`; no delivery-ready claim is made.
+
+## MULTITRACK-20261016-FINAL-OBSERVED-VERIFICATION
+
+- Context/profile: the same PHASE-009 / FEAT-030/031 / TICKET-102/103/104
+  scope and exact configured
+  `rubber-duck / gpt-5.6-luna / high / all-validation` decision owner.
+  The following are raw observed results, submitted to that final validator
+  rather than self-classified as an automatic pass.
+- Full-suite command:
+  `env GDK_BACKEND=x11 GSK_RENDERER=cairo FRAMESTUDIO_PHASE010_ARTIFACT_DIR=<session>/files/multitrack-final-functionality make test PYTHON=.venv/bin/python`.
+  **1030 tests ran in 800.131 s; two failures, 11 skipped, no errors.**
+  Export, benchmark, PCM/video equality, cache transition and recovery tests
+  did not fail. Do not report the overall suite as green.
+- The extreme-zoom real-pointer snap assertion failed with exactly the same
+  `2.1370430297637473 != 2.137` on both the preserved pre-optimization
+  worktree and current implementation. The PHASE-010 pointer-click journey
+  failed during the full run but passed in both isolated baseline/current
+  comparisons. Commands:
+  `env GDK_BACKEND=x11 GSK_RENDERER=cairo <quality-python> -m unittest tests.test_editor_keyboard_functionality.EditorKeyboardFunctionalityTests.test_real_pointer_click_with_small_hand_movement_still_snaps_at_extreme_zoom tests.test_phase010_functionality.Phase010FunctionalityTests.test_complete_edit_and_delivery_journey`.
+  Each comparison ran two tests (baseline 51.744 s; current 51.303 s), with
+  only the identical extreme-zoom failure. The unrelated pointer behavior was
+  not rewritten to clear the gate; raw failures remain visible.
+- Automated functionality test **MULTITRACK-REAL-MEDIA-AV-PARITY**:
+  session script `files/multitrack-real-media-check.py`, executable with
+  `env GDK_BACKEND=x11 GSK_RENDERER=cairo .venv/bin/python <session-script> --project <read-only-local-project> --current-root <repository> --baseline-root <preserved-corrected-baseline> --artifact-root <new-direct-session-child> --report <session>/files/multitrack-real-media-result.json`.
+  It stream-copies short excerpts from three active local HD inputs, creates
+  a separate three-track/six-block project with repeats and a triplicate
+  interval, and exports through actual analysis, AV planning, checkpointed
+  rendering and persisted MP4 verification. Baseline/current outputs have
+  exactly equal ordered decoded video and signed-32-bit PCM:
+  30 frames, 48000 stereo PCM frames, 1920x1080, H.264/yuv420p, AAC/48 kHz,
+  square pixels and equal time bases.
+- The same executable then opens the resulting video through actual GTK
+  `--source <output> --smoke-test --smoke-project <owned-project>`.
+  It asserts excerpt SHA256 preservation, original media size/mtime/ctime
+  preservation and original project SHA256 preservation. All assertions and
+  playback smoke passed. This is a real-media correctness check, **not** a
+  real-project speed measurement, enhancement run or resumed original export.
+  Private media and paths stay outside repository evidence.
+- The charter's first attempt failed in the **baseline** because the new
+  session-only helper lacked Python's multiprocessing `__main__` guard.
+  Added that guard and reran in a fresh owned directory; no production
+  fallback or disabled parallel audio analysis was introduced. The first
+  traceback and subsequent successful result remain retained locally.
+  Performance mode was restored to the prior `power-saver` after both attempts.
+- `make contract PYTHON=.venv/bin/python`: **45 tests pass in 23.897 s**.
+  `env TMPDIR=<new-owned-session-directory> GDK_BACKEND=x11 GSK_RENDERER=cairo make smoke PYTHON=.venv/bin/python`:
+  **both generated-media GTK creation/reopen flows exit 0**; the isolated
+  temporary directory was removed after its own fixtures were cleaned.
+- Final deterministic command:
+  `make -k static-analysis compile diff-check PYTHON=.venv/bin/python STATIC_ANALYSIS_DIR=<session>/files/multitrack-final-static`.
+  Exit 2 remains solely the documented pre-existing Ruff B905. Format:
+  193 files compliant; all configured mypy calls pass, including both new
+  harnesses; complexity, dependency graph, dependency audit, Bandit,
+  compilation and whitespace checks pass. Duplication remains 41 clones /
+  0.644% / zero new against the unchanged approved baseline. Final Bandit
+  has no findings or malformed-annotation warnings.
+- Churn artifact contains only three JavaScript skill-test entries, no
+  compositor/harness entries. It supplies **no useful Python hotspot ranking**
+  for this change and is not substituted for functional or review evidence.
+- SHA256 of both integrated compositor source files still matches the measured
+  candidate hashes in `multitrack-render-results.json`. No production source
+  changed after the full-suite run.
+- **Remaining gates:** full-suite pointer failure; full-run journey
+  intermittency; pre-existing B905; required Ubuntu/Xvfb/PR-runtime parity and
+  remote evidence unavailable locally. Final exact-profile review follows.
+  Tickets remain open/`verifying`; original project/full export remain paused.
+
+## MULTITRACK-20261016-FINAL-VALIDATOR
+
+- Decision owner actually invoked:
+  **rubber-duck / gpt-5.6-luna / high / all-validation**.
+  It reviewed the final production implementation, synthetic reports, decoded
+  count/contract gates, source hashes, functionality observations, baseline
+  comparisons and static/CI configuration. This is `automaticValidation`,
+  never `userValidation`.
+- **Introduced blocking findings: none.** No new correctness, security or
+  optimization-eligibility bug was identified in the selected route.
+- **Scoped automated functionality: PASS.** Accepted affected outcomes:
+  clock frame retention; triplicate graph equivalence; audio input/PCM reuse;
+  cache recipe migration; cancellation/recovery reuse; generated and
+  workstation real-media AV output; contract and GTK playback smoke.
+- **Measured selection accepted within stated limits:** the combined policy
+  is faster on the generated large/triplicate fixtures, with exact decoded
+  equality. The review accepted the rejected track/chunk alternatives and
+  experimental-only status of seek/NVDEC. It explicitly rejected full-project
+  extrapolation or interpreting warm residual timers as fresh export gains.
+- **Overall automatic validation: FAILED/BLOCKED.** Full tests and full Ruff
+  remain failed despite baseline provenance; the result cannot be changed
+  into a pass by calling them pre-existing. Required Ubuntu/Xvfb runtime
+  equivalence and remote checks remain unavailable. Churn's Python coverage
+  limitation remains explicit.
+- **Delivery readiness: BLOCKED.** No commit, push, PR or closure is authorized
+  by this result. PHASE-009, FEAT-030/031 and TICKET-102/103/104 stay open;
+  the tickets remain `verifying`. Prior uncommitted recovery/progress work
+  and original export checkpoints are preserved.
+- Portable final decision and sanitized workstation observations are added to
+  `multitrack-render-results.json`. Raw test/static/contract/smoke and baseline
+  comparison logs are copied from `/tmp` to the persistent session `files/`
+  directory under their `multitrack-*` filenames. No private media/path is
+  added to repository evidence.
+- Next delivery action is to obtain the actual configured Ubuntu 24.04/Xvfb
+  quality/remote result and resolve its failed gates under scoped authorization.
+  This is a blocker handoff, not a claim that CI was run or permission to bypass
+  the current commit gates.
+- Final cleanup/verification: both explicitly owned private real-media test
+  directories were removed after saving the initial harness failure log and
+  successful result outside the repository. Synthetic benchmark artifacts,
+  original media, original project and export checkpoints were retained.
+  Portable JSON parses successfully, measured compositor hashes still match,
+  `git diff --check` passes, power profile is `power-saver`, and no tracked
+  shell session remains running.
+
+## MULTITRACK-20261016-QUALITY-REMEDIATION
+
+- The user requested continued autonomous work instead of stopping at the
+  previous local quality failures. TICKET-104 now records the bounded
+  verification repair scope. The prior failed runs and validator decision
+  remain historical evidence, not erased or retroactively marked passed.
+- Decision owner remains
+  `rubber-duck / gpt-5.6-luna / high / all-validation`; final classification
+  awaits the complete rerun and its scoped review below.
+- Restored the previously missing CI display tools only after the exact
+  `xvfb-run` command failed with exit 127. Official Arch
+  `xorg-server-xvfb 21.1.25-2` and `xorg-xauth 1.1.5-1` packages were downloaded,
+  their detached signatures verified against the system's official public
+  signing keyring, and extracted into session-owned `multitrack-xvfb-tools/`.
+  No system package, manifest or production dependency changed. Commands use
+  an explicit scoped PATH, authenticated Xvfb, and `-screen 0 1920x1200x24`.
+- The isolated display alone did not cure the pointer assertion: baseline
+  failure was retained in `multitrack-isolated-pointer-check.log`. Actual GTK
+  event traces then established two distinct issues: a segment press suppressed
+  initial snap until release; physical test coordinates also omitted the
+  native widget-to-surface translation (client-side decoration offsets).
+- Regression
+  `EditorTrackDragTests.test_uncommitted_segment_press_snaps_before_release`
+  failed before production modification (nonzero unsnapped position instead
+  of the segment start). `_seek_from_x` now permits snapping while a drag is
+  uncommitted, including the initial segment press. Established drag movement
+  still bypasses snapping, and the Super modifier still bypasses it.
+- Regression
+  `EditorTrackDragTests.test_screen_coordinates_include_native_surface_translation`
+  failed before the helper accepted a native transform. The common physical
+  pointer helper now adds `Gtk.Native.get_surface_transform()` for native
+  widget coordinates. Keyboard, drag and removal charters pass their native
+  translation; raw root-coordinate checks keep the zero-transform default.
+  No assertions were removed or click failures retried into success.
+- Initial focused repair exposed six outside-click failures under Xvfb,
+  retained in `multitrack-quality-remediation.log`. Traces showed the nominal
+  outside point was actually inside the snap zone because of the missing
+  decoration transform. Correcting that coordinate conversion resolved them.
+- Ruff B905: the preview comparison already asserts equal buffer lengths;
+  its `zip` now specifies `strict=True`. Pixel-difference tolerances and
+  assertions remain unchanged.
+- Handler/protected-flow command:
+  `.venv/bin/python -m unittest tests.test_editor_track_drag tests.test_editor_timeline tests.test_editor_timeline_snapping tests.test_editor_seek_dispatch`.
+  **49 tests pass in 0.052 s**, including actual-drag, threshold and bypass
+  protections.
+- Automated functionality command:
+  `PATH=<session-tools>/usr/bin:$PATH xvfb-run --auto-servernum --server-args='-screen 0 1920x1200x24' env GDK_BACKEND=x11 GSK_RENDERER=cairo .venv/bin/python -m unittest tests.test_editor_keyboard_functionality tests.test_editor_track_drag_functionality tests.test_editor_removal_controls_functionality tests.test_phase010_functionality.Phase010FunctionalityTests.test_complete_edit_and_delivery_journey`.
+  **27 tests pass in 115.767 s, one native-Wayland-only skip**. These exercise
+  actual physical pointer/keyboard events, snapping, Super bypass, cross-track
+  dragging, removal, persistence and the full editing/export journey.
+- `make contract smoke PYTHON=.venv/bin/python` under a separate authenticated
+  Xvfb also exits 0; the contract suite again passes 45 tests.
+- A fresh full **`make quality`** is running under authenticated Xvfb, with
+  the same Cairo renderer and screen settings as CI. Its raw output is
+  persistent at session `files/multitrack-isolated-final-quality.log`.
+  Python/media distro versions still differ from Ubuntu CI, so display-wrapper
+  restoration alone is not claimed as complete remote/runtime parity.
+- Video/audio compositor hashes and the measured policy are unchanged.
+  Neither the original full export nor its checkpoints was resumed or removed.
+
+## MULTITRACK-20261016-LOCAL-QUALITY-TERMINAL
+
+- The same scoped TICKET-104 repair now has terminal raw full-gate evidence:
+  `PATH=<session-tools>/usr/bin:$PATH xvfb-run --auto-servernum --server-args='-screen 0 1920x1200x24' env GDK_BACKEND=x11 GSK_RENDERER=cairo FRAMESTUDIO_PHASE010_ARTIFACT_DIR=<session>/files/multitrack-isolated-final-functionality make quality PYTHON=.venv/bin/python STATIC_ANALYSIS_DIR=<session>/files/multitrack-final-static`.
+  **Exit 0. All 1032 tests complete in 831.295 s, 10 skipped, no failures or
+  errors.** Skips remain explicit environment/optional-capability results,
+  not successful tests. The earlier pointer and journey failures no longer
+  occur in the full run.
+- The command also passes compilation, whitespace, format (193 files), full
+  Ruff including the previous B905, every configured mypy call, complexity,
+  dependency boundaries, dependency advisory audit and Bandit. Duplication:
+  41 clones, 0.644%, zero new against the unchanged approved baseline.
+  Churn still has no useful Python entries; that limitation is unchanged.
+- Raw output is persisted directly at session
+  `files/multitrack-isolated-final-quality.log`. Post-run compositor SHA256
+  still matches the actual benchmarked candidate files, `git diff --check`
+  passes and `powerprofilesctl get` returns `power-saver`.
+- The post-repair CLI contract and both GTK smoke flows also pass under
+  authenticated Xvfb, as recorded in
+  `files/multitrack-isolated-contract-smoke.log`.
+- This terminal local result supersedes the earlier failed local quality
+  results, without erasing their provenance. The exact configured Rubber Duck
+  profile must classify this new result and the narrow repair before recording
+  terminal `automaticValidation`.
+- No actual Ubuntu/remote CI result has been obtained. Restoring the display
+  wrapper is not represented as changing host Python/FFmpeg to Ubuntu versions,
+  publishing the branch, fulfilling remote checks or closing delivery records.
+
+## MULTITRACK-20261016-QUALITY-REMEDIATION-VALIDATOR
+
+- The required **rubber-duck / gpt-5.6-luna / high / all-validation**
+  validator reviewed the narrow quality repair and latest terminal evidence.
+  It found **no introduced blocking issue**. This review supplements the
+  earlier optimization review; measured compositor source is unchanged.
+- **Scoped `automatedFunctionality`: PASS. Scoped `automaticValidation`:
+  PASS.** These are agent-owned outcomes, not user confirmation. The reviewer
+  accepted the early segment-press snapping, native-to-surface physical input
+  conversion and strict byte-comparison zip correction.
+- **Local technical/static quality: PASS**, with explicit skips and the
+  unchanged optional Python-churn coverage concern. To avoid counting skips
+  as successes, the raw full result is **1032 tests run, 1022 successful,
+  10 skipped, zero failures/errors**, in 831.295 s. The full `make quality`
+  exits 0. CLI contracts and GTK create/reopen smoke also pass.
+- **Original local request: complete.** Research, individual/combined
+  experiments, measured safe production selection, resumability/decoded
+  parity evidence and the requested continuation's local quality remediation
+  have terminal evidence. The previous failed local runs remain preserved;
+  the latest passing results supersede them, not conceal them.
+- **Publication/lifecycle readiness remains BLOCKED**, independently of that
+  local completion: host/Ubuntu-runtime parity and actual remote checks are
+  unavailable, the branch is unpublished and the worktree intentionally
+  contains unstaged prior work. No commit, push, PR, human-validation claim
+  or ticket/feature/phase closure follows from this decision.
+- The portable `multitrack-render-results.json` now records the latest passing
+  local result and keeps the earlier failed full-suite result as history.
+  Planning records remain open/`verifying`. A completed-feature changelog entry
+  is deferred because the feature records have not met delivery closeout.
+- Next delivery action belongs to `aidd-review`: resolve actual remote
+  Ubuntu/CI-runtime evidence and its configured gates before publication or
+  lifecycle closeout. This does not authorize a gate bypass or implicit staging.

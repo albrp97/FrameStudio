@@ -12,7 +12,7 @@ metric-based export experiments
 **Last updated:** 2026-09-09
 **Source paths:** `docs/planning/phases/open/PHASE-009-selecting-and-delivering-efficient-export-pipelines.md`,
 `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
-`docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`,
+`docs/planning/features/open/FEAT-028-adding-optional-upscale-enhancement.md`,
 `benchmarks/render_strategy_benchmark.py`, `framestudio/export_planning.py`,
 `framestudio/export_smart_render.py`, `framestudio/export_interpolation.py`,
 `.github/aidd-config.yml`
@@ -48,6 +48,10 @@ media set.
 - Separate machine integrity gates from human visual observations.
 - Publish a recommendation and confidence limits without changing production
   routing until the implementation ticket is verified.
+- Renewed 2026-10-16 comparison: final synchronized 1/2/3/4-track composition,
+  repeated and unique ranges, changing active sets, gaps, and standalone
+  track/source reels under the existing PHASE-010 / CHG-013 contract. Compare
+  individual candidates and compatible combinations using a fresh baseline.
 
 ## Explicit non-goals
 
@@ -86,4 +90,3 @@ media set.
   `NOT APPLICABLE` with report and artifact paths.
 - **Pass criteria:** all intended rows are runnable or explicitly accounted
   for, and the recommendation is evidence-bounded.
-

@@ -6,17 +6,18 @@
 **Phase:** PHASE-009
 **Feature:** FEAT-031
 **Capability links:** CAP-005, CAP-011, CAP-012
-**Status:** active
+**Status:** verifying
 **Horizon:** future
 **Priority:** 1
 **Owner:** repository implementation in the active worktree
 **Approval:** user-authorized by the 2026-09-09 export-optimization request
-**Last updated:** 2026-09-09
+**Last updated:** 2026-10-16
 **Source paths:** `docs/planning/features/open/FEAT-031-executing-efficient-resumable-export-pipelines.md`,
 `docs/planning/tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md`,
 `framestudio/export_smart_render.py`, `framestudio/export_interpolation.py`,
 `framestudio/export_cache.py`, `framestudio/export_session.py`,
-`framestudio/export_delivery.py`
+`framestudio/export_delivery.py`, `framestudio/video_compositor.py`,
+`framestudio/audio_compositor.py`, `framestudio/av_compositor.py`
 **Dependencies:** TICKET-102 recommendation; existing per-segment enhanced
 route; cache/session/output verification contracts
 **Risks:** crossing deleted boundaries, changing frame quantization, repeated
@@ -55,7 +56,41 @@ unsafe or unsupported media.
 - Removing the existing route or weakening verification.
 - Adding new external runtime dependencies.
 
+## 2026-10-16 multitrack implementation refinement
+
+The current user request authorizes implementation of viable multitrack
+render candidates and compatible combinations, followed by evidence-based
+selection under TICKET-102. Preserve the PHASE-010 / CHG-013 dynamic-layout,
+stereo-mix and independent track/source reel contracts. Optimizing final
+composition must not apply slot crops or pan to standalone source reels.
+
+Retain the existing renderer as oracle/fallback. Candidate artifacts must
+retain source/range, output-frame lattice, transform/layout, profile and
+policy identity as applicable; invalidation must prevent reuse after relevant
+edits. Preserve per-item checkpoints, completed-pending recovery, diagnostics,
+cooperative cancellation, and global/current progress including elapsed/ETA.
+Do not resume the user's paused full export as part of experimentation.
+Do not change baseline codec settings or introduce intermediate generation
+loss in exchange for an apparent speedup.
+
 ## Observable acceptance criteria
+
+### Current integrated implementation
+
+The measured combination is integrated locally: video resource limits only
+for at least three distinct consumed paths, equal-geometry triplicate scale
+factoring, and audio input reuse with separate per-branch processing. Encoder
+settings, standalone-reel semantics and existing preparation ownership remain
+unchanged. Experimental seek/NVDEC and lossless track/chunk routes are not
+enabled.
+
+The correctness prerequisite assigns a global final frame clock after concat.
+Only video/mux preparation recipes change version; native/upscale/FPS/audio
+artifacts remain reusable. A real-FFmpeg cache-transition test confirms zero
+repeated native/interpolation/audio jobs and one new video/mux job.
+
+Final integrated functionality, static analysis and exact-profile automatic
+review are tracked by TICKET-104. No delivery side effect or closure is claimed.
 
 - Given compatible repeated runs, the optimized route reduces redundant
   process invocations relative to the protected baseline.
@@ -95,4 +130,3 @@ unsafe or unsupported media.
   after verified publication.
 - **Evidence response:** return `PASS`, `FAIL`, `BLOCKED`, or approved
   `NOT APPLICABLE` with export/session/cache paths.
-

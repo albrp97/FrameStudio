@@ -260,7 +260,7 @@ class PrecisePreviewFunctionalityTests(unittest.TestCase):
             # that gap, above the observed rounding) separates the two.
             self.assertEqual(len(result.data), len(reference))
             self.assertEqual(result.data[3::4], reference[3::4])
-            deltas = [abs(a - b) for a, b in zip(result.data, reference)]
+            deltas = [abs(a - b) for a, b in zip(result.data, reference, strict=True)]
             self.assertLessEqual(max(deltas), 32)
             self.assertLessEqual(sum(deltas) / len(deltas), 2.5)
         return result

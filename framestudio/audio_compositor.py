@@ -5,6 +5,7 @@ import math
 import threading
 import uuid
 from array import array
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Mapping
@@ -463,17 +464,50 @@ def _render_command(
     plan: AudioPlan,
     partial: Path,
     ffmpeg_path: str,
+    *,
+    reuse_inputs: bool = True,
 ) -> tuple[list[str], str]:
     input_paths: list[Path] = []
+    input_indexes: dict[Path, int] = {}
+    input_uses: list[int] = []
+    block_inputs: list[list[int]] = []
+    for interval in plan.intervals:
+        interval_inputs: list[int] = []
+        for block in interval.audible_blocks:
+            path = Path(project.source_by_id(block.source_id).path)
+            if reuse_inputs and path in input_indexes:
+                input_index = input_indexes[path]
+            else:
+                input_index = len(input_paths)
+                input_paths.append(path)
+                input_uses.append(0)
+                if reuse_inputs:
+                    input_indexes[path] = input_index
+            input_uses[input_index] += 1
+            interval_inputs.append(input_index)
+        block_inputs.append(interval_inputs)
+
     filters: list[str] = []
+    split_refs: dict[int, deque[str]] = {}
+    for input_index, uses in enumerate(input_uses):
+        if uses < 2:
+            continue
+        split_labels = [f"in_{input_index}_{use}" for use in range(uses)]
+        filters.append(
+            f"[{input_index}:a:0]asplit={uses}" + "".join(f"[{label}]" for label in split_labels),
+        )
+        split_refs[input_index] = deque(f"[{label}]" for label in split_labels)
+
     interval_labels: list[str] = []
     for interval_index, interval in enumerate(plan.intervals):
         audio_blocks = interval.audible_blocks
         mapped_labels: list[str] = []
         for block_index, block in enumerate(audio_blocks):
-            source = project.source_by_id(block.source_id)
-            input_index = len(input_paths)
-            input_paths.append(Path(source.path))
+            input_index = block_inputs[interval_index][block_index]
+            if input_index in split_refs:
+                input_ref = split_refs[input_index].popleft()
+            else:
+                input_ref = f"[{input_index}:a:0]"
             label = f"src_{interval_index}_{block_index}"
             legacy_center = (
                 len(audio_blocks) == 1
@@ -483,7 +517,7 @@ def _render_command(
             if legacy_center:
                 source_filter = _legacy_center_source_filter(block)
                 filters.append(
-                    f"[{input_index}:a:0]{source_filter},"
+                    f"{input_ref}{source_filter},"
                     f"atrim=start_sample={block.source_start_sample}:"
                     f"end_sample={block.source_end_sample},"
                     f"apad=pad_len={interval.duration_samples},"
@@ -493,7 +527,7 @@ def _render_command(
             else:
                 filters.append(
                     _composed_source_filter(
-                        input_index,
+                        input_ref,
                         block,
                         label,
                         interval.duration_samples,
@@ -601,13 +635,13 @@ def _legacy_center_source_filter(block: AudioBlockPlan) -> str:
 
 
 def _composed_source_filter(
-    input_index: int,
+    input_ref: str,
     block: AudioBlockPlan,
     label: str,
     interval_samples: int,
 ) -> str:
     filters = [
-        f"[{input_index}:a:0]aresample=48000:async=0:first_pts=0",
+        f"{input_ref}aresample=48000:async=0:first_pts=0",
         f"atrim=start_sample={block.source_start_sample}:end_sample={block.source_end_sample}",
         "asetpts=PTS-STARTPTS",
     ]

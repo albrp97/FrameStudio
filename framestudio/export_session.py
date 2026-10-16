@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import fcntl
-import hashlib
 import json
 import os
 import shutil
 import stat
-import tempfile
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -17,6 +15,9 @@ from typing import Any, TypeVar
 from .export_cache import (
     CACHE_DIRECTORY_SUFFIX,
     ExportCacheError,
+    _json_value,
+    _request_key,
+    _write_manifest,
     build_export_cache_request,
 )
 
@@ -43,31 +44,6 @@ class ExportSessionMismatch(ExportSessionError):
 
 class ExportSessionInvalid(ExportSessionError):
     """Raised when a session manifest is corrupt or unsupported."""
-
-
-def _json_value(value: Any) -> Any:
-    if isinstance(value, Path):
-        return str(value.expanduser().resolve())
-    if isinstance(value, Mapping):
-        return {
-            str(key): _json_value(item)
-            for key, item in sorted(value.items(), key=lambda item: str(item[0]))
-        }
-    if isinstance(value, (list, tuple)):
-        return [_json_value(item) for item in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return str(value)
-
-
-def _request_key(request: Mapping[str, Any]) -> str:
-    encoded = json.dumps(
-        _json_value(request),
-        ensure_ascii=True,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def _timestamp() -> str:
@@ -506,27 +482,10 @@ class ExportSession:
         return self.root / _safe_relative(self.root, self.root / relative)
 
     def _save_manifest(self) -> None:
-        manifest_path = self.root / "manifest.json"
         self.manifest["updated_at"] = _timestamp()
-        temporary_path: Path | None = None
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=self.root,
-                prefix=".manifest-",
-                suffix=".tmp",
-                delete=False,
-            ) as temporary:
-                temporary_path = Path(temporary.name)
-                json.dump(self.manifest, temporary, ensure_ascii=True, indent=2, sort_keys=True)
-                temporary.write("\n")
-                temporary.flush()
-                os.fsync(temporary.fileno())
-            os.replace(temporary_path, manifest_path)
+            _write_manifest(self.root, self.manifest)
         except OSError as error:
-            if temporary_path is not None:
-                temporary_path.unlink(missing_ok=True)
             raise ExportSessionError(f"Could not save export session manifest: {error}") from error
 
     def mark_running(self, stage_id: str) -> None:

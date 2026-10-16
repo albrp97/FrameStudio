@@ -12,9 +12,9 @@ implement the most efficient export pipeline
 **Last updated:** 2026-09-09
 **Source paths:** `vision.md`, `docs/specs/project-scope.md`,
 `docs/specs/future-product-direction.md`,
-`docs/planning/phases/closed/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
+`docs/planning/phases/open/PHASE-008-optimizing-responsive-preview-and-media-strategy.md`,
 `docs/planning/features/closed/FEAT-026-comparing-mixed-fps-render-strategies.md`,
-`docs/planning/features/closed/FEAT-028-adding-optional-upscale-enhancement.md`,
+`docs/planning/features/open/FEAT-028-adding-optional-upscale-enhancement.md`,
 `docs/planning/tickets/closed/TICKET-076-adopt-per-source-render-strategy.md`,
 `docs/planning/tickets/closed/TICKET-080-benchmark-upscale-render-strategies.md`,
 `framestudio/export_smart_render.py`, `framestudio/export_interpolation.py`,
@@ -54,6 +54,11 @@ not a universal hardware claim.
   stream-copy join is rejected.
 - Preserve existing cache/session identity, atomic publication, cancellation,
   source safety, and user-visible progress contracts.
+- The 2026-10-16 user authorization explicitly selects this phase for renewed
+  multitrack research, candidate combinations, implementation, and comparative
+  benchmarks. Hold the implemented PHASE-010 / CHG-013 dynamic-layout,
+  slot-based stereo mix, and independent track/source output contracts fixed;
+  this is an export-route optimization, not new editing semantics.
 
 ## Explicit non-goals
 
@@ -70,8 +75,11 @@ not a universal hardware claim.
 
 ## Entry conditions
 
-- PHASE-008 is complete and its mixed-FPS, restoration, upscale, and
+- The previously delivered PHASE-008 mixed-FPS, restoration, upscale, and
   resumable-export behavior is available as the protected baseline.
+  PHASE-008 and FEAT-028 were subsequently reopened for bounded CHG-011
+  follow-ups; this phase depends on that delivered export baseline, not on
+  claiming those independent follow-ups or their parent records complete.
 - The existing export test suite and compilation baseline pass.
 - FFmpeg/ffprobe and the target workstation resource probes are available.
 - The local RVE/TensorRT runtime and model availability are recorded before
@@ -119,4 +127,3 @@ not a universal hardware claim.
 - Target-workstation real-media output probes and source-hash evidence.
 - Explicit blocked/skipped rows for unavailable runtimes, hardware, or visual
   review.
-

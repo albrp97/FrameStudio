@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from .export_journal import record_export_error
 from .export_process import (
     check_export_cancelled,
     make_progress_heartbeat,
@@ -30,6 +31,7 @@ from .export_process import (
     run_ffmpeg,
     validate_decoded_output,
 )
+from .export_progress import progress_scope
 from .export_types import ExportExecutionError, ExportProgressCallback
 from .fps_policy import (
     DEFAULT_FPS_BACKEND,
@@ -403,6 +405,14 @@ def render_project_video(
     source_hashes = tuple(item.source_hash for item in plan.probed_metadata)
     fallbacks: list[str] = []
     started = time.monotonic()
+    preparation_end = (
+        80.0
+        if any(
+            route.upscale_requested or route.fps_action == "interpolate"
+            for route in plan.processing_routes
+        )
+        else 0.0
+    )
     try:
         source_stats = tuple(item.path.stat() for item in plan.probed_metadata)
         assets = _prepare_assets(
@@ -412,7 +422,7 @@ def render_project_video(
             ffprobe_path=ffprobe_path,
             fallbacks=fallbacks,
             cancel_event=cancel_event,
-            progress_callback=progress_callback,
+            progress_callback=progress_scope(progress_callback, 0, preparation_end),
             preparations=preparations,
         )
         command = _build_render_command(
@@ -429,9 +439,15 @@ def render_project_video(
             command_total_frames=plan.expected_frames,
             progress_total_duration_seconds=plan.expected_duration_seconds,
             progress_total_frames=plan.expected_frames,
-            progress_callback=progress_callback,
+            progress_callback=progress_scope(progress_callback, preparation_end, 98),
         )
-
+        report_preparation_progress(
+            progress_scope(progress_callback, 98, 100),
+            "Verifying video composition",
+            0,
+            1,
+            started,
+        )
         _verify_rendered_output(
             partial,
             plan,
@@ -465,6 +481,13 @@ def render_project_video(
             cancellation_lock=cancellation_lock,
         )
         output_probe = replace(output_probe, path=destination)
+        report_preparation_progress(
+            progress_scope(progress_callback, 98, 100),
+            "Verified video composition",
+            1,
+            1,
+            started,
+        )
         return VideoRenderResult(
             destination=destination,
             output_probe=output_probe,
@@ -899,15 +922,29 @@ def _prepare_assets(
     prepared_by_content: dict[str, _PreparedAsset] = {}
     started = time.monotonic()
     blocks = plan.layout_plan.included_blocks
-    for index, block in enumerate(blocks):
-        check_export_cancelled(cancel_event)
-        report_preparation_progress(
-            progress_callback,
-            "Preparing video segments",
-            index,
-            len(blocks),
-            started,
+    report_preparation_progress(
+        progress_scope(progress_callback, 0, 0),
+        "Preparing video segments",
+        0,
+        len(blocks),
+        started,
+    )
+    check_export_cancelled(cancel_event)
+    work = {
+        _preparation_identity(
+            block, probes[block.source_id], routes[block.source_id]
+        ).cache_key: max(1, block.source_range.source_duration_ticks)
+        for block in blocks
+        if block.block_id in renderable_block_ids
+        and (
+            routes[block.source_id].upscale_requested
+            or routes[block.source_id].fps_action == "interpolate"
         )
+    }
+    total_work = sum(work.values()) or 1
+    completed_work = 0
+    for block in blocks:
+        check_export_cancelled(cancel_event)
         if block.block_id not in renderable_block_ids:
             continue
         route = routes[block.source_id]
@@ -918,6 +955,18 @@ def _prepare_assets(
         if identity in prepared_by_content:
             assets[block.block_id] = prepared_by_content[identity]
             continue
+        item_progress = progress_scope(
+            progress_callback,
+            100 * completed_work / total_work,
+            100 * (completed_work + work[identity]) / total_work,
+        )
+        report_preparation_progress(
+            item_progress,
+            f"Preparing video segment {len(prepared_by_content) + 1}/{len(work)}",
+            0,
+            1,
+            started,
+        )
         source_frames = _round_half_up(
             Fraction(block.source_range.source_duration_ticks, PROJECT_TIMEBASE)
             * canonical_rate(probe.media.frame_rate),
@@ -956,6 +1005,7 @@ def _prepare_assets(
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
             cancel_event=cancel_event,
+            progress_callback=progress_scope(item_progress, 0, 5),
         )
         current = raw
         if route.upscale_requested:
@@ -995,12 +1045,14 @@ def _prepare_assets(
                         ffmpeg_path=ffmpeg_path,
                         ffprobe_path=ffprobe_path,
                         cancel_event=cancel_event,
+                        progress_callback=progress_scope(item_progress, 5, 30),
                     )
                     current = restored
                     request = restored_request
                 except PreparationCacheError:
                     raise
                 except (ExportExecutionError, OSError, RuntimeError, VideoCompositorError) as error:
+                    record_export_error(error)
                     check_export_cancelled(cancel_event)
                     fallbacks.append(
                         f"{block.block_id}: RVE upscale unavailable at render time; "
@@ -1019,22 +1071,15 @@ def _prepare_assets(
             target_frames = max(1, target_frames)
             interpolated = workspace / f"{asset_stem}-fps.mp4"
             interpolation_source_rate = canonical_rate(probe.media.frame_rate)
-
-            def interpolate(
-                backend: str,
-                *,
-                input_request: Mapping[str, Any] = request,
-                input_path: Path = current,
-                destination: Path = interpolated,
-                source_rate: Fraction = interpolation_source_rate,
-                input_frames: int = source_frames,
-                output_frames: int = target_frames,
-            ) -> Path:
-                interpolation_request = {
-                    "input": input_request,
+            interpolation_progress = progress_scope(
+                item_progress, 30 if route.upscale_requested else 5, 100
+            )
+            interpolation_requests = {
+                backend: {
+                    "input": request,
                     "backend": backend,
                     "target_rate": str(plan.target_rate),
-                    "target_frames": output_frames,
+                    "target_frames": target_frames,
                     "runtime": (
                         preparations.runtime(
                             ffmpeg_path, ffprobe_path, neural=backend.startswith("rve")
@@ -1043,10 +1088,24 @@ def _prepare_assets(
                         else None
                     ),
                 }
+                for backend in dict.fromkeys((route.fps_backend, DEFAULT_FPS_FALLBACK_BACKEND))
+            }
+
+            def interpolate(
+                backend: str,
+                *,
+                input_path: Path = current,
+                destination: Path = interpolated,
+                source_rate: Fraction = interpolation_source_rate,
+                input_frames: int = source_frames,
+                output_frames: int = target_frames,
+                requests: Mapping[str, Any] = interpolation_requests,
+                callback: ExportProgressCallback | None = interpolation_progress,
+            ) -> Path:
                 return _materialize_video_stage(
                     preparations,
                     "interpolated segment",
-                    interpolation_request,
+                    requests[backend],
                     destination,
                     partial(
                         run_source_interpolation,
@@ -1059,19 +1118,35 @@ def _prepare_assets(
                         ffmpeg_path=ffmpeg_path,
                         artifact_gate=False,
                         cancel_event=cancel_event,
-                        progress_callback=progress_callback,
+                        progress_callback=callback,
                     ),
                     ffmpeg_path=ffmpeg_path,
                     ffprobe_path=ffprobe_path,
                     cancel_event=cancel_event,
+                    progress_callback=callback,
                 )
 
             try:
-                current = interpolate(route.fps_backend)
+                cached = None
+                if preparations is not None:
+                    for backend, interpolation_request in interpolation_requests.items():
+                        cached = preparations.reuse(
+                            "interpolated segment",
+                            interpolation_request,
+                            progress_callback=interpolation_progress,
+                        )
+                        if cached is not None:
+                            if backend != route.fps_backend:
+                                fallbacks.append(
+                                    f"{block.block_id}: reusing verified {backend} fallback"
+                                )
+                            break
+                current = cached if cached is not None else interpolate(route.fps_backend)
                 fps_converted = True
             except PreparationCacheError:
                 raise
             except (ExportExecutionError, OSError, RuntimeError, VideoCompositorError) as error:
+                record_export_error(error)
                 check_export_cancelled(cancel_event)
                 if route.fps_backend != DEFAULT_FPS_FALLBACK_BACKEND:
                     try:
@@ -1104,6 +1179,14 @@ def _prepare_assets(
             fps_converted=fps_converted,
         )
         prepared_by_content[identity] = assets[block.block_id]
+        completed_work += work[identity]
+        report_preparation_progress(
+            item_progress,
+            f"Prepared video segment {len(prepared_by_content)}/{len(work)}",
+            1,
+            1,
+            started,
+        )
         if preparations is None:
             _verify_preparation(current, ffprobe_path, ffmpeg_path, cancel_event=cancel_event)
     return assets
@@ -1119,20 +1202,24 @@ def _materialize_video_stage(
     ffmpeg_path: str,
     ffprobe_path: str,
     cancel_event: threading.Event | None,
+    progress_callback: ExportProgressCallback | None = None,
 ) -> Path:
     if preparations is None:
         produce(destination)
         return destination
+
+    def validate(path: Path) -> None:
+        try:
+            _verify_preparation(path, ffprobe_path, ffmpeg_path, cancel_event=cancel_event)
+        except VideoCompositorExecutionError as error:
+            raise ExportExecutionError(str(error)) from error
+
     return preparations.materialize(
         stage,
         request,
         produce,
-        partial(
-            _verify_preparation,
-            ffprobe_path=ffprobe_path,
-            ffmpeg_path=ffmpeg_path,
-            cancel_event=cancel_event,
-        ),
+        validate,
+        progress_callback=progress_callback,
     )
 
 
@@ -1260,6 +1347,7 @@ def _build_render_command(
     output: Path,
     ffmpeg_path: str,
     reuse_inputs: bool = True,
+    factor_triplicate: bool = True,
 ) -> list[str]:
     inputs: list[Path] = []
     input_indices: dict[Path, int] = {}
@@ -1339,20 +1427,39 @@ def _build_render_command(
                 )
                 crop_labels.append(crop_label)
             else:
+                shared_scale = factor_triplicate and all(
+                    (crop.scaled_width, crop.scaled_height)
+                    == (first_crop.scaled_width, first_crop.scaled_height)
+                    for crop in crop_plans
+                )
+                # Convert before splitting so odd-width crops retain full chroma resolution.
+                scale_prefix = (
+                    f"scale={first_crop.scaled_width}:{first_crop.scaled_height}:"
+                    "flags=lanczos,format=yuv444p,"
+                    if shared_scale
+                    else ""
+                )
                 split_labels = [
                     f"i{interval_index}s{slot_index}split{crop_index}"
                     for crop_index in range(len(crop_plans))
                 ]
                 filters.append(
-                    f"{trim_prefix}split={len(split_labels)}"
+                    f"{trim_prefix}{scale_prefix}split={len(split_labels)}"
                     + "".join(f"[{label}]" for label in split_labels),
                 )
                 for crop_index, crop in enumerate(crop_plans):
                     crop_label = f"i{interval_index}s{slot_index}c{crop_index}"
+                    branch_scale = (
+                        ""
+                        if shared_scale
+                        else (
+                            f"scale={crop.scaled_width}:{crop.scaled_height}:flags=lanczos,"
+                            "format=yuv444p,"
+                        )
+                    )
                     filters.append(
-                        f"[{split_labels[crop_index]}]"
-                        f"scale={crop.scaled_width}:{crop.scaled_height}:flags=lanczos,"
-                        f"format=yuv444p,crop={crop.target.width}:{crop.target.height}:"
+                        f"[{split_labels[crop_index]}]{branch_scale}"
+                        f"crop={crop.target.width}:{crop.target.height}:"
                         f"{crop.crop_x}:{crop.crop_y},setsar=1[{crop_label}]",
                     )
                     crop_labels.append(crop_label)
@@ -1383,9 +1490,14 @@ def _build_render_command(
             )
         interval_labels.append(interval_label)
     concat_inputs = "".join(f"[{label}]" for label in interval_labels)
+    # Concat cannot infer a one-frame interval's duration; keep every planned frame.
     filters.append(
-        f"{concat_inputs}concat=n={len(interval_labels)}:v=1:a=0,format=yuv420p[vout]",
+        f"{concat_inputs}concat=n={len(interval_labels)}:v=1:a=0,format=yuv420p,"
+        f"settb=expr={plan.target_rate.denominator}/{plan.target_rate.numerator},"
+        "setpts=N[vout]",
     )
+    budgeted_composition = len(set(inputs)) >= 3
+    decoder_options = ["-threads", "1"] if budgeted_composition else []
     return [
         ffmpeg_path,
         "-hide_banner",
@@ -1393,7 +1505,8 @@ def _build_render_command(
         "error",
         "-nostdin",
         "-y",
-        *sum((["-i", str(path)] for path in inputs), []),
+        *(["-filter_complex_threads", "2"] if budgeted_composition else []),
+        *sum(([*decoder_options, "-i", str(path)] for path in inputs), []),
         "-filter_complex",
         ";".join(filters),
         "-map",

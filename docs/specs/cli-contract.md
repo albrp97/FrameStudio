@@ -256,6 +256,27 @@ reports the selected stream-copy or fallback route, the reason, verified
 output metadata, and publication path. Unverified partial files are never
 reported as successful output.
 
+Progress includes additive `overall_percent`, `current_percent`, `output_index`
+(one-based during output execution, zero during preparation), `output_count`,
+`overall_elapsed_seconds`, and nullable `overall_eta_seconds` fields. Overall
+timing is distinct from the current operation's `elapsed_seconds`/`eta_seconds`;
+ETA is unknown before measurable progress and zero at whole-batch completion.
+`percent` remains the renderer's existing
+output/stage percentage; `current_percent` retains the innermost operation's
+percentage when stages are nested. `overall_percent` is a monotonic,
+duration-weighted whole-batch work percentage, not a wall-clock estimate, and
+is 100 only after all requested outputs and the receipt are complete. Preparation
+also emits progress events; a cancelled plan can therefore have progress on
+stdout before its structured error on stderr.
+
+Actual exports retain a private adjacent
+`.<destination-name>.framestudio-export.log` JSON Lines journal containing
+progress, five-second heartbeats, child-process diagnostics and failure chains.
+Failures and interruptions retain it; verified whole-batch success removes it.
+`SIGINT` and `SIGTERM` request cooperative cancellation and checkpoint retention.
+An uncatchable kill leaves the last recorded operation/heartbeat instead of
+a fabricated terminal error.
+
 Exports also keep a destination-scoped checkpoint session until verified
 publication succeeds. Use `--resume` to explicitly continue a compatible
 cancelled or failed session, `--restart` to discard its checkpoints and start

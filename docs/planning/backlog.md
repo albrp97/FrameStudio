@@ -76,8 +76,9 @@ evidence after the user's explicit manual-validation and closeout decision on
 user's 2026-09-07 validation, focused functionality evidence, repository
 gates, and review evidence. TICKET-029 and TICKET-105 through TICKET-107 are
 open in `verifying` under CHG-011; TICKET-108 is verifying under the user's
-2026-10-05 FPS-cutoff fix authorization. TICKET-104 is also verifying its
-export integrity and resume scope.
+2026-10-05 FPS-cutoff fix authorization. TICKET-102 through TICKET-104 remain
+open in `verifying`: multitrack benchmarking, implementation and local quality
+now pass, while remote/runtime publication and closeout gates remain unresolved.
 
 | Sequence | ID | Status | Parent feature | Phase | Current path |
 |---:|---|---|---|---|---|
@@ -182,8 +183,8 @@ export integrity and resume scope.
 | 99 | TICKET-099 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md` |
 | 100 | TICKET-100 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md` |
 | 101 | TICKET-101 | complete | FEAT-029 | PHASE-008 | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
-| 102 | TICKET-102 | active | FEAT-030 | PHASE-009 | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
-| 103 | TICKET-103 | active | FEAT-031 | PHASE-009 | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
+| 102 | TICKET-102 | verifying | FEAT-030 | PHASE-009 | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
+| 103 | TICKET-103 | verifying | FEAT-031 | PHASE-009 | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
 | 104 | TICKET-104 | verifying | FEAT-031 | PHASE-009 | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
 | 105 | TICKET-105 | verifying | FEAT-011 | PHASE-004 | `tickets/open/TICKET-105-randomize-multi-clip-add-order.md` |
 | 106 | TICKET-106 | verifying | FEAT-029 | PHASE-008 | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
@@ -1056,8 +1057,8 @@ cancellation or failure.
 | 99 | TICKET-099 | Checkpoint and resume all export stages | FEAT-029 | TICKET-098, TICKET-087, TICKET-093; staged export execution | complete | `tickets/closed/TICKET-099-checkpoint-and-resume-all-export-stages.md` |
 | 100 | TICKET-100 | Offer export resume, restart, and discard controls | FEAT-029 | TICKET-098, TICKET-099, TICKET-090; GTK project lifecycle | complete | `tickets/closed/TICKET-100-offer-export-resume-restart-and-discard-controls.md` |
 | 101 | TICKET-101 | Preserve the CLI export resume contract | FEAT-029 | TICKET-098, TICKET-099, TICKET-088; CLI JSON Lines | complete | `tickets/closed/TICKET-101-preserve-cli-export-resume-contract.md` |
-| 102 | TICKET-102 | Benchmark efficient export pipeline candidates | FEAT-030 | protected export baseline; representative media; target workstation | active | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
-| 103 | TICKET-103 | Implement the conditional grouped export route | FEAT-031 | TICKET-102; enhanced export/cache/session contracts | active | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
+| 102 | TICKET-102 | Benchmark efficient export pipeline candidates | FEAT-030 | protected export baseline; representative media; target workstation | verifying | `tickets/open/TICKET-102-benchmark-efficient-export-pipeline-candidates.md` |
+| 103 | TICKET-103 | Implement the conditional grouped export route | FEAT-031 | TICKET-102; enhanced export/cache/session contracts | verifying | `tickets/open/TICKET-103-implement-conditional-grouped-export-route.md` |
 | 104 | TICKET-104 | Verify export pipeline integrity and resume | FEAT-031 | TICKET-103; output verification and user-validation gates | verifying | `tickets/open/TICKET-104-verify-export-pipeline-integrity-and-resume.md` |
 | 106 | TICKET-106 | Set practical timeline wheel seek pacing | FEAT-029 | timeline seek contract; scroll gesture routing | verifying | `tickets/open/TICKET-106-timeline-wheel-seek-pacing.md` |
 | 107 | TICKET-107 | Fit preserved-resolution content to the output canvas | FEAT-028 | fixed 1920x1080 canvas; composition filter contract | verifying | `tickets/open/TICKET-107-fit-preserve-resolution-content-to-canvas.md` |
@@ -1201,6 +1202,14 @@ implement the most efficient safe export pipeline. TICKET-102 must establish
 equivalent benchmark data before TICKET-103 changes production routing.
 TICKET-104 owns automated functionality evidence, generated-media verification,
 resume behavior, review, and the exact user-validation handoff.
+
+The 2026-10-16 user request explicitly selects the same TICKET-102 through
+TICKET-104 chain for renewed multitrack architecture research, individual and
+combined candidate experiments, implementation and comparative measurement.
+Existing PHASE-010 / CHG-013 output semantics remain protected. Isolated
+prototypes precede production adoption; the current worktree, not the older
+pre-dedup renderer, is the baseline. Records remain open until their actual
+validation and delivery gates are satisfied.
 
 ### Feature coverage
 

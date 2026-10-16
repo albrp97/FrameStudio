@@ -408,6 +408,7 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
         timeline_before = self.window.project.timeline.to_dict()
         canvas = self.window.timeline_canvas
         canvas.set_zoom(zoom)
+        self.window._seek_timeline(2.637)
         second_id = self.window.selected_segment_id
         self.window.set_title(f"FrameStudio snap {uuid.uuid4().hex}")
         _pump_events(self.GLib, 20)
@@ -433,9 +434,12 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
             self.assertGreater(relative[0], 0)
             self.assertLess(relative[0], self.window.get_width())
             point = _screen_coordinates(
-                xdotool("getwindowgeometry", "--shell", window_id), relative
+                xdotool("getwindowgeometry", "--shell", window_id),
+                relative,
+                surface_transform=self.window.get_surface_transform(),
             )
             xdotool("mousemove", "--sync", str(point[0]), str(point[1]))
+            playhead_before_click = self.window.project.playhead_seconds
             if bypass:
                 xdotool("keydown", "Super_L")
             try:
@@ -452,6 +456,10 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
                 if bypass:
                     xdotool("keyup", "Super_L")
             self.assertEqual(self.window.selected_segment_id, second_id)
+            context = f"inside={inside}, bypass={bypass}, zoom={zoom}, absolute={absolute}"
+            self.assertNotEqual(
+                self.window.project.playhead_seconds, playhead_before_click, context
+            )
             if inside and not bypass:
                 self.assertEqual(self.window.project.playhead_seconds, clip.timeline_start_seconds)
                 self.assertEqual(canvas.get_playhead_seconds(), clip.timeline_start_seconds)
@@ -459,7 +467,7 @@ class EditorKeyboardFunctionalityTests(unittest.TestCase):
                 self.assertGreater(
                     self.window.project.playhead_seconds,
                     clip.timeline_start_seconds,
-                    f"inside={inside}, bypass={bypass}, zoom={zoom}, absolute={absolute}",
+                    context,
                 )
             self.assertEqual(self.window.project.timeline.to_dict(), timeline_before)
             self.assertEqual(self.source.read_bytes(), self.source_bytes)

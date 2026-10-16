@@ -14,7 +14,41 @@ from fractions import Fraction
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from framestudio.export_process import ensure_exact_video_frame_count, probe_frame_count
+from framestudio.export_planning import probe_keyframe_timestamps
+from framestudio.export_process import (
+    ensure_exact_video_frame_count,
+    probe_frame_count,
+    probe_source_frame_count,
+)
+
+
+def _make_b_frame_clip(root: Path) -> Path:
+    clip = root / "source.mp4"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc=size=64x64:rate=25",
+            "-t",
+            "2",
+            "-c:v",
+            "libx264",
+            "-bf",
+            "2",
+            "-g",
+            "25",
+            "-pix_fmt",
+            "yuv420p",
+            str(clip),
+        ],
+        check=True,
+    )
+    return clip
 
 
 @unittest.skipUnless(
@@ -102,6 +136,29 @@ class EnsureExactVideoFrameCountTests(unittest.TestCase):
             self.ensure_frame_count(clip, natural_frames)
 
             self.assertEqual(clip.read_bytes(), before_bytes)
+
+
+@unittest.skipUnless(
+    shutil.which("ffmpeg") and shutil.which("ffprobe"),
+    "FFmpeg and ffprobe are required",
+)
+class ProbeSourceFrameCountTests(unittest.TestCase):
+    def test_demux_count_matches_decoded_count_for_b_frame_clip(self):
+        with TemporaryDirectory() as temporary_directory:
+            clip = _make_b_frame_clip(Path(temporary_directory))
+
+            self.assertEqual(probe_source_frame_count(clip), probe_frame_count(clip))
+            self.assertEqual(probe_source_frame_count(clip), 50)
+
+
+class ProbeKeyframeTimestampsTests(unittest.TestCase):
+    def test_packet_keyframe_scan_finds_gop_starts_with_b_frames(self):
+        with TemporaryDirectory() as temporary_directory:
+            clip = _make_b_frame_clip(Path(temporary_directory))
+
+            timestamps = probe_keyframe_timestamps(clip, "ffprobe")
+
+            self.assertEqual(timestamps, (0.0, 1.0))
 
 
 if __name__ == "__main__":

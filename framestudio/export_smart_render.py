@@ -167,6 +167,9 @@ def _scaled_progress_callback(
             replace(
                 progress,
                 percent=start_percent + (end_percent - start_percent) * fraction,
+                current_percent=progress.percent
+                if progress.current_percent is None
+                else progress.current_percent,
             )
         )
 

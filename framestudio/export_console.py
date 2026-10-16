@@ -82,6 +82,18 @@ class ConsoleProgressReporter:
             return
 
         detail = f"Step {step}/{CONSOLE_EXPORT_STEP_COUNT} - {label}: {progress.percent:.1f}%"
+        if progress.overall_percent is not None:
+            current = (
+                progress.percent if progress.current_percent is None else progress.current_percent
+            )
+            detail = (
+                f"Overall {progress.overall_percent:.1f}% "
+                f"(elapsed {_format_seconds(progress.overall_elapsed_seconds)}, "
+                f"ETA {_format_seconds(progress.overall_eta_seconds)}) | "
+                f"current {current:.1f}% | {detail}"
+            )
+            if progress.output_count:
+                detail += f" | output {progress.output_index}/{progress.output_count}"
         if progress.stage.casefold() not in {label.casefold(), "complete"}:
             detail += f" [{progress.stage}]"
         if progress.total_frames:
@@ -93,7 +105,9 @@ class ConsoleProgressReporter:
         if progress.eta_seconds is not None:
             detail += f" | ETA {_format_seconds(progress.eta_seconds)}"
         print(detail, file=self.stream, flush=True)
-        if progress.stage.casefold() == "complete":
+        if progress.stage.casefold() == "complete" and (
+            progress.overall_percent is None or progress.overall_percent >= 100
+        ):
             print("Export complete.", file=self.stream, flush=True)
         self._last_step = step
         self._last_stage = progress.stage

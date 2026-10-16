@@ -50,6 +50,8 @@ from .export_coordinator import (
     verify_planned_output,
 )
 from .export_estimates import calibration_for_policy, estimate_project_export
+from .export_journal import ExportJournal, journal_path
+from .export_progress import ExportProgressTracker
 from .export_session import (
     ExportSessionError,
     ExportSessionInfo,
@@ -595,6 +597,7 @@ def _handle_coordinated_output_plan(
     probe_media_fn: Callable[..., MediaProbe],
     progress_output: TextIO | None,
     cancel_event: threading.Event,
+    progress_tracker: ExportProgressTracker | None = None,
 ) -> dict[str, Any]:
     resume_mode = getattr(args, "resume_mode", "fresh")
     session_info = discover_export_session(args.output)
@@ -661,10 +664,10 @@ def _handle_coordinated_output_plan(
             },
         )
 
-    report_preparation = ConsoleProgressReporter(
-        stream=sys.stderr if progress_output is None else progress_output,
-        force=bool(getattr(args, "human_progress", False)),
+    report_progress = progress_tracker or _progress_callback(
+        args=args, output=output, progress_output=progress_output
     )
+    report_preparation = report_progress
     source_hash_cache: SourceHashCache = {}
     plan_arguments, final_plan, source_plans = _build_output_plans(
         args,
@@ -703,11 +706,6 @@ def _handle_coordinated_output_plan(
         )
         for key in request_by_key
     }
-    report_progress = _progress_callback(
-        args=args,
-        output=output,
-        progress_output=progress_output,
-    )
     publication_lock = threading.Lock()
 
     def render_output(request: OutputRequest, candidate: Path, event: threading.Event) -> Path:
@@ -790,6 +788,7 @@ def _handle_coordinated_output_plan(
             publication_lock=publication_lock,
             tool_versions=tool_identities,
             protected_source_paths=protected_source_paths(project),
+            progress_tracker=progress_tracker,
             protected_receipt_paths=protected_receipt_paths(
                 project,
                 project_path=args.project,
@@ -876,6 +875,7 @@ def _handle_coordinated_output_plan(
         "export": export_payload,
     }
     if not result.complete:
+        export_payload["diagnostic_log"] = display_path(journal_path(args.output), args.full_paths)
         message = (
             result.error.get("message", "Export did not complete")
             if result.error is not None
@@ -1033,17 +1033,38 @@ def _handle_independent_output_plan(
             plan_project_export_fn=plan_project_export_fn,
             cancel_event=cancel_event,
         )
-    return _handle_coordinated_output_plan(
-        args,
-        project,
-        output=output,
-        output_plan=output_plan,
-        plan_project_export_fn=plan_project_export_fn,
-        execute_export_fn=execute_export_fn,
-        probe_media_fn=probe_media_fn,
-        progress_output=progress_output,
-        cancel_event=cancel_event,
+
+    def execute(tracker: ExportProgressTracker | None = None) -> dict[str, Any]:
+        return _handle_coordinated_output_plan(
+            args,
+            project,
+            output=output,
+            output_plan=output_plan,
+            plan_project_export_fn=plan_project_export_fn,
+            execute_export_fn=execute_export_fn,
+            probe_media_fn=probe_media_fn,
+            progress_output=progress_output,
+            cancel_event=cancel_event,
+            progress_tracker=tracker,
+        )
+
+    if getattr(args, "resume_mode", "fresh") == "discard":
+        return execute()
+    callback = _progress_callback(args=args, output=output, progress_output=progress_output)
+    protected = (
+        args.project,
+        *protected_source_paths(project),
+        *(request.destination for request in output_plan.output_requests),
     )
+    with ExportJournal(args.output, protected_paths=protected) as journal:
+
+        def report(progress: ExportProgress) -> None:
+            journal.progress(progress)
+            callback(progress)
+
+        tracker = ExportProgressTracker(report)
+        journal.heartbeat_callback = tracker.heartbeat
+        return execute(tracker)
 
 
 def _prepare_export_session(
@@ -1136,8 +1157,10 @@ def _export_cancellation() -> Iterator[threading.Event]:
     cancel_event = threading.Event()
     on_main_thread = threading.current_thread() is threading.main_thread()
     previous_sigint = signal.getsignal(signal.SIGINT)
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
     if on_main_thread:
         signal.signal(signal.SIGINT, lambda _signum, _frame: cancel_event.set())
+        signal.signal(signal.SIGTERM, lambda _signum, _frame: cancel_event.set())
     try:
         yield cancel_event
     except ExportPlanningError as error:
@@ -1151,6 +1174,7 @@ def _export_cancellation() -> Iterator[threading.Event]:
     finally:
         if on_main_thread:
             signal.signal(signal.SIGINT, previous_sigint)
+            signal.signal(signal.SIGTERM, previous_sigterm)
 
 
 def handle_export(

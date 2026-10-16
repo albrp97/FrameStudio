@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import unittest
 from dataclasses import replace
 from fractions import Fraction
@@ -638,7 +639,11 @@ class EditorSourceOutputTests(unittest.TestCase):
 
                     self.assertTrue(context.exception.details["partial_success"])
                     self.assertFalse(context.exception.details["verified"])
-                    self.assertEqual(output.getvalue(), "")
+                    messages = [json.loads(line) for line in output.getvalue().splitlines()]
+                    self.assertTrue(messages)
+                    self.assertTrue(
+                        all(message["command"] == "export.progress" for message in messages)
+                    )
                     self.assertEqual(
                         [item["state"] for item in context.exception.details["results"]],
                         [result.state.value for result in results],

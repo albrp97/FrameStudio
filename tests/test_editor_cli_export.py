@@ -113,11 +113,15 @@ class EditorCliExportTests(unittest.TestCase):
     def test_sigint_during_source_only_audio_planning_is_structured_and_cleans_child(self):
         self._assert_audio_planning_cancellation(synchronized=True, output_mode="source-only")
 
+    def test_sigterm_is_logged_and_cancels_analysis_without_leaving_child_process(self):
+        self._assert_audio_planning_cancellation(synchronized=True, signum=signal.SIGTERM)
+
     def _assert_audio_planning_cancellation(
         self,
         *,
         synchronized: bool,
         output_mode: str = "final-only",
+        signum: int = signal.SIGINT,
     ) -> None:
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -186,13 +190,21 @@ class EditorCliExportTests(unittest.TestCase):
                 self.assertTrue(child_marker.exists(), "export exited before audio analysis")
                 child_pid = int(child_marker.read_text())
                 self.assertIsNone(process.poll())
-                process.send_signal(signal.SIGINT)
+                process.send_signal(signum)
                 stdout, stderr = process.communicate(timeout=2.0)
                 self.assertEqual(process.returncode, 5, stderr)
-                self.assertEqual(stdout, "")
+                progress = [json.loads(line) for line in stdout.splitlines()]
+                self.assertTrue(all(item["event"] == "progress" for item in progress))
+                self.assertTrue(all(item["progress"]["overall_percent"] < 100 for item in progress))
                 payload = json.loads(stderr)
                 self.assertFalse(payload["ok"])
                 self.assertEqual(payload["error"]["code"], "export_cancelled")
+                from framestudio.export_journal import journal_path
+
+                journal = journal_path(destination)
+                self.assertTrue(journal.is_file())
+                entries = [json.loads(line) for line in journal.read_text().splitlines()]
+                self.assertEqual(entries[-1]["event"], "cancelled")
                 self.assertFalse(destination.exists())
                 self.assertFalse(Path(f"/proc/{child_pid}").exists())
                 self.assertEqual(source.read_bytes(), source_before)
@@ -809,7 +821,14 @@ class EditorCliExportTests(unittest.TestCase):
             self.assertEqual(result, 0)
             lines = [json.loads(line) for line in stdout.getvalue().splitlines()]
             self.assertEqual(lines[0]["command"], "export.progress")
-            self.assertEqual(lines[0]["progress"]["percent"], 50.0)
+            encoding = [
+                line["progress"]
+                for line in lines
+                if line.get("event") == "progress" and line["progress"]["stage"] == "encoding"
+            ]
+            self.assertEqual(encoding[0]["percent"], 50.0)
+            self.assertEqual(encoding[0]["current_percent"], 50.0)
+            self.assertLess(encoding[0]["overall_percent"], 100.0)
             self.assertEqual(lines[-1]["command"], "export")
             self.assertTrue(lines[-1]["export"]["verified"])
             self.assertEqual(lines[-1]["export"]["route"], "stream-copy")

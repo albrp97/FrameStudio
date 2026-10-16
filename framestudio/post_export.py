@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from .export_journal import journal_path
+
 POST_EXPORT_ACTIONS = ("nothing", "sleep", "shutdown")
 
 
@@ -68,6 +70,10 @@ def write_export_failure_log(
         f"Destination: {Path(destination).name if destination is not None else 'unknown'}\n"
         f"Error: {safe_message}\n"
     )
+    if destination is not None:
+        journal = journal_path(Path(destination))
+        if journal.is_file():
+            payload += f"Diagnostic journal: {journal.name}\n"
     partial: Path | None = None
     file_descriptor: int | None = None
     try:

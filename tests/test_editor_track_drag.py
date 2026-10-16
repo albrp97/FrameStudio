@@ -124,6 +124,36 @@ def synchronized_timeline() -> SegmentTimeline:
 
 
 class EditorTrackDragTests(unittest.TestCase):
+    def test_screen_coordinates_include_native_surface_translation(self):
+        from tests.test_editor_track_drag_functionality import _screen_coordinates
+
+        geometry = "X=100\nY=200\n"
+        self.assertEqual(_screen_coordinates(geometry, (20, 30)), (120, 230))
+        self.assertEqual(
+            _screen_coordinates(geometry, (20, 30), surface_transform=(5, 5)),
+            (125, 235),
+        )
+
+    def test_uncommitted_segment_press_snaps_before_release(self):
+        for state in (0, 64):
+            with self.subTest(state=state):
+                seeks = []
+                canvas = create_timeline_canvas(FakeGtk)(
+                    on_seek=seeks.append,
+                    snap_bypass_modifier_mask=64,
+                )
+                canvas.set_timeline(synchronized_timeline())
+                canvas.set_zoom(461.32)
+                clip = canvas._layout()[0]
+                x, y = clip.x + clip.snap_width / 2, clip.y + clip.height / 2
+                gesture = FakeGesture(state=state)
+                canvas._on_drag_begin(gesture, x, y)
+                canvas._on_pressed(gesture, 1, x, y)
+                if state:
+                    self.assertGreater(seeks[-1], clip.timeline_start_seconds)
+                else:
+                    self.assertEqual(seeks[-1], clip.timeline_start_seconds)
+
     def test_native_drag_begin_before_ctrl_press_does_not_toggle_selection_twice(self):
         drops: list[tuple[str, int, str]] = []
         canvas = create_timeline_canvas(FakeGtk)(

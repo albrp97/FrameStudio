@@ -433,8 +433,15 @@ video composition, audio composition and verified AV mux are separate durable
 checkpoints. Each is recorded only after successful verification, with a content
 hash and a recipe/tool/runtime identity. Custom restoration models are
 content-fingerprinted too. Resume checks checkpoint integrity and reuses matching
-completed work even in a new application process. An interrupted step is not
-marked complete; it must run again, while earlier completed steps remain reusable.
+completed work even in a new application process. Each unique segment is saved
+individually, not only at the end of an entire interpolation batch: stopping
+after 20 of 40 completed segments preserves those 20. A completed verified
+fallback is reused before retrying an AI backend that failed on the same range.
+An operation that finished writing but was interrupted before validation retains
+its pending file for validation on resume. Incomplete or invalid files are
+rebuilt; they are never accepted as completed work. An interruption inside an
+unfinished encoder/inference operation may still require repeating that item;
+arbitrary in-memory AI/encoder state is not a frame-level checkpoint.
 Checkpoint/storage errors are explicit failures, not reasons to silently
 downgrade the AI backend. Any permitted enhancement fallback is retained in the
 video checkpoint metadata and reported again on reuse.
@@ -514,6 +521,40 @@ The standalone `baseline` mode disables content reuse; optional paired
 restoration stage. Reports include trial times, job counts, decoded-frame hashes,
 source-preservation checks, and completed interpolation backends.
 
+#### Additional multitrack optimization
+
+The final compositor bounds decoder/filter concurrency when it consumes at
+least three distinct video inputs, rather than creating an automatic decoder
+thread pool for every input. One/two-input renders and the final encoder keep
+their existing settings. Identical triplicate scale/format work runs once
+before the three crops, and repeated audio uses one input decoder with separate
+trim, resample, pan and limiter branches.
+
+Three sequential local trials compared this combination against the already
+deduplicated renderer above, with the same encoded profile and identical
+decoded video/PCM. These are additional results, not cumulative percentages:
+
+| Generated workload | Before, median | Selected, median | Less elapsed time |
+| --- | ---: | ---: | ---: |
+| 3 tracks, 35 sources, 114 blocks, 116 layout intervals | 11.468 s | 8.027 s | 30.0% (1.43x) |
+| 3 tracks with triplicate composition | 2.525 s | 1.776 s | 29.7% (1.42x) |
+| Repeated ranges with FFmpeg FPS enhancement | 3.628 s | 3.552 s | 2.1% (approximately neutral) |
+
+Inputs were generated 320x180 media; output remained 1920x1080. These
+workstation-specific results do not predict the full duration of a real
+high-resolution/RVE export. Lossless per-track/chunk intermediates were also
+tested, but added overhead rather than winning on the tested static workload.
+No GPU scaler/encoder substitution or reduced-quality intermediate was adopted.
+
+Completed native, upscale, FPS and audio checkpoints remain reusable. A
+composition-clock correction invalidates only old video/mux preparation
+recipes, preventing one-frame layout intervals from losing frames during
+concatenation. It does not discard completed segment enhancement or audio work.
+The same limitation on resuming inside an unfinished operation still applies.
+Protocol, limitations and exact trial data are in
+[`evidence/efficient-export-pipeline-benchmark.md`](evidence/efficient-export-pipeline-benchmark.md)
+and [`evidence/multitrack-render-results.json`](evidence/multitrack-render-results.json).
+
 Disable the final-video option to export only the reels. These choices also
 work with synchronized tracks:
 
@@ -567,6 +608,18 @@ Successful batches have an adjacent hidden
 recovery state, not an atomic transaction across all output files.
 Discard removes recovery state, never original media or published outputs.
 
+During an actual export, an adjacent hidden diagnostic journal is kept at
+`.<destination-name>.framestudio-export.log`. It records operations, output
+position, percentages, subprocess PIDs and exit diagnostics, chained errors,
+and a heartbeat every five seconds even when no frames advance. It survives
+cancellation, failure, or a killed application and appends new attempts. A
+subsequent attempt identifies an unfinished previous run. It is removed only
+after the entire requested output set has been verified and delivered.
+An abrupt kill or power loss cannot write a final explanation; the retained
+last heartbeat and operation show where execution stopped, not an invented
+crash cause. The log is private to the local user and is not a substitute for
+the media checkpoints.
+
 When stdout is used for automation, export progress is JSON Lines. Human
 readable numbered stages are written to stderr, so terminal progress does not
 corrupt machine-readable output. Human progress refreshes every five seconds
@@ -574,6 +627,19 @@ while progress samples continue, even when the displayed percentage has not
 advanced, and during long FFprobe frame-count and FFmpeg decoded-output
 validation scans. The versioned details are in
 [`docs/specs/cli-contract.md`](docs/specs/cli-contract.md).
+
+The editor shows separate **Overall** and **Current operation** progress bars.
+The Overall bar includes whole-export elapsed time and an estimated remaining
+time; the current-operation timing remains separate. ETA is unknown until there
+is measurable progress, excludes jumps from verified reused work when estimating
+the processing rate, and reaches zero only on whole-batch completion.
+CLI progress reports both percentages and the current output number. Overall
+progress weights all requested outputs by duration, reserves preparation and
+verification/publication work, and nests segment preparation, composition,
+audio and mux progress. It never resets for the next segment or output and
+reaches 100% only when the whole batch succeeds. Verified reused outputs count
+toward completed work; reused substeps advance as their integrity is checked.
+These weights measure planned work, not an exact share of wall-clock time.
 
 ## Use the command-line editor
 

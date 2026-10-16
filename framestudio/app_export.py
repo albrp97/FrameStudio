@@ -9,7 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
-from .app_helpers import format_export_progress_label
+from .app_helpers import format_export_overall_label, format_export_progress_label
 from .audio import audio_decision_is_stale
 from .av_compositor import (
     AVCompositorExecutionError,
@@ -44,6 +44,7 @@ from .export_coordinator import (
     resolve_output_plan,
     verify_planned_output,
 )
+from .export_journal import ExportJournal
 from .export_naming import smart_export_name
 from .export_panel import (
     ExportPanelState,
@@ -53,6 +54,7 @@ from .export_panel import (
     upscale_panel_rows,
 )
 from .export_process import check_export_cancelled, report_preparation_progress
+from .export_progress import ExportProgressTracker
 from .export_session import (
     ExportSessionError,
     discard_export_session,
@@ -783,17 +785,27 @@ def on_export_dialog_done(window: Any, dialog: Any, result: Any, GLib: Any) -> N
 def reset_export_progress(window: Any) -> None:
     window.export_progress_panel.set_visible(True)
     window.export_progress_bar.set_fraction(0.0)
-    window.export_progress_bar.set_text("0.0%")
+    window.export_progress_bar.set_text("Overall 0.0%")
+    current_bar = getattr(window, "export_current_progress_bar", None)
+    if current_bar is not None:
+        current_bar.set_fraction(0.0)
+        current_bar.set_text("Current operation 0.0%")
     window.export_progress_label.set_text("Preparing export...")
     window.cancel_export_button.set_visible(True)
     window.cancel_export_button.set_sensitive(True)
 
 
 def update_export_progress(window: Any, progress: ExportProgress) -> bool:
+    overall = progress.percent if progress.overall_percent is None else progress.overall_percent
     window.export_progress_bar.set_fraction(
-        max(0.0, min(1.0, progress.percent / 100.0)),
+        max(0.0, min(1.0, overall / 100.0)),
     )
-    window.export_progress_bar.set_text(f"{progress.percent:.1f}%")
+    window.export_progress_bar.set_text(format_export_overall_label(progress))
+    current_bar = getattr(window, "export_current_progress_bar", None)
+    if current_bar is not None:
+        current = progress.percent if progress.current_percent is None else progress.current_percent
+        current_bar.set_fraction(max(0.0, min(1.0, current / 100.0)))
+        current_bar.set_text(f"Current operation {current:.1f}%")
     window.export_progress_label.set_text(format_export_progress_label(progress))
     return False
 
@@ -952,7 +964,51 @@ def run_output_choice_job(
     project_path: Path | None = None,
 ) -> tuple[Path, OutputPlan, ExportPlan | AVRenderPlan | None, int]:
     """Render a selected output set through one recoverable coordinator."""
+    protected = tuple(Path(source.path) for source in project.sources or (project.source,))
+    if project_path is not None:
+        protected += (project_path,)
+    with ExportJournal(destination, protected_paths=protected) as journal:
 
+        def report(progress: ExportProgress) -> None:
+            journal.progress(progress)
+            if progress_callback is not None:
+                progress_callback(progress)
+
+        tracker = ExportProgressTracker(report)
+        journal.heartbeat_callback = tracker.heartbeat
+        return _run_output_choice_job(
+            project,
+            destination,
+            output_mode=output_mode,
+            frame_rate_policy=frame_rate_policy,
+            upscale_policy=upscale_policy,
+            progress_callback=tracker,
+            cancel_event=cancel_event,
+            cancellation_lock=cancellation_lock,
+            analysis_lock=analysis_lock,
+            resume_mode=resume_mode,
+            batch_result_holder=batch_result_holder,
+            project_path=project_path,
+            progress_tracker=tracker,
+        )
+
+
+def _run_output_choice_job(
+    project: Project,
+    destination: Path,
+    *,
+    output_mode: str,
+    frame_rate_policy: FrameRatePolicy | None,
+    upscale_policy: UpscalePolicy | None,
+    progress_callback: ExportProgressCallback,
+    cancel_event: threading.Event | None,
+    cancellation_lock: threading.Lock | None,
+    analysis_lock: threading.Lock | None,
+    resume_mode: str,
+    batch_result_holder: dict[str, ExportBatchResult] | None,
+    project_path: Path | None,
+    progress_tracker: ExportProgressTracker,
+) -> tuple[Path, OutputPlan, ExportPlan | AVRenderPlan | None, int]:
     plan_export_job = partial(
         _plan_export_with_analysis_lock,
         cancel_event=cancel_event,
@@ -1115,6 +1171,7 @@ def run_output_choice_job(
                 publication_lock=lock,
                 tool_versions=tool_identities,
                 protected_source_paths=protected_source_paths(project),
+                progress_tracker=progress_tracker,
                 protected_receipt_paths=protected_receipt_paths(
                     project,
                     project_path=project_path,

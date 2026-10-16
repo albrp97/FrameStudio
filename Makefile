@@ -10,6 +10,8 @@ QUALITY_PATHS = framestudio.py framestudio tests/test_editor_*.py \
 	benchmarks/render_strategy_benchmark.py tests/test_render_strategy_benchmark.py \
 	benchmarks/efficient_export_pipeline_benchmark.py \
 	tests/test_efficient_export_pipeline_benchmark.py \
+	benchmarks/multitrack_render_benchmark.py tests/test_multitrack_render_benchmark.py \
+	benchmarks/multitrack_architecture_benchmark.py tests/test_multitrack_architecture_benchmark.py \
 	benchmarks/playback_performance.py benchmarks/large_timeline_performance.py \
 	benchmarks/seek_performance.py benchmarks/large_project_preview.py \
 	benchmarks/repeated_render_benchmark.py \
@@ -18,6 +20,7 @@ QUALITY_PATHS = framestudio.py framestudio tests/test_editor_*.py \
 COMPLEXITY_PATHS = framestudio.py framestudio/cli.py framestudio/operations.py \
 	benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py \
 	benchmarks/efficient_export_pipeline_benchmark.py \
+	benchmarks/multitrack_render_benchmark.py benchmarks/multitrack_architecture_benchmark.py \
 	benchmarks/playback_performance.py benchmarks/large_timeline_performance.py \
 	benchmarks/seek_performance.py benchmarks/large_project_preview.py \
 	benchmarks/repeated_render_benchmark.py
@@ -81,6 +84,8 @@ type-check:
 	$(PYTHON) -m mypy --config-file pyproject.toml \
 		benchmarks/efficient_export_pipeline_benchmark.py
 	$(PYTHON) -m mypy --config-file pyproject.toml \
+		benchmarks/multitrack_render_benchmark.py benchmarks/multitrack_architecture_benchmark.py
+	$(PYTHON) -m mypy --config-file pyproject.toml \
 		benchmarks/playback_performance.py benchmarks/large_timeline_performance.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/seek_performance.py
 	$(PYTHON) -m mypy --config-file pyproject.toml benchmarks/large_project_preview.py
@@ -121,6 +126,7 @@ security:
 	$(PYTHON) -m bandit -r framestudio.py framestudio \
 		benchmarks/restoration_benchmark.py benchmarks/render_strategy_benchmark.py \
 		benchmarks/efficient_export_pipeline_benchmark.py \
+		benchmarks/multitrack_render_benchmark.py benchmarks/multitrack_architecture_benchmark.py \
 		benchmarks/playback_performance.py benchmarks/large_timeline_performance.py \
 		benchmarks/seek_performance.py \
 		benchmarks/large_project_preview.py \

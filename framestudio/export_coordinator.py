@@ -27,11 +27,13 @@ from urllib.parse import unquote, urlparse
 
 from .audio import AUDIO_POLICY_VERSION
 from .audio_compositor import AUDIO_CHANNELS, AUDIO_SAMPLE_RATE, fixed_pan_vector
+from .export_journal import record_export_error
 from .export_process import (
     check_export_cancelled,
     make_progress_heartbeat,
     report_preparation_progress,
 )
+from .export_progress import ExportProgressTracker
 from .export_session import (
     ExportSession,
     ExportSessionError,
@@ -799,6 +801,7 @@ class ExportCoordinator:
         protected_source_paths: Sequence[Path] = (),
         protected_receipt_paths: Sequence[Path] = (),
         policy_versions: Mapping[str, JSONValue] | None = None,
+        progress_tracker: ExportProgressTracker | None = None,
     ) -> None:
         self.output_requests = tuple(output_requests)
         self.session_destination = Path(session_destination).expanduser()
@@ -807,6 +810,7 @@ class ExportCoordinator:
         self.verify_output = verify_output
         self.publication_lock = publication_lock
         self.on_published = on_published
+        self.progress_tracker = progress_tracker
         self.tool_versions = dict(tool_versions or {})
         self.schema_version = schema_version
         self.compositor_version = compositor_version
@@ -1351,6 +1355,10 @@ class ExportCoordinator:
             )
 
         try:
+            if self.progress_tracker is not None:
+                self.progress_tracker.configure(
+                    tuple(item.expected_duration_seconds for item in self.output_requests)
+                )
             if mode == "resume":
                 self._apply_resume_records(
                     session,
@@ -1358,6 +1366,10 @@ class ExportCoordinator:
                     receipt=receipt,
                     cancel_event=event,
                 )
+                if self.progress_tracker is not None:
+                    for index, output_request in enumerate(self.output_requests):
+                        if results[_identity_key(output_request.identity)].verified:
+                            self.progress_tracker.finish_output(index, reused=True)
             self._save_batch_manifest(session, results, mode=mode)
             bookkeeping_error: dict[str, str] | None = None
             for index, output_request in enumerate(self.output_requests):
@@ -1367,6 +1379,8 @@ class ExportCoordinator:
                     continue
                 if event.is_set():
                     break
+                if self.progress_tracker is not None:
+                    self.progress_tracker.begin_output(index)
                 results[key] = ExportOutputResult(
                     identity=output_request.identity,
                     destination=output_request.destination,
@@ -1396,6 +1410,8 @@ class ExportCoordinator:
                         raise RuntimeError("Renderer returned an unexpected candidate path")
                     if event.is_set():
                         raise ExportCancelled("Export cancelled during rendering")
+                    if self.progress_tracker is not None:
+                        self.progress_tracker.verifying()
                     verification = self.verify_output(output_request, candidate, event)
                     if event.is_set():
                         raise ExportCancelled("Export cancelled during verification")
@@ -1430,19 +1446,24 @@ class ExportCoordinator:
                         self._save_batch_manifest(session, results, mode=mode)
                         if bookkeeping_error is not None:
                             break
+                        if self.progress_tracker is not None:
+                            self.progress_tracker.finish_output(index)
                         if self.on_published is not None:
                             self.on_published(output_request, output_request.destination)
                     except ExportCancelled as error:
+                        record_export_error(error)
                         bookkeeping_error = self._retain_published_context_failure(
                             results, failure_context, error, "cancelled", event
                         )
                         break
                     except (OSError, RuntimeError, ValueError, TypeError) as error:
+                        record_export_error(error)
                         bookkeeping_error = self._retain_published_context_failure(
                             results, failure_context, error, "bookkeeping", event
                         )
                         break
                 except ExportCancelled as error:
+                    record_export_error(error)
                     if publication_committed:
                         bookkeeping_error = self._retain_published_context_failure(
                             results, failure_context, error, "cancelled", event
@@ -1459,6 +1480,7 @@ class ExportCoordinator:
                     )
                     break
                 except (OSError, RuntimeError, ValueError, TypeError) as error:
+                    record_export_error(error)
                     if publication_committed:
                         bookkeeping_error = self._retain_published_context_failure(
                             results, failure_context, error, "bookkeeping", event
@@ -1494,6 +1516,8 @@ class ExportCoordinator:
                     bookkeeping_error = _error_payload("bookkeeping", str(error))
                 else:
                     session.cleanup_after_success()
+                    if self.progress_tracker is not None:
+                        self.progress_tracker.finish()
                     return ExportBatchResult(
                         results=tuple(results.values()),
                         mode=mode,

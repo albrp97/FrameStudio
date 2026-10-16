@@ -49,6 +49,11 @@ retaining a verified per-segment fallback and resumable artifacts.
 - Reuse valid grouped artifacts after cancellation, late failure, project
   reopen, or a later export attempt.
 - Emit truthful progress and explicit fallback diagnostics.
+- The 2026-10-16 multitrack optimization must preserve PHASE-010 / CHG-013:
+  dynamic active-set layouts and audio pan for the final video, but full-canvas
+  framing and normal source audio for each independent track/source reel.
+  Adopt only benchmark-supported candidates or compatible combinations;
+  retain the existing renderer as the comparison oracle and verified fallback.
 
 ## Explicit non-goals
 
@@ -93,4 +98,3 @@ retaining a verified per-segment fallback and resumable artifacts.
   `NOT APPLICABLE` with command output and artifact paths.
 - **Pass criteria:** technical tests, output verification, source
   preservation, resume behavior, and user-visible inspection all pass.
-

@@ -1,0 +1,109 @@
+{
+  "composition_version": 1,
+  "output_settings": {},
+  "project_id": "ticket-120-one-track-fixture",
+  "schema_version": 4,
+  "source": {
+    "metadata": {
+      "audio_channel_layout": "mono",
+      "audio_channels": 1,
+      "audio_codec": "aac",
+      "audio_sample_rate": 48000,
+      "audio_stream_present": true,
+      "duration_seconds": 4.0,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "frame_rate": "12/1",
+      "height": 640,
+      "orientation": "portrait",
+      "video_codec": "h264",
+      "width": 360
+    },
+    "modified_time_ns": 1792140538135996079,
+    "path": "/home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4",
+    "size_bytes": 37319,
+    "source_id": "ff4136cf97e347878193fd7e94535843",
+    "uri": "file:///home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4"
+  },
+  "source_settings": {
+    "ff4136cf97e347878193fd7e94535843": {
+      "audio": {
+        "gain_db": 0.0,
+        "measurements": {
+          "mean_rms_db": -23.0,
+          "median_db": -23.0,
+          "peak_db": -20.0,
+          "sample_count": 48000
+        },
+        "policy_version": "legacy-concat-v1",
+        "source_fingerprint": {
+          "modified_time_ns": 1792140538135996079,
+          "size_bytes": 37319
+        },
+        "status": "ready"
+      }
+    }
+  },
+  "sources": [
+    {
+      "metadata": {
+        "audio_channel_layout": "mono",
+        "audio_channels": 1,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_stream_present": true,
+        "duration_seconds": 4.0,
+        "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+        "frame_rate": "12/1",
+        "height": 640,
+        "orientation": "portrait",
+        "video_codec": "h264",
+        "width": 360
+      },
+      "modified_time_ns": 1792140538135996079,
+      "path": "/home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4",
+      "size_bytes": 37319,
+      "source_id": "ff4136cf97e347878193fd7e94535843",
+      "uri": "file:///home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4"
+    }
+  ],
+  "timeline": {
+    "active_track_id": "track-1",
+    "duration_ticks": 4000000,
+    "frame_rate": null,
+    "playhead_ticks": 0,
+    "ripple": false,
+    "source_durations_ticks": {
+      "ff4136cf97e347878193fd7e94535843": 4000000
+    },
+    "timebase": "1/1000000",
+    "timeline_model_version": 1,
+    "timing_mode": "absolute",
+    "tracks": [
+      {
+        "blocks": [
+          {
+            "block_id": "block-1",
+            "color_index": 0,
+            "deleted": false,
+            "segment_id": "segment-1",
+            "source_end_ticks": 4000000,
+            "source_id": "ff4136cf97e347878193fd7e94535843",
+            "source_start_ticks": 0,
+            "state": {},
+            "timeline_end_ticks": 4000000,
+            "timeline_start_ticks": 0,
+            "track_id": "track-1",
+            "triplicate": null,
+            "visual_transform": {
+              "offset_x": 0.0,
+              "offset_y": 0.0,
+              "version": 1,
+              "zoom": 1.0
+            }
+          }
+        ],
+        "track_id": "track-1"
+      }
+    ]
+  }
+}

@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -18,6 +17,14 @@ from .export_types import ExportExecutionError, ExportProgressCallback
 
 class PreparationCacheError(ExportExecutionError):
     """A checkpoint failure, not an unavailable enhancement backend."""
+
+
+def _request_identity(stage: str, request: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
+    payload = {"preparation_version": 1, "stage": stage, "request": dict(request)}
+    key = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
+    return payload, key
 
 
 def file_digest(path: Path, cancel_event: threading.Event | None = None) -> str:
@@ -107,14 +114,16 @@ class RenderPreparations:
         validate: Callable[[Path], object],
         *,
         suffix: str = ".mp4",
+        progress_callback: ExportProgressCallback | None = None,
     ) -> Path:
         check_export_cancelled(self.cancel_event)
-        payload = {"preparation_version": 1, "stage": stage, "request": dict(request)}
-        key = hashlib.sha256(
-            json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
-        ).hexdigest()
+        payload, key = _request_identity(stage, request)
+        callback = progress_callback or self.progress_callback
         if key in self._ready:
             self.hits += 1
+            report_preparation_progress(
+                callback, f"Reusing verified {stage}", 1, 1, time.monotonic()
+            )
             return self._ready[key]
         destination = self.root / f"{key}{suffix}"
         started = time.monotonic()
@@ -126,36 +135,60 @@ class RenderPreparations:
             session = ExportSession.open(
                 destination, payload, (stage,), mode="resume" if info.exists else "fresh"
             )
-            cached = session.reuse(stage)
+            cached = self._reuse_verified(session, stage, key, callback)
             if cached is not None:
-                record = session.manifest["stages"][stage]["metadata"]
-                if isinstance(record, dict) and file_digest(
-                    cached, self.cancel_event
-                ) == record.get("sha256"):
-                    self.hits += 1
-                    self._ready[key] = cached
-                    self.validation_data[cached] = record.get("validation")
-                    report_preparation_progress(
-                        self.progress_callback, f"Reusing verified {stage}", 1, 1, started
-                    )
-                    return cached
-                session.invalidate(stage)
+                return cached
             self.misses += 1
             session.mark_running(stage)
             final_path = session.artifact_path(stage, suffix=suffix)
-            with tempfile.NamedTemporaryFile(
-                dir=final_path.parent,
-                prefix=f"{final_path.stem}.partial-",
-                suffix=suffix,
-                delete=False,
-            ) as temporary:
-                candidate = Path(temporary.name)
-            candidate.unlink()
-            producing = True
-            produce(candidate)
-            producing = False
+            candidate = final_path.with_name(f"{final_path.stem}.pending{suffix}")
+            pending_proof = session.manifest["stages"][stage].get("pending_complete")
+            validated = False
+            validation = None
+            if not candidate.exists() and final_path.is_file() and isinstance(pending_proof, dict):
+                final_stat = final_path.stat()
+                if pending_proof == {
+                    "size": final_stat.st_size,
+                    "mtime_ns": final_stat.st_mtime_ns,
+                }:
+                    os.replace(final_path, candidate)
+            if candidate.is_file():
+                report_preparation_progress(
+                    callback, f"Recovering completed {stage}", 0, 1, started
+                )
+                try:
+                    pending_stat = candidate.stat()
+                    if pending_proof != {
+                        "size": pending_stat.st_size,
+                        "mtime_ns": pending_stat.st_mtime_ns,
+                    }:
+                        raise ExportExecutionError("Pending operation did not finish writing")
+                    validation = validate(candidate)
+                    validated = True
+                except ExportExecutionError:
+                    check_export_cancelled(self.cancel_event)
+                    report_preparation_progress(
+                        callback, f"Rebuilding incomplete {stage}", 0, 1, started
+                    )
+                    candidate.unlink()
+            if not candidate.exists():
+                session.manifest["stages"][stage]["pending_complete"] = None
+                session._save_manifest()
+                report_preparation_progress(callback, f"Preparing {stage}", 0, 1, started)
+                producing = True
+                produce(candidate)
+                producing = False
+                with candidate.open("rb") as handle:
+                    os.fsync(handle.fileno())
+                produced_stat = candidate.stat()
+                session.manifest["stages"][stage]["pending_complete"] = {
+                    "size": produced_stat.st_size,
+                    "mtime_ns": produced_stat.st_mtime_ns,
+                }
+                session._save_manifest()
             check_export_cancelled(self.cancel_event)
-            validation = validate(candidate)
+            if not validated:
+                validation = validate(candidate)
             proof = file_digest(candidate, self.cancel_event)
             with candidate.open("rb") as handle:
                 os.fsync(handle.fileno())
@@ -163,9 +196,7 @@ class RenderPreparations:
             session.record(stage, final_path, metadata={"sha256": proof, "validation": validation})
             self._ready[key] = final_path
             self.validation_data[final_path] = validation
-            report_preparation_progress(
-                self.progress_callback, f"Checkpointed {stage}", 1, 1, started
-            )
+            report_preparation_progress(callback, f"Checkpointed {stage}", 1, 1, started)
             return final_path
         except ExportSessionError as error:
             raise PreparationCacheError(str(error)) from error
@@ -175,10 +206,55 @@ class RenderPreparations:
             raise PreparationCacheError(f"Could not persist or read {stage} checkpoint") from error
         finally:
             try:
-                if candidate is not None:
+                if producing and candidate is not None:
                     candidate.unlink(missing_ok=True)
-            except OSError as error:
-                raise PreparationCacheError("Could not clean incomplete checkpoint") from error
             finally:
                 if session is not None:
                     session.close()
+
+    def reuse(
+        self,
+        stage: str,
+        request: Mapping[str, Any],
+        *,
+        suffix: str = ".mp4",
+        progress_callback: ExportProgressCallback | None = None,
+    ) -> Path | None:
+        """Look up a verified alternative before retrying an expensive failed backend."""
+        check_export_cancelled(self.cancel_event)
+        payload, key = _request_identity(stage, request)
+        destination = self.root / f"{key}{suffix}"
+        if not discover_export_session(destination).exists:
+            return None
+        try:
+            session = ExportSession.open(destination, payload, (stage,), mode="resume")
+            try:
+                return self._reuse_verified(
+                    session, stage, key, progress_callback or self.progress_callback
+                )
+            finally:
+                session.close()
+        except (OSError, ExportSessionError) as error:
+            raise PreparationCacheError(f"Could not read {stage} checkpoint") from error
+
+    def _reuse_verified(
+        self,
+        session: ExportSession,
+        stage: str,
+        key: str,
+        callback: ExportProgressCallback | None,
+    ) -> Path | None:
+        cached = session.reuse(stage)
+        if cached is None:
+            return None
+        record = session.manifest["stages"][stage]["metadata"]
+        if not isinstance(record, dict) or file_digest(cached, self.cancel_event) != record.get(
+            "sha256"
+        ):
+            session.invalidate(stage)
+            return None
+        self.hits += 1
+        self._ready[key] = cached
+        self.validation_data[cached] = record.get("validation")
+        report_preparation_progress(callback, f"Reusing verified {stage}", 1, 1, time.monotonic())
+        return cached

@@ -13,6 +13,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any, Protocol
 
+from .export_journal import record_export_process
 from .export_types import (
     _BOUNDARY_TOLERANCE,
     ExportExecutionError,
@@ -213,7 +214,14 @@ def monotonic_progress_callback(
         last_percent = percent
         last_frame = frame
         if percent != progress.percent or frame != progress.frame:
-            progress = replace(progress, percent=percent, frame=frame)
+            progress = replace(
+                progress,
+                percent=percent,
+                frame=frame,
+                current_percent=progress.percent
+                if progress.current_percent is None
+                else progress.current_percent,
+            )
         callback(progress)
 
     return forward
@@ -366,6 +374,7 @@ def _run_command_with_heartbeat(
         text=True,
     )
     try:
+        record_export_process("process_started", process.pid, command[0])
         while True:
             if cancel_event is not None and cancel_event.is_set():
                 _terminate_process(process)
@@ -376,6 +385,13 @@ def _run_command_with_heartbeat(
                 if heartbeat_callback is not None:
                     heartbeat_callback()
             else:
+                record_export_process(
+                    "process_exited",
+                    process.pid,
+                    command[0],
+                    returncode=process.returncode,
+                    stderr_tail=stderr[-4096:],
+                )
                 if cancel_event is not None and cancel_event.is_set():
                     raise ExportExecutionError("Export cancelled")
                 return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
@@ -420,6 +436,7 @@ def run_command_with_cancellation(
         text=text,
     )
     try:
+        record_export_process("process_started", process.pid, command[0])
         while True:
             if cancel_event.is_set():
                 _terminate_process(process)
@@ -430,6 +447,13 @@ def run_command_with_cancellation(
                 continue
             if cancel_event.is_set():
                 raise ExportExecutionError("Export cancelled")
+            record_export_process(
+                "process_exited",
+                process.pid,
+                command[0],
+                returncode=process.returncode,
+                stderr_tail=stderr[-4096:] if isinstance(stderr, str) else str(stderr[-4096:]),
+            )
             return subprocess.CompletedProcess(
                 list(command),
                 process.returncode,
@@ -470,7 +494,7 @@ def run_ffmpeg(
             raise ExportExecutionError(f"Could not start FFmpeg: {command[0]}") from error
         if result.returncode != 0:
             detail = result.stderr.strip() or "FFmpeg failed without a diagnostic"
-            raise ExportExecutionError(detail)
+            raise ExportExecutionError(f"FFmpeg exited with code {result.returncode}: {detail}")
         return
 
     if not command:
@@ -522,6 +546,7 @@ def run_ffmpeg(
         cancellation_watcher.start()
 
     try:
+        record_export_process("process_started", process.pid, command[0], stage=stage)
         if process.stdout is None:
             raise ExportExecutionError("FFmpeg progress pipe is unavailable")
         for raw_line in process.stdout:
@@ -595,7 +620,15 @@ def run_ffmpeg(
             _terminate_process(process)
     if return_code != 0:
         detail = "\n".join(tail) or "FFmpeg failed without a diagnostic"
-        raise ExportExecutionError(detail)
+        record_export_process(
+            "process_exited",
+            process.pid,
+            command[0],
+            returncode=return_code,
+            stderr_tail=detail,
+        )
+        raise ExportExecutionError(f"FFmpeg exited with code {return_code}: {detail}")
+    record_export_process("process_exited", process.pid, command[0], returncode=return_code)
 
 
 def expected_export_frames(plan: ExportPlan, source_probe: MediaProbe) -> int:
@@ -630,23 +663,25 @@ def segment_is_full_source(
     )
 
 
-def probe_frame_count(
+def _ffprobe_video_count(
     path: Path,
-    ffprobe_path: str = "ffprobe",
+    ffprobe_path: str,
     *,
-    heartbeat_callback: Callable[[], None] | None = None,
-    heartbeat_interval_seconds: float = 5.0,
-    cancel_event: threading.Event | None = None,
+    count_flag: str,
+    stream_key: str,
+    heartbeat_callback: Callable[[], None] | None,
+    heartbeat_interval_seconds: float,
+    cancel_event: threading.Event | None,
 ) -> int:
     command = [
         ffprobe_path,
         "-v",
         "error",
-        "-count_frames",
+        count_flag,
         "-select_streams",
         "v:0",
         "-show_entries",
-        "stream=nb_read_frames",
+        f"stream={stream_key}",
         "-of",
         "json",
         str(path),
@@ -666,13 +701,69 @@ def probe_frame_count(
         detail = result.stderr.strip() or "ffprobe could not count video frames"
         raise ExportExecutionError(detail)
     try:
-        value = json.loads(result.stdout)["streams"][0]["nb_read_frames"]
+        value = json.loads(result.stdout)["streams"][0][stream_key]
         count = int(value)
     except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise ExportExecutionError(f"Could not count frames in {path.name}") from error
     if count <= 0:
         raise ExportExecutionError(f"Frame count is invalid for {path.name}")
     return count
+
+
+def probe_frame_count(
+    path: Path,
+    ffprobe_path: str = "ffprobe",
+    *,
+    heartbeat_callback: Callable[[], None] | None = None,
+    heartbeat_interval_seconds: float = 5.0,
+    cancel_event: threading.Event | None = None,
+) -> int:
+    """Count decoded video frames by fully decoding the stream (slow, exact)."""
+    return _ffprobe_video_count(
+        path,
+        ffprobe_path,
+        count_flag="-count_frames",
+        stream_key="nb_read_frames",
+        heartbeat_callback=heartbeat_callback,
+        heartbeat_interval_seconds=heartbeat_interval_seconds,
+        cancel_event=cancel_event,
+    )
+
+
+def probe_source_frame_count(
+    path: Path,
+    ffprobe_path: str = "ffprobe",
+    *,
+    heartbeat_callback: Callable[[], None] | None = None,
+    heartbeat_interval_seconds: float = 5.0,
+    cancel_event: threading.Event | None = None,
+) -> int:
+    """Count frames of an unmodified source by demuxing packets, without decoding.
+
+    For H.264 and similar codecs each video packet carries one frame, so the
+    demuxed packet count matches the decoded frame count while avoiding a full
+    decode. Falls back to the decoded count when packets are not reported.
+    """
+    try:
+        return _ffprobe_video_count(
+            path,
+            ffprobe_path,
+            count_flag="-count_packets",
+            stream_key="nb_read_packets",
+            heartbeat_callback=heartbeat_callback,
+            heartbeat_interval_seconds=heartbeat_interval_seconds,
+            cancel_event=cancel_event,
+        )
+    except ExportExecutionError:
+        if cancel_event is not None and cancel_event.is_set():
+            raise
+        return probe_frame_count(
+            path,
+            ffprobe_path,
+            heartbeat_callback=heartbeat_callback,
+            heartbeat_interval_seconds=heartbeat_interval_seconds,
+            cancel_event=cancel_event,
+        )
 
 
 def ensure_exact_video_frame_count(

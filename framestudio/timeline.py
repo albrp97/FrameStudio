@@ -421,7 +421,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
             self._seek_from_x(
                 x,
                 y=y,
-                notify=False,
+                notify=True,
                 update_selection=update_selection,
                 additive=self._pressed_selection_additive,
             )
@@ -549,14 +549,19 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                     self._update_segment_drag(offset_x, offset_y)
                     self._finish_segment_drag()
             elif self._drag_start_x is not None:
+                seek_x = self._drag_start_x + offset_x if drag_committed else self._drag_start_x
+                seek_y = (
+                    (self._drag_start_y or 0.0) + offset_y
+                    if drag_committed
+                    else (self._drag_start_y or 0.0)
+                )
                 self._seek_from_x(
-                    self._drag_start_x + offset_x,
-                    y=(self._drag_start_y or 0.0) + offset_y,
+                    seek_x,
+                    y=seek_y,
                     notify=True,
                     update_selection=False,
                     additive=self._pressed_selection_additive,
                 )
-            self._clear_drag_state(reset_drag_happened=False)
 
         def _on_drag_cancel(self, _gesture, _event=None) -> None:
             self._drag_committed = self._drag_happened
@@ -786,7 +791,7 @@ def create_timeline_canvas(gtk_module: Any) -> Any:
                 self._zoom,
             )
             if (
-                (self._drag_mode is None or (self._drag_mode == "seek" and not self._drag_moved))
+                not self._drag_moved
                 and not self._snap_bypassed
                 and clip is not None
                 and y is not None

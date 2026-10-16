@@ -1,0 +1,363 @@
+{
+  "composition_version": 1,
+  "output_settings": {},
+  "project_id": "ticket-120-four-track-fixture",
+  "schema_version": 4,
+  "source": {
+    "metadata": {
+      "audio_channel_layout": "mono",
+      "audio_channels": 1,
+      "audio_codec": "aac",
+      "audio_sample_rate": 48000,
+      "audio_stream_present": true,
+      "duration_seconds": 4.0,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "frame_rate": "12/1",
+      "height": 640,
+      "orientation": "portrait",
+      "video_codec": "h264",
+      "width": 360
+    },
+    "modified_time_ns": 1792140538135996079,
+    "path": "/home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4",
+    "size_bytes": 37319,
+    "source_id": "cee9eba67b114e5a94214d306639a964",
+    "uri": "file:///home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4"
+  },
+  "source_settings": {
+    "949039a06d4c4dcba1c48e0a102ba621": {
+      "audio": {
+        "gain_db": 0.0,
+        "measurements": {
+          "mean_rms_db": -23.0,
+          "median_db": -23.0,
+          "peak_db": -20.0,
+          "sample_count": 48000
+        },
+        "policy_version": "legacy-concat-v1",
+        "source_fingerprint": {
+          "modified_time_ns": 1792140538206651589,
+          "size_bytes": 37346
+        },
+        "status": "ready"
+      }
+    },
+    "cee9eba67b114e5a94214d306639a964": {
+      "audio": {
+        "gain_db": 0.0,
+        "measurements": {
+          "mean_rms_db": -23.0,
+          "median_db": -23.0,
+          "peak_db": -20.0,
+          "sample_count": 48000
+        },
+        "policy_version": "legacy-concat-v1",
+        "source_fingerprint": {
+          "modified_time_ns": 1792140538135996079,
+          "size_bytes": 37319
+        },
+        "status": "ready"
+      }
+    },
+    "e000954cbf55442fb9c51782c02ab8bf": {
+      "audio": {
+        "gain_db": 0.0,
+        "measurements": {
+          "mean_rms_db": -23.0,
+          "median_db": -23.0,
+          "peak_db": -20.0,
+          "sample_count": 48000
+        },
+        "policy_version": "legacy-concat-v1",
+        "source_fingerprint": {
+          "modified_time_ns": 1792140538274078274,
+          "size_bytes": 37544
+        },
+        "status": "ready"
+      }
+    },
+    "f963b71193c742f7ace71555a5a004b3": {
+      "audio": {
+        "gain_db": 0.0,
+        "measurements": {
+          "mean_rms_db": -23.0,
+          "median_db": -23.0,
+          "peak_db": -20.0,
+          "sample_count": 48000
+        },
+        "policy_version": "legacy-concat-v1",
+        "source_fingerprint": {
+          "modified_time_ns": 1792140538343412296,
+          "size_bytes": 37463
+        },
+        "status": "ready"
+      }
+    }
+  },
+  "sources": [
+    {
+      "metadata": {
+        "audio_channel_layout": "mono",
+        "audio_channels": 1,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_stream_present": true,
+        "duration_seconds": 4.0,
+        "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+        "frame_rate": "12/1",
+        "height": 640,
+        "orientation": "portrait",
+        "video_codec": "h264",
+        "width": 360
+      },
+      "modified_time_ns": 1792140538135996079,
+      "path": "/home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4",
+      "size_bytes": 37319,
+      "source_id": "cee9eba67b114e5a94214d306639a964",
+      "uri": "file:///home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/red-portrait.mp4"
+    },
+    {
+      "metadata": {
+        "audio_channel_layout": "mono",
+        "audio_channels": 1,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_stream_present": true,
+        "duration_seconds": 4.0,
+        "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+        "frame_rate": "12/1",
+        "height": 360,
+        "orientation": "landscape",
+        "video_codec": "h264",
+        "width": 640
+      },
+      "modified_time_ns": 1792140538206651589,
+      "path": "/home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/green-landscape.mp4",
+      "size_bytes": 37346,
+      "source_id": "949039a06d4c4dcba1c48e0a102ba621",
+      "uri": "file:///home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/green-landscape.mp4"
+    },
+    {
+      "metadata": {
+        "audio_channel_layout": "mono",
+        "audio_channels": 1,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_stream_present": true,
+        "duration_seconds": 4.0,
+        "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+        "frame_rate": "12/1",
+        "height": 300,
+        "orientation": "landscape",
+        "video_codec": "h264",
+        "width": 800
+      },
+      "modified_time_ns": 1792140538274078274,
+      "path": "/home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/blue-ultrawide.mp4",
+      "size_bytes": 37544,
+      "source_id": "e000954cbf55442fb9c51782c02ab8bf",
+      "uri": "file:///home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/blue-ultrawide.mp4"
+    },
+    {
+      "metadata": {
+        "audio_channel_layout": "mono",
+        "audio_channels": 1,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_stream_present": true,
+        "duration_seconds": 4.0,
+        "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+        "frame_rate": "12/1",
+        "height": 480,
+        "orientation": "square",
+        "video_codec": "h264",
+        "width": 480
+      },
+      "modified_time_ns": 1792140538343412296,
+      "path": "/home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/yellow-square.mp4",
+      "size_bytes": 37463,
+      "source_id": "f963b71193c742f7ace71555a5a004b3",
+      "uri": "file:///home/ghiki/code/FrameStudio/tests/.ticket120-gtk-f8a994dcf1b744359dc63eb0772bea20/fixtures/yellow-square.mp4"
+    }
+  ],
+  "timeline": {
+    "active_track_id": "track-1",
+    "duration_ticks": 5000000,
+    "frame_rate": null,
+    "playhead_ticks": 0,
+    "ripple": false,
+    "source_durations_ticks": {
+      "949039a06d4c4dcba1c48e0a102ba621": 4000000,
+      "cee9eba67b114e5a94214d306639a964": 4000000,
+      "e000954cbf55442fb9c51782c02ab8bf": 4000000,
+      "f963b71193c742f7ace71555a5a004b3": 4000000
+    },
+    "timebase": "1/1000000",
+    "timeline_model_version": 1,
+    "timing_mode": "absolute",
+    "tracks": [
+      {
+        "blocks": [
+          {
+            "block_id": "red-main",
+            "color_index": 2,
+            "deleted": false,
+            "segment_id": "red-main",
+            "source_end_ticks": 3000000,
+            "source_id": "cee9eba67b114e5a94214d306639a964",
+            "source_start_ticks": 0,
+            "state": {},
+            "timeline_end_ticks": 3500000,
+            "timeline_start_ticks": 500000,
+            "track_id": "track-1",
+            "triplicate": null,
+            "visual_transform": {
+              "offset_x": 0.0,
+              "offset_y": 0.0,
+              "version": 1,
+              "zoom": 1.0
+            }
+          },
+          {
+            "block_id": "red-tail",
+            "color_index": 1,
+            "deleted": false,
+            "segment_id": "red-tail",
+            "source_end_ticks": 3750000,
+            "source_id": "cee9eba67b114e5a94214d306639a964",
+            "source_start_ticks": 3000000,
+            "state": {},
+            "timeline_end_ticks": 5000000,
+            "timeline_start_ticks": 4250000,
+            "track_id": "track-1",
+            "triplicate": null,
+            "visual_transform": {
+              "offset_x": 0.0,
+              "offset_y": 0.0,
+              "version": 1,
+              "zoom": 1.0
+            }
+          }
+        ],
+        "track_id": "track-1"
+      },
+      {
+        "blocks": [
+          {
+            "block_id": "green-main",
+            "color_index": 2,
+            "deleted": false,
+            "segment_id": "green-main",
+            "source_end_ticks": 2000000,
+            "source_id": "949039a06d4c4dcba1c48e0a102ba621",
+            "source_start_ticks": 0,
+            "state": {},
+            "timeline_end_ticks": 3000000,
+            "timeline_start_ticks": 1000000,
+            "track_id": "track-2",
+            "triplicate": null,
+            "visual_transform": {
+              "offset_x": 0.0,
+              "offset_y": 0.0,
+              "version": 1,
+              "zoom": 1.0
+            }
+          }
+        ],
+        "track_id": "track-2"
+      },
+      {
+        "blocks": [
+          {
+            "block_id": "blue-triplicate",
+            "color_index": 3,
+            "deleted": false,
+            "segment_id": "blue-triplicate",
+            "source_end_ticks": 2000000,
+            "source_id": "e000954cbf55442fb9c51782c02ab8bf",
+            "source_start_ticks": 0,
+            "state": {},
+            "timeline_end_ticks": 3500000,
+            "timeline_start_ticks": 1500000,
+            "track_id": "track-3",
+            "triplicate": {
+              "background": "black",
+              "enabled": true,
+              "group_id": "ticket-120-triplicate",
+              "instances": [
+                {
+                  "role": "center"
+                },
+                {
+                  "role": "left"
+                },
+                {
+                  "role": "right"
+                }
+              ],
+              "layout": "three-column",
+              "shared_transform": {
+                "offset_x": 120.0,
+                "offset_y": -80.0,
+                "version": 1,
+                "zoom": 1.5
+              }
+            },
+            "visual_transform": {
+              "offset_x": 120.0,
+              "offset_y": -80.0,
+              "version": 1,
+              "zoom": 1.5
+            }
+          },
+          {
+            "block_id": "blue-tail",
+            "color_index": 1,
+            "deleted": false,
+            "segment_id": "blue-tail",
+            "source_end_ticks": 2000000,
+            "source_id": "e000954cbf55442fb9c51782c02ab8bf",
+            "source_start_ticks": 1500000,
+            "state": {},
+            "timeline_end_ticks": 4500000,
+            "timeline_start_ticks": 4000000,
+            "track_id": "track-3",
+            "triplicate": null,
+            "visual_transform": {
+              "offset_x": -90.0,
+              "offset_y": 60.0,
+              "version": 1,
+              "zoom": 1.2
+            }
+          }
+        ],
+        "track_id": "track-3"
+      },
+      {
+        "blocks": [
+          {
+            "block_id": "yellow-main",
+            "color_index": 0,
+            "deleted": false,
+            "segment_id": "yellow-main",
+            "source_end_ticks": 1500000,
+            "source_id": "f963b71193c742f7ace71555a5a004b3",
+            "source_start_ticks": 0,
+            "state": {},
+            "timeline_end_ticks": 3500000,
+            "timeline_start_ticks": 2000000,
+            "track_id": "track-4",
+            "triplicate": null,
+            "visual_transform": {
+              "offset_x": 0.0,
+              "offset_y": 0.0,
+              "version": 1,
+              "zoom": 1.0
+            }
+          }
+        ],
+        "track_id": "track-4"
+      }
+    ]
+  }
+}

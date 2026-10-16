@@ -73,6 +73,7 @@ from .operations import (
     set_segment_deleted,
     split_segment,
 )
+from .output_plan import active_export_sources
 from .persistence import (
     ProjectPersistenceError,
     load_project,
@@ -762,7 +763,10 @@ def _handle_save(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _policy_metadata(project: Project) -> tuple[dict[str, Any], ...]:
-    return policy_source_metadata(project.sources or (project.source,))
+    sources = active_export_sources(project)
+    if not sources:
+        raise CliError("export_planning", "Cannot export an empty edit", exit_code=CLI_EXIT_INVALID)
+    return policy_source_metadata(sources)
 
 
 def _frame_rate_policy_override(

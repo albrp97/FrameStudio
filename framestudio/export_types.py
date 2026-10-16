@@ -51,6 +51,12 @@ class ExportProgress:
     fps: float | None
     elapsed_seconds: float
     eta_seconds: float | None
+    current_percent: float | None = None
+    overall_percent: float | None = None
+    output_index: int = 0
+    output_count: int = 0
+    overall_elapsed_seconds: float | None = None
+    overall_eta_seconds: float | None = None
 
 
 ExportProgressCallback = Callable[[ExportProgress], None]

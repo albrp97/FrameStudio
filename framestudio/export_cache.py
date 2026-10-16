@@ -170,6 +170,34 @@ def _request_key(request: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _write_manifest(root: Path, manifest: Mapping[str, Any]) -> None:
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=root,
+            prefix=".manifest-",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            json.dump(manifest, temporary, ensure_ascii=True, indent=2, sort_keys=True)
+            temporary.write("\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, root / "manifest.json")
+        directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise
+
+
 def _clear_directory(directory: Path) -> None:
     _validate_cache_root(directory)
     try:
@@ -262,26 +290,10 @@ class ExportCache:
         return len(artifacts) if isinstance(artifacts, dict) else 0
 
     def _save_manifest(self) -> None:
-        manifest_path = self.root / "manifest.json"
         try:
             self.root.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=self.root,
-                prefix=".manifest-",
-                suffix=".tmp",
-                delete=False,
-            ) as temporary:
-                temporary_path = Path(temporary.name)
-                json.dump(self.manifest, temporary, ensure_ascii=True, indent=2, sort_keys=True)
-                temporary.write("\n")
-                temporary.flush()
-                os.fsync(temporary.fileno())
-            os.replace(temporary_path, manifest_path)
+            _write_manifest(self.root, self.manifest)
         except OSError as error:
-            if "temporary_path" in locals():
-                temporary_path.unlink(missing_ok=True)
             raise ExportCacheError(f"Could not save export cache manifest: {error}") from error
 
     def _path_for(self, artifact_path: str) -> Path:

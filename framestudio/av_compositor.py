@@ -34,6 +34,7 @@ from .export_process import (
     run_ffmpeg,
     validate_decoded_output,
 )
+from .export_progress import progress_scope
 from .export_types import ExportExecutionError, ExportProgressCallback
 from .fps_policy import FrameRatePolicy, ResolvedFrameRatePolicy
 from .interpolation import RuntimeValidationCache
@@ -229,7 +230,9 @@ def render_project_av(
         planned_source_paths=_protected_source_paths(plan.protected_sources),
     )
     _assert_sources_unchanged(
-        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+        plan.protected_sources,
+        cancel_event=cancel_event,
+        progress_callback=progress_scope(progress_callback, 0, 0),
     )
     publication_stage: Path | None = None
     staging_directory: Path | None = None
@@ -267,7 +270,9 @@ def render_project_av(
         cleanup_attempted = True
         _clean_staging_before_publish(staging_directory)
         _assert_sources_unchanged(
-            plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+            plan.protected_sources,
+            cancel_event=cancel_event,
+            progress_callback=progress_scope(progress_callback, 99, 99),
         )
 
         result = AVRenderResult(
@@ -606,7 +611,7 @@ def _render_checkpointed_stages(
     progress_callback: ExportProgressCallback | None,
 ) -> tuple[Path, _VerifiedMux]:
     request = {
-        "composition_version": 2,
+        "composition_version": 3,
         "layout": asdict(video_plan.layout_plan),
         "sources": plan.source_hashes,
         "target_rate": str(video_plan.target_rate),
@@ -633,6 +638,7 @@ def _render_checkpointed_stages(
         ),
     }
     video_validation: dict[str, Any] = {}
+    video_progress = progress_scope(progress_callback, 0, 88)
 
     def render_video(destination: Path) -> None:
         result = render_project_video(
@@ -640,16 +646,22 @@ def _render_checkpointed_stages(
             ffmpeg_path=ffmpeg_path,
             ffprobe_path=ffprobe_path,
             cancel_event=cancel_event,
-            progress_callback=progress_callback,
+            progress_callback=video_progress,
             preparations=preparations,
         )
         video_validation["processing_fallbacks"] = list(result.processing_fallbacks)
+
+    def validate_video(_path: Path) -> dict[str, Any]:
+        if "processing_fallbacks" not in video_validation:
+            raise ExportExecutionError("Unverified composition has no enhancement provenance")
+        return video_validation
 
     video_stage = preparations.materialize(
         "video composition",
         request,
         render_video,
-        lambda _path: video_validation,  # The child verifies before returning.
+        validate_video,
+        progress_callback=video_progress,
     )
     video_metadata = preparations.validation_data[video_stage]
     if (
@@ -661,10 +673,16 @@ def _render_checkpointed_stages(
     fallbacks = tuple(video_metadata["processing_fallbacks"])
     for fallback in fallbacks:
         report_preparation_progress(
-            progress_callback, f"Video enhancement fallback: {fallback}", 1, 1, time.monotonic()
+            progress_scope(progress_callback, 88, 88),
+            f"Video enhancement fallback: {fallback}",
+            1,
+            1,
+            time.monotonic(),
         )
     _assert_sources_unchanged(
-        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+        plan.protected_sources,
+        cancel_event=cancel_event,
+        progress_callback=progress_scope(progress_callback, 88, 88),
     )
     audio_request = {
         "audio_plan": asdict(plan.audio_plan),
@@ -684,6 +702,7 @@ def _render_checkpointed_stages(
         ),
         lambda _path: None,  # render_audio already verifies the exact PCM contract.
         suffix=".wav",
+        progress_callback=progress_scope(progress_callback, 88, 94),
     )
 
     def verify(path: Path) -> dict[str, float]:
@@ -707,6 +726,7 @@ def _render_checkpointed_stages(
             cancel_event=cancel_event,
         ),
         verify,
+        progress_callback=progress_scope(progress_callback, 94, 99),
     )
     summary = preparations.validation_data[muxed]
     if (
@@ -717,7 +737,9 @@ def _render_checkpointed_stages(
     ):
         raise PreparationCacheError("Verified composition checkpoint has invalid audio metadata")
     _assert_sources_unchanged(
-        plan.protected_sources, cancel_event=cancel_event, progress_callback=progress_callback
+        plan.protected_sources,
+        cancel_event=cancel_event,
+        progress_callback=progress_scope(progress_callback, 99, 99),
     )
     return muxed, _VerifiedMux(
         output_probe=probe_media(muxed, ffprobe_path),

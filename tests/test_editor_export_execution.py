@@ -1645,6 +1645,7 @@ class EditorExportExecutionTests(unittest.TestCase):
 
         class Process:
             def __init__(self):
+                self.pid = 12345
                 self.stdout = Output()
                 self.returncode = -15
                 self.terminated = False

@@ -269,19 +269,40 @@ def format_key_bindings() -> str:
 
 
 def format_export_progress_label(progress: ExportProgress) -> str:
+    current = progress.percent if progress.current_percent is None else progress.current_percent
+    prefix = (
+        f"Output {progress.output_index}/{progress.output_count} | "
+        if progress.output_count and progress.output_index
+        else ""
+    )
     if progress.stage == "Analyzing export audio" or progress.stage.endswith("export sources"):
         return (
-            f"{progress.stage} | {progress.percent:.1f}% | "
+            f"{prefix}{progress.stage} | {current:.1f}% | "
             f"sources {progress.frame}/{progress.total_frames} | "
             f"elapsed {format_duration(progress.elapsed_seconds)}"
         )
     fps = f"{progress.fps:.1f} fps" if progress.fps is not None else "-- fps"
     eta = format_duration(progress.eta_seconds) if progress.eta_seconds is not None else "--:--"
     return (
-        f"{progress.stage.title()} | {progress.percent:.1f}% | "
+        f"{prefix}{progress.stage.title()} | {current:.1f}% | "
         f"frame {progress.frame}/{progress.total_frames} | {fps} | "
         f"elapsed {format_duration(progress.elapsed_seconds)} | ETA {eta}"
     )
+
+
+def format_export_overall_label(progress: ExportProgress) -> str:
+    percent = progress.percent if progress.overall_percent is None else progress.overall_percent
+    elapsed = (
+        progress.elapsed_seconds
+        if progress.overall_elapsed_seconds is None
+        else progress.overall_elapsed_seconds
+    )
+    eta = (
+        format_duration(progress.overall_eta_seconds)
+        if progress.overall_eta_seconds is not None
+        else "--:--"
+    )
+    return f"Overall {percent:.1f}% | elapsed {format_duration(elapsed)} | ETA {eta}"
 
 
 def is_fit_zoom_key(

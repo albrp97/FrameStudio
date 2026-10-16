@@ -3,7 +3,9 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import unittest
+from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -48,9 +50,14 @@ for module, attribute, label in (
         return _fn(*args, **kwargs)
     setattr(module, attribute, traced)
 event = threading.Event()
+checkpoint_count = 0
+cancel_name, _, cancel_number = cancel_stage.partition('@')
 def progress(update):
-    if cancel_stage and update.stage == 'Checkpointed ' + cancel_stage:
-        event.set()
+    global checkpoint_count
+    if cancel_name and update.stage == 'Checkpointed ' + cancel_name:
+        checkpoint_count += 1
+        if checkpoint_count == int(cancel_number or '1'):
+            event.set()
 try:
     with redirect_stdout(sys.stderr):
         run_output_choice_job(
@@ -72,6 +79,242 @@ else:
 
 
 class RenderPreparationFunctionalityTests(unittest.TestCase):
+    def test_clock_recipe_invalidates_video_and_mux_but_reuses_native_and_audio(self):
+        from framestudio.operations import ensure_project_audio_analysis
+
+        with TemporaryDirectory(prefix="framestudio-clock-recipe-") as temporary:
+            root = Path(temporary)
+            source = root / "source.mp4"
+            _make_constant_source(
+                source,
+                color="red",
+                frame_rate=30,
+                width=320,
+                height=180,
+                frequencies=(440, 880),
+                duration=0.5,
+            )
+            source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+            project = Project.create_synchronized_multi(((source, probe_media(source).metadata()),))
+            ensure_project_audio_analysis(project)
+            plan = av.plan_project_av(
+                project,
+                root / "old-recipe.mp4",
+                frame_rate_policy=FrameRatePolicy(
+                    choice="custom",
+                    custom_rate=60,
+                    target_rate=60,
+                    backend="ffmpeg-minterpolate",
+                    enhancement_enabled=True,
+                ),
+                upscale_policy=UpscalePolicy(enhancement_enabled=False),
+            )
+            materialize = RenderPreparations.materialize
+
+            def legacy_recipe(preparations, stage, request, *args, **kwargs):
+                if stage == "video composition":
+                    request = {**request, "composition_version": 2}
+                elif stage == "verified AV composition":
+                    request = {
+                        **request,
+                        "video": {**request["video"], "composition_version": 2},
+                    }
+                return materialize(preparations, stage, request, *args, **kwargs)
+
+            cache = root / "checkpoints"
+            with patch.object(RenderPreparations, "materialize", new=legacy_recipe):
+                av.render_project_av(plan, preparations=RenderPreparations(cache))
+
+            with (
+                patch.object(video, "_extract_block", wraps=video._extract_block) as extract,
+                patch.object(
+                    video, "run_source_interpolation", wraps=video.run_source_interpolation
+                ) as interpolate,
+                patch.object(av, "render_project_video", wraps=av.render_project_video) as compose,
+                patch.object(av, "render_audio", wraps=av.render_audio) as audio,
+                patch.object(av, "_mux_stages", wraps=av._mux_stages) as mux,
+            ):
+                result = av.render_project_av(
+                    replace(plan, destination=root / "new-recipe.mp4"),
+                    preparations=RenderPreparations(cache),
+                )
+            self.assertEqual(result.actual_frames, 30)
+            self.assertEqual(
+                (extract.call_count, interpolate.call_count, audio.call_count), (0, 0, 0)
+            )
+            self.assertEqual((compose.call_count, mux.call_count), (1, 1))
+            decoded = [
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-v",
+                        "error",
+                        "-i",
+                        str(path),
+                        "-map",
+                        "0:v",
+                        "-f",
+                        "framemd5",
+                        "-",
+                    ],
+                    check=True,
+                    capture_output=True,
+                ).stdout
+                for path in (plan.destination, result.destination)
+            ]
+            self.assertEqual(decoded[0], decoded[1])
+            self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), source_hash)
+
+    def test_resume_reuses_completed_fallback_instead_of_retrying_failed_rve(self):
+        from framestudio.export_types import ExportExecutionError
+
+        with TemporaryDirectory(prefix="framestudio-fallback-resume-") as temporary:
+            root = Path(temporary)
+            source = root / "source.mp4"
+            _make_constant_source(
+                source,
+                color="red",
+                frame_rate=30,
+                width=320,
+                height=180,
+                frequencies=(440, 880),
+                duration=0.5,
+            )
+            project = Project.create_synchronized_multi(((source, probe_media(source).metadata()),))
+            from framestudio.operations import ensure_project_audio_analysis
+
+            ensure_project_audio_analysis(project)
+            plan = av.plan_project_av(
+                project,
+                root / "output.mp4",
+                frame_rate_policy=FrameRatePolicy(
+                    choice="custom",
+                    custom_rate=60,
+                    target_rate=60,
+                    backend="ffmpeg-minterpolate",
+                    enhancement_enabled=True,
+                ),
+                upscale_policy=UpscalePolicy(enhancement_enabled=False),
+            )
+            route = replace(plan.video_plan.processing_routes[0], fps_backend="rve-4.26")
+            plan = replace(plan, video_plan=replace(plan.video_plan, processing_routes=(route,)))
+            original = video.run_source_interpolation
+            calls = []
+
+            def interpolate(*args, **kwargs):
+                calls.append(kwargs["backend"])
+                if kwargs["backend"] == "rve-4.26":
+                    raise ExportExecutionError("injected backend failure")
+                return original(*args, **kwargs)
+
+            event = threading.Event()
+
+            def progress(update):
+                if update.stage == "Checkpointed interpolated segment":
+                    event.set()
+
+            with patch.object(video, "run_source_interpolation", side_effect=interpolate):
+                with self.assertRaisesRegex(av.AVCompositorExecutionError, "cancelled"):
+                    av.render_project_av(
+                        plan,
+                        cancel_event=event,
+                        progress_callback=progress,
+                        preparations=RenderPreparations(root / "cache", cancel_event=event),
+                    )
+                event.clear()
+                result = av.render_project_av(plan, preparations=RenderPreparations(root / "cache"))
+            self.assertEqual(calls, ["rve-4.26", "ffmpeg-minterpolate"])
+            self.assertTrue(any("reusing verified" in note for note in result.processing_fallbacks))
+            self.assertEqual(result.actual_frames, 30)
+
+    def test_twenty_of_forty_interpolations_survive_process_restart(self):
+        with TemporaryDirectory(prefix="framestudio-forty-resume-") as temporary:
+            root = Path(temporary)
+            source = root / "source.mp4"
+            _make_constant_source(
+                source,
+                color="red",
+                frame_rate=30,
+                width=320,
+                height=180,
+                frequencies=(440, 880),
+                duration=20.0,
+            )
+            original = hashlib.sha256(source.read_bytes()).hexdigest()
+            project = Project.create_synchronized_multi(((source, probe_media(source).metadata()),))
+            project.timeline.replace_track_blocks(
+                "track-1",
+                tuple(
+                    make_block(
+                        segment_id=f"segment-{index}",
+                        track_id="track-1",
+                        source_id=project.source.source_id,
+                        source_start=index * 0.5,
+                        source_end=(index + 1) * 0.5,
+                        timeline_start=index * 0.5,
+                        timeline_end=(index + 1) * 0.5,
+                    )
+                    for index in range(40)
+                ),
+            )
+            project_path = root / "edit.framestudio.json"
+            save_project(project, project_path)
+            destination, trace = root / "output.mp4", root / "calls.txt"
+            from framestudio.export_journal import journal_path
+
+            for mode, stop in (("fresh", "interpolated segment@20"), ("resume", "")):
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        _RUN_EXPORT,
+                        str(project_path),
+                        str(destination),
+                        str(trace),
+                        mode,
+                        stop,
+                    ],
+                    env={**os.environ, "XDG_CACHE_HOME": str(root / "cache")},
+                    capture_output=True,
+                    text=True,
+                    timeout=240,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["cancelled"], mode == "fresh")
+                self.assertEqual(journal_path(destination).exists(), mode == "fresh")
+                calls = trace.read_text().splitlines()
+                self.assertEqual(calls.count(mode + ":interpolate"), 20, calls)
+                if mode == "fresh":
+                    manifests = list(
+                        (session_root(destination) / "render-preparations").glob("*/manifest.json")
+                    )
+                    completed = [
+                        json.loads(path.read_text())["stages"].get("interpolated segment", {})
+                        for path in manifests
+                    ]
+                    self.assertEqual(sum(s.get("status") == "complete" for s in completed), 20)
+            self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), original)
+            self.assertAlmostEqual(probe_media(destination).duration_seconds, 20, delta=0.1)
+            frames = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-count_frames",
+                    "-select_streams",
+                    "v:0",
+                    "-show_entries",
+                    "stream=nb_read_frames",
+                    "-of",
+                    "csv=p=0",
+                    str(destination),
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertEqual(int(frames.stdout.strip()), 1200)
+
     def test_shared_native_frames_preserve_different_framing_and_triplicate_pixels(self):
         with TemporaryDirectory(prefix="framestudio-framing-reuse-") as temporary:
             root = Path(temporary)

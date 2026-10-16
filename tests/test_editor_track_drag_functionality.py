@@ -45,6 +45,8 @@ def _gtk_runtime() -> tuple[Any, Any, Any, Any]:
 def _screen_coordinates(
     geometry: str,
     relative: tuple[float, float],
+    *,
+    surface_transform: tuple[float, float] = (0.0, 0.0),
 ) -> tuple[int, int]:
     values = {
         key: int(value)
@@ -54,7 +56,10 @@ def _screen_coordinates(
             if "=" in line and line.split("=", 1)[0] in {"X", "Y"}
         )
     }
-    return round(values["X"] + relative[0]), round(values["Y"] + relative[1])
+    return (
+        round(values["X"] + relative[0] + surface_transform[0]),
+        round(values["Y"] + relative[1] + surface_transform[1]),
+    )
 
 
 def _make_video(destination: Path, color: str, duration: float = 2.0) -> None:
@@ -198,7 +203,9 @@ class TrackDragFunctionalityTests(unittest.TestCase):
             "--shell",
             self._pointer_window_id(),
         )
-        return _screen_coordinates(geometry, relative)
+        return _screen_coordinates(
+            geometry, relative, surface_transform=self.window.get_surface_transform()
+        )
 
     def _pointer_click(
         self,

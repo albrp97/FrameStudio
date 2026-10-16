@@ -388,14 +388,17 @@ class NativeRemovalControlsFunctionalityTests(unittest.TestCase):
         target_window: Any | None = None,
         window_title: str | None = None,
     ) -> tuple[int, int]:
-        relative = widget.translate_coordinates(target_window or self.window, x, y)
+        native = target_window or self.window
+        relative = widget.translate_coordinates(native, x, y)
         self.assertIsNotNone(relative)
         geometry = self._xdotool(
             "getwindowgeometry",
             "--shell",
             self._window_id(window_title),
         )
-        return _screen_coordinates(geometry, relative)
+        return _screen_coordinates(
+            geometry, relative, surface_transform=native.get_surface_transform()
+        )
 
     def _physical_click(
         self,
