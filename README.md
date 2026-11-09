@@ -306,6 +306,11 @@ editing. Export-preparation failures remain visible in the status area.
 Seeking while playing keeps playback active. Enabling or disabling Triplicate
 keeps the current playhead and play/pause state.
 
+Enhanced sequential exports fit footage that exceeds either canvas dimension
+before applying Focus or Triplicate, matching preview framing rather than
+cropping tall portrait footage at its native size. Exports cached with the old
+framing must be started again instead of resumed.
+
 The selected clip follows playback and playhead seeks. With synchronized
 tracks, it follows the included clip on the active track; empty or excluded
 intervals have no playing selection. While paused, a manually selected deleted

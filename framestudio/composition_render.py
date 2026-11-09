@@ -174,8 +174,7 @@ def segment_video_filters(
     preserve_source_resolution = preserve_resolution and not (
         content_width is not None
         and content_height is not None
-        and content_width > width
-        and content_height > height
+        and (content_width > width or content_height > height)
     )
     start = f"{start_value:.6f}"
     duration = f"{duration_value:.6f}"

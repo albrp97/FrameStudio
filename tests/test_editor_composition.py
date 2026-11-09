@@ -1722,7 +1722,7 @@ class EditorCompositionTests(unittest.TestCase):
         self.assertIn("scale=3840:2160", grouped[1])
         self.assertIn("crop=640:1080:3200:1080", grouped[1])
 
-    def test_preserve_resolution_mode_crops_or_pads_without_downscaling(self):
+    def test_preserve_resolution_mode_fits_tall_portrait_content(self):
         timeline = SegmentTimeline(10.0)
         segment = timeline.segments[0]
 
@@ -1737,10 +1737,9 @@ class EditorCompositionTests(unittest.TestCase):
             content_height=1920,
         )
 
-        self.assertIn("scale=1080:1920", filters[0])
-        self.assertIn("crop=1080:1080", filters[0])
+        self.assertIn("force_original_aspect_ratio=decrease", filters[0])
         self.assertIn("pad=1920:1080", filters[0])
-        self.assertNotIn("force_original_aspect_ratio=decrease", filters[0])
+        self.assertNotIn("scale=1080:1920", filters[0])
 
     def test_preserve_resolution_mode_downscales_oversized_landscape_content(self):
         timeline = SegmentTimeline(10.0)
@@ -1865,7 +1864,7 @@ class EditorCompositionTests(unittest.TestCase):
             self.assertGreater(right_edge[2], right_edge[0])
             self.assertEqual(source.read_bytes(), source_bytes)
 
-    def test_preserve_resolution_triplicate_crops_each_slot_without_downscaling(self):
+    def test_preserve_resolution_triplicate_fits_tall_portrait_content(self):
         timeline = SegmentTimeline(10.0)
         segment = timeline.segments[0].with_triplicate(
             TriplicateGroup.create(VisualTransform()),
@@ -1882,9 +1881,115 @@ class EditorCompositionTests(unittest.TestCase):
             content_height=1920,
         )
 
-        self.assertIn("scale=1080:1920", filters[1])
+        self.assertIn("force_original_aspect_ratio=decrease", filters[1])
         self.assertIn("crop=640:1080", filters[1])
-        self.assertNotIn("force_original_aspect_ratio=decrease", filters[1])
+        self.assertNotIn("scale=1080:1920", filters[1])
+
+    @unittest.skipUnless(
+        shutil.which("ffmpeg") and shutil.which("ffprobe"),
+        "FFmpeg and ffprobe are required",
+    )
+    def test_enhanced_portrait_cli_export_matches_preview_framing(self):
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            source = root / "portrait.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=c=black:s=1080x1920:r=10,"
+                    "drawbox=x=0:y=0:w=1080:h=320:color=red:t=fill,"
+                    "drawbox=x=0:y=1600:w=1080:h=320:color=blue:t=fill",
+                    "-t",
+                    "0.6",
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    str(source),
+                ],
+                check=True,
+            )
+            source_bytes = source.read_bytes()
+            project = Project.create(source, probe_media(source).metadata())
+            segment_id = project.timeline.segments[0].segment_id
+            for triplicate, zoom, offset_y in ((False, 1.0, 0.0), (True, 1.2, 30.0)):
+                with self.subTest(triplicate=triplicate):
+                    apply_visual_transform(
+                        project,
+                        [segment_id],
+                        zoom=zoom,
+                        offset_y=offset_y,
+                    )
+                    if triplicate:
+                        enable_triplicate(project, [segment_id])
+                    project_path = root / f"project-{triplicate}.framestudio.json"
+                    save_project(project, project_path)
+                    destination = root / f"export-{triplicate}.mp4"
+                    status, stdout, stderr = run_cli(
+                        "export",
+                        str(project_path),
+                        "--output",
+                        str(destination),
+                        "--fps-choice",
+                        "custom",
+                        "--custom-fps",
+                        "20",
+                        "--enhance-fps",
+                        "--fps-backend",
+                        "ffmpeg-minterpolate",
+                        "--upscale-enhancement",
+                    )
+                    self.assertEqual(status, 0, stdout.getvalue() + stderr.getvalue())
+                    filters = segment_video_filters(
+                        "[0:v:0]",
+                        project.timeline.find(segment_id),
+                        CANVAS_WIDTH,
+                        CANVAS_HEIGHT,
+                        "[preview]",
+                        frame_rate="10/1",
+                    )
+
+                    def decoded_frame(path, graph, label):
+                        return subprocess.run(
+                            [
+                                "ffmpeg",
+                                "-hide_banner",
+                                "-loglevel",
+                                "error",
+                                "-i",
+                                str(path),
+                                "-filter_complex",
+                                ";".join(graph) + f";{label}scale=192:108,format=rgb24[pixels]",
+                                "-map",
+                                "[pixels]",
+                                "-frames:v",
+                                "1",
+                                "-threads",
+                                "1",
+                                "-f",
+                                "rawvideo",
+                                "-",
+                            ],
+                            check=True,
+                            capture_output=True,
+                        ).stdout
+
+                    preview = decoded_frame(source, filters, "[preview]")
+                    rendered = decoded_frame(destination, ["[0:v:0]null[render]"], "[render]")
+                    self.assertEqual(len(rendered), 192 * 108 * 3)
+                    error = sum(abs(a - b) for a, b in zip(preview, rendered, strict=True)) / len(
+                        rendered
+                    )
+                    self.assertLess(error, 3.0)
+                    self.assertEqual(probe_frame_count(destination), 12)
+                    self.assertEqual(source.read_bytes(), source_bytes)
 
     @unittest.skipUnless(
         shutil.which("ffmpeg") and shutil.which("ffprobe"),

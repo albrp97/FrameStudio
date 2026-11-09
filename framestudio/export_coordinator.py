@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     from .model_project import Project
 
 BATCH_SCHEMA_VERSION = 1
-COMPOSITOR_VERSION = "t124-flexible-export-v1"
+COMPOSITOR_VERSION = "t124-flexible-export-v2"
 RECEIPT_SUFFIX = ".framestudio-batch-receipt.json"
 
 JSONScalar: TypeAlias = None | bool | int | float | str
